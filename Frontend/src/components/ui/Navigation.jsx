@@ -152,7 +152,7 @@ const Navigation = () => {
               className="rounded-xl flex items-center justify-center shadow-lg group-hover:shadow-xl transition-shadow">
               <img
                 src={logoPath}
-                alt="Pickleball.College Logo"
+                alt="Pickleball.Community Logo"
                 className="w-full h-full object-contain p-1"
                 onError={handleImageError}
                 onLoad={() => console.log('Logo loaded successfully from:', logoPath)}
@@ -160,7 +160,7 @@ const Navigation = () => {
             </div>
             <div>
               <span className="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-800 bg-clip-text text-transparent">
-                Pickleball.College
+                Pickleball.Community
               </span>
               <div className="h-1 w-0 group-hover:w-full bg-gradient-to-r from-blue-500 to-purple-700 transition-all duration-300 rounded-full"></div>
             </div>

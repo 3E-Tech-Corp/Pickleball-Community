@@ -23,7 +23,7 @@ const Features = () => {
     <section className="features">
       <div className="container">
         <div className="section-title">
-          <h2>Why Choose Pickleball.College?</h2>
+          <h2>Why Choose Pickleball.Community?</h2>
           <p>Everything you need to improve your pickleball skills, all in one modern platform</p>
         </div>
         <div className="features-grid">

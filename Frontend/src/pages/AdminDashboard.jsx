@@ -116,7 +116,7 @@ const AdminDashboard = () => {
 
   // Default theme values
   const getDefaultTheme = () => ({
-    organizationName: 'Pickleball College',
+    organizationName: 'Pickleball Community',
     primaryColor: '#047857',
     primaryDarkColor: '#065f46',
     primaryLightColor: '#d1fae5',

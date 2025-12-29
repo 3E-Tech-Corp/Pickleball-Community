@@ -9,7 +9,7 @@ import { GraduationCap, Users } from 'lucide-react'
 const SHARED_AUTH_URL = import.meta.env.VITE_SHARED_AUTH_URL || ''
 
 // Global site key for cross-site auth
-const SITE_KEY = 'college'
+const SITE_KEY = 'Community'
 
 const Register = () => {
   const navigate = useNavigate()
@@ -147,7 +147,7 @@ const Register = () => {
             onSuccess={handleRegisterSuccess}
             onError={handleRegisterError}
             onSwitchToLogin={() => navigate('/login')}
-            siteName="Pickleball College"
+            siteName="Pickleball Community"
             primaryColor="blue"
             showRoleSelection={true}
             roles={roles}
@@ -156,7 +156,7 @@ const Register = () => {
               <SiteLogoOverlay
                 mainLogoUrl={mainLogoUrl}
                 siteLogoUrl={siteLogoUrl}
-                siteName="Pickleball College"
+                siteName="Pickleball Community"
                 size="lg"
               />
             }

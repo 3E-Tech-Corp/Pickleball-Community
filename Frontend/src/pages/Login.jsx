@@ -8,7 +8,7 @@ import { SharedLogin, SiteLogoOverlay } from '../components/shared-auth'
 const SHARED_AUTH_URL = import.meta.env.VITE_SHARED_AUTH_URL || ''
 
 // Global site key for cross-site auth
-const SITE_KEY = 'college'
+const SITE_KEY = 'Community'
 
 const Login = () => {
   const navigate = useNavigate()
@@ -137,14 +137,14 @@ const Login = () => {
             onError={handleLoginError}
             onSwitchToRegister={() => navigate('/register')}
             onForgotPassword={() => navigate('/forgot-password')}
-            siteName="Pickleball College"
+            siteName="Pickleball Community"
             primaryColor="blue"
             site={SITE_KEY}
             logo={
               <SiteLogoOverlay
                 mainLogoUrl={mainLogoUrl}
                 siteLogoUrl={siteLogoUrl}
-                siteName="Pickleball College"
+                siteName="Pickleball Community"
                 size="lg"
               />
             }
