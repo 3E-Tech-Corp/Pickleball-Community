@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
-import { userApi, materialApi, themeApi, getAssetUrl } from '../services/api'
+import { userApi, themeApi, getAssetUrl } from '../services/api'
 import {
   Users, BookOpen, Calendar, DollarSign, Search, Edit2, Trash2,
   ChevronLeft, ChevronRight, Filter, MoreVertical, Eye, X,
@@ -24,10 +24,6 @@ const AdminDashboard = () => {
   const [isUserModalOpen, setIsUserModalOpen] = useState(false)
   const [savingUser, setSavingUser] = useState(false)
 
-  // Materials state
-  const [materials, setMaterials] = useState([])
-  const [materialSearch, setMaterialSearch] = useState('')
-
   // Theme state
   const [themeSettings, setThemeSettings] = useState(null)
   const [themePresets, setThemePresets] = useState([])
@@ -46,8 +42,6 @@ const AdminDashboard = () => {
   useEffect(() => {
     if (activeTab === 'users') {
       fetchUsers()
-    } else if (activeTab === 'materials') {
-      fetchMaterials()
     } else if (activeTab === 'theme') {
       fetchTheme()
     }
@@ -62,22 +56,6 @@ const AdminDashboard = () => {
       }
     } catch (error) {
       console.error('Error fetching users:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const fetchMaterials = async () => {
-    setLoading(true)
-    try {
-      const response = await materialApi.getMaterials()
-      if (response.success && response.data) {
-        setMaterials(response.data)
-      } else if (Array.isArray(response)) {
-        setMaterials(response)
-      }
-    } catch (error) {
-      console.error('Error fetching materials:', error)
     } finally {
       setLoading(false)
     }
@@ -232,12 +210,6 @@ const AdminDashboard = () => {
     return matchesSearch && matchesRole
   })
 
-  // Filter materials
-  const filteredMaterials = materials.filter(m => {
-    return (m.title?.toLowerCase() || '').includes(materialSearch.toLowerCase()) ||
-           (m.description?.toLowerCase() || '').includes(materialSearch.toLowerCase())
-  })
-
   // Pagination logic
   const getPaginatedData = (data) => {
     const startIndex = (currentPage - 1) * itemsPerPage
@@ -296,7 +268,6 @@ const AdminDashboard = () => {
   // Sidebar navigation items
   const navItems = [
     { id: 'users', label: 'Users', icon: Users, count: users.length },
-    { id: 'materials', label: 'Materials', icon: BookOpen, count: materials.length },
     { id: 'theme', label: 'Theme', icon: Palette },
     { id: 'certification', label: 'Certification', icon: Award, link: '/admin/certification' },
     { id: 'events', label: 'Events', icon: Calendar, count: 0, disabled: true },
@@ -508,108 +479,6 @@ const AdminDashboard = () => {
                       <div className="p-12 text-center">
                         <Users className="w-12 h-12 text-gray-300 mx-auto mb-4" />
                         <p className="text-gray-500">No users found</p>
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Materials Tab */}
-          {activeTab === 'materials' && (
-            <div>
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-2xl font-bold text-gray-900">Materials Management</h2>
-              </div>
-
-              {/* Search */}
-              <div className="bg-white rounded-xl shadow-sm p-4 mb-6">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                  <input
-                    type="text"
-                    placeholder="Search materials..."
-                    value={materialSearch}
-                    onChange={(e) => setMaterialSearch(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  />
-                </div>
-              </div>
-
-              {/* Materials Grid */}
-              <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-                {loading ? (
-                  <div className="p-12 text-center">
-                    <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600 mx-auto"></div>
-                    <p className="mt-4 text-gray-500">Loading materials...</p>
-                  </div>
-                ) : (
-                  <>
-                    <table className="w-full">
-                      <thead className="bg-gray-50 border-b">
-                        <tr>
-                          <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Material</th>
-                          <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
-                          <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Coach</th>
-                          <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Price</th>
-                          <th className="px-6 py-4 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-200">
-                        {getPaginatedData(filteredMaterials).map(m => (
-                          <tr key={m.id} className="hover:bg-gray-50">
-                            <td className="px-6 py-4">
-                              <div className="flex items-center">
-                                <div className="w-16 h-12 rounded bg-gray-200 overflow-hidden flex-shrink-0">
-                                  {m.thumbnailUrl ? (
-                                    <img
-                                      src={getAssetUrl(m.thumbnailUrl)}
-                                      alt={m.title}
-                                      className="w-full h-full object-cover"
-                                    />
-                                  ) : (
-                                    <div className="w-full h-full flex items-center justify-center bg-gray-100">
-                                      <BookOpen className="w-6 h-6 text-gray-400" />
-                                    </div>
-                                  )}
-                                </div>
-                                <div className="ml-4">
-                                  <div className="font-medium text-gray-900">{m.title}</div>
-                                  <div className="text-sm text-gray-500 truncate max-w-xs">
-                                    {m.description?.substring(0, 50)}...
-                                  </div>
-                                </div>
-                              </div>
-                            </td>
-                            <td className="px-6 py-4">
-                              <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                                {m.contentType}
-                              </span>
-                            </td>
-                            <td className="px-6 py-4 text-sm text-gray-500">
-                              {m.coachName || 'Unknown'}
-                            </td>
-                            <td className="px-6 py-4 text-sm font-medium text-gray-900">
-                              ${m.price?.toFixed(2) || '0.00'}
-                            </td>
-                            <td className="px-6 py-4 text-right">
-                              <button className="text-blue-600 hover:text-blue-800 p-2 rounded-lg hover:bg-blue-50">
-                                <Eye className="w-4 h-4" />
-                              </button>
-                              <button className="text-red-600 hover:text-red-800 p-2 rounded-lg hover:bg-red-50 ml-2">
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-
-                    {filteredMaterials.length === 0 && (
-                      <div className="p-12 text-center">
-                        <BookOpen className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-                        <p className="text-gray-500">No materials found</p>
                       </div>
                     )}
                   </>
