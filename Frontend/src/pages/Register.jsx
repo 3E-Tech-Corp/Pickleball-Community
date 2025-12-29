@@ -9,7 +9,7 @@ import { GraduationCap, Users } from 'lucide-react'
 const SHARED_AUTH_URL = import.meta.env.VITE_SHARED_AUTH_URL || ''
 
 // Global site key for cross-site auth
-const SITE_KEY = 'Community'
+const SITE_KEY = 'community'
 
 const Register = () => {
   const navigate = useNavigate()
