@@ -89,6 +89,26 @@ public class AuthController : ControllerBase
         });
     }
 
+    /// <summary>
+    /// Debug endpoint to check current token claims
+    /// </summary>
+    [HttpGet("me")]
+    [Authorize]
+    public ActionResult GetCurrentUser()
+    {
+        var claims = User.Claims.Select(c => new { c.Type, c.Value }).ToList();
+        var role = User.FindFirst("role")?.Value ?? User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value;
+        var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+
+        return Ok(new
+        {
+            UserId = userId,
+            Role = role,
+            IsAdmin = User.IsInRole("Admin"),
+            Claims = claims
+        });
+    }
+
     // Keep legacy endpoints for backwards compatibility during transition
     [HttpPost("register")]
     public async Task<ActionResult> Register(RegisterRequest request)
