@@ -175,8 +175,9 @@ export const authApi = {
   },
 
   // Sync user from shared auth to local database
-  syncFromSharedAuth: (token) =>
-    api.post('/auth/sync', { token }),
+  // role: optional site-specific role from shared auth (e.g., 'Admin', 'Student')
+  syncFromSharedAuth: (token, role) =>
+    api.post('/auth/sync', { token, role }),
 
   fastlogin: async (token) => {
     try {

@@ -12,6 +12,8 @@ import { CheckCircle, XCircle, Loader2 } from 'lucide-react'
  * - token: JWT token from shared auth
  * - returnTo: (optional) path to redirect after auth (default: based on role)
  * - error: (optional) error message if auth failed
+ * - siteRole: (optional) user's role for this site from shared auth
+ * - isSiteAdmin: (optional) whether user is admin for this site
  */
 const AuthCallback = () => {
   const [status, setStatus] = useState('processing') // 'processing', 'success', 'error'
@@ -37,10 +39,11 @@ const AuthCallback = () => {
         return
       }
 
-      // Get token and isAdmin from URL
+      // Get token and site-specific role info from URL
       const token = searchParams.get('token')
-      const isAdminFromShared = searchParams.get('isAdmin')
-      console.log('isAdmin from shared auth:', isAdminFromShared)
+      const siteRole = searchParams.get('siteRole')
+      const isSiteAdmin = searchParams.get('isSiteAdmin') === 'true'
+      console.log('Site role from shared auth:', siteRole, 'isSiteAdmin:', isSiteAdmin)
 
       if (!token) {
         setStatus('error')
@@ -56,11 +59,15 @@ const AuthCallback = () => {
 
       setMessage('Syncing user data...')
 
+      // Determine role: isSiteAdmin takes precedence, then siteRole, then default
+      const effectiveRole = isSiteAdmin ? 'Admin' : (siteRole || 'Student')
+      console.log('Effective role for sync:', effectiveRole)
+
       // Sync user to local database - this returns a NEW local JWT with site-specific role
       let userData = null
       let localToken = token // fallback to shared auth token
       try {
-        const syncResponse = await authApi.syncFromSharedAuth(token)
+        const syncResponse = await authApi.syncFromSharedAuth(token, effectiveRole)
         userData = syncResponse.User || syncResponse.user
 
         // Use the new local token if provided (contains site-specific role)
@@ -85,7 +92,7 @@ const AuthCallback = () => {
             email: payload.email,
             firstName: payload.firstName || payload.given_name,
             lastName: payload.lastName || payload.family_name,
-            role: payload.role || 'Student'
+            role: effectiveRole  // Use role from shared auth params
           }
         } catch (decodeError) {
           console.error('Failed to decode token:', decodeError)

@@ -52,6 +52,16 @@ public class AuthController : ControllerBase
             // Sync user to local database
             var localUser = await _sharedAuthService.SyncUserAsync(sharedUser);
 
+            // Update role if provided from shared auth (isSiteAdmin or siteRole)
+            if (!string.IsNullOrEmpty(request.Role))
+            {
+                var validRoles = new[] { "Student", "Coach", "Admin" };
+                if (validRoles.Contains(request.Role) && localUser.Role != request.Role)
+                {
+                    localUser = await _authService.UpdateRoleAsync(localUser.Id, request.Role);
+                }
+            }
+
             // Generate a new local JWT with the site-specific role
             var localToken = _authService.GenerateJwtToken(localUser);
 
@@ -200,6 +210,7 @@ public class AuthController : ControllerBase
 public class SyncUserRequest
 {
     public string Token { get; set; } = string.Empty;
+    public string? Role { get; set; }  // Optional site-specific role from shared auth
 }
 
 public class UpdateRoleRequest
