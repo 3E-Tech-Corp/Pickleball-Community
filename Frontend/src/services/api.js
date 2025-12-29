@@ -37,17 +37,14 @@ const api = axios.create({
 // Add auth token to requests
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('jwtToken') ;
-  // const token = localStorage.getItem('jwtToken') || 
-  //               localStorage.getItem('authToken') ||
-  //               JSON.parse(localStorage.getItem('pickleball_user'))?.RefreshToken;
-  
+
   console.log('API Request:', config.method?.toUpperCase(), config.url);
   console.log('Using token:', token ? token.substring(0, 20) + '...' : 'No token');
-  
+
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
   }
-  
+
   return config
 }, (error) => {
   console.error('Request interceptor error:', error);
@@ -220,95 +217,6 @@ export const authApi = {
 // Export shared auth URLs for components that need them
 export { SHARED_AUTH_URL, SHARED_AUTH_UI_URL }
 
-export const materialApi = {
-  createMaterial: (formData) => 
-    api.post('/materials', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' }
-    }),
-
-  getMaterials: () => 
-    api.get('/materials'),
-
-  getCoachMaterials: (coachId) => {
-    console.log('Getting materials for coach:', coachId);
-    return api.get(`/materials/coach/${coachId}`);
-  },
-
-  purchaseMaterial: (materialId) => 
-    api.post(`/materials/${materialId}/purchase`),
-
-  updateMaterial: (id, data) =>
-    api.put(`/materials/${id}`, data, {
-      headers: {
-        'Content-Type': 'multipart/form-data'
-      }
-    }),
-
-  deleteMaterial: (id) =>
-    api.delete(`/materials/${id}`),
-
-  getMaterial: (id) =>
-    api.get(`/materials/${id}`),
-
-  togglePublish: (id) =>
-    api.post(`/materials/${id}/toggle-publish`)
-}
-
-export const sessionApi = {
-  scheduleSession: (sessionData) =>
-    api.post('/sessions', sessionData),
-
-  // Student requests a session with a coach (pending confirmation)
-  requestSession: (data) =>
-    api.post('/sessions/request', data),
-
-  // Coach confirms a pending session
-  confirmSession: (sessionId, data) =>
-    api.post(`/sessions/${sessionId}/confirm`, data),
-
-  // Get pending sessions for coach
-  getPendingSessions: () =>
-    api.get('/sessions/pending'),
-
-  // Coach proposes changes to a session
-  proposeChanges: (sessionId, data) =>
-    api.post(`/sessions/${sessionId}/propose`, data),
-
-  // Student accepts coach's proposal
-  acceptProposal: (sessionId) =>
-    api.post(`/sessions/${sessionId}/accept-proposal`),
-
-  // Student declines coach's proposal
-  declineProposal: (sessionId) =>
-    api.post(`/sessions/${sessionId}/decline-proposal`),
-
-  // Get sessions with pending proposals (for student)
-  getSessionsWithProposals: () =>
-    api.get('/sessions/proposals'),
-
-  getCoachSessions: (coachId) => {
-    console.log('Getting sessions for coach:', coachId);
-    return api.get(`/sessions/coach/${coachId}`)
-      .catch(error => {
-        console.log('Coach sessions with ID failed, trying without ID...');
-        return api.get('/sessions/coach');
-      });
-  },
-
-  getStudentSessions: () =>
-    api.get('/sessions/student'),
-
-  cancelSession: (sessionId) =>
-    api.delete(`/sessions/${sessionId}`)
-}
-
-// For debugging - test endpoints
-export const testApi = {
-  testAuth: () => api.get('/auth/test'),
-  testMaterials: () => api.get('/materials/test'),
-  testSessions: () => api.get('/sessions/test')
-}
-
 // Theme Management API
 export const themeApi = {
   // Get active theme (public - no auth required)
@@ -379,65 +287,6 @@ export const contentTypesApi = {
 
   // Get content type by code
   getByCode: (code) => api.get(`/contenttypes/${code}`)
-}
-
-// Course Management API
-export const courseApi = {
-  // Create a new course
-  createCourse: (formData) =>
-    api.post('/courses', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' }
-    }),
-
-  // Update a course
-  updateCourse: (id, formData) =>
-    api.put(`/courses/${id}`, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' }
-    }),
-
-  // Get all published courses
-  getCourses: () =>
-    api.get('/courses'),
-
-  // Get courses for a coach
-  getCoachCourses: (coachId) =>
-    api.get(`/courses/coach/${coachId}`),
-
-  // Get a single course with materials
-  getCourse: (id) =>
-    api.get(`/courses/${id}`),
-
-  // Toggle publish status
-  togglePublish: (id) =>
-    api.post(`/courses/${id}/toggle-publish`),
-
-  // Delete a course
-  deleteCourse: (id) =>
-    api.delete(`/courses/${id}`),
-
-  // Add material to course
-  addMaterial: (courseId, data) =>
-    api.post(`/courses/${courseId}/materials`, data),
-
-  // Update course material (sort order, preview status)
-  updateMaterial: (courseId, courseMaterialId, data) =>
-    api.put(`/courses/${courseId}/materials/${courseMaterialId}`, data),
-
-  // Remove material from course
-  removeMaterial: (courseId, courseMaterialId) =>
-    api.delete(`/courses/${courseId}/materials/${courseMaterialId}`),
-
-  // Reorder materials
-  reorderMaterials: (courseId, materials) =>
-    api.post(`/courses/${courseId}/materials/reorder`, { materials }),
-
-  // Purchase course
-  purchaseCourse: (courseId) =>
-    api.post(`/courses/${courseId}/purchase`),
-
-  // Check if user has purchased course
-  hasPurchased: (courseId) =>
-    api.get(`/courses/${courseId}/purchased`)
 }
 
 // Asset Management API
@@ -521,125 +370,6 @@ export const tagApi = {
   // Search tags by name
   searchTags: (query, limit = 10) =>
     api.get(`/tags/search?query=${encodeURIComponent(query)}&limit=${limit}`)
-}
-
-// Video Review Request API
-export const videoReviewApi = {
-  // Create a video review request (student)
-  createRequest: (data) =>
-    api.post('/videoreviews', data),
-
-  // Update a video review request (student)
-  updateRequest: (requestId, data) =>
-    api.put(`/videoreviews/${requestId}`, data),
-
-  // Get my video review requests (student)
-  getMyRequests: () =>
-    api.get('/videoreviews/my-requests'),
-
-  // Cancel a request (student)
-  cancelRequest: (requestId) =>
-    api.delete(`/videoreviews/${requestId}`),
-
-  // Coach proposes a price/note (bidding)
-  propose: (requestId, data) =>
-    api.post(`/videoreviews/${requestId}/propose`, data),
-
-  // Student accepts coach's proposal
-  acceptProposal: (requestId) =>
-    api.post(`/videoreviews/${requestId}/accept-proposal`),
-
-  // Student declines coach's proposal
-  declineProposal: (requestId) =>
-    api.post(`/videoreviews/${requestId}/decline-proposal`),
-
-  // Get open requests (coach) - includes targeted and open requests
-  getOpenRequests: () =>
-    api.get('/videoreviews/open'),
-
-  // Get coach's assigned requests
-  getCoachRequests: () =>
-    api.get('/videoreviews/coach'),
-
-  // Accept a request directly (coach - for simple flow)
-  acceptRequest: (requestId) =>
-    api.post(`/videoreviews/${requestId}/accept`),
-
-  // Complete a review (coach)
-  completeReview: (requestId, data) =>
-    api.post(`/videoreviews/${requestId}/complete`, data),
-
-  // Get a specific request
-  getRequest: (requestId) =>
-    api.get(`/videoreviews/${requestId}`)
-}
-
-// Coach Search API (uses dedicated coaches endpoint)
-export const coachApi = {
-  // Get all coaches with their profiles
-  getCoaches: () =>
-    api.get('/users/coaches').then(response => response.data || response),
-
-  // Get a single coach by ID
-  getCoach: (id) =>
-    api.get(`/users/coaches/${id}`).then(response => response.data || response),
-
-  // Search coaches (filter on client-side for now)
-  searchCoaches: (query) =>
-    api.get('/users/coaches').then(response => {
-      const coaches = response.data || response;
-      return coaches.filter(u =>
-        u.firstName?.toLowerCase().includes(query.toLowerCase()) ||
-        u.lastName?.toLowerCase().includes(query.toLowerCase()) ||
-        u.bio?.toLowerCase().includes(query.toLowerCase())
-      );
-    })
-}
-
-// Blog API
-export const blogApi = {
-  // Get all published blog posts (public)
-  getPosts: (page = 1, pageSize = 10, category = null) => {
-    const params = new URLSearchParams({ page, pageSize });
-    if (category) params.append('category', category);
-    return api.get(`/blog?${params.toString()}`);
-  },
-
-  // Get all categories
-  getCategories: () =>
-    api.get('/blog/categories'),
-
-  // Get blog post by slug
-  getPostBySlug: (slug) =>
-    api.get(`/blog/slug/${slug}`),
-
-  // Get blog post by ID
-  getPostById: (id) =>
-    api.get(`/blog/${id}`),
-
-  // Get posts by coach (public - only published)
-  getCoachPosts: (coachId) =>
-    api.get(`/blog/coach/${coachId}`),
-
-  // Get current coach's posts (including drafts)
-  getMyPosts: () =>
-    api.get('/blog/my-posts'),
-
-  // Create a new blog post
-  createPost: (data) =>
-    api.post('/blog', data),
-
-  // Update a blog post
-  updatePost: (id, data) =>
-    api.put(`/blog/${id}`, data),
-
-  // Delete a blog post
-  deletePost: (id) =>
-    api.delete(`/blog/${id}`),
-
-  // Toggle publish status
-  togglePublish: (id) =>
-    api.post(`/blog/${id}/toggle-publish`)
 }
 
 // Player Certification API

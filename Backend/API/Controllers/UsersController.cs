@@ -51,7 +51,6 @@ public class UsersController : ControllerBase
             }
 
             var user = await _context.Users
-                .Include(u => u.CoachProfile)
                 .FirstOrDefaultAsync(u => u.Id == userId.Value);
 
             if (user == null)

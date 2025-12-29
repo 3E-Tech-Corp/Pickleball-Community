@@ -1,7 +1,7 @@
-# Pickleball College
+# Pickleball Community
 
 ## Overview
-Full-stack web application for pickleball training, coaching, and player certification.
+Full-stack web application for the pickleball community. Users can connect with friends, join clubs, and get player skill certifications through peer reviews.
 
 ## Tech Stack
 - **Backend**: ASP.NET Core 8, Entity Framework Core, SQL Server
@@ -26,18 +26,17 @@ Store all database migration scripts in `/Backend/API/Scripts/` with naming conv
 - Build Frontend: `npm run build` in `/Frontend`
 
 ## Key Features
-- Coach training materials (Video, Audio, Document, Image, Link)
-- Player certification with weighted skill groups
-- Course management
-- Marketplace for materials
-- Rating and tagging system
+- **Player Certification**: Peer-reviewed skill ratings with weighted skill groups
+- **User Profiles**: Detailed pickleball player profiles with equipment, experience, and play style
+- **Rating & Tagging**: General purpose rating and tagging system
+- **Community Features** (planned): Friends, clubs, events
 
 ## Shared Authentication (Funtime-Shared)
 This project uses shared authentication from the Funtime-Shared repository:
 - **UserId**: All Users.Id values come from the shared auth service (no local IDENTITY)
 - **JWT Tokens**: Tokens are issued by shared auth and validated locally with `sites[]` claim
 - **Cross-site tracking**: Same UserId across pickleball.college, pickleball.date, pickleball.community, pickleball.jobs, pickleball.casino
-- **Site-specific roles**: Each site maintains its own Role (Student/Coach/Admin)
+- **Site-specific roles**: Each site maintains its own Role (User/Admin)
 
 ### Auth Flow:
 1. Frontend calls shared auth API for login/register
@@ -69,11 +68,6 @@ Reference: https://github.com/LegalDragon/Funtime-Shared (branch: `claude/debug-
 3. Import shared styles and initialize before app renders
 4. Use hooks: `useAuth()`, `useSites()`, `usePayments()`
 5. Use components: Button, Input, AuthForm, Avatar, SkillBadge, SiteBadge
-
-#### Payment Processing:
-- Stripe integration via `PaymentModal` component
-- Supports saved payment methods and new card entry
-- Shared API handles payment intents, subscriptions, webhooks
 
 #### API Endpoints (AuthController):
 - Registration and login (public)

@@ -80,11 +80,4 @@ public class User
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
     public bool IsActive { get; set; } = true;
-
-    // Navigation properties
-    public CoachProfile? CoachProfile { get; set; }
-    public ICollection<TrainingMaterial> TrainingMaterials { get; set; } = new List<TrainingMaterial>();
-    public ICollection<MaterialPurchase> MaterialPurchases { get; set; } = new List<MaterialPurchase>();
-    public ICollection<TrainingSession> CoachingSessions { get; set; } = new List<TrainingSession>();
-    public ICollection<TrainingSession> StudentSessions { get; set; } = new List<TrainingSession>();
 }

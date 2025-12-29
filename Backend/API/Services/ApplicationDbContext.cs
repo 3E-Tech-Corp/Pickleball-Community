@@ -10,15 +10,6 @@ public class ApplicationDbContext : DbContext
     }
 
     public DbSet<User> Users { get; set; }
-    public DbSet<CoachProfile> CoachProfiles { get; set; }
-    public DbSet<TrainingMaterial> TrainingMaterials { get; set; }
-    public DbSet<MaterialPurchase> MaterialPurchases { get; set; }
-    public DbSet<TrainingSession> TrainingSessions { get; set; }
-
-    // Courses
-    public DbSet<Course> Courses { get; set; }
-    public DbSet<CourseMaterial> CourseMaterials { get; set; }
-    public DbSet<CoursePurchase> CoursePurchases { get; set; }
 
     // Theme and Asset Management
     public DbSet<ThemeSettings> ThemeSettings { get; set; }
@@ -26,7 +17,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<ActivityLog> ActivityLogs { get; set; }
     public DbSet<Asset> Assets { get; set; }
 
-    // Content Types for Materials
+    // Content Types
     public DbSet<ContentType> ContentTypes { get; set; }
 
     // Ratings
@@ -35,12 +26,6 @@ public class ApplicationDbContext : DbContext
     // Tags
     public DbSet<TagDefinition> TagDefinitions { get; set; }
     public DbSet<ObjectTag> ObjectTags { get; set; }
-
-    // Video Review Requests
-    public DbSet<VideoReviewRequest> VideoReviewRequests { get; set; }
-
-    // Blog Posts
-    public DbSet<BlogPost> BlogPosts { get; set; }
 
     // Player Certification
     public DbSet<KnowledgeLevel> KnowledgeLevels { get; set; }
@@ -58,95 +43,6 @@ public class ApplicationDbContext : DbContext
             entity.Property(u => u.Id).ValueGeneratedNever();
             entity.HasIndex(u => u.Email).IsUnique();
             entity.Property(u => u.Role).HasConversion<string>();
-        });
-
-        modelBuilder.Entity<TrainingMaterial>(entity =>
-        {
-            entity.HasOne(tm => tm.Coach)
-                  .WithMany(u => u.TrainingMaterials)
-                  .HasForeignKey(tm => tm.CoachId)
-                  .OnDelete(DeleteBehavior.Restrict);
-
-            entity.Property(tm => tm.ContentType).HasConversion<string>();
-        });
-
-        modelBuilder.Entity<TrainingSession>(entity =>
-        {
-            entity.Property(ts => ts.SessionType).HasConversion<string>();
-            entity.Property(ts => ts.Status).HasConversion<string>();
-
-            entity.HasOne(ts => ts.Coach)
-                  .WithMany(u => u.CoachingSessions)
-                  .HasForeignKey(ts => ts.CoachId)
-                  .OnDelete(DeleteBehavior.Restrict);
-
-            entity.HasOne(ts => ts.Student)
-                  .WithMany(u => u.StudentSessions)
-                  .HasForeignKey(ts => ts.StudentId)
-                  .OnDelete(DeleteBehavior.Restrict);
-        });
-
-        modelBuilder.Entity<MaterialPurchase>(entity =>
-        {
-            entity.HasOne(mp => mp.Student)
-                  .WithMany(u => u.MaterialPurchases)
-                  .HasForeignKey(mp => mp.StudentId)
-                  .OnDelete(DeleteBehavior.Restrict);
-
-            entity.HasOne(mp => mp.Material)
-                  .WithMany(tm => tm.Purchases)
-                  .HasForeignKey(mp => mp.MaterialId)
-                  .OnDelete(DeleteBehavior.Restrict);
-        });
-
-        modelBuilder.Entity<CoachProfile>(entity =>
-        {
-            entity.HasOne(cp => cp.User)
-                  .WithOne(u => u.CoachProfile)
-                  .HasForeignKey<CoachProfile>(cp => cp.UserId)
-                  .OnDelete(DeleteBehavior.Cascade);
-        });
-
-        // Course configuration
-        modelBuilder.Entity<Course>(entity =>
-        {
-            entity.HasOne(c => c.Coach)
-                  .WithMany()
-                  .HasForeignKey(c => c.CoachId)
-                  .OnDelete(DeleteBehavior.Restrict);
-
-            entity.Property(c => c.Title).IsRequired().HasMaxLength(200);
-            entity.Property(c => c.Description).HasMaxLength(2000);
-        });
-
-        modelBuilder.Entity<CourseMaterial>(entity =>
-        {
-            entity.HasOne(cm => cm.Course)
-                  .WithMany(c => c.CourseMaterials)
-                  .HasForeignKey(cm => cm.CourseId)
-                  .OnDelete(DeleteBehavior.Cascade);
-
-            entity.HasOne(cm => cm.Material)
-                  .WithMany(m => m.CourseMaterials)
-                  .HasForeignKey(cm => cm.MaterialId)
-                  .OnDelete(DeleteBehavior.Restrict);
-
-            entity.HasIndex(cm => new { cm.CourseId, cm.MaterialId }).IsUnique();
-        });
-
-        modelBuilder.Entity<CoursePurchase>(entity =>
-        {
-            entity.HasOne(cp => cp.Course)
-                  .WithMany(c => c.Purchases)
-                  .HasForeignKey(cp => cp.CourseId)
-                  .OnDelete(DeleteBehavior.Restrict);
-
-            entity.HasOne(cp => cp.Student)
-                  .WithMany()
-                  .HasForeignKey(cp => cp.StudentId)
-                  .OnDelete(DeleteBehavior.Restrict);
-
-            entity.HasIndex(cp => new { cp.CourseId, cp.StudentId }).IsUnique();
         });
 
         // Theme and Asset Management configuration
@@ -291,52 +187,6 @@ public class ApplicationDbContext : DbContext
             entity.HasIndex(ot => new { ot.TagId, ot.ObjectType, ot.ObjectId }).IsUnique();
             // Index for querying tags by object
             entity.HasIndex(ot => new { ot.ObjectType, ot.ObjectId });
-        });
-
-        // VideoReviewRequest configuration
-        modelBuilder.Entity<VideoReviewRequest>(entity =>
-        {
-            entity.HasOne(v => v.Student)
-                  .WithMany()
-                  .HasForeignKey(v => v.StudentId)
-                  .OnDelete(DeleteBehavior.Restrict);
-
-            entity.HasOne(v => v.TargetCoach)
-                  .WithMany()
-                  .HasForeignKey(v => v.CoachId)
-                  .OnDelete(DeleteBehavior.Restrict);
-
-            entity.HasOne(v => v.AcceptedByCoach)
-                  .WithMany()
-                  .HasForeignKey(v => v.AcceptedByCoachId)
-                  .OnDelete(DeleteBehavior.Restrict);
-
-            entity.Property(v => v.Title).IsRequired().HasMaxLength(200);
-            entity.Property(v => v.VideoUrl).IsRequired().HasMaxLength(500);
-            entity.Property(v => v.Status).IsRequired().HasMaxLength(50);
-
-            // Index for finding open requests
-            entity.HasIndex(v => v.Status);
-            entity.HasIndex(v => v.StudentId);
-            entity.HasIndex(v => v.CoachId);
-        });
-
-        // BlogPost configuration
-        modelBuilder.Entity<BlogPost>(entity =>
-        {
-            entity.HasOne(b => b.Author)
-                  .WithMany()
-                  .HasForeignKey(b => b.AuthorId)
-                  .OnDelete(DeleteBehavior.Restrict);
-
-            entity.Property(b => b.Title).IsRequired().HasMaxLength(200);
-            entity.Property(b => b.Slug).IsRequired().HasMaxLength(500);
-            entity.Property(b => b.Content).IsRequired();
-
-            entity.HasIndex(b => b.Slug).IsUnique();
-            entity.HasIndex(b => b.AuthorId);
-            entity.HasIndex(b => b.IsPublished);
-            entity.HasIndex(b => b.PublishedAt);
         });
 
         // Player Certification configuration
