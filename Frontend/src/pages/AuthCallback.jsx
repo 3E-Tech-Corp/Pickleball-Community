@@ -125,17 +125,16 @@ const AuthCallback = () => {
       let redirectPath = returnTo ? decodeURIComponent(returnTo) : '/'
 
       // If no returnTo, redirect based on role
+      // Admin users go to student dashboard (they can access admin from menu)
       if (!returnTo && userData.role) {
         const role = userData.role.toLowerCase()
         switch (role) {
           case 'coach':
             redirectPath = '/coach/dashboard'
             break
+          case 'admin':
           case 'student':
             redirectPath = '/student/dashboard'
-            break
-          case 'admin':
-            redirectPath = '/admin/dashboard'
             break
         }
       }
