@@ -64,19 +64,30 @@ export default function MyCertificate() {
   };
 
   // Letter grade based on 0-100 scale
+  // Below 20: No grade, 20-70: F-A, 70-85: Semi-Pro, 85+: Pro
   const getLetterGrade = (score100) => {
-    if (score100 >= 93) return { letter: 'A', color: 'text-green-600 bg-green-100' };
-    if (score100 >= 90) return { letter: 'A-', color: 'text-green-600 bg-green-100' };
-    if (score100 >= 87) return { letter: 'B+', color: 'text-blue-600 bg-blue-100' };
-    if (score100 >= 83) return { letter: 'B', color: 'text-blue-600 bg-blue-100' };
-    if (score100 >= 80) return { letter: 'B-', color: 'text-blue-600 bg-blue-100' };
-    if (score100 >= 77) return { letter: 'C+', color: 'text-yellow-600 bg-yellow-100' };
-    if (score100 >= 73) return { letter: 'C', color: 'text-yellow-600 bg-yellow-100' };
-    if (score100 >= 70) return { letter: 'C-', color: 'text-yellow-600 bg-yellow-100' };
-    if (score100 >= 67) return { letter: 'D+', color: 'text-orange-600 bg-orange-100' };
-    if (score100 >= 63) return { letter: 'D', color: 'text-orange-600 bg-orange-100' };
-    if (score100 >= 60) return { letter: 'D-', color: 'text-orange-600 bg-orange-100' };
-    return { letter: 'F', color: 'text-red-600 bg-red-100' };
+    if (score100 >= 85) return { letter: 'P', label: 'Pro', color: 'text-purple-600 bg-purple-100', isPro: true };
+    if (score100 >= 70) return { letter: 'SP', label: 'Semi-Pro', color: 'text-indigo-600 bg-indigo-100', isPro: true };
+    if (score100 < 20) return { letter: '-', label: 'Unrated', color: 'text-gray-400 bg-gray-100', isPro: false };
+
+    // Scale 20-70 to letter grades F-A (50 point range)
+    // F: 20-30, D-: 30-33.3, D: 33.3-36.7, D+: 36.7-40
+    // C-: 40-43.3, C: 43.3-46.7, C+: 46.7-50
+    // B-: 50-53.3, B: 53.3-56.7, B+: 56.7-60
+    // A-: 60-63.3, A: 63.3-66.7, A+: 66.7-70
+    if (score100 >= 66.7) return { letter: 'A+', color: 'text-green-600 bg-green-100', isPro: false };
+    if (score100 >= 63.3) return { letter: 'A', color: 'text-green-600 bg-green-100', isPro: false };
+    if (score100 >= 60) return { letter: 'A-', color: 'text-green-600 bg-green-100', isPro: false };
+    if (score100 >= 56.7) return { letter: 'B+', color: 'text-blue-600 bg-blue-100', isPro: false };
+    if (score100 >= 53.3) return { letter: 'B', color: 'text-blue-600 bg-blue-100', isPro: false };
+    if (score100 >= 50) return { letter: 'B-', color: 'text-blue-600 bg-blue-100', isPro: false };
+    if (score100 >= 46.7) return { letter: 'C+', color: 'text-yellow-600 bg-yellow-100', isPro: false };
+    if (score100 >= 43.3) return { letter: 'C', color: 'text-yellow-600 bg-yellow-100', isPro: false };
+    if (score100 >= 40) return { letter: 'C-', color: 'text-yellow-600 bg-yellow-100', isPro: false };
+    if (score100 >= 36.7) return { letter: 'D+', color: 'text-orange-600 bg-orange-100', isPro: false };
+    if (score100 >= 33.3) return { letter: 'D', color: 'text-orange-600 bg-orange-100', isPro: false };
+    if (score100 >= 30) return { letter: 'D-', color: 'text-orange-600 bg-orange-100', isPro: false };
+    return { letter: 'F', color: 'text-red-600 bg-red-100', isPro: false };
   };
 
   // Convert 0-10 score to 0-100 and get letter grade for a group
@@ -132,14 +143,14 @@ export default function MyCertificate() {
 
               {certificate?.totalReviews > 0 ? (
                 <>
-                  {/* Overall Score with Letter Grade */}
+                  {/* Overall Score with Letter Grade / Pro Badge */}
                   {(() => {
                     const totalScore100 = Math.round((certificate.weightedOverallScore || certificate.overallAverageScore) * 10);
                     const grade = getLetterGrade(totalScore100);
                     return (
-                      <div className="flex items-center gap-4 p-4 bg-gradient-to-r from-primary-50 to-primary-100 rounded-lg mb-6">
+                      <div className={`flex items-center gap-4 p-4 rounded-lg mb-6 ${grade.isPro ? 'bg-gradient-to-r from-purple-50 to-indigo-100' : 'bg-gradient-to-r from-primary-50 to-primary-100'}`}>
                         <div className="flex-shrink-0 flex items-center gap-3">
-                          <div className={`w-16 h-16 rounded-full flex items-center justify-center text-2xl font-bold ${grade.color}`}>
+                          <div className={`${grade.isPro ? 'w-20 h-16 rounded-lg px-3' : 'w-16 h-16 rounded-full'} flex items-center justify-center text-2xl font-bold ${grade.color}`}>
                             {grade.letter}
                           </div>
                           <div className="text-3xl font-bold text-gray-900">
@@ -148,7 +159,9 @@ export default function MyCertificate() {
                           </div>
                         </div>
                         <div className="flex-1">
-                          <div className="text-lg font-semibold text-gray-900">Overall Rating</div>
+                          <div className="text-lg font-semibold text-gray-900">
+                            {grade.label || 'Overall Rating'}
+                          </div>
                           <div className="text-sm text-gray-600">
                             Based on {certificate.totalReviews} review{certificate.totalReviews !== 1 ? 's' : ''}
                           </div>
@@ -165,14 +178,17 @@ export default function MyCertificate() {
                         const groupScore100 = getGroupScore100(group.averageScore);
                         const groupGrade = getLetterGrade(groupScore100);
                         return (
-                          <div key={group.groupId} className="border border-gray-200 rounded-lg p-4">
+                          <div key={group.groupId} className={`border rounded-lg p-4 ${groupGrade.isPro ? 'border-purple-200 bg-purple-50/30' : 'border-gray-200'}`}>
                             <div className="flex items-center justify-between mb-3">
                               <div className="flex items-center gap-3">
-                                <span className={`inline-flex items-center justify-center w-10 h-10 rounded-lg text-lg font-bold ${groupGrade.color}`}>
+                                <span className={`inline-flex items-center justify-center ${groupGrade.isPro ? 'px-3 py-2' : 'w-10 h-10'} rounded-lg text-lg font-bold ${groupGrade.color}`}>
                                   {groupGrade.letter}
                                 </span>
                                 <div>
-                                  <div className="font-semibold text-gray-900">{group.groupName}</div>
+                                  <div className="font-semibold text-gray-900">
+                                    {group.groupName}
+                                    {groupGrade.isPro && <span className="ml-2 text-xs font-medium text-purple-600">({groupGrade.label})</span>}
+                                  </div>
                                   <div className="text-xs text-gray-500">Weight: {group.weight}%</div>
                                 </div>
                               </div>
