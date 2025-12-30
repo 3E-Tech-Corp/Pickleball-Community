@@ -129,10 +129,11 @@ public class UsersController : ControllerBase
             // Check friendship status if user is logged in and viewing someone else's profile
             if (currentUserId.HasValue && currentUserId.Value != id)
             {
-                // Check if they are friends
+                // Check if they are friends (UserId1 is always smaller, UserId2 is always larger)
+                var smallerId = Math.Min(currentUserId.Value, id);
+                var largerId = Math.Max(currentUserId.Value, id);
                 var friendship = await _context.Friendships
-                    .Where(f => (f.UserId == currentUserId.Value && f.FriendId == id) ||
-                               (f.UserId == id && f.FriendId == currentUserId.Value))
+                    .Where(f => f.UserId1 == smallerId && f.UserId2 == largerId)
                     .FirstOrDefaultAsync();
 
                 if (friendship != null)
