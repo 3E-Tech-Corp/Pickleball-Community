@@ -387,6 +387,7 @@ function CourtDetailModal({ court, isAuthenticated, onClose, onConfirmationSubmi
   const [formData, setFormData] = useState({
     nameConfirmed: court.myConfirmation?.nameConfirmed ?? null,
     suggestedName: court.myConfirmation?.suggestedName || '',
+    notACourt: court.myConfirmation?.notACourt ?? null,
     confirmedIndoorCount: court.myConfirmation?.confirmedIndoorCount ?? '',
     confirmedOutdoorCount: court.myConfirmation?.confirmedOutdoorCount ?? '',
     confirmedCoveredCount: court.myConfirmation?.confirmedCoveredCount ?? '',
@@ -605,6 +606,27 @@ function CourtDetailModal({ court, isAuthenticated, onClose, onConfirmationSubmi
                 </div>
               ) : (
                 <form onSubmit={handleSubmitConfirmation} className="space-y-6">
+                  {/* Not A Court Flag */}
+                  <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={formData.notACourt === true}
+                        onChange={(e) => setFormData({ ...formData, notACourt: e.target.checked || null })}
+                        className="w-5 h-5 text-red-600 border-gray-300 rounded focus:ring-red-500"
+                      />
+                      <div>
+                        <span className="font-medium text-red-700">This is not a pickleball court anymore</span>
+                        <p className="text-sm text-red-600">Check this if the location no longer has pickleball courts (closed, converted, etc.)</p>
+                      </div>
+                    </label>
+                    {agg.notACourtCount > 0 && (
+                      <p className="mt-2 text-sm text-red-500">
+                        {agg.notACourtCount} user{agg.notACourtCount !== 1 ? 's have' : ' has'} flagged this as not a court
+                      </p>
+                    )}
+                  </div>
+
                   {/* Name Confirmation */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -627,17 +649,22 @@ function CourtDetailModal({ court, isAuthenticated, onClose, onConfirmationSubmi
                           onChange={() => setFormData({ ...formData, nameConfirmed: false })}
                           className="text-green-600"
                         />
-                        <span>No</span>
+                        <span>No, suggest different name</span>
                       </label>
                     </div>
                     {formData.nameConfirmed === false && (
                       <input
                         type="text"
-                        placeholder="Suggest correct name..."
+                        placeholder="Enter the correct name..."
                         value={formData.suggestedName}
                         onChange={(e) => setFormData({ ...formData, suggestedName: e.target.value })}
                         className="mt-2 w-full border border-gray-300 rounded-lg p-2 focus:ring-green-500 focus:border-green-500"
                       />
+                    )}
+                    {agg.mostSuggestedName && (
+                      <p className="mt-2 text-sm text-gray-500">
+                        Most suggested name: <span className="font-medium text-gray-700">{agg.mostSuggestedName}</span>
+                      </p>
                     )}
                   </div>
 
@@ -874,6 +901,17 @@ function CourtDetailModal({ court, isAuthenticated, onClose, onConfirmationSubmi
                           {new Date(conf.updatedAt).toLocaleDateString()}
                         </span>
                       </div>
+                      {conf.notACourt && (
+                        <div className="mb-2 px-3 py-1 bg-red-100 text-red-700 rounded-full text-sm inline-block">
+                          Flagged as not a court
+                        </div>
+                      )}
+                      {conf.suggestedName && (
+                        <div className="mb-2 text-sm">
+                          <span className="text-gray-500">Suggested name:</span>{' '}
+                          <span className="font-medium text-gray-700">{conf.suggestedName}</span>
+                        </div>
+                      )}
                       <div className="grid grid-cols-2 gap-2 text-sm">
                         {conf.rating && (
                           <div className="flex items-center gap-1">

@@ -35,6 +35,8 @@ public class CourtAggregatedInfoDto
     public string? CommonHours { get; set; }
     public string? CommonSurfaceType { get; set; }
     public List<string>? CommonAmenities { get; set; }
+    public int NotACourtCount { get; set; } // Number of users who flagged this as not a court
+    public string? MostSuggestedName { get; set; } // Most commonly suggested name
 }
 
 public class CourtDetailDto : CourtDto
@@ -52,6 +54,7 @@ public class CourtConfirmationDto
     public string? UserProfileImageUrl { get; set; }
     public bool? NameConfirmed { get; set; }
     public string? SuggestedName { get; set; }
+    public bool? NotACourt { get; set; }
     public int? ConfirmedIndoorCount { get; set; }
     public int? ConfirmedOutdoorCount { get; set; }
     public int? ConfirmedCoveredCount { get; set; }
@@ -72,6 +75,7 @@ public class SubmitCourtConfirmationDto
 {
     public bool? NameConfirmed { get; set; }
     public string? SuggestedName { get; set; }
+    public bool? NotACourt { get; set; }
     public int? ConfirmedIndoorCount { get; set; }
     public int? ConfirmedOutdoorCount { get; set; }
     public int? ConfirmedCoveredCount { get; set; }

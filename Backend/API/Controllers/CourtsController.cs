@@ -85,7 +85,9 @@ public class CourtsController : ControllerBase
                         AggregatedInfo = new CourtAggregatedInfoDto
                         {
                             ConfirmationCount = reader.GetInt32(reader.GetOrdinal("ConfirmationCount")),
-                            AverageRating = reader.IsDBNull(reader.GetOrdinal("AverageRating")) ? null : reader.GetDouble(reader.GetOrdinal("AverageRating"))
+                            AverageRating = reader.IsDBNull(reader.GetOrdinal("AverageRating")) ? null : reader.GetDouble(reader.GetOrdinal("AverageRating")),
+                            NotACourtCount = reader.IsDBNull(reader.GetOrdinal("NotACourtCount")) ? 0 : reader.GetInt32(reader.GetOrdinal("NotACourtCount")),
+                            MostSuggestedName = reader.IsDBNull(reader.GetOrdinal("MostSuggestedName")) ? null : reader.GetString(reader.GetOrdinal("MostSuggestedName"))
                         }
                     };
 
@@ -277,6 +279,8 @@ public class CourtsController : ControllerBase
                     {
                         ConfirmationCount = reader.GetInt32(reader.GetOrdinal("ConfirmationCount")),
                         AverageRating = reader.IsDBNull(reader.GetOrdinal("AverageRating")) ? null : reader.GetDouble(reader.GetOrdinal("AverageRating")),
+                        NotACourtCount = reader.IsDBNull(reader.GetOrdinal("NotACourtCount")) ? 0 : reader.GetInt32(reader.GetOrdinal("NotACourtCount")),
+                        MostSuggestedName = reader.IsDBNull(reader.GetOrdinal("MostSuggestedName")) ? null : reader.GetString(reader.GetOrdinal("MostSuggestedName")),
                         MostConfirmedIndoorCount = reader.IsDBNull(reader.GetOrdinal("MostConfirmedIndoorCount")) ? null : reader.GetInt32(reader.GetOrdinal("MostConfirmedIndoorCount")),
                         MostConfirmedOutdoorCount = reader.IsDBNull(reader.GetOrdinal("MostConfirmedOutdoorCount")) ? null : reader.GetInt32(reader.GetOrdinal("MostConfirmedOutdoorCount")),
                         MostConfirmedHasLights = reader.IsDBNull(reader.GetOrdinal("MostConfirmedHasLights")) ? null : reader.GetBoolean(reader.GetOrdinal("MostConfirmedHasLights")),
@@ -301,6 +305,7 @@ public class CourtsController : ControllerBase
                             UserProfileImageUrl = reader.IsDBNull(reader.GetOrdinal("UserProfileImageUrl")) ? null : reader.GetString(reader.GetOrdinal("UserProfileImageUrl")),
                             NameConfirmed = reader.IsDBNull(reader.GetOrdinal("NameConfirmed")) ? null : reader.GetBoolean(reader.GetOrdinal("NameConfirmed")),
                             SuggestedName = reader.IsDBNull(reader.GetOrdinal("SuggestedName")) ? null : reader.GetString(reader.GetOrdinal("SuggestedName")),
+                            NotACourt = reader.IsDBNull(reader.GetOrdinal("NotACourt")) ? null : reader.GetBoolean(reader.GetOrdinal("NotACourt")),
                             ConfirmedIndoorCount = reader.IsDBNull(reader.GetOrdinal("ConfirmedIndoorCount")) ? null : reader.GetInt32(reader.GetOrdinal("ConfirmedIndoorCount")),
                             ConfirmedOutdoorCount = reader.IsDBNull(reader.GetOrdinal("ConfirmedOutdoorCount")) ? null : reader.GetInt32(reader.GetOrdinal("ConfirmedOutdoorCount")),
                             ConfirmedCoveredCount = reader.IsDBNull(reader.GetOrdinal("ConfirmedCoveredCount")) ? null : reader.GetInt32(reader.GetOrdinal("ConfirmedCoveredCount")),
@@ -428,6 +433,7 @@ public class CourtsController : ControllerBase
             {
                 existingConfirmation.NameConfirmed = dto.NameConfirmed ?? existingConfirmation.NameConfirmed;
                 existingConfirmation.SuggestedName = dto.SuggestedName ?? existingConfirmation.SuggestedName;
+                existingConfirmation.NotACourt = dto.NotACourt ?? existingConfirmation.NotACourt;
                 existingConfirmation.ConfirmedIndoorCount = dto.ConfirmedIndoorCount ?? existingConfirmation.ConfirmedIndoorCount;
                 existingConfirmation.ConfirmedOutdoorCount = dto.ConfirmedOutdoorCount ?? existingConfirmation.ConfirmedOutdoorCount;
                 existingConfirmation.ConfirmedCoveredCount = dto.ConfirmedCoveredCount ?? existingConfirmation.ConfirmedCoveredCount;
@@ -460,6 +466,7 @@ public class CourtsController : ControllerBase
                     UserId = userId.Value,
                     NameConfirmed = dto.NameConfirmed,
                     SuggestedName = dto.SuggestedName,
+                    NotACourt = dto.NotACourt,
                     ConfirmedIndoorCount = dto.ConfirmedIndoorCount,
                     ConfirmedOutdoorCount = dto.ConfirmedOutdoorCount,
                     ConfirmedCoveredCount = dto.ConfirmedCoveredCount,
@@ -615,6 +622,7 @@ public class CourtsController : ControllerBase
             UserProfileImageUrl = cc.User?.ProfileImageUrl,
             NameConfirmed = cc.NameConfirmed,
             SuggestedName = cc.SuggestedName,
+            NotACourt = cc.NotACourt,
             ConfirmedIndoorCount = cc.ConfirmedIndoorCount,
             ConfirmedOutdoorCount = cc.ConfirmedOutdoorCount,
             ConfirmedCoveredCount = cc.ConfirmedCoveredCount,

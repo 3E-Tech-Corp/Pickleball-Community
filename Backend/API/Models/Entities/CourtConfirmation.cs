@@ -22,6 +22,9 @@ public class CourtConfirmation
     [MaxLength(100)]
     public string? SuggestedName { get; set; }
 
+    // Flag to indicate this location is no longer a pickleball court
+    public bool? NotACourt { get; set; }
+
     // Court count confirmations
     public int? ConfirmedIndoorCount { get; set; }
     public int? ConfirmedOutdoorCount { get; set; }
