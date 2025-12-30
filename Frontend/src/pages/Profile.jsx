@@ -155,21 +155,31 @@ const Profile = () => {
       try {
         const response = await sharedUserApi.uploadAvatar(file)
         console.log('Avatar upload response:', response)
+        console.log('Avatar upload response type:', typeof response)
+        console.log('Avatar upload response keys:', response ? Object.keys(response) : 'null')
 
-        // Handle Funtime-Shared response format - returns asset with id
+        // Handle Funtime-Shared response format
         // Save only the relative path to DB, construct full URL when viewing
         let assetPath = null
+        let assetId = null
 
-        // Check for id (Funtime-Shared format) and construct relative path
+        // Try different response formats
         if (response && response.id) {
-          assetPath = `/asset/${response.id}`
-        } else if (response.data?.id) {
-          assetPath = `/asset/${response.data.id}`
-        } else if (response.data?.data?.id) {
-          assetPath = `/asset/${response.data.data.id}`
+          assetId = response.id
+        } else if (response && response.Id) {
+          assetId = response.Id
+        } else if (response?.data?.id) {
+          assetId = response.data.id
+        } else if (response?.data?.Id) {
+          assetId = response.data.Id
+        } else if (response?.asset?.id) {
+          assetId = response.asset.id
+        } else if (response?.asset?.Id) {
+          assetId = response.asset.Id
         }
 
-        if (assetPath) {
+        if (assetId) {
+          assetPath = `/asset/${assetId}`
           console.log('New avatar path:', assetPath)
           // Update local user with new avatar path
           updateUser({ ...user, avatar: assetPath, profileImageUrl: assetPath })
@@ -179,7 +189,8 @@ const Profile = () => {
           // Save relative path to local backend
           await userApi.updateProfile({ profileImageUrl: assetPath })
         } else {
-          throw new Error(response.message || 'Upload failed - no asset ID returned')
+          console.error('Could not find asset ID in response:', JSON.stringify(response, null, 2))
+          throw new Error('Upload failed - no asset ID returned. Check console for response format.')
         }
       } catch (error) {
         console.error('Avatar upload error:', error)
