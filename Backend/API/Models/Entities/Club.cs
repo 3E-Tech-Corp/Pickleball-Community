@@ -57,6 +57,18 @@ public class Club
     [MaxLength(50)]
     public string? InviteCode { get; set; }
 
+    // Membership fees
+    public bool HasMembershipFee { get; set; } = false;
+
+    [MaxLength(100)]
+    public string? MembershipFeeAmount { get; set; } // e.g., "$25", "$50/year"
+
+    [MaxLength(50)]
+    public string? MembershipFeePeriod { get; set; } // monthly, yearly, quarterly, one-time
+
+    [MaxLength(2000)]
+    public string? PaymentInstructions { get; set; } // How to pay, Venmo/PayPal info, etc.
+
     public int CreatedByUserId { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
@@ -81,7 +93,15 @@ public class ClubMember
     [MaxLength(20)]
     public string Role { get; set; } = "Member"; // Admin, Moderator, Member
 
+    [MaxLength(100)]
+    public string? Title { get; set; } // Custom title like "Treasurer", "Secretary", "Tournament Director"
+
     public DateTime JoinedAt { get; set; } = DateTime.UtcNow;
+    public DateTime? MembershipValidTo { get; set; } // When membership expires (null = lifetime/no expiry)
+
+    [MaxLength(500)]
+    public string? MembershipNotes { get; set; } // Admin notes about payment status, etc.
+
     public bool IsActive { get; set; } = true;
 
     // Navigation

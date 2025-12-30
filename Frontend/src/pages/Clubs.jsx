@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { Users, Search, Filter, MapPin, Plus, Globe, Mail, Phone, ChevronLeft, ChevronRight, X, Copy, Check, Bell, UserPlus, Settings, Crown, Shield, Clock } from 'lucide-react';
+import { Users, Search, Filter, MapPin, Plus, Globe, Mail, Phone, ChevronLeft, ChevronRight, X, Copy, Check, Bell, UserPlus, Settings, Crown, Shield, Clock, DollarSign, Calendar, Upload, Image, Edit3 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { clubsApi, getSharedAssetUrl } from '../services/api';
+import { clubsApi, assetApi, getSharedAssetUrl } from '../services/api';
 
 export default function Clubs() {
   const { user, isAuthenticated } = useAuth();
@@ -575,6 +575,12 @@ function ClubCard({ club, onViewDetails, showManageButton = false }) {
               <span>{club.distance.toFixed(1)} miles away</span>
             </div>
           )}
+          {club.hasMembershipFee && (
+            <div className="flex items-center gap-2 text-green-600">
+              <DollarSign className="w-4 h-4" />
+              <span>Membership Fee{club.membershipFeeAmount && `: ${club.membershipFeeAmount}`}</span>
+            </div>
+          )}
         </div>
 
         <div className="mt-4 flex gap-2">
@@ -608,6 +614,8 @@ function ClubDetailModal({ club, isAuthenticated, currentUserId, onClose, onJoin
   const [copied, setCopied] = useState(false);
   const [newNotification, setNewNotification] = useState({ title: '', message: '' });
   const [sendingNotification, setSendingNotification] = useState(false);
+  const [editingMember, setEditingMember] = useState(null);
+  const [memberEditData, setMemberEditData] = useState({ title: '', membershipValidTo: '', membershipNotes: '' });
 
   const isAdmin = club.isAdmin;
   const isModerator = club.isModerator;
@@ -733,6 +741,33 @@ function ClubDetailModal({ club, isAuthenticated, currentUserId, onClose, onJoin
       onClose();
     } catch (err) {
       console.error('Error leaving club:', err);
+    }
+  };
+
+  // When editing a member, load their current data
+  useEffect(() => {
+    if (editingMember) {
+      setMemberEditData({
+        title: editingMember.title || '',
+        membershipValidTo: editingMember.membershipValidTo ? editingMember.membershipValidTo.split('T')[0] : '',
+        membershipNotes: editingMember.membershipNotes || ''
+      });
+    }
+  }, [editingMember]);
+
+  const handleSaveMemberDetails = async () => {
+    if (!editingMember) return;
+    try {
+      const data = {
+        title: memberEditData.title || null,
+        membershipValidTo: memberEditData.membershipValidTo ? new Date(memberEditData.membershipValidTo).toISOString() : null,
+        membershipNotes: memberEditData.membershipNotes || null
+      };
+      await clubsApi.updateMember(club.id, editingMember.id, data);
+      setEditingMember(null);
+      loadMembers();
+    } catch (err) {
+      console.error('Error updating member:', err);
     }
   };
 
@@ -873,6 +908,49 @@ function ClubDetailModal({ club, isAuthenticated, currentUserId, onClose, onJoin
                 </div>
               )}
 
+              {/* Membership Fee */}
+              {club.hasMembershipFee && (
+                <div>
+                  <h3 className="font-medium text-gray-900 mb-2 flex items-center gap-2">
+                    <DollarSign className="w-5 h-5 text-green-600" />
+                    Membership Fee
+                  </h3>
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-lg font-semibold text-green-800">{club.membershipFeeAmount || 'Fee Required'}</span>
+                      {club.membershipFeePeriod && (
+                        <span className="text-sm text-green-600 capitalize">{club.membershipFeePeriod}</span>
+                      )}
+                    </div>
+                    {(isMember || isAdmin) && club.paymentInstructions && (
+                      <div className="mt-3 pt-3 border-t border-green-200">
+                        <h4 className="text-sm font-medium text-green-800 mb-1">Payment Instructions</h4>
+                        <p className="text-sm text-green-700 whitespace-pre-wrap">{club.paymentInstructions}</p>
+                      </div>
+                    )}
+                    {!isMember && !isAdmin && (
+                      <p className="text-sm text-green-600 mt-2">Join to see payment instructions</p>
+                    )}
+                  </div>
+                  {/* Show user's membership status */}
+                  {isMember && club.myMembershipValidTo && (
+                    <div className="mt-3 flex items-center gap-2 text-sm">
+                      <Calendar className="w-4 h-4 text-gray-500" />
+                      <span className={`${new Date(club.myMembershipValidTo) < new Date() ? 'text-red-600' : 'text-gray-600'}`}>
+                        Membership valid until: {new Date(club.myMembershipValidTo).toLocaleDateString()}
+                        {new Date(club.myMembershipValidTo) < new Date() && ' (Expired)'}
+                      </span>
+                    </div>
+                  )}
+                  {isMember && club.myTitle && (
+                    <div className="mt-2 flex items-center gap-2 text-sm">
+                      <Crown className="w-4 h-4 text-yellow-500" />
+                      <span className="text-gray-600">Title: {club.myTitle}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Contact */}
               {(club.website || club.email || club.phone) && (
                 <div>
@@ -941,7 +1019,7 @@ function ClubDetailModal({ club, isAuthenticated, currentUserId, onClose, onJoin
               ) : members.length > 0 ? (
                 <div className="space-y-3">
                   {members.map(member => (
-                    <div key={member.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <div key={member.id} className={`flex items-center justify-between p-3 rounded-lg ${member.isMembershipExpired ? 'bg-red-50' : 'bg-gray-50'}`}>
                       <div className="flex items-center gap-3">
                         {member.profileImageUrl ? (
                           <img src={getSharedAssetUrl(member.profileImageUrl)} alt="" className="w-10 h-10 rounded-full object-cover" />
@@ -953,14 +1031,24 @@ function ClubDetailModal({ club, isAuthenticated, currentUserId, onClose, onJoin
                           </div>
                         )}
                         <div>
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 flex-wrap">
                             <span className="font-medium text-gray-900">{member.name}</span>
                             {member.role === 'Admin' && <Crown className="w-4 h-4 text-yellow-500" />}
                             {member.role === 'Moderator' && <Shield className="w-4 h-4 text-blue-500" />}
+                            {member.title && (
+                              <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded">{member.title}</span>
+                            )}
+                            {member.isMembershipExpired && (
+                              <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded">Expired</span>
+                            )}
                           </div>
                           <p className="text-sm text-gray-500">
-                            {member.location || member.experienceLevel || `Joined ${new Date(member.joinedAt).toLocaleDateString()}`}
+                            Joined {new Date(member.joinedAt).toLocaleDateString()}
+                            {member.membershipValidTo && ` • Valid to ${new Date(member.membershipValidTo).toLocaleDateString()}`}
                           </p>
+                          {isAdmin && member.membershipNotes && (
+                            <p className="text-xs text-gray-400 mt-1 italic">Note: {member.membershipNotes}</p>
+                          )}
                         </div>
                       </div>
                       {isAdmin && member.userId !== currentUserId && (
@@ -974,6 +1062,13 @@ function ClubDetailModal({ club, isAuthenticated, currentUserId, onClose, onJoin
                             <option value="Moderator">Moderator</option>
                             <option value="Admin">Admin</option>
                           </select>
+                          <button
+                            onClick={() => setEditingMember(member)}
+                            className="p-1 text-purple-500 hover:bg-purple-50 rounded"
+                            title="Edit member details"
+                          >
+                            <Edit3 className="w-4 h-4" />
+                          </button>
                           <button
                             onClick={() => handleRemoveMember(member.id)}
                             className="p-1 text-red-500 hover:bg-red-50 rounded"
@@ -1156,11 +1251,95 @@ function ClubDetailModal({ club, isAuthenticated, currentUserId, onClose, onJoin
                     <span className="text-gray-600">Approval Required</span>
                     <span className="font-medium">{club.requiresApproval ? 'Yes' : 'No'}</span>
                   </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Membership Fee</span>
+                    <span className="font-medium">{club.hasMembershipFee ? (club.membershipFeeAmount || 'Yes') : 'No'}</span>
+                  </div>
+                  {club.hasMembershipFee && club.membershipFeePeriod && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Fee Period</span>
+                      <span className="font-medium capitalize">{club.membershipFeePeriod}</span>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
           )}
         </div>
+
+        {/* Edit Member Modal */}
+        {editingMember && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-[60]">
+            <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-gray-900">Edit Member Details</h3>
+                <button onClick={() => setEditingMember(null)} className="p-1 text-gray-400 hover:text-gray-600">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="mb-4">
+                <div className="flex items-center gap-3">
+                  {editingMember.profileImageUrl ? (
+                    <img src={getSharedAssetUrl(editingMember.profileImageUrl)} alt="" className="w-12 h-12 rounded-full object-cover" />
+                  ) : (
+                    <div className="w-12 h-12 rounded-full bg-purple-100 flex items-center justify-center">
+                      <span className="text-purple-600 font-medium text-lg">{editingMember.name?.charAt(0) || '?'}</span>
+                    </div>
+                  )}
+                  <div>
+                    <p className="font-medium text-gray-900">{editingMember.name}</p>
+                    <p className="text-sm text-gray-500">{editingMember.role}</p>
+                  </div>
+                </div>
+              </div>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
+                  <input
+                    type="text"
+                    value={memberEditData.title}
+                    onChange={(e) => setMemberEditData({ ...memberEditData, title: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg p-2"
+                    placeholder="e.g., Treasurer, Secretary, Tournament Director"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Membership Valid To</label>
+                  <input
+                    type="date"
+                    value={memberEditData.membershipValidTo}
+                    onChange={(e) => setMemberEditData({ ...memberEditData, membershipValidTo: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg p-2"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Notes (Admin Only)</label>
+                  <textarea
+                    value={memberEditData.membershipNotes}
+                    onChange={(e) => setMemberEditData({ ...memberEditData, membershipNotes: e.target.value })}
+                    rows={3}
+                    className="w-full border border-gray-300 rounded-lg p-2"
+                    placeholder="Payment status, notes about member..."
+                  />
+                </div>
+              </div>
+              <div className="flex gap-3 mt-6">
+                <button
+                  onClick={() => setEditingMember(null)}
+                  className="flex-1 py-2 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveMemberDetails}
+                  className="flex-1 py-2 bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700"
+                >
+                  Save
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -1170,6 +1349,7 @@ function CreateClubModal({ onClose, onCreate }) {
   const [formData, setFormData] = useState({
     name: '',
     description: '',
+    logoUrl: '',
     address: '',
     city: '',
     state: '',
@@ -1179,10 +1359,45 @@ function CreateClubModal({ onClose, onCreate }) {
     email: '',
     phone: '',
     isPublic: true,
-    requiresApproval: true
+    requiresApproval: true,
+    hasMembershipFee: false,
+    membershipFeeAmount: '',
+    membershipFeePeriod: '',
+    paymentInstructions: ''
   });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+
+  const handleLogoUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      setError('Please select an image file');
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setError('Logo must be less than 5MB');
+      return;
+    }
+
+    setUploadingLogo(true);
+    setError(null);
+    try {
+      const response = await assetApi.upload(file, 'logos', 'Club', null);
+      if (response.success) {
+        setFormData({ ...formData, logoUrl: response.data.url });
+      } else {
+        setError(response.message || 'Upload failed');
+      }
+    } catch (err) {
+      setError(err.message || 'Failed to upload logo');
+    } finally {
+      setUploadingLogo(false);
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -1245,6 +1460,44 @@ function CreateClubModal({ onClose, onCreate }) {
               className="w-full border border-gray-300 rounded-lg p-2 focus:ring-purple-500 focus:border-purple-500"
               placeholder="Tell people about your club..."
             />
+          </div>
+
+          {/* Logo Upload */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Club Logo</label>
+            <div className="flex items-center gap-4">
+              {formData.logoUrl ? (
+                <div className="relative">
+                  <img src={formData.logoUrl} alt="Club logo" className="w-20 h-20 rounded-lg object-cover" />
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, logoUrl: '' })}
+                    className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              ) : (
+                <label className="w-20 h-20 border-2 border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-purple-500 hover:bg-purple-50">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleLogoUpload}
+                    className="hidden"
+                    disabled={uploadingLogo}
+                  />
+                  {uploadingLogo ? (
+                    <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-purple-600"></div>
+                  ) : (
+                    <>
+                      <Image className="w-6 h-6 text-gray-400" />
+                      <span className="text-xs text-gray-500 mt-1">Upload</span>
+                    </>
+                  )}
+                </label>
+              )}
+              <p className="text-xs text-gray-500">Max 5MB. JPG or PNG recommended.</p>
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -1358,7 +1611,66 @@ function CreateClubModal({ onClose, onCreate }) {
                 <p className="text-sm text-gray-500">New members need approval to join</p>
               </div>
             </label>
+
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={formData.hasMembershipFee}
+                onChange={(e) => setFormData({ ...formData, hasMembershipFee: e.target.checked })}
+                className="w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+              />
+              <div>
+                <span className="font-medium text-gray-900">Membership Fee</span>
+                <p className="text-sm text-gray-500">This club has a membership fee</p>
+              </div>
+            </label>
           </div>
+
+          {/* Membership Fee Details */}
+          {formData.hasMembershipFee && (
+            <div className="p-4 bg-green-50 border border-green-200 rounded-lg space-y-4">
+              <h4 className="font-medium text-green-800 flex items-center gap-2">
+                <DollarSign className="w-4 h-4" />
+                Membership Fee Details
+              </h4>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Fee Amount</label>
+                  <input
+                    type="text"
+                    value={formData.membershipFeeAmount}
+                    onChange={(e) => setFormData({ ...formData, membershipFeeAmount: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg p-2 focus:ring-purple-500 focus:border-purple-500"
+                    placeholder="$25"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Fee Period</label>
+                  <select
+                    value={formData.membershipFeePeriod}
+                    onChange={(e) => setFormData({ ...formData, membershipFeePeriod: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg p-2 focus:ring-purple-500 focus:border-purple-500"
+                  >
+                    <option value="">Select period...</option>
+                    <option value="monthly">Monthly</option>
+                    <option value="quarterly">Quarterly</option>
+                    <option value="yearly">Yearly</option>
+                    <option value="one-time">One-time</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Payment Instructions</label>
+                <textarea
+                  value={formData.paymentInstructions}
+                  onChange={(e) => setFormData({ ...formData, paymentInstructions: e.target.value })}
+                  rows={3}
+                  className="w-full border border-gray-300 rounded-lg p-2 focus:ring-purple-500 focus:border-purple-500"
+                  placeholder="Venmo: @clubname, PayPal: club@email.com, or cash at meetings..."
+                />
+              </div>
+            </div>
+          )}
 
           <div className="flex gap-3 pt-4">
             <button

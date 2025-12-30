@@ -11,6 +11,8 @@ public class ClubDto
     public string? State { get; set; }
     public string? Country { get; set; }
     public bool IsPublic { get; set; }
+    public bool HasMembershipFee { get; set; }
+    public string? MembershipFeeAmount { get; set; }
     public int MemberCount { get; set; }
     public double? Distance { get; set; } // Calculated distance from user
     public DateTime CreatedAt { get; set; }
@@ -32,11 +34,19 @@ public class ClubDetailDto : ClubDto
     public int CreatedByUserId { get; set; }
     public string? CreatedByUserName { get; set; }
 
+    // Membership fee details
+    public string? MembershipFeePeriod { get; set; }
+    public string? PaymentInstructions { get; set; } // Only visible to members/admins
+
     // User's relationship with this club
     public bool IsMember { get; set; }
     public bool IsAdmin { get; set; }
     public bool IsModerator { get; set; }
     public bool HasPendingRequest { get; set; }
+
+    // Current user's membership info
+    public DateTime? MyMembershipValidTo { get; set; }
+    public string? MyTitle { get; set; }
 
     public List<ClubMemberDto>? RecentMembers { get; set; }
 }
@@ -51,7 +61,11 @@ public class ClubMemberDto
     public string? ExperienceLevel { get; set; }
     public string? Location { get; set; }
     public string Role { get; set; } = "Member";
+    public string? Title { get; set; } // Custom title like "Treasurer"
     public DateTime JoinedAt { get; set; }
+    public DateTime? MembershipValidTo { get; set; }
+    public string? MembershipNotes { get; set; } // Only visible to admins
+    public bool IsMembershipExpired { get; set; } // Computed: MembershipValidTo < now
 }
 
 // Club join request
@@ -105,6 +119,10 @@ public class CreateClubDto
     public string? Phone { get; set; }
     public bool IsPublic { get; set; } = true;
     public bool RequiresApproval { get; set; } = true;
+    public bool HasMembershipFee { get; set; } = false;
+    public string? MembershipFeeAmount { get; set; }
+    public string? MembershipFeePeriod { get; set; }
+    public string? PaymentInstructions { get; set; }
 }
 
 // Update club request
@@ -139,10 +157,20 @@ public class ReviewJoinRequestDto
     public bool Approve { get; set; }
 }
 
-// Update member role
+// Update member role and details
 public class UpdateMemberRoleDto
 {
     public string Role { get; set; } = "Member"; // Admin, Moderator, Member
+    public string? Title { get; set; } // Custom title like "Treasurer"
+}
+
+// Update member details (for admins)
+public class UpdateMemberDto
+{
+    public string? Role { get; set; }
+    public string? Title { get; set; }
+    public DateTime? MembershipValidTo { get; set; }
+    public string? MembershipNotes { get; set; }
 }
 
 // Send notification

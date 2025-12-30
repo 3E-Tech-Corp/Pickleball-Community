@@ -113,6 +113,8 @@ public class ClubsController : ControllerBase
                 State = x.club.State,
                 Country = x.club.Country,
                 IsPublic = x.club.IsPublic,
+                HasMembershipFee = x.club.HasMembershipFee,
+                MembershipFeeAmount = x.club.MembershipFeeAmount,
                 MemberCount = x.memberCount,
                 Distance = x.distance,
                 CreatedAt = x.club.CreatedAt
@@ -183,6 +185,10 @@ public class ClubsController : ControllerBase
                 IsPublic = club.IsPublic,
                 RequiresApproval = club.RequiresApproval,
                 InviteCode = isAdmin ? club.InviteCode : null, // Only show to admins
+                HasMembershipFee = club.HasMembershipFee,
+                MembershipFeeAmount = club.MembershipFeeAmount,
+                MembershipFeePeriod = club.MembershipFeePeriod,
+                PaymentInstructions = (membership != null || isAdmin) ? club.PaymentInstructions : null, // Only show to members/admins
                 MemberCount = club.Members.Count,
                 CreatedAt = club.CreatedAt,
                 CreatedByUserId = club.CreatedByUserId,
@@ -191,6 +197,8 @@ public class ClubsController : ControllerBase
                 IsAdmin = isAdmin,
                 IsModerator = isModerator,
                 HasPendingRequest = hasPendingRequest,
+                MyMembershipValidTo = membership?.MembershipValidTo,
+                MyTitle = membership?.Title,
                 RecentMembers = club.Members
                     .OrderByDescending(m => m.JoinedAt)
                     .Take(10)
@@ -203,7 +211,11 @@ public class ClubsController : ControllerBase
                         ExperienceLevel = m.User?.ExperienceLevel,
                         Location = GetUserLocation(m.User),
                         Role = m.Role,
-                        JoinedAt = m.JoinedAt
+                        Title = m.Title,
+                        JoinedAt = m.JoinedAt,
+                        MembershipValidTo = isAdmin ? m.MembershipValidTo : null, // Only show to admins
+                        MembershipNotes = isAdmin ? m.MembershipNotes : null, // Only show to admins
+                        IsMembershipExpired = m.MembershipValidTo.HasValue && m.MembershipValidTo.Value < DateTime.UtcNow
                     }).ToList()
             };
 
@@ -248,6 +260,10 @@ public class ClubsController : ControllerBase
                 Phone = dto.Phone,
                 IsPublic = dto.IsPublic,
                 RequiresApproval = dto.RequiresApproval,
+                HasMembershipFee = dto.HasMembershipFee,
+                MembershipFeeAmount = dto.MembershipFeeAmount,
+                MembershipFeePeriod = dto.MembershipFeePeriod,
+                PaymentInstructions = dto.PaymentInstructions,
                 InviteCode = inviteCode,
                 CreatedByUserId = userId.Value
             };
@@ -314,6 +330,10 @@ public class ClubsController : ControllerBase
             club.Phone = dto.Phone;
             club.IsPublic = dto.IsPublic;
             club.RequiresApproval = dto.RequiresApproval;
+            club.HasMembershipFee = dto.HasMembershipFee;
+            club.MembershipFeeAmount = dto.MembershipFeeAmount;
+            club.MembershipFeePeriod = dto.MembershipFeePeriod;
+            club.PaymentInstructions = dto.PaymentInstructions;
             club.UpdatedAt = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
@@ -487,6 +507,10 @@ public class ClubsController : ControllerBase
             if (club == null || !club.IsActive)
                 return NotFound(new ApiResponse<List<ClubMemberDto>> { Success = false, Message = "Club not found" });
 
+            var userId = GetCurrentUserId();
+            var isAdmin = userId.HasValue && await _context.ClubMembers
+                .AnyAsync(m => m.ClubId == id && m.UserId == userId.Value && m.Role == "Admin" && m.IsActive);
+
             var members = await _context.ClubMembers
                 .Include(m => m.User)
                 .Where(m => m.ClubId == id && m.IsActive)
@@ -501,9 +525,22 @@ public class ClubsController : ControllerBase
                     ExperienceLevel = m.User != null ? m.User.ExperienceLevel : null,
                     Location = m.User != null ? GetUserLocationStatic(m.User.City, m.User.State) : null,
                     Role = m.Role,
-                    JoinedAt = m.JoinedAt
+                    Title = m.Title,
+                    JoinedAt = m.JoinedAt,
+                    MembershipValidTo = m.MembershipValidTo,
+                    MembershipNotes = m.MembershipNotes,
+                    IsMembershipExpired = m.MembershipValidTo.HasValue && m.MembershipValidTo.Value < DateTime.UtcNow
                 })
                 .ToListAsync();
+
+            // Hide admin-only fields for non-admins
+            if (!isAdmin)
+            {
+                foreach (var member in members)
+                {
+                    member.MembershipNotes = null;
+                }
+            }
 
             return Ok(new ApiResponse<List<ClubMemberDto>> { Success = true, Data = members });
         }
@@ -551,6 +588,7 @@ public class ClubsController : ControllerBase
             }
 
             membership.Role = dto.Role;
+            membership.Title = dto.Title;
             await _context.SaveChangesAsync();
 
             return Ok(new ApiResponse<bool> { Success = true, Data = true, Message = "Role updated" });
@@ -559,6 +597,86 @@ public class ClubsController : ControllerBase
         {
             _logger.LogError(ex, "Error updating member role");
             return StatusCode(500, new ApiResponse<bool> { Success = false, Message = "An error occurred" });
+        }
+    }
+
+    // PUT: /clubs/{id}/members/{memberId} - Update member details (admin only)
+    [HttpPut("{id}/members/{memberId}")]
+    [Authorize]
+    public async Task<ActionResult<ApiResponse<ClubMemberDto>>> UpdateMember(int id, int memberId, [FromBody] UpdateMemberDto dto)
+    {
+        try
+        {
+            var userId = GetCurrentUserId();
+            if (!userId.HasValue)
+                return Unauthorized(new ApiResponse<ClubMemberDto> { Success = false, Message = "User not authenticated" });
+
+            // Check if user is admin
+            var isAdmin = await _context.ClubMembers
+                .AnyAsync(m => m.ClubId == id && m.UserId == userId.Value && m.Role == "Admin" && m.IsActive);
+
+            if (!isAdmin)
+                return Forbid();
+
+            var membership = await _context.ClubMembers
+                .Include(m => m.User)
+                .FirstOrDefaultAsync(m => m.Id == memberId && m.ClubId == id && m.IsActive);
+
+            if (membership == null)
+                return NotFound(new ApiResponse<ClubMemberDto> { Success = false, Message = "Member not found" });
+
+            // Update fields if provided
+            if (!string.IsNullOrEmpty(dto.Role))
+            {
+                if (!new[] { "Admin", "Moderator", "Member" }.Contains(dto.Role))
+                    return BadRequest(new ApiResponse<ClubMemberDto> { Success = false, Message = "Invalid role" });
+
+                // Cannot demote the last admin
+                if (membership.Role == "Admin" && dto.Role != "Admin")
+                {
+                    var adminCount = await _context.ClubMembers
+                        .CountAsync(m => m.ClubId == id && m.Role == "Admin" && m.IsActive);
+
+                    if (adminCount == 1)
+                        return BadRequest(new ApiResponse<ClubMemberDto> { Success = false, Message = "Cannot demote the only admin" });
+                }
+
+                membership.Role = dto.Role;
+            }
+
+            if (dto.Title != null)
+                membership.Title = dto.Title;
+
+            if (dto.MembershipValidTo.HasValue)
+                membership.MembershipValidTo = dto.MembershipValidTo;
+
+            if (dto.MembershipNotes != null)
+                membership.MembershipNotes = dto.MembershipNotes;
+
+            await _context.SaveChangesAsync();
+
+            var result = new ClubMemberDto
+            {
+                Id = membership.Id,
+                UserId = membership.UserId,
+                Name = membership.User != null ? $"{membership.User.FirstName} {membership.User.LastName}".Trim() : "",
+                ProfileImageUrl = membership.User?.ProfileImageUrl,
+                ExperienceLevel = membership.User?.ExperienceLevel,
+                Location = GetUserLocation(membership.User),
+                Role = membership.Role,
+                Title = membership.Title,
+                JoinedAt = membership.JoinedAt,
+                MembershipValidTo = membership.MembershipValidTo,
+                MembershipNotes = membership.MembershipNotes,
+                IsMembershipExpired = membership.MembershipValidTo.HasValue && membership.MembershipValidTo.Value < DateTime.UtcNow
+            };
+
+            return Ok(new ApiResponse<ClubMemberDto> { Success = true, Data = result, Message = "Member updated" });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating member");
+            return StatusCode(500, new ApiResponse<ClubMemberDto> { Success = false, Message = "An error occurred" });
         }
     }
 
@@ -841,6 +959,8 @@ public class ClubsController : ControllerBase
                     State = m.Club.State,
                     Country = m.Club.Country,
                     IsPublic = m.Club.IsPublic,
+                    HasMembershipFee = m.Club.HasMembershipFee,
+                    MembershipFeeAmount = m.Club.MembershipFeeAmount,
                     MemberCount = _context.ClubMembers.Count(cm => cm.ClubId == m.ClubId && cm.IsActive),
                     CreatedAt = m.Club.CreatedAt
                 })
@@ -858,6 +978,8 @@ public class ClubsController : ControllerBase
                     State = m.Club.State,
                     Country = m.Club.Country,
                     IsPublic = m.Club.IsPublic,
+                    HasMembershipFee = m.Club.HasMembershipFee,
+                    MembershipFeeAmount = m.Club.MembershipFeeAmount,
                     MemberCount = _context.ClubMembers.Count(cm => cm.ClubId == m.ClubId && cm.IsActive),
                     CreatedAt = m.Club.CreatedAt
                 })
@@ -992,6 +1114,8 @@ public class ClubsController : ControllerBase
                 State = club.State,
                 Country = club.Country,
                 IsPublic = club.IsPublic,
+                HasMembershipFee = club.HasMembershipFee,
+                MembershipFeeAmount = club.MembershipFeeAmount,
                 MemberCount = memberCount,
                 CreatedAt = club.CreatedAt
             };

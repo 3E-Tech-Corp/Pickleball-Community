@@ -655,9 +655,13 @@ export const clubsApi = {
   // Get club members
   getMembers: (id) => api.get(`/clubs/${id}/members`),
 
-  // Update member role
-  updateMemberRole: (clubId, memberId, role) =>
-    api.put(`/clubs/${clubId}/members/${memberId}/role`, { role }),
+  // Update member role and title
+  updateMemberRole: (clubId, memberId, role, title = null) =>
+    api.put(`/clubs/${clubId}/members/${memberId}/role`, { role, title }),
+
+  // Update member details (admin only)
+  updateMember: (clubId, memberId, data) =>
+    api.put(`/clubs/${clubId}/members/${memberId}`, data),
 
   // Remove a member
   removeMember: (clubId, memberId) =>
