@@ -114,6 +114,8 @@ public class UsersController : ControllerBase
                 user.LastName = request.LastName;
             if (request.Bio != null)
                 user.Bio = request.Bio;
+            if (request.ProfileImageUrl != null)
+                user.ProfileImageUrl = request.ProfileImageUrl;
 
             // Update basic info fields
             if (request.Gender != null)
