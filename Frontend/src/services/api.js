@@ -511,7 +511,14 @@ export const courtsApi = {
   getStatesByCountry: (country) => api.get(`/courts/countries/${encodeURIComponent(country)}/states`),
 
   // Get cities for a state with court counts
-  getCitiesByState: (country, state) => api.get(`/courts/countries/${encodeURIComponent(country)}/states/${encodeURIComponent(state)}/cities`)
+  getCitiesByState: (country, state) => api.get(`/courts/countries/${encodeURIComponent(country)}/states/${encodeURIComponent(state)}/cities`),
+
+  // Court Assets
+  getAssets: (courtId) => api.get(`/courts/${courtId}/assets`),
+  uploadAsset: (courtId, data) => api.post(`/courts/${courtId}/assets`, data),
+  deleteAsset: (assetId) => api.delete(`/courts/assets/${assetId}`),
+  voteOnAsset: (assetId, isLike) => api.post(`/courts/assets/${assetId}/vote`, { isLike }),
+  removeAssetVote: (assetId) => api.delete(`/courts/assets/${assetId}/vote`)
 }
 
 // Event Types API

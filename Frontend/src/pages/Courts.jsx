@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { MapPin, Search, Filter, Star, Clock, Plus, Phone, Globe, CheckCircle, X, Sun, DollarSign, Layers, ThumbsUp, MessageSquare, ChevronLeft, ChevronRight, ExternalLink, Calendar, Navigation, List, Map, ArrowUpDown, SortAsc, SortDesc, Locate } from 'lucide-react';
+import { MapPin, Search, Filter, Star, Clock, Plus, Phone, Globe, CheckCircle, X, Sun, DollarSign, Layers, ThumbsUp, ThumbsDown, MessageSquare, ChevronLeft, ChevronRight, ExternalLink, Calendar, Navigation, List, Map, ArrowUpDown, SortAsc, SortDesc, Locate, Image, Video, Upload, Trash2, Play } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { courtsApi } from '../services/api';
+import { courtsApi, assetApi } from '../services/api';
 
 const SURFACE_TYPES = [
   { value: 'all', label: 'All Surfaces' },
@@ -839,6 +839,14 @@ function CourtCard({ court, onViewDetails }) {
 function CourtDetailModal({ court, isAuthenticated, onClose, onConfirmationSubmitted }) {
   const [activeTab, setActiveTab] = useState('details');
   const [submitting, setSubmitting] = useState(false);
+
+  // Asset state
+  const [assets, setAssets] = useState([]);
+  const [assetsLoading, setAssetsLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState(null);
+  const { user } = useAuth();
+
   const [formData, setFormData] = useState({
     nameConfirmed: court.myConfirmation?.nameConfirmed ?? null,
     suggestedName: court.myConfirmation?.suggestedName || '',
@@ -854,8 +862,126 @@ function CourtDetailModal({ court, isAuthenticated, onClose, onConfirmationSubmi
     rating: court.myConfirmation?.rating ?? null,
     surfaceType: court.myConfirmation?.surfaceType || '',
     amenities: court.myConfirmation?.amenities || [],
-    notes: court.myConfirmation?.notes || ''
+    notes: court.myConfirmation?.notes || '',
+    confirmedAddress: court.myConfirmation?.confirmedAddress || '',
+    confirmedCity: court.myConfirmation?.confirmedCity || '',
+    confirmedState: court.myConfirmation?.confirmedState || '',
+    confirmedCountry: court.myConfirmation?.confirmedCountry || ''
   });
+
+  // Load assets when modal opens
+  useEffect(() => {
+    const loadAssets = async () => {
+      setAssetsLoading(true);
+      try {
+        const response = await courtsApi.getAssets(court.courtId);
+        if (response.success) {
+          setAssets(response.data || []);
+        }
+      } catch (err) {
+        console.error('Error loading court assets:', err);
+      } finally {
+        setAssetsLoading(false);
+      }
+    };
+    loadAssets();
+  }, [court.courtId]);
+
+  // Handle asset vote (like/dislike)
+  const handleAssetVote = async (assetId, isLike) => {
+    if (!isAuthenticated) return;
+    try {
+      const asset = assets.find(a => a.id === assetId);
+      if (!asset) return;
+
+      // If user already has the same vote, remove it
+      if (asset.userLiked === isLike) {
+        const response = await courtsApi.removeAssetVote(assetId);
+        if (response.success) {
+          setAssets(prev => prev.map(a => a.id === assetId ? response.data : a));
+        }
+      } else {
+        // Add or change vote
+        const response = await courtsApi.voteOnAsset(assetId, isLike);
+        if (response.success) {
+          setAssets(prev => prev.map(a => a.id === assetId ? response.data : a));
+        }
+      }
+    } catch (err) {
+      console.error('Error voting on asset:', err);
+    }
+  };
+
+  // Handle asset upload
+  const handleAssetUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    const isImage = file.type.startsWith('image/');
+    const isVideo = file.type.startsWith('video/');
+    if (!isImage && !isVideo) {
+      setUploadError('Please select an image or video file');
+      return;
+    }
+
+    // Validate file size (50MB for videos, 10MB for images)
+    const maxSize = isVideo ? 50 * 1024 * 1024 : 10 * 1024 * 1024;
+    if (file.size > maxSize) {
+      setUploadError(`File too large. Maximum size is ${isVideo ? '50MB' : '10MB'}`);
+      return;
+    }
+
+    setUploading(true);
+    setUploadError(null);
+
+    try {
+      // Upload file to asset service
+      const folder = isVideo ? 'videos' : 'images';
+      const uploadResponse = await assetApi.upload(file, folder, 'CourtAsset', court.courtId);
+
+      if (!uploadResponse.success) {
+        throw new Error(uploadResponse.message || 'Upload failed');
+      }
+
+      // Create court asset record
+      const assetData = {
+        assetType: isVideo ? 'video' : 'image',
+        assetUrl: uploadResponse.data.url,
+        thumbnailUrl: isVideo ? null : uploadResponse.data.url,
+        width: null,
+        height: null,
+        fileSizeBytes: file.size,
+        mimeType: file.type
+      };
+
+      const response = await courtsApi.uploadAsset(court.courtId, assetData);
+      if (response.success) {
+        setAssets(prev => [response.data, ...prev]);
+      }
+    } catch (err) {
+      console.error('Error uploading asset:', err);
+      setUploadError(err.message || 'Failed to upload file');
+    } finally {
+      setUploading(false);
+      // Reset file input
+      e.target.value = '';
+    }
+  };
+
+  // Handle asset delete
+  const handleDeleteAsset = async (assetId) => {
+    if (!confirm('Are you sure you want to delete this photo/video?')) return;
+
+    try {
+      const response = await courtsApi.deleteAsset(assetId);
+      if (response.success) {
+        setAssets(prev => prev.filter(a => a.id !== assetId));
+      }
+    } catch (err) {
+      console.error('Error deleting asset:', err);
+    }
+  };
 
   const handleSubmitConfirmation = async (e) => {
     e.preventDefault();
@@ -946,6 +1072,17 @@ function CourtDetailModal({ court, isAuthenticated, onClose, onConfirmationSubmi
               }`}
             >
               User Reports ({agg.confirmationCount || 0})
+            </button>
+            <button
+              onClick={() => setActiveTab('photos')}
+              className={`px-6 py-3 font-medium text-sm border-b-2 transition-colors flex items-center gap-1 ${
+                activeTab === 'photos'
+                  ? 'border-green-600 text-green-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              <Image className="w-4 h-4" />
+              Photos ({assets.length})
             </button>
           </div>
         </div>
@@ -1179,6 +1316,43 @@ function CourtDetailModal({ court, isAuthenticated, onClose, onConfirmationSubmi
                           placeholder={court.coveredNum?.toString() || '0'}
                           value={formData.confirmedCoveredCount}
                           onChange={(e) => setFormData({ ...formData, confirmedCoveredCount: e.target.value })}
+                          className="w-full border border-gray-300 rounded-lg p-2 focus:ring-green-500 focus:border-green-500"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Address Confirmation */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Confirm Address</label>
+                    <div className="space-y-2">
+                      <input
+                        type="text"
+                        placeholder={court.address || 'Street address...'}
+                        value={formData.confirmedAddress}
+                        onChange={(e) => setFormData({ ...formData, confirmedAddress: e.target.value })}
+                        className="w-full border border-gray-300 rounded-lg p-2 focus:ring-green-500 focus:border-green-500"
+                      />
+                      <div className="grid grid-cols-3 gap-2">
+                        <input
+                          type="text"
+                          placeholder={court.city || 'City...'}
+                          value={formData.confirmedCity}
+                          onChange={(e) => setFormData({ ...formData, confirmedCity: e.target.value })}
+                          className="w-full border border-gray-300 rounded-lg p-2 focus:ring-green-500 focus:border-green-500"
+                        />
+                        <input
+                          type="text"
+                          placeholder={court.state || 'State...'}
+                          value={formData.confirmedState}
+                          onChange={(e) => setFormData({ ...formData, confirmedState: e.target.value })}
+                          className="w-full border border-gray-300 rounded-lg p-2 focus:ring-green-500 focus:border-green-500"
+                        />
+                        <input
+                          type="text"
+                          placeholder={court.country || 'Country...'}
+                          value={formData.confirmedCountry}
+                          onChange={(e) => setFormData({ ...formData, confirmedCountry: e.target.value })}
                           className="w-full border border-gray-300 rounded-lg p-2 focus:ring-green-500 focus:border-green-500"
                         />
                       </div>
@@ -1423,6 +1597,170 @@ function CourtDetailModal({ court, isAuthenticated, onClose, onConfirmationSubmi
                   <MessageSquare className="w-12 h-12 text-gray-300 mx-auto mb-4" />
                   <p>No user confirmations yet. Be the first to confirm info about this court!</p>
                 </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'photos' && (
+            <div>
+              {/* Upload Section */}
+              {isAuthenticated && (
+                <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+                  <h3 className="font-medium text-gray-900 mb-3 flex items-center gap-2">
+                    <Upload className="w-5 h-5 text-green-600" />
+                    Share a Photo or Video
+                  </h3>
+                  <div className="flex items-center gap-4">
+                    <label className="flex-1">
+                      <input
+                        type="file"
+                        accept="image/*,video/*"
+                        onChange={handleAssetUpload}
+                        disabled={uploading}
+                        className="hidden"
+                      />
+                      <div className={`flex items-center justify-center gap-2 py-3 px-4 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-green-500 hover:bg-green-50 transition-colors ${uploading ? 'opacity-50 cursor-wait' : ''}`}>
+                        {uploading ? (
+                          <>
+                            <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-green-600"></div>
+                            <span className="text-gray-600">Uploading...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Plus className="w-5 h-5 text-gray-400" />
+                            <span className="text-gray-600">Click to upload photo or video</span>
+                          </>
+                        )}
+                      </div>
+                    </label>
+                  </div>
+                  {uploadError && (
+                    <p className="mt-2 text-sm text-red-600">{uploadError}</p>
+                  )}
+                  <p className="mt-2 text-xs text-gray-500">
+                    Images up to 10MB, videos up to 50MB. Accepted formats: JPG, PNG, GIF, MP4, WebM
+                  </p>
+                </div>
+              )}
+
+              {/* Assets Gallery */}
+              {assetsLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-green-600"></div>
+                </div>
+              ) : assets.length > 0 ? (
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  {assets.map(asset => (
+                    <div key={asset.id} className="relative group">
+                      {/* Asset Preview */}
+                      <div className="aspect-square bg-gray-100 rounded-lg overflow-hidden">
+                        {asset.assetType === 'video' ? (
+                          <div className="relative w-full h-full">
+                            <video
+                              src={asset.assetUrl}
+                              className="w-full h-full object-cover"
+                              muted
+                            />
+                            <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+                              <Play className="w-12 h-12 text-white" />
+                            </div>
+                          </div>
+                        ) : (
+                          <img
+                            src={asset.assetUrl}
+                            alt={asset.description || 'Court photo'}
+                            className="w-full h-full object-cover"
+                            loading="lazy"
+                          />
+                        )}
+                      </div>
+
+                      {/* Overlay with user info and actions */}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity rounded-lg">
+                        <div className="absolute bottom-0 left-0 right-0 p-3">
+                          {/* User info */}
+                          <div className="flex items-center gap-2 mb-2">
+                            {asset.userProfileImageUrl ? (
+                              <img src={asset.userProfileImageUrl} alt="" className="w-6 h-6 rounded-full" />
+                            ) : (
+                              <div className="w-6 h-6 rounded-full bg-green-100 flex items-center justify-center">
+                                <span className="text-green-600 text-xs font-medium">
+                                  {asset.userName?.charAt(0) || '?'}
+                                </span>
+                              </div>
+                            )}
+                            <span className="text-white text-sm truncate">{asset.userName || 'Anonymous'}</span>
+                          </div>
+
+                          {/* Like/Dislike actions */}
+                          <div className="flex items-center gap-3">
+                            <button
+                              onClick={() => handleAssetVote(asset.id, true)}
+                              disabled={!isAuthenticated}
+                              className={`flex items-center gap-1 text-sm transition-colors ${
+                                asset.userLiked === true
+                                  ? 'text-green-400'
+                                  : 'text-white/80 hover:text-green-400'
+                              } ${!isAuthenticated ? 'cursor-not-allowed opacity-50' : ''}`}
+                              title={isAuthenticated ? 'Like' : 'Sign in to like'}
+                            >
+                              <ThumbsUp className="w-4 h-4" />
+                              <span>{asset.likeCount || 0}</span>
+                            </button>
+                            <button
+                              onClick={() => handleAssetVote(asset.id, false)}
+                              disabled={!isAuthenticated}
+                              className={`flex items-center gap-1 text-sm transition-colors ${
+                                asset.userLiked === false
+                                  ? 'text-red-400'
+                                  : 'text-white/80 hover:text-red-400'
+                              } ${!isAuthenticated ? 'cursor-not-allowed opacity-50' : ''}`}
+                              title={isAuthenticated ? 'Dislike' : 'Sign in to dislike'}
+                            >
+                              <ThumbsDown className="w-4 h-4" />
+                              <span>{asset.dislikeCount || 0}</span>
+                            </button>
+
+                            {/* Delete button (owner only) */}
+                            {asset.isOwner && (
+                              <button
+                                onClick={() => handleDeleteAsset(asset.id)}
+                                className="ml-auto text-white/80 hover:text-red-400 transition-colors"
+                                title="Delete"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Video badge */}
+                      {asset.assetType === 'video' && (
+                        <div className="absolute top-2 left-2 px-2 py-1 bg-black/60 rounded text-white text-xs flex items-center gap-1">
+                          <Video className="w-3 h-3" />
+                          Video
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-12 text-gray-500">
+                  <Image className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                  <h3 className="font-medium text-gray-900 mb-2">No Photos Yet</h3>
+                  <p className="text-sm">
+                    {isAuthenticated
+                      ? 'Be the first to share a photo of this court!'
+                      : 'Sign in to share photos of this court.'}
+                  </p>
+                </div>
+              )}
+
+              {!isAuthenticated && assets.length > 0 && (
+                <p className="mt-4 text-center text-sm text-gray-500">
+                  Sign in to like photos or share your own
+                </p>
               )}
             </div>
           )}

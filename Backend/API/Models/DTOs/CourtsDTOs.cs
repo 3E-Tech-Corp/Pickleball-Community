@@ -37,12 +37,17 @@ public class CourtAggregatedInfoDto
     public List<string>? CommonAmenities { get; set; }
     public int NotACourtCount { get; set; } // Number of users who flagged this as not a court
     public string? MostSuggestedName { get; set; } // Most commonly suggested name
+    public string? MostConfirmedAddress { get; set; }
+    public string? MostConfirmedCity { get; set; }
+    public string? MostConfirmedState { get; set; }
+    public string? MostConfirmedCountry { get; set; }
 }
 
 public class CourtDetailDto : CourtDto
 {
     public List<CourtConfirmationDto>? RecentConfirmations { get; set; }
     public CourtConfirmationDto? MyConfirmation { get; set; }
+    public List<CourtAssetDto>? TopAssets { get; set; }
 }
 
 public class CourtConfirmationDto
@@ -67,6 +72,10 @@ public class CourtConfirmationDto
     public string? Notes { get; set; }
     public List<string>? Amenities { get; set; }
     public string? SurfaceType { get; set; }
+    public string? ConfirmedAddress { get; set; }
+    public string? ConfirmedCity { get; set; }
+    public string? ConfirmedState { get; set; }
+    public string? ConfirmedCountry { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
 }
@@ -88,6 +97,10 @@ public class SubmitCourtConfirmationDto
     public string? Notes { get; set; }
     public List<string>? Amenities { get; set; }
     public string? SurfaceType { get; set; }
+    public string? ConfirmedAddress { get; set; }
+    public string? ConfirmedCity { get; set; }
+    public string? ConfirmedState { get; set; }
+    public string? ConfirmedCountry { get; set; }
 }
 
 public class CourtSearchRequest
@@ -112,4 +125,42 @@ public class LocationCountDto
 {
     public string Name { get; set; } = string.Empty;
     public int Count { get; set; }
+}
+
+// Court Asset DTOs
+public class CourtAssetDto
+{
+    public int Id { get; set; }
+    public int CourtId { get; set; }
+    public int UserId { get; set; }
+    public string? UserName { get; set; }
+    public string? UserProfileImageUrl { get; set; }
+    public string AssetType { get; set; } = string.Empty; // 'image' or 'video'
+    public string AssetUrl { get; set; } = string.Empty;
+    public string? ThumbnailUrl { get; set; }
+    public string? Description { get; set; }
+    public int? Width { get; set; }
+    public int? Height { get; set; }
+    public int LikeCount { get; set; }
+    public int DislikeCount { get; set; }
+    public bool? UserLiked { get; set; } // null = not voted, true = liked, false = disliked
+    public bool IsOwner { get; set; }
+    public DateTime CreatedAt { get; set; }
+}
+
+public class UploadCourtAssetDto
+{
+    public string AssetType { get; set; } = "image"; // 'image' or 'video'
+    public string AssetUrl { get; set; } = string.Empty;
+    public string? ThumbnailUrl { get; set; }
+    public string? Description { get; set; }
+    public int? Width { get; set; }
+    public int? Height { get; set; }
+    public long? FileSizeBytes { get; set; }
+    public string? MimeType { get; set; }
+}
+
+public class CourtAssetLikeDto
+{
+    public bool IsLike { get; set; } // true = like, false = dislike
 }

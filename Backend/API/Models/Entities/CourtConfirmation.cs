@@ -61,6 +61,19 @@ public class CourtConfirmation
     [MaxLength(50)]
     public string? SurfaceType { get; set; } // concrete, asphalt, sport_court, wood
 
+    // Address confirmation
+    [MaxLength(200)]
+    public string? ConfirmedAddress { get; set; }
+
+    [MaxLength(100)]
+    public string? ConfirmedCity { get; set; }
+
+    [MaxLength(100)]
+    public string? ConfirmedState { get; set; }
+
+    [MaxLength(100)]
+    public string? ConfirmedCountry { get; set; }
+
     // Timestamps
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;

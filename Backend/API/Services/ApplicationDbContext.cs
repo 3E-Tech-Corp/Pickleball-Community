@@ -44,6 +44,8 @@ public class ApplicationDbContext : DbContext
     public DbSet<CourtGeoCode> CourtGeoCodes { get; set; }
     public DbSet<GeoCodeType> GeoCodeTypes { get; set; }
     public DbSet<CourtConfirmation> CourtConfirmations { get; set; }
+    public DbSet<CourtAsset> CourtAssets { get; set; }
+    public DbSet<CourtAssetLike> CourtAssetLikes { get; set; }
 
     // Events
     public DbSet<EventType> EventTypes { get; set; }
@@ -382,6 +384,39 @@ public class ApplicationDbContext : DbContext
 
             entity.HasIndex(cc => new { cc.CourtId, cc.UserId }).IsUnique();
             entity.HasIndex(cc => cc.CourtId);
+        });
+
+        modelBuilder.Entity<CourtAsset>(entity =>
+        {
+            entity.HasOne(ca => ca.Court)
+                  .WithMany()
+                  .HasForeignKey(ca => ca.CourtId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(ca => ca.User)
+                  .WithMany()
+                  .HasForeignKey(ca => ca.UserId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasIndex(ca => ca.CourtId);
+            entity.HasIndex(ca => ca.UserId);
+            entity.HasIndex(ca => ca.CreatedAt);
+        });
+
+        modelBuilder.Entity<CourtAssetLike>(entity =>
+        {
+            entity.HasOne(cal => cal.Asset)
+                  .WithMany(a => a.Likes)
+                  .HasForeignKey(cal => cal.AssetId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(cal => cal.User)
+                  .WithMany()
+                  .HasForeignKey(cal => cal.UserId)
+                  .OnDelete(DeleteBehavior.NoAction);
+
+            entity.HasIndex(cal => new { cal.AssetId, cal.UserId }).IsUnique();
+            entity.HasIndex(cal => cal.AssetId);
         });
     }
 }

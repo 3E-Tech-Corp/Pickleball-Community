@@ -455,6 +455,10 @@ public class CourtsController : ControllerBase
                 existingConfirmation.Rating = dto.Rating ?? existingConfirmation.Rating;
                 existingConfirmation.Notes = dto.Notes ?? existingConfirmation.Notes;
                 existingConfirmation.SurfaceType = dto.SurfaceType ?? existingConfirmation.SurfaceType;
+                existingConfirmation.ConfirmedAddress = dto.ConfirmedAddress ?? existingConfirmation.ConfirmedAddress;
+                existingConfirmation.ConfirmedCity = dto.ConfirmedCity ?? existingConfirmation.ConfirmedCity;
+                existingConfirmation.ConfirmedState = dto.ConfirmedState ?? existingConfirmation.ConfirmedState;
+                existingConfirmation.ConfirmedCountry = dto.ConfirmedCountry ?? existingConfirmation.ConfirmedCountry;
                 if (dto.Amenities != null)
                     existingConfirmation.Amenities = string.Join(",", dto.Amenities);
                 existingConfirmation.UpdatedAt = DateTime.UtcNow;
@@ -488,6 +492,10 @@ public class CourtsController : ControllerBase
                     Rating = dto.Rating,
                     Notes = dto.Notes,
                     SurfaceType = dto.SurfaceType,
+                    ConfirmedAddress = dto.ConfirmedAddress,
+                    ConfirmedCity = dto.ConfirmedCity,
+                    ConfirmedState = dto.ConfirmedState,
+                    ConfirmedCountry = dto.ConfirmedCountry,
                     Amenities = dto.Amenities != null ? string.Join(",", dto.Amenities) : null
                 };
 
@@ -817,6 +825,10 @@ public class CourtsController : ControllerBase
             Rating = cc.Rating,
             Notes = cc.Notes,
             SurfaceType = cc.SurfaceType,
+            ConfirmedAddress = cc.ConfirmedAddress,
+            ConfirmedCity = cc.ConfirmedCity,
+            ConfirmedState = cc.ConfirmedState,
+            ConfirmedCountry = cc.ConfirmedCountry,
             Amenities = cc.Amenities?.Split(',', StringSplitOptions.RemoveEmptyEntries).ToList(),
             CreatedAt = cc.CreatedAt,
             UpdatedAt = cc.UpdatedAt
