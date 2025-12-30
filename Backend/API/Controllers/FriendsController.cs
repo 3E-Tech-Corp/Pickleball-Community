@@ -58,7 +58,7 @@ public class FriendsController : ControllerBase
                 .Where(f => f.UserId1 == userId.Value || f.UserId2 == userId.Value)
                 .ToListAsync();
 
-            var friends = friendships.Select(f =>
+            var friendsList = friendships.Select(f =>
             {
                 var friendUser = f.UserId1 == userId.Value ? f.User2 : f.User1;
                 return new FriendDto
@@ -77,7 +77,7 @@ public class FriendsController : ControllerBase
                 };
             }).ToList();
 
-            return Ok(new ApiResponse<List<FriendDto>> { Success = true, Data = friends });
+            return Ok(new ApiResponse<List<FriendDto>> { Success = true, Data = friendsList });
         }
         catch (Exception ex)
         {
@@ -166,7 +166,7 @@ public class FriendsController : ControllerBase
                 .Take(20)
                 .ToListAsync();
 
-            var users = usersQuery.Select(u => new PlayerSearchResultDto
+            var usersList = usersQuery.Select(u => new PlayerSearchResultDto
             {
                 Id = u.Id,
                 Name = $"{u.FirstName} {u.LastName}".Trim(),
@@ -179,7 +179,7 @@ public class FriendsController : ControllerBase
                 HasPendingRequest = pendingRequestUserIds.Contains(u.Id)
             }).ToList();
 
-            return Ok(new ApiResponse<List<PlayerSearchResultDto>> { Success = true, Data = users });
+            return Ok(new ApiResponse<List<PlayerSearchResultDto>> { Success = true, Data = usersList });
         }
         catch (Exception ex)
         {
@@ -242,13 +242,13 @@ public class FriendsController : ControllerBase
             }
 
             // Fallback to LINQ
-            var requestsData = await _context.FriendRequests
+            var pendingData = await _context.FriendRequests
                 .Include(fr => fr.Sender)
                 .Where(fr => fr.RecipientId == userId.Value && fr.Status == "Pending")
                 .OrderByDescending(fr => fr.CreatedAt)
                 .ToListAsync();
 
-            var requests = requestsData.Select(fr => new FriendRequestDto
+            var pendingList = pendingData.Select(fr => new FriendRequestDto
             {
                 Id = fr.Id,
                 Status = fr.Status,
@@ -267,7 +267,7 @@ public class FriendsController : ControllerBase
                 }
             }).ToList();
 
-            return Ok(new ApiResponse<List<FriendRequestDto>> { Success = true, Data = requests });
+            return Ok(new ApiResponse<List<FriendRequestDto>> { Success = true, Data = pendingList });
         }
         catch (Exception ex)
         {
@@ -334,13 +334,13 @@ public class FriendsController : ControllerBase
             }
 
             // Fallback to LINQ
-            var requestsData = await _context.FriendRequests
+            var sentData = await _context.FriendRequests
                 .Include(fr => fr.Recipient)
                 .Where(fr => fr.SenderId == userId.Value && fr.Status == "Pending")
                 .OrderByDescending(fr => fr.CreatedAt)
                 .ToListAsync();
 
-            var requests = requestsData.Select(fr => new FriendRequestDto
+            var sentList = sentData.Select(fr => new FriendRequestDto
             {
                 Id = fr.Id,
                 Status = fr.Status,
@@ -359,7 +359,7 @@ public class FriendsController : ControllerBase
                 }
             }).ToList();
 
-            return Ok(new ApiResponse<List<FriendRequestDto>> { Success = true, Data = requests });
+            return Ok(new ApiResponse<List<FriendRequestDto>> { Success = true, Data = sentList });
         }
         catch (Exception ex)
         {
