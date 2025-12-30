@@ -39,7 +39,7 @@ export const getSharedAssetUrl = (path) => {
 }
 
 // Export URLs for direct use if needed
-export { API_BASE_URL, SHARED_AUTH_URL }
+export { API_BASE_URL, SHARED_AUTH_URL, SHARED_AUTH_UI_URL }
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -255,9 +255,6 @@ export const authApi = {
   }
 
 }
-
-// Export shared auth URLs for components that need them
-export { SHARED_AUTH_URL, SHARED_AUTH_UI_URL }
 
 // Theme Management API
 export const themeApi = {
