@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { Calendar, MapPin, Clock, Users, ChevronLeft, ChevronRight, ArrowRight } from 'lucide-react';
+import { Calendar, MapPin, Clock, Users, ChevronLeft, ChevronRight, ArrowRight, Trophy, Stethoscope, UsersRound, PartyPopper } from 'lucide-react';
 import { eventsApi, getSharedAssetUrl } from '../../services/api';
 
 export default function FeaturedEvents() {
@@ -195,15 +195,17 @@ export default function FeaturedEvents() {
 }
 
 function EventCard({ event, formatDate, formatTime }) {
-  const getEventTypeColor = (typeName) => {
+  const getEventTypeStyle = (typeName) => {
     const name = (typeName || '').toLowerCase();
-    if (name.includes('tournament')) return 'bg-purple-100 text-purple-700';
-    if (name.includes('open') || name.includes('play')) return 'bg-green-100 text-green-700';
-    if (name.includes('clinic') || name.includes('lesson')) return 'bg-blue-100 text-blue-700';
-    if (name.includes('league')) return 'bg-orange-100 text-orange-700';
-    if (name.includes('social')) return 'bg-pink-100 text-pink-700';
-    return 'bg-gray-100 text-gray-700';
+    if (name.includes('tournament')) return { color: 'bg-purple-100 text-purple-700', Icon: Trophy };
+    if (name.includes('open') || name.includes('play')) return { color: 'bg-green-100 text-green-700', Icon: UsersRound };
+    if (name.includes('clinic') || name.includes('lesson')) return { color: 'bg-blue-100 text-blue-700', Icon: Stethoscope };
+    if (name.includes('league')) return { color: 'bg-orange-100 text-orange-700', Icon: Trophy };
+    if (name.includes('social')) return { color: 'bg-pink-100 text-pink-700', Icon: PartyPopper };
+    return { color: 'bg-gray-100 text-gray-700', Icon: Calendar };
   };
+
+  const typeStyle = getEventTypeStyle(event.eventTypeName);
 
   return (
     <Link
@@ -238,7 +240,8 @@ function EventCard({ event, formatDate, formatTime }) {
 
         {/* Event Type Badge */}
         <div className="absolute top-3 right-3">
-          <span className={`px-2 py-1 text-xs font-medium rounded-full ${getEventTypeColor(event.eventTypeName)}`}>
+          <span className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full ${typeStyle.color}`}>
+            <typeStyle.Icon className="w-3 h-3" />
             {event.eventTypeName || 'Event'}
           </span>
         </div>
