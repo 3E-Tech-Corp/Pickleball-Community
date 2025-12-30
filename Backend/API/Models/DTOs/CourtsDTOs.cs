@@ -96,10 +96,20 @@ public class CourtSearchRequest
     public double? Latitude { get; set; }
     public double? Longitude { get; set; }
     public double? RadiusMiles { get; set; } = 100;
+    public string? Country { get; set; }
     public string? State { get; set; }
     public string? City { get; set; }
     public bool? HasLights { get; set; }
     public bool? IsIndoor { get; set; }
     public int Page { get; set; } = 1;
     public int PageSize { get; set; } = 20;
+}
+
+/// <summary>
+/// DTO for location dropdown items with court counts
+/// </summary>
+public class LocationCountDto
+{
+    public string Name { get; set; } = string.Empty;
+    public int Count { get; set; }
 }

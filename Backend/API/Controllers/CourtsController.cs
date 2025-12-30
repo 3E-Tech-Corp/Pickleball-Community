@@ -521,6 +521,181 @@ public class CourtsController : ControllerBase
         }
     }
 
+    // GET: /courts/countries - Get countries with court counts
+    [HttpGet("countries")]
+    public async Task<ActionResult<ApiResponse<List<LocationCountDto>>>> GetCountries()
+    {
+        try
+        {
+            var countries = new List<LocationCountDto>();
+
+            var connection = _context.Database.GetDbConnection();
+            await connection.OpenAsync();
+
+            try
+            {
+                using var command = connection.CreateCommand();
+                command.CommandText = "GetCourtCountries";
+                command.CommandType = CommandType.StoredProcedure;
+
+                using var reader = await command.ExecuteReaderAsync();
+                while (await reader.ReadAsync())
+                {
+                    countries.Add(new LocationCountDto
+                    {
+                        Name = reader.GetString(reader.GetOrdinal("Country")),
+                        Count = reader.GetInt32(reader.GetOrdinal("CourtCount"))
+                    });
+                }
+            }
+            finally
+            {
+                await connection.CloseAsync();
+            }
+
+            return Ok(new ApiResponse<List<LocationCountDto>> { Success = true, Data = countries });
+        }
+        catch (SqlException ex) when (ex.Message.Contains("Could not find stored procedure"))
+        {
+            // Fallback to LINQ
+            _logger.LogWarning("Stored procedure GetCourtCountries not found, falling back to LINQ");
+            var countries = await _context.Courts
+                .Where(c => c.IsActive)
+                .GroupBy(c => c.Country ?? "Unknown")
+                .Select(g => new LocationCountDto { Name = g.Key, Count = g.Count() })
+                .OrderByDescending(x => x.Count)
+                .ThenBy(x => x.Name)
+                .ToListAsync();
+
+            return Ok(new ApiResponse<List<LocationCountDto>> { Success = true, Data = countries });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error fetching countries");
+            return StatusCode(500, new ApiResponse<List<LocationCountDto>> { Success = false, Message = "An error occurred" });
+        }
+    }
+
+    // GET: /courts/countries/{country}/states - Get states for a country with court counts
+    [HttpGet("countries/{country}/states")]
+    public async Task<ActionResult<ApiResponse<List<LocationCountDto>>>> GetStatesByCountry(string country)
+    {
+        try
+        {
+            var states = new List<LocationCountDto>();
+
+            var connection = _context.Database.GetDbConnection();
+            await connection.OpenAsync();
+
+            try
+            {
+                using var command = connection.CreateCommand();
+                command.CommandText = "GetCourtStatesByCountry";
+                command.CommandType = CommandType.StoredProcedure;
+
+                command.Parameters.Add(new SqlParameter("@Country", SqlDbType.NVarChar, 100) { Value = country });
+
+                using var reader = await command.ExecuteReaderAsync();
+                while (await reader.ReadAsync())
+                {
+                    states.Add(new LocationCountDto
+                    {
+                        Name = reader.GetString(reader.GetOrdinal("State")),
+                        Count = reader.GetInt32(reader.GetOrdinal("CourtCount"))
+                    });
+                }
+            }
+            finally
+            {
+                await connection.CloseAsync();
+            }
+
+            return Ok(new ApiResponse<List<LocationCountDto>> { Success = true, Data = states });
+        }
+        catch (SqlException ex) when (ex.Message.Contains("Could not find stored procedure"))
+        {
+            // Fallback to LINQ
+            _logger.LogWarning("Stored procedure GetCourtStatesByCountry not found, falling back to LINQ");
+            var searchCountry = country == "Unknown" ? null : country;
+            var states = await _context.Courts
+                .Where(c => c.IsActive && (searchCountry == null ? c.Country == null : c.Country == searchCountry))
+                .GroupBy(c => c.State ?? "Unknown")
+                .Select(g => new LocationCountDto { Name = g.Key, Count = g.Count() })
+                .OrderByDescending(x => x.Count)
+                .ThenBy(x => x.Name)
+                .ToListAsync();
+
+            return Ok(new ApiResponse<List<LocationCountDto>> { Success = true, Data = states });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error fetching states for country {Country}", country);
+            return StatusCode(500, new ApiResponse<List<LocationCountDto>> { Success = false, Message = "An error occurred" });
+        }
+    }
+
+    // GET: /courts/countries/{country}/states/{state}/cities - Get cities for a state with court counts
+    [HttpGet("countries/{country}/states/{state}/cities")]
+    public async Task<ActionResult<ApiResponse<List<LocationCountDto>>>> GetCitiesByState(string country, string state)
+    {
+        try
+        {
+            var cities = new List<LocationCountDto>();
+
+            var connection = _context.Database.GetDbConnection();
+            await connection.OpenAsync();
+
+            try
+            {
+                using var command = connection.CreateCommand();
+                command.CommandText = "GetCourtCitiesByState";
+                command.CommandType = CommandType.StoredProcedure;
+
+                command.Parameters.Add(new SqlParameter("@Country", SqlDbType.NVarChar, 100) { Value = country });
+                command.Parameters.Add(new SqlParameter("@State", SqlDbType.NVarChar, 100) { Value = state });
+
+                using var reader = await command.ExecuteReaderAsync();
+                while (await reader.ReadAsync())
+                {
+                    cities.Add(new LocationCountDto
+                    {
+                        Name = reader.GetString(reader.GetOrdinal("City")),
+                        Count = reader.GetInt32(reader.GetOrdinal("CourtCount"))
+                    });
+                }
+            }
+            finally
+            {
+                await connection.CloseAsync();
+            }
+
+            return Ok(new ApiResponse<List<LocationCountDto>> { Success = true, Data = cities });
+        }
+        catch (SqlException ex) when (ex.Message.Contains("Could not find stored procedure"))
+        {
+            // Fallback to LINQ
+            _logger.LogWarning("Stored procedure GetCourtCitiesByState not found, falling back to LINQ");
+            var searchCountry = country == "Unknown" ? null : country;
+            var searchState = state == "Unknown" ? null : state;
+            var cities = await _context.Courts
+                .Where(c => c.IsActive
+                    && (searchCountry == null ? c.Country == null : c.Country == searchCountry)
+                    && (searchState == null ? c.State == null : c.State == searchState))
+                .GroupBy(c => c.City ?? "Unknown")
+                .Select(g => new LocationCountDto { Name = g.Key, Count = g.Count() })
+                .OrderByDescending(x => x.Count)
+                .ThenBy(x => x.Name)
+                .ToListAsync();
+
+            return Ok(new ApiResponse<List<LocationCountDto>> { Success = true, Data = cities });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error fetching cities for {Country}/{State}", country, state);
+            return StatusCode(500, new ApiResponse<List<LocationCountDto>> { Success = false, Message = "An error occurred" });
+        }
+    }
+
     // GET: /courts/states - Get list of states with courts using stored procedure
     [HttpGet("states")]
     public async Task<ActionResult<ApiResponse<List<string>>>> GetStates()
