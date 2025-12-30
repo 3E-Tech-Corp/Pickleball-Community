@@ -49,6 +49,7 @@ public class CourtsController : ControllerBase
 
                 // Add parameters
                 command.Parameters.Add(new SqlParameter("@Query", SqlDbType.NVarChar, 100) { Value = (object?)request.Query ?? DBNull.Value });
+                command.Parameters.Add(new SqlParameter("@Country", SqlDbType.NVarChar, 20) { Value = (object?)request.Country ?? DBNull.Value });
                 command.Parameters.Add(new SqlParameter("@State", SqlDbType.NVarChar, 50) { Value = (object?)request.State ?? DBNull.Value });
                 command.Parameters.Add(new SqlParameter("@City", SqlDbType.NVarChar, 50) { Value = (object?)request.City ?? DBNull.Value });
                 command.Parameters.Add(new SqlParameter("@HasLights", SqlDbType.Bit) { Value = request.HasLights.HasValue && request.HasLights.Value ? true : DBNull.Value });
@@ -130,8 +131,17 @@ public class CourtsController : ControllerBase
     {
         var query = _context.Courts.AsQueryable();
 
+        if (!string.IsNullOrWhiteSpace(request.Country))
+        {
+            var searchCountry = request.Country == "Unknown" ? null : request.Country;
+            query = query.Where(c => searchCountry == null ? c.Country == null : c.Country == searchCountry);
+        }
+
         if (!string.IsNullOrWhiteSpace(request.State))
-            query = query.Where(c => c.State == request.State);
+        {
+            var searchState = request.State == "Unknown" ? null : request.State;
+            query = query.Where(c => searchState == null ? c.State == null : c.State == searchState);
+        }
 
         if (!string.IsNullOrWhiteSpace(request.City))
         {

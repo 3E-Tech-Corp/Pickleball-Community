@@ -149,7 +149,11 @@ export default function Courts() {
       try {
         const response = await courtsApi.getStatesByCountry(selectedCountry);
         if (response.success) {
-          setStatesWithCounts(response.data || []);
+          // Sort alphabetically by name
+          const sorted = (response.data || []).sort((a, b) =>
+            a.name.localeCompare(b.name)
+          );
+          setStatesWithCounts(sorted);
         }
       } catch (err) {
         console.error('Error loading states:', err);
@@ -170,7 +174,11 @@ export default function Courts() {
       try {
         const response = await courtsApi.getCitiesByState(selectedCountry, selectedState);
         if (response.success) {
-          setCitiesWithCounts(response.data || []);
+          // Sort alphabetically by name
+          const sorted = (response.data || []).sort((a, b) =>
+            a.name.localeCompare(b.name)
+          );
+          setCitiesWithCounts(sorted);
         }
       } catch (err) {
         console.error('Error loading cities:', err);
