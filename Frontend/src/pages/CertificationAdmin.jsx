@@ -13,6 +13,7 @@ export default function CertificationAdmin() {
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
   const [activeTab, setActiveTab] = useState('groups');
+  const [selectedGroupFilter, setSelectedGroupFilter] = useState('all');
 
   // Modal states
   const [showKnowledgeModal, setShowKnowledgeModal] = useState(false);
@@ -52,6 +53,13 @@ export default function CertificationAdmin() {
 
   // Calculate total weight
   const totalWeight = skillGroups.filter(g => g.isActive).reduce((sum, g) => sum + g.weight, 0);
+
+  // Filter skill areas by selected group
+  const filteredSkillAreas = selectedGroupFilter === 'all'
+    ? skillAreas
+    : selectedGroupFilter === 'ungrouped'
+      ? skillAreas.filter(skill => !skill.skillGroupId)
+      : skillAreas.filter(skill => skill.skillGroupId === parseInt(selectedGroupFilter));
 
   // Knowledge Level handlers
   const handleSaveKnowledge = async (data) => {
@@ -346,8 +354,31 @@ export default function CertificationAdmin() {
               </button>
             </div>
 
+            {/* Skill Group Filter Dropdown */}
+            <div className="p-4 border-b bg-gray-50">
+              <div className="flex items-center gap-3">
+                <label className="text-sm font-medium text-gray-700">Filter by Group:</label>
+                <select
+                  value={selectedGroupFilter}
+                  onChange={(e) => setSelectedGroupFilter(e.target.value)}
+                  className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-primary-500 focus:border-primary-500"
+                >
+                  <option value="all">All Groups</option>
+                  <option value="ungrouped">Ungrouped</option>
+                  {skillGroups.map(group => (
+                    <option key={group.id} value={group.id}>
+                      {group.name} ({group.skillAreas?.length || 0} skills)
+                    </option>
+                  ))}
+                </select>
+                <span className="text-sm text-gray-500">
+                  Showing {filteredSkillAreas.length} of {skillAreas.length} skills
+                </span>
+              </div>
+            </div>
+
             <div className="divide-y">
-              {skillAreas.map(skill => (
+              {filteredSkillAreas.map(skill => (
                 <div
                   key={skill.id}
                   className={`p-4 flex items-center justify-between ${!skill.isActive ? 'bg-gray-50' : ''}`}
@@ -400,9 +431,11 @@ export default function CertificationAdmin() {
                 </div>
               ))}
 
-              {skillAreas.length === 0 && (
+              {filteredSkillAreas.length === 0 && (
                 <div className="p-8 text-center text-gray-500">
-                  No skill areas configured. Add one to get started.
+                  {skillAreas.length === 0
+                    ? 'No skill areas configured. Add one to get started.'
+                    : 'No skills match the selected filter.'}
                 </div>
               )}
             </div>
