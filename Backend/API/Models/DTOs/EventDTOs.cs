@@ -8,6 +8,8 @@ public class EventDto
     public string? Description { get; set; }
     public int EventTypeId { get; set; }
     public string? EventTypeName { get; set; }
+    public string? EventTypeIcon { get; set; }
+    public string? EventTypeColor { get; set; }
     public DateTime StartDate { get; set; }
     public DateTime EndDate { get; set; }
     public DateTime? RegistrationOpenDate { get; set; }

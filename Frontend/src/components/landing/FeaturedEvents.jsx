@@ -1,7 +1,61 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { Calendar, MapPin, Clock, Users, ChevronLeft, ChevronRight, ArrowRight, Trophy, Stethoscope, UsersRound, PartyPopper, Swords } from 'lucide-react';
+import {
+  Calendar, MapPin, Clock, Users, ChevronLeft, ChevronRight, ArrowRight,
+  // Icons that can be assigned to event types
+  Trophy, Medal, Award, Crown, Target, Flame, Swords, Shield,
+  CalendarDays, CalendarCheck, CalendarClock, Timer,
+  Users2, UserPlus, UserCheck, User,
+  BookOpen, GraduationCap, Lightbulb, Sparkles, Star,
+  PartyPopper, Heart, ThumbsUp, Smile, Music, Gift, Cake,
+  Dumbbell, Activity, Bike, CircleDot, Compass, Mountain, Zap, Rocket,
+  Stethoscope, HeartPulse,
+  MessageCircle, Megaphone, Bell, Mail,
+  Home, Building, Store, Flag, Bookmark, Tag, Hash, AtSign,
+  Sun, Moon, Cloud, Leaf, TreePine, Waves, Droplet, Wind
+} from 'lucide-react';
 import { eventsApi, getSharedAssetUrl } from '../../services/api';
+
+// Icon lookup map
+const ICON_MAP = {
+  'trophy': Trophy, 'medal': Medal, 'award': Award, 'crown': Crown, 'target': Target,
+  'goal': Target, 'flame': Flame, 'swords': Swords, 'shield': Shield,
+  'calendar': Calendar, 'calendar-days': CalendarDays, 'calendar-check': CalendarCheck,
+  'calendar-clock': CalendarClock, 'clock': Clock, 'timer': Timer, 'timer-off': Timer,
+  'users': Users, 'users-round': Users, 'users2': Users2, 'user-plus': UserPlus,
+  'user-check': UserCheck, 'user': User, 'person-standing': User, 'handshake': Users,
+  'book-open': BookOpen, 'graduation-cap': GraduationCap, 'school': GraduationCap, 'lightbulb': Lightbulb,
+  'brain': Lightbulb, 'sparkles': Sparkles, 'star': Star,
+  'party-popper': PartyPopper, 'heart': Heart, 'thumbs-up': ThumbsUp, 'smile': Smile,
+  'music': Music, 'gift': Gift, 'cake': Cake,
+  'dumbbell': Dumbbell, 'activity': Activity, 'bike': Bike, 'circle-dot': CircleDot,
+  'compass': Compass, 'mountain': Mountain, 'zap': Zap, 'rocket': Rocket,
+  'stethoscope': Stethoscope, 'heart-pulse': HeartPulse, 'pill': HeartPulse, 'cross': HeartPulse, 'badge-plus': HeartPulse,
+  'message-circle': MessageCircle, 'megaphone': Megaphone, 'bell': Bell, 'mail': Mail,
+  'radio': Bell, 'podcast': Megaphone, 'map-pin': MapPin,
+  'home': Home, 'building': Building, 'store': Store, 'flag': Flag,
+  'bookmark': Bookmark, 'tag': Tag, 'hash': Hash, 'at-sign': AtSign,
+  'sun': Sun, 'moon': Moon, 'cloud': Cloud, 'leaf': Leaf,
+  'tree-pine': TreePine, 'waves': Waves, 'droplets': Droplet, 'wind': Wind,
+};
+
+// Color lookup map - returns both background and text classes for badges
+const COLOR_MAP = {
+  'green': { bg: 'bg-green-100', text: 'text-green-700' },
+  'blue': { bg: 'bg-blue-100', text: 'text-blue-700' },
+  'yellow': { bg: 'bg-yellow-100', text: 'text-yellow-700' },
+  'purple': { bg: 'bg-purple-100', text: 'text-purple-700' },
+  'pink': { bg: 'bg-pink-100', text: 'text-pink-700' },
+  'red': { bg: 'bg-red-100', text: 'text-red-700' },
+  'orange': { bg: 'bg-orange-100', text: 'text-orange-700' },
+  'teal': { bg: 'bg-teal-100', text: 'text-teal-700' },
+  'indigo': { bg: 'bg-indigo-100', text: 'text-indigo-700' },
+  'cyan': { bg: 'bg-cyan-100', text: 'text-cyan-700' },
+  'emerald': { bg: 'bg-emerald-100', text: 'text-emerald-700' },
+  'rose': { bg: 'bg-rose-100', text: 'text-rose-700' },
+  'amber': { bg: 'bg-amber-100', text: 'text-amber-700' },
+  'slate': { bg: 'bg-slate-100', text: 'text-slate-700' },
+};
 
 export default function FeaturedEvents() {
   const [events, setEvents] = useState([]);
@@ -195,8 +249,17 @@ export default function FeaturedEvents() {
 }
 
 function EventCard({ event, formatDate, formatTime }) {
-  const getEventTypeStyle = (typeName) => {
-    const name = (typeName || '').toLowerCase();
+  // Get icon from event type data, fallback to name-based matching for backwards compatibility
+  const getEventTypeStyle = () => {
+    // Use dynamic icon/color from event type if available
+    if (event.eventTypeIcon && event.eventTypeColor) {
+      const Icon = ICON_MAP[event.eventTypeIcon] || Calendar;
+      const colorStyle = COLOR_MAP[event.eventTypeColor] || { bg: 'bg-gray-100', text: 'text-gray-700' };
+      return { color: `${colorStyle.bg} ${colorStyle.text}`, Icon };
+    }
+
+    // Fallback: match based on event type name (for backwards compatibility)
+    const name = (event.eventTypeName || '').toLowerCase();
     if (name.includes('tournament')) return { color: 'bg-purple-100 text-purple-700', Icon: Trophy };
     if (name.includes('mini') || name.includes('match')) return { color: 'bg-red-100 text-red-700', Icon: Swords };
     if (name.includes('open') || name.includes('play')) return { color: 'bg-green-100 text-green-700', Icon: UsersRound };
@@ -206,7 +269,7 @@ function EventCard({ event, formatDate, formatTime }) {
     return { color: 'bg-gray-100 text-gray-700', Icon: Calendar };
   };
 
-  const typeStyle = getEventTypeStyle(event.eventTypeName);
+  const typeStyle = getEventTypeStyle();
 
   return (
     <Link
