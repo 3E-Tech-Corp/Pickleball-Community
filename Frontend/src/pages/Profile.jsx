@@ -157,28 +157,27 @@ const Profile = () => {
         console.log('Avatar upload response:', response)
 
         // Handle Funtime-Shared response format - returns asset with id
-        let newAvatarUrl = null
+        // Save only the relative path to DB, construct full URL when viewing
+        let assetPath = null
 
-        // Check for id (Funtime-Shared format) and construct URL
+        // Check for id (Funtime-Shared format) and construct relative path
         if (response && response.id) {
-          newAvatarUrl = `${SHARED_AUTH_URL}/asset/${response.id}`
+          assetPath = `/asset/${response.id}`
         } else if (response.data?.id) {
-          newAvatarUrl = `${SHARED_AUTH_URL}/asset/${response.data.id}`
+          assetPath = `/asset/${response.data.id}`
         } else if (response.data?.data?.id) {
-          newAvatarUrl = `${SHARED_AUTH_URL}/asset/${response.data.data.id}`
-        } else if (response.data?.url || response.data?.data?.url) {
-          // Fallback for URL in response
-          newAvatarUrl = response.data?.url || response.data?.data?.url
+          assetPath = `/asset/${response.data.data.id}`
         }
 
-        if (newAvatarUrl) {
-          console.log('New avatar URL:', newAvatarUrl)
-          // Update local user with new avatar URL from shared service
-          updateUser({ ...user, avatar: newAvatarUrl, profileImageUrl: newAvatarUrl })
-          setAvatarPreview(newAvatarUrl)
+        if (assetPath) {
+          console.log('New avatar path:', assetPath)
+          // Update local user with new avatar path
+          updateUser({ ...user, avatar: assetPath, profileImageUrl: assetPath })
+          // Display using full URL
+          setAvatarPreview(`${SHARED_AUTH_URL}${assetPath}`)
 
-          // Also sync to local backend
-          await userApi.updateProfile({ profileImageUrl: newAvatarUrl })
+          // Save relative path to local backend
+          await userApi.updateProfile({ profileImageUrl: assetPath })
         } else {
           throw new Error(response.message || 'Upload failed - no asset ID returned')
         }

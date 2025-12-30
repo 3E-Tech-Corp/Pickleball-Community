@@ -148,14 +148,14 @@ const VideoUploadModal = ({
       try {
         // Upload to Funtime-Shared asset service
         const response = await sharedAssetApi.upload(selectedFile, 'video', objectType || 'video')
+        // Save only relative path to DB, construct full URL when viewing
         if (response && response.id) {
-          // Construct URL using shared asset endpoint
-          const videoUrl = `${SHARED_AUTH_URL}/asset/${response.id}`
-          onSave({ url: videoUrl, type: 'file', fileId: response.id })
+          const videoPath = `/asset/${response.id}`
+          onSave({ url: videoPath, type: 'file', fileId: response.id })
           onClose()
-        } else if (response.success && response.data) {
-          // Fallback for alternative response format
-          onSave({ url: response.data.url, type: 'file', fileId: response.data.fileId || response.data.id })
+        } else if (response.success && response.data?.id) {
+          const videoPath = `/asset/${response.data.id}`
+          onSave({ url: videoPath, type: 'file', fileId: response.data.id })
           onClose()
         } else {
           setError(response.message || 'Upload failed')

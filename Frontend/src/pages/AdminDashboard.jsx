@@ -164,13 +164,13 @@ const AdminDashboard = () => {
     }
   }
 
-  // Helper to construct shared asset URL from response
-  const getSharedAssetUrlFromResponse = (response) => {
+  // Helper to get relative asset path from response (for saving to DB)
+  const getAssetPathFromResponse = (response) => {
     if (response && response.id) {
-      return `${SHARED_AUTH_URL}/asset/${response.id}`
+      return `/asset/${response.id}`
     }
-    if (response.success && response.data?.url) {
-      return response.data.url
+    if (response.success && response.data?.id) {
+      return `/asset/${response.data.id}`
     }
     return null
   }
@@ -184,14 +184,14 @@ const AdminDashboard = () => {
     try {
       // Upload to Funtime-Shared asset service
       const response = await sharedAssetApi.upload(file, 'image', 'theme')
-      const logoUrl = getSharedAssetUrlFromResponse(response)
+      // Save only relative path to DB
+      const logoUrl = getAssetPathFromResponse(response)
       if (logoUrl) {
         setThemeSettings(prev => ({ ...prev, logoUrl }))
-        // Save theme settings to persist the URL
         await themeApi.update({ ...themeSettings, logoUrl })
         await refreshTheme()
       } else {
-        throw new Error('Failed to get asset URL')
+        throw new Error('Failed to get asset path')
       }
     } catch (error) {
       console.error('Error uploading logo:', error)
@@ -210,13 +210,14 @@ const AdminDashboard = () => {
     try {
       // Upload to Funtime-Shared asset service
       const response = await sharedAssetApi.upload(file, 'image', 'theme')
-      const faviconUrl = getSharedAssetUrlFromResponse(response)
+      // Save only relative path to DB
+      const faviconUrl = getAssetPathFromResponse(response)
       if (faviconUrl) {
         setThemeSettings(prev => ({ ...prev, faviconUrl }))
         await themeApi.update({ ...themeSettings, faviconUrl })
         await refreshTheme()
       } else {
-        throw new Error('Failed to get asset URL')
+        throw new Error('Failed to get asset path')
       }
     } catch (error) {
       console.error('Error uploading favicon:', error)
@@ -235,13 +236,14 @@ const AdminDashboard = () => {
     try {
       // Upload to Funtime-Shared asset service
       const response = await sharedAssetApi.upload(file, 'video', 'theme')
-      const heroVideoUrl = getSharedAssetUrlFromResponse(response)
+      // Save only relative path to DB
+      const heroVideoUrl = getAssetPathFromResponse(response)
       if (heroVideoUrl) {
         setThemeSettings(prev => ({ ...prev, heroVideoUrl }))
         await themeApi.update({ ...themeSettings, heroVideoUrl })
         await refreshTheme()
       } else {
-        throw new Error('Failed to get asset URL')
+        throw new Error('Failed to get asset path')
       }
     } catch (error) {
       console.error('Error uploading hero video:', error)
@@ -260,13 +262,14 @@ const AdminDashboard = () => {
     try {
       // Upload to Funtime-Shared asset service
       const response = await sharedAssetApi.upload(file, 'image', 'theme')
-      const heroImageUrl = getSharedAssetUrlFromResponse(response)
+      // Save only relative path to DB
+      const heroImageUrl = getAssetPathFromResponse(response)
       if (heroImageUrl) {
         setThemeSettings(prev => ({ ...prev, heroImageUrl }))
         await themeApi.update({ ...themeSettings, heroImageUrl })
         await refreshTheme()
       } else {
-        throw new Error('Failed to get asset URL')
+        throw new Error('Failed to get asset path')
       }
     } catch (error) {
       console.error('Error uploading hero image:', error)

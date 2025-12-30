@@ -940,17 +940,17 @@ function CourtDetailModal({ court, isAuthenticated, onClose, onConfirmationSubmi
       const assetType = isVideo ? 'video' : 'image';
       const uploadResponse = await sharedAssetApi.upload(file, assetType, 'court');
 
-      // Handle response and construct URL
+      // Save only relative path to DB, construct full URL when viewing
       let assetUrl;
       if (uploadResponse && uploadResponse.id) {
-        assetUrl = `${SHARED_AUTH_URL}/asset/${uploadResponse.id}`;
-      } else if (uploadResponse.success && uploadResponse.data?.url) {
-        assetUrl = uploadResponse.data.url;
+        assetUrl = `/asset/${uploadResponse.id}`;
+      } else if (uploadResponse.success && uploadResponse.data?.id) {
+        assetUrl = `/asset/${uploadResponse.data.id}`;
       } else {
         throw new Error(uploadResponse.message || 'Upload failed');
       }
 
-      // Create court asset record
+      // Create court asset record with relative path
       const assetData = {
         assetType: isVideo ? 'video' : 'image',
         assetUrl: assetUrl,

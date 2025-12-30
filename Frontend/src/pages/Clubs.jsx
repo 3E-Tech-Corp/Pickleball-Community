@@ -727,15 +727,16 @@ function ClubDetailModal({ club, isAuthenticated, currentUserId, onClose, onJoin
     try {
       // Upload to Funtime-Shared
       const response = await sharedAssetApi.upload(file, 'image', 'club');
+      // Save only relative path to DB, construct full URL when viewing
       let logoUrl;
       if (response && response.id) {
-        logoUrl = `${SHARED_AUTH_URL}/asset/${response.id}`;
-      } else if (response.success && response.data?.url) {
-        logoUrl = response.data.url;
+        logoUrl = `/asset/${response.id}`;
+      } else if (response.success && response.data?.id) {
+        logoUrl = `/asset/${response.data.id}`;
       }
 
       if (logoUrl) {
-        // Update club with new logo URL
+        // Update club with new logo path (relative)
         const updateResponse = await clubsApi.update(clubData.id, { ...clubData, logoUrl });
         if (updateResponse.success) {
           setClubData(prev => ({ ...prev, logoUrl }));
@@ -1531,13 +1532,13 @@ function CreateClubModal({ onClose, onCreate }) {
     try {
       // Upload to Funtime-Shared asset service
       const response = await sharedAssetApi.upload(file, 'image', 'club');
+      // Save only relative path to DB
       if (response && response.id) {
-        // Construct URL using the shared asset endpoint
-        const logoUrl = `${SHARED_AUTH_URL}/asset/${response.id}`;
+        const logoUrl = `/asset/${response.id}`;
         setFormData({ ...formData, logoUrl });
-      } else if (response.success && response.data?.url) {
-        // Fallback for alternative response format
-        setFormData({ ...formData, logoUrl: response.data.url });
+      } else if (response.success && response.data?.id) {
+        const logoUrl = `/asset/${response.data.id}`;
+        setFormData({ ...formData, logoUrl });
       } else {
         setError(response.message || 'Upload failed');
       }
