@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Menu, X, LogOut, HomeIcon, School2Icon, User, Bell, FileText, Calendar, MapPin, Users } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
-import { getAssetUrl } from '../../services/api';
+import { getAssetUrl, getSharedAssetUrl } from '../../services/api';
 import { useSharedAuth } from '../../hooks/useSharedAuth';
 
 // Shared Auth API URL from environment
@@ -142,10 +142,10 @@ const Navigation = () => {
     return user.role?.toLowerCase() || 'user';
   };
 
-  // Get user avatar URL
+  // Get user avatar URL (from Funtime-Shared)
   const getUserAvatarUrl = () => {
     if (!user?.profileImageUrl) return null;
-    return getAssetUrl(user.profileImageUrl);
+    return getSharedAssetUrl(user.profileImageUrl);
   };
 
   // Close dropdown when clicking outside
