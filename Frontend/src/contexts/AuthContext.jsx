@@ -61,8 +61,18 @@ export const AuthProvider = ({ children }) => {
             axios.defaults.headers.common['Authorization'] = `Bearer ${sharedToken}`
 
             const syncResponse = await authApi.syncFromSharedAuth(sharedToken)
+            console.log('Sync response:', syncResponse)
+
             // Use the LOCAL token from sync response - this has the proper site-specific role
-            token = syncResponse.Token || syncResponse.token || sharedToken
+            // The sync endpoint returns { Token, User } - use the LOCAL token, not shared token
+            const localToken = syncResponse.Token || syncResponse.token
+            if (localToken) {
+              token = localToken
+              console.log('Using local token from sync (first 50 chars):', localToken.substring(0, 50))
+            } else {
+              console.warn('No local token in sync response, falling back to shared token')
+              token = sharedToken
+            }
             userData = syncResponse.User || syncResponse.user || sharedUser
           }
         } catch (sharedError) {
