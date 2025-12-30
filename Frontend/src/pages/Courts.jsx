@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { MapPin, Search, Filter, Star, Clock, Plus, Phone, Globe, CheckCircle, X, Sun, DollarSign, Layers, ThumbsUp, ThumbsDown, MessageSquare, ChevronLeft, ChevronRight, ExternalLink, Calendar, Navigation, List, Map, ArrowUpDown, SortAsc, SortDesc, Locate, Image, Video, Upload, Trash2, Play } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { courtsApi, sharedAssetApi, getSharedAssetUrl } from '../services/api';
+import { courtsApi, courtTypesApi, sharedAssetApi, getSharedAssetUrl } from '../services/api';
 import CourtMap from '../components/ui/CourtMap';
 import L from 'leaflet';
 
@@ -58,6 +58,8 @@ export default function Courts() {
   // Common filters
   const [hasLights, setHasLights] = useState(false);
   const [isIndoor, setIsIndoor] = useState(false);
+  const [courtTypes, setCourtTypes] = useState([]);
+  const [selectedCourtType, setSelectedCourtType] = useState('');
 
   // Results
   const [selectedCourt, setSelectedCourt] = useState(null);
@@ -140,6 +142,21 @@ export default function Courts() {
     loadCountries();
   }, []);
 
+  // Load court types
+  useEffect(() => {
+    const loadCourtTypes = async () => {
+      try {
+        const response = await courtTypesApi.getAll();
+        if (response.success) {
+          setCourtTypes(response.data || []);
+        }
+      } catch (err) {
+        console.error('Error loading court types:', err);
+      }
+    };
+    loadCourtTypes();
+  }, []);
+
   // Load states when country is selected
   useEffect(() => {
     if (!selectedCountry) {
@@ -216,6 +233,7 @@ export default function Courts() {
         pageSize,
         hasLights: hasLights || undefined,
         isIndoor: isIndoor || undefined,
+        courtTypeId: selectedCourtType || undefined,
         sortBy: sortBy || undefined,
         sortOrder: sortOrder || undefined,
       };
@@ -270,7 +288,7 @@ export default function Courts() {
     } finally {
       setLoading(false);
     }
-  }, [page, searchMode, userLocation, radiusMiles, selectedCountry, selectedState, selectedCity, courtNameSearch, hasLights, isIndoor, sortBy, sortOrder]);
+  }, [page, searchMode, userLocation, radiusMiles, selectedCountry, selectedState, selectedCity, courtNameSearch, hasLights, isIndoor, selectedCourtType, sortBy, sortOrder]);
 
   useEffect(() => {
     loadCourts();
@@ -583,6 +601,22 @@ export default function Courts() {
               <Layers className="w-4 h-4 text-blue-500" />
               <span className="text-sm text-gray-700">Indoor</span>
             </label>
+
+            {/* Court Type Filter */}
+            {courtTypes.length > 0 && (
+              <div className="flex items-center gap-2">
+                <select
+                  value={selectedCourtType}
+                  onChange={(e) => { setSelectedCourtType(e.target.value); setPage(1); }}
+                  className="text-sm border border-gray-300 rounded-lg px-3 py-1.5 focus:ring-green-500 focus:border-green-500"
+                >
+                  <option value="">All Types</option>
+                  {courtTypes.map(type => (
+                    <option key={type.id} value={type.id}>{type.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             {/* Sort Options (for list view) */}
             {viewMode === 'list' && (
@@ -1817,6 +1851,7 @@ function AddCourtModal({ onClose, onCourtAdded, userLocation }) {
     outdoorNum: 0,
     coveredNum: 0,
     hasLights: false,
+    courtTypeId: '',
     latitude: userLocation?.lat || 0,
     longitude: userLocation?.lng || 0
   });
@@ -2202,6 +2237,28 @@ function AddCourtModal({ onClose, onCourtAdded, userLocation }) {
                   </div>
                 </div>
               </div>
+
+              {/* Court Type */}
+              {courtTypes.length > 0 && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Court Type</label>
+                  <select
+                    value={formData.courtTypeId}
+                    onChange={(e) => setFormData({ ...formData, courtTypeId: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg p-2 focus:ring-green-500 focus:border-green-500"
+                  >
+                    <option value="">Select a type...</option>
+                    {courtTypes.map(type => (
+                      <option key={type.id} value={type.id}>{type.name}</option>
+                    ))}
+                  </select>
+                  {formData.courtTypeId && courtTypes.find(t => t.id === parseInt(formData.courtTypeId))?.description && (
+                    <p className="mt-1 text-xs text-gray-500">
+                      {courtTypes.find(t => t.id === parseInt(formData.courtTypeId))?.description}
+                    </p>
+                  )}
+                </div>
+              )}
 
               {/* Has Lights */}
               <label className="flex items-center gap-3 cursor-pointer">

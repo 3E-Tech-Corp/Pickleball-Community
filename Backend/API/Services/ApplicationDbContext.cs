@@ -41,6 +41,7 @@ public class ApplicationDbContext : DbContext
 
     // Courts
     public DbSet<Court> Courts { get; set; }
+    public DbSet<CourtType> CourtTypes { get; set; }
     public DbSet<CourtGeoCode> CourtGeoCodes { get; set; }
     public DbSet<GeoCodeType> GeoCodeTypes { get; set; }
     public DbSet<CourtConfirmation> CourtConfirmations { get; set; }
@@ -358,6 +359,17 @@ public class ApplicationDbContext : DbContext
             entity.HasMany(c => c.Confirmations)
                   .WithOne(cc => cc.Court)
                   .HasForeignKey(cc => cc.CourtId);
+            entity.HasOne(c => c.CourtType)
+                  .WithMany()
+                  .HasForeignKey(c => c.CourtTypeId)
+                  .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        // Court Type configuration
+        modelBuilder.Entity<CourtType>(entity =>
+        {
+            entity.Property(ct => ct.Name).IsRequired().HasMaxLength(50);
+            entity.HasIndex(ct => ct.SortOrder);
         });
 
         // Court GeoCode configuration

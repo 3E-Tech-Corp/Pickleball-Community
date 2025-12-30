@@ -6,7 +6,7 @@ import {
   Users, BookOpen, Calendar, DollarSign, Search, Edit2, Trash2,
   ChevronLeft, ChevronRight, Filter, MoreVertical, Eye, X,
   Shield, GraduationCap, User, CheckCircle, XCircle, Save,
-  Palette, Upload, RefreshCw, Image, Layers, Check, Award, Tags, UserCog, Video
+  Palette, Upload, RefreshCw, Image, Layers, Check, Award, Tags, UserCog, Video, Building2
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
@@ -380,6 +380,7 @@ const AdminDashboard = () => {
     { id: 'theme', label: 'Theme', icon: Palette },
     { id: 'certification', label: 'Certification', icon: Award, link: '/admin/certification' },
     { id: 'eventTypes', label: 'Event Types', icon: Tags, link: '/admin/event-types' },
+    { id: 'courtTypes', label: 'Court Types', icon: Building2, link: '/admin/court-types' },
     { id: 'clubRoles', label: 'Club Roles', icon: UserCog, link: '/admin/club-member-roles' },
     { id: 'events', label: 'Events', icon: Calendar, count: 0, disabled: true },
     { id: 'transactions', label: 'Transactions', icon: DollarSign, count: 0, disabled: true }

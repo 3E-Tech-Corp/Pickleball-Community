@@ -17,6 +17,8 @@ public class CourtDto
     public int? OutdoorNum { get; set; }
     public int? CoveredNum { get; set; }
     public bool HasLights { get; set; }
+    public int? CourtTypeId { get; set; }
+    public string? CourtTypeName { get; set; }
     public double? Latitude { get; set; }
     public double? Longitude { get; set; }
     public double? Distance { get; set; } // Calculated distance from user
@@ -112,6 +114,7 @@ public class CourtSearchRequest
     public string? Country { get; set; }
     public string? State { get; set; }
     public string? City { get; set; }
+    public int? CourtTypeId { get; set; }
     public bool? HasLights { get; set; }
     public bool? IsIndoor { get; set; }
     public int Page { get; set; } = 1;
@@ -212,6 +215,7 @@ public class AddCourtRequest
     public int? OutdoorNum { get; set; }
     public int? CoveredNum { get; set; }
     public bool HasLights { get; set; }
+    public int? CourtTypeId { get; set; }
     public double Latitude { get; set; }
     public double Longitude { get; set; }
 }

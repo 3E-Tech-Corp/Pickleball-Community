@@ -155,6 +155,9 @@ public class CourtsController : ControllerBase
         if (request.IsIndoor.HasValue && request.IsIndoor.Value)
             query = query.Where(c => c.IndoorNum > 0);
 
+        if (request.CourtTypeId.HasValue)
+            query = query.Where(c => c.CourtTypeId == request.CourtTypeId.Value);
+
         if (!string.IsNullOrWhiteSpace(request.Query))
         {
             var searchPattern = $"%{request.Query}%";
@@ -858,6 +861,7 @@ public class CourtsController : ControllerBase
                 OutdoorNum = request.OutdoorNum ?? 0,
                 CoveredNum = request.CoveredNum ?? 0,
                 Lights = request.HasLights ? "Y" : "N",
+                CourtTypeId = request.CourtTypeId,
                 GpsLat = request.Latitude.ToString(),
                 GpsLng = request.Longitude.ToString(),
                 AdminUid = userId.Value
@@ -865,6 +869,14 @@ public class CourtsController : ControllerBase
 
             _context.Courts.Add(court);
             await _context.SaveChangesAsync();
+
+            // Load court type name if applicable
+            string? courtTypeName = null;
+            if (court.CourtTypeId.HasValue)
+            {
+                var courtType = await _context.CourtTypes.FindAsync(court.CourtTypeId.Value);
+                courtTypeName = courtType?.Name;
+            }
 
             var dto = new CourtDto
             {
@@ -882,6 +894,8 @@ public class CourtsController : ControllerBase
                 OutdoorNum = court.OutdoorNum,
                 CoveredNum = court.CoveredNum,
                 HasLights = court.Lights == "Y",
+                CourtTypeId = court.CourtTypeId,
+                CourtTypeName = courtTypeName,
                 Latitude = request.Latitude,
                 Longitude = request.Longitude,
                 AggregatedInfo = new CourtAggregatedInfoDto { ConfirmationCount = 0 }

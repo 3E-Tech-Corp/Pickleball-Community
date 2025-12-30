@@ -81,7 +81,11 @@ public class Court
     [MaxLength(50)]
     public string? GpsLng2 { get; set; }
 
+    [Column("CourtTypeId")]
+    public int? CourtTypeId { get; set; }
+
     // Navigation properties
+    public CourtType? CourtType { get; set; }
     public ICollection<CourtGeoCode>? GeoCodes { get; set; }
     public ICollection<CourtConfirmation>? Confirmations { get; set; }
 }

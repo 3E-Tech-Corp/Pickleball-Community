@@ -593,6 +593,7 @@ export const courtsApi = {
     if (params.country) queryParams.append('country', params.country);
     if (params.state) queryParams.append('state', params.state);
     if (params.city) queryParams.append('city', params.city);
+    if (params.courtTypeId) queryParams.append('courtTypeId', params.courtTypeId);
     if (params.hasLights !== undefined) queryParams.append('hasLights', params.hasLights);
     if (params.isIndoor !== undefined) queryParams.append('isIndoor', params.isIndoor);
     if (params.page) queryParams.append('page', params.page);
@@ -668,6 +669,31 @@ export const eventTypesApi = {
 
   // Reorder event types (admin)
   reorder: (orderedIds) => api.put('/eventtypes/reorder', orderedIds)
+}
+
+// Court Types API
+export const courtTypesApi = {
+  // Get all court types (public)
+  getAll: (includeInactive = false) =>
+    api.get(`/courttypes${includeInactive ? '?includeInactive=true' : ''}`),
+
+  // Get single court type
+  getById: (id) => api.get(`/courttypes/${id}`),
+
+  // Create new court type (admin)
+  create: (data) => api.post('/courttypes', data),
+
+  // Update court type (admin)
+  update: (id, data) => api.put(`/courttypes/${id}`, data),
+
+  // Delete/deactivate court type (admin)
+  delete: (id) => api.delete(`/courttypes/${id}`),
+
+  // Restore court type (admin)
+  restore: (id) => api.post(`/courttypes/${id}/restore`),
+
+  // Reorder court types (admin)
+  reorder: (orderedIds) => api.put('/courttypes/reorder', orderedIds)
 }
 
 // Events API (full event management)
