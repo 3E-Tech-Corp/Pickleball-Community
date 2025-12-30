@@ -41,10 +41,11 @@ public class CourtsController : ControllerBase
                 query = query.Where(c => c.State == request.State);
             }
 
-            // Filter by city if provided
+            // Filter by city if provided (case-insensitive using EF.Functions.Like)
             if (!string.IsNullOrWhiteSpace(request.City))
             {
-                query = query.Where(c => c.City != null && c.City.ToLower().Contains(request.City.ToLower()));
+                var cityPattern = $"%{request.City}%";
+                query = query.Where(c => c.City != null && EF.Functions.Like(c.City, cityPattern));
             }
 
             // Filter by lights if provided
@@ -59,14 +60,14 @@ public class CourtsController : ControllerBase
                 query = query.Where(c => c.IndoorNum > 0);
             }
 
-            // Text search if provided
+            // Text search if provided (case-insensitive using EF.Functions.Like)
             if (!string.IsNullOrWhiteSpace(request.Query))
             {
-                var searchLower = request.Query.ToLower();
+                var searchPattern = $"%{request.Query}%";
                 query = query.Where(c =>
-                    (c.Name != null && c.Name.ToLower().Contains(searchLower)) ||
-                    (c.City != null && c.City.ToLower().Contains(searchLower)) ||
-                    (c.Addr1 != null && c.Addr1.ToLower().Contains(searchLower)));
+                    (c.Name != null && EF.Functions.Like(c.Name, searchPattern)) ||
+                    (c.City != null && EF.Functions.Like(c.City, searchPattern)) ||
+                    (c.Addr1 != null && EF.Functions.Like(c.Addr1, searchPattern)));
             }
 
             var courts = await query.ToListAsync();
@@ -103,11 +104,20 @@ public class CourtsController : ControllerBase
                 .Take(request.PageSize)
                 .ToList();
 
-            // Get aggregated info for courts
+            // Get aggregated info for courts (handle case where table may not exist yet)
             var courtIds = pagedCourts.Select(x => x.court.CourtId).ToList();
-            var confirmations = await _context.CourtConfirmations
-                .Where(cc => courtIds.Contains(cc.CourtId))
-                .ToListAsync();
+            List<CourtConfirmation> confirmations;
+            try
+            {
+                confirmations = await _context.CourtConfirmations
+                    .Where(cc => courtIds.Contains(cc.CourtId))
+                    .ToListAsync();
+            }
+            catch
+            {
+                // Table may not exist yet
+                confirmations = new List<CourtConfirmation>();
+            }
 
             var confirmationsByCourtId = confirmations.GroupBy(c => c.CourtId).ToDictionary(g => g.Key, g => g.ToList());
 
@@ -169,11 +179,20 @@ public class CourtsController : ControllerBase
             if (court == null)
                 return NotFound(new ApiResponse<CourtDetailDto> { Success = false, Message = "Court not found" });
 
-            var confirmations = await _context.CourtConfirmations
-                .Include(cc => cc.User)
-                .Where(cc => cc.CourtId == id)
-                .OrderByDescending(cc => cc.UpdatedAt)
-                .ToListAsync();
+            List<CourtConfirmation> confirmations;
+            try
+            {
+                confirmations = await _context.CourtConfirmations
+                    .Include(cc => cc.User)
+                    .Where(cc => cc.CourtId == id)
+                    .OrderByDescending(cc => cc.UpdatedAt)
+                    .ToListAsync();
+            }
+            catch
+            {
+                // Table may not exist yet
+                confirmations = new List<CourtConfirmation>();
+            }
 
             double? distance = null;
             if (userLat.HasValue && userLng.HasValue &&
@@ -319,10 +338,10 @@ public class CourtsController : ControllerBase
                 .Include(cc => cc.User)
                 .Where(cc => cc.CourtId == id)
                 .OrderByDescending(cc => cc.UpdatedAt)
-                .Select(cc => MapToConfirmationDto(cc))
                 .ToListAsync();
 
-            return Ok(new ApiResponse<List<CourtConfirmationDto>> { Success = true, Data = confirmations });
+            var dtos = confirmations.Select(cc => MapToConfirmationDto(cc)).ToList();
+            return Ok(new ApiResponse<List<CourtConfirmationDto>> { Success = true, Data = dtos });
         }
         catch (Exception ex)
         {
