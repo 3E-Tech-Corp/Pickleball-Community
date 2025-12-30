@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useForm } from 'react-hook-form'
 import { useAuth } from '../contexts/AuthContext'
-import { userApi, assetApi, getAssetUrl } from '../services/api'
+import { userApi, assetApi, sharedUserApi, getAssetUrl, getSharedAssetUrl } from '../services/api'
 import VideoUploadModal from '../components/ui/VideoUploadModal'
 import {
   User, Camera, Video, MapPin, Phone, Calendar,
@@ -123,10 +123,10 @@ const Profile = () => {
       setHandedness(user.handedness || '')
       setTempBio(user.bio || '')
 
-      // Set avatar preview from either avatar or profileImageUrl
+      // Set avatar preview from either avatar or profileImageUrl (from Funtime-Shared)
       const avatarUrl = user.avatar || user.profileImageUrl
       if (avatarUrl) {
-        setAvatarPreview(getAssetUrl(avatarUrl))
+        setAvatarPreview(getSharedAssetUrl(avatarUrl))
       }
       if (user.introVideo) {
         setVideoPreview(getAssetUrl(user.introVideo))
@@ -150,23 +150,28 @@ const Profile = () => {
       }
       reader.readAsDataURL(file)
 
-      // Upload to server using user avatar API (links asset to user)
+      // Upload to Funtime-Shared service
       setAvatarUploading(true)
       try {
-        const response = await userApi.uploadAvatar(file)
-        if (response.success && response.data) {
-          // Update local user with new avatar URL
-          const newAvatarUrl = response.data.avatarUrl
+        const response = await sharedUserApi.uploadAvatar(file)
+        // Handle response - check for data in different response formats
+        const responseData = response.data?.data || response.data
+        if (responseData && responseData.url) {
+          // Update local user with new avatar URL from shared service
+          const newAvatarUrl = responseData.url
           updateUser({ ...user, avatar: newAvatarUrl, profileImageUrl: newAvatarUrl })
-          setAvatarPreview(getAssetUrl(newAvatarUrl))
+          setAvatarPreview(getSharedAssetUrl(newAvatarUrl))
+
+          // Also sync to local backend
+          await userApi.updateProfile({ profileImageUrl: newAvatarUrl })
         } else {
-          throw new Error(response.message || 'Upload failed')
+          throw new Error(response.data?.message || 'Upload failed')
         }
       } catch (error) {
         console.error('Avatar upload error:', error)
-        alert('Failed to upload avatar: ' + (error.message || 'Unknown error'))
+        alert('Failed to upload avatar: ' + (error.response?.data?.message || error.message || 'Unknown error'))
         // Revert preview on error
-        setAvatarPreview(getAssetUrl(user?.avatar || user?.profileImageUrl) || null)
+        setAvatarPreview(getSharedAssetUrl(user?.avatar || user?.profileImageUrl) || null)
       } finally {
         setAvatarUploading(false)
       }

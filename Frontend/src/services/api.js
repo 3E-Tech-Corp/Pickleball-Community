@@ -139,6 +139,35 @@ const sharedAuthApi = axios.create({
   withCredentials: false
 })
 
+// Add auth token to shared auth API requests
+sharedAuthApi.interceptors.request.use((config) => {
+  const token = localStorage.getItem('jwtToken');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+}, (error) => {
+  return Promise.reject(error);
+});
+
+// Shared User API (for Funtime-Shared user profile operations)
+export const sharedUserApi = {
+  // Upload avatar to shared auth service
+  uploadAvatar: async (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return sharedAuthApi.post('/api/assets/upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+  },
+
+  // Get user profile from shared auth
+  getProfile: () => sharedAuthApi.get('/api/users/me'),
+
+  // Update user profile on shared auth
+  updateProfile: (data) => sharedAuthApi.put('/api/users/me', data),
+}
+
 export const authApi = {
   // Get auth configuration (shared auth URL and site code)
   getConfig: () => api.get('/auth/config'),
