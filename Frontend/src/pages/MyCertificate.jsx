@@ -1,10 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { certificationApi } from '../services/api';
 import { getAssetUrl } from '../services/api';
 import {
   User, Star, Copy, Check, Plus, Link as LinkIcon,
   Eye, EyeOff, Calendar, MessageSquare, ChevronDown, ChevronUp,
-  Award, TrendingUp
+  Award, TrendingUp, Filter, BarChart3
 } from 'lucide-react';
 
 export default function MyCertificate() {
@@ -15,6 +15,11 @@ export default function MyCertificate() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [copiedLink, setCopiedLink] = useState(null);
   const [expandedReview, setExpandedReview] = useState(null);
+
+  // Filter states
+  const [showComparison, setShowComparison] = useState(false);
+  const [knowledgeLevelFilter, setKnowledgeLevelFilter] = useState('all');
+  const [timePeriodFilter, setTimePeriodFilter] = useState('all');
 
   useEffect(() => {
     loadData();
@@ -68,7 +73,7 @@ export default function MyCertificate() {
   const getLetterGrade = (score100) => {
     if (score100 >= 85) return { letter: 'P', label: 'Pro', color: 'text-purple-600 bg-purple-100', isPro: true };
     if (score100 >= 70) return { letter: 'SP', label: 'Semi-Pro', color: 'text-indigo-600 bg-indigo-100', isPro: true };
-    if (score100 < 20) return { letter: '-', label: 'Unrated', color: 'text-gray-400 bg-gray-100', isPro: false };
+    if (score100 < 20) return { letter: 'NA', label: 'Not Rated', color: 'text-gray-400 bg-gray-100', isPro: false };
 
     // Scale 20-70 to letter grades F-A (50 point range)
     // F: 20-30, D-: 30-33.3, D: 33.3-36.7, D+: 36.7-40
@@ -94,6 +99,56 @@ export default function MyCertificate() {
   const getGroupScore100 = (groupAverage) => {
     return Math.round(groupAverage * 10);
   };
+
+  // Filter reviews based on selected filters
+  const filteredReviews = useMemo(() => {
+    if (!certificate?.reviews) return [];
+
+    return certificate.reviews.filter(review => {
+      // Exclude self-reviews from filtered view (they're shown separately)
+      if (review.isSelfReview) return false;
+
+      // Filter by knowledge level
+      if (knowledgeLevelFilter !== 'all' && review.knowledgeLevelName !== knowledgeLevelFilter) {
+        return false;
+      }
+
+      // Filter by time period
+      if (timePeriodFilter !== 'all') {
+        const reviewDate = new Date(review.createdAt);
+        const now = new Date();
+        const daysDiff = (now - reviewDate) / (1000 * 60 * 60 * 24);
+
+        switch (timePeriodFilter) {
+          case 'week':
+            if (daysDiff > 7) return false;
+            break;
+          case 'month':
+            if (daysDiff > 30) return false;
+            break;
+          case '3months':
+            if (daysDiff > 90) return false;
+            break;
+          case 'year':
+            if (daysDiff > 365) return false;
+            break;
+        }
+      }
+
+      return true;
+    });
+  }, [certificate?.reviews, knowledgeLevelFilter, timePeriodFilter]);
+
+  // Get unique knowledge levels from reviews for filter dropdown
+  const availableKnowledgeLevels = useMemo(() => {
+    if (!certificate?.reviews) return [];
+    const levels = new Set(
+      certificate.reviews
+        .filter(r => !r.isSelfReview)
+        .map(r => r.knowledgeLevelName)
+    );
+    return Array.from(levels);
+  }, [certificate?.reviews]);
 
   if (loading) {
     return (
@@ -263,12 +318,142 @@ export default function MyCertificate() {
               )}
             </div>
 
-            {/* Individual Reviews */}
+            {/* Self-Review Comparison */}
+            {certificate?.hasSelfReview && certificate?.selfReview && certificate?.peerReviewCount > 0 && (
+              <div className="bg-white rounded-xl shadow-sm p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <BarChart3 className="w-5 h-5 text-purple-600" />
+                    <h2 className="text-xl font-semibold text-gray-900">Self vs Peer Comparison</h2>
+                  </div>
+                  <button
+                    onClick={() => setShowComparison(!showComparison)}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                      showComparison
+                        ? 'bg-purple-100 text-purple-700'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
+                  >
+                    {showComparison ? 'Hide Comparison' : 'Show Comparison'}
+                  </button>
+                </div>
+
+                {showComparison && (
+                  <div className="space-y-4">
+                    {/* Overall comparison */}
+                    <div className="grid grid-cols-2 gap-4 p-4 bg-gray-50 rounded-lg">
+                      <div className="text-center">
+                        <div className="text-sm text-gray-500 mb-1">Your Self-Assessment</div>
+                        <div className="text-2xl font-bold text-purple-600">
+                          {getGroupScore100(certificate.selfReview.weightedOverallScore)}/100
+                        </div>
+                        <div className={`inline-block mt-1 px-2 py-0.5 rounded text-sm font-bold ${getLetterGrade(getGroupScore100(certificate.selfReview.weightedOverallScore)).color}`}>
+                          {getLetterGrade(getGroupScore100(certificate.selfReview.weightedOverallScore)).letter}
+                        </div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-sm text-gray-500 mb-1">Peer Average ({certificate.peerReviewCount} reviews)</div>
+                        <div className="text-2xl font-bold text-primary-600">
+                          {getGroupScore100(certificate.weightedOverallScore)}/100
+                        </div>
+                        <div className={`inline-block mt-1 px-2 py-0.5 rounded text-sm font-bold ${getLetterGrade(getGroupScore100(certificate.weightedOverallScore)).color}`}>
+                          {getLetterGrade(getGroupScore100(certificate.weightedOverallScore)).letter}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Group-by-group comparison */}
+                    {certificate.selfReview.groupScores?.map(selfGroup => {
+                      const peerGroup = certificate.groupScores?.find(g => g.groupId === selfGroup.groupId);
+                      if (!peerGroup) return null;
+
+                      const selfScore100 = getGroupScore100(selfGroup.averageScore);
+                      const peerScore100 = getGroupScore100(peerGroup.averageScore);
+                      const diff = selfScore100 - peerScore100;
+
+                      return (
+                        <div key={selfGroup.groupId} className="border border-gray-200 rounded-lg p-4">
+                          <div className="flex items-center justify-between mb-3">
+                            <span className="font-medium text-gray-900">{selfGroup.groupName}</span>
+                            <span className={`text-sm font-medium ${
+                              diff > 5 ? 'text-orange-600' : diff < -5 ? 'text-blue-600' : 'text-gray-500'
+                            }`}>
+                              {diff > 0 ? `+${diff}` : diff} pts difference
+                            </span>
+                          </div>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <div className="text-xs text-gray-500 mb-1">Self</div>
+                              <div className="flex items-center gap-2">
+                                <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
+                                  <div
+                                    className="h-full bg-purple-500 rounded-full"
+                                    style={{ width: `${selfScore100}%` }}
+                                  />
+                                </div>
+                                <span className="text-sm font-medium text-purple-600 w-12 text-right">{selfScore100}</span>
+                              </div>
+                            </div>
+                            <div>
+                              <div className="text-xs text-gray-500 mb-1">Peers</div>
+                              <div className="flex items-center gap-2">
+                                <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
+                                  <div
+                                    className="h-full bg-primary-500 rounded-full"
+                                    style={{ width: `${peerScore100}%` }}
+                                  />
+                                </div>
+                                <span className="text-sm font-medium text-primary-600 w-12 text-right">{peerScore100}</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Individual Reviews with Filters */}
             {certificate?.reviews?.length > 0 && (
               <div className="bg-white rounded-xl shadow-sm p-6">
-                <h2 className="text-xl font-semibold text-gray-900 mb-4">Review Details</h2>
-                <div className="space-y-4">
-                  {certificate.reviews.map(review => (
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+                  <h2 className="text-xl font-semibold text-gray-900">Review Details</h2>
+                  <div className="flex flex-wrap gap-2">
+                    {/* Knowledge Level Filter */}
+                    <select
+                      value={knowledgeLevelFilter}
+                      onChange={(e) => setKnowledgeLevelFilter(e.target.value)}
+                      className="text-sm border border-gray-300 rounded-lg px-3 py-1.5 focus:ring-primary-500 focus:border-primary-500"
+                    >
+                      <option value="all">All Experience Levels</option>
+                      {availableKnowledgeLevels.map(level => (
+                        <option key={level} value={level}>{level}</option>
+                      ))}
+                    </select>
+                    {/* Time Period Filter */}
+                    <select
+                      value={timePeriodFilter}
+                      onChange={(e) => setTimePeriodFilter(e.target.value)}
+                      className="text-sm border border-gray-300 rounded-lg px-3 py-1.5 focus:ring-primary-500 focus:border-primary-500"
+                    >
+                      <option value="all">All Time</option>
+                      <option value="week">Last Week</option>
+                      <option value="month">Last Month</option>
+                      <option value="3months">Last 3 Months</option>
+                      <option value="year">Last Year</option>
+                    </select>
+                  </div>
+                </div>
+
+                {filteredReviews.length === 0 ? (
+                  <div className="text-center py-6 text-gray-500">
+                    No reviews match the selected filters.
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {filteredReviews.map(review => (
                     <div key={review.id} className="border border-gray-200 rounded-lg overflow-hidden">
                       <button
                         onClick={() => setExpandedReview(expandedReview === review.id ? null : review.id)}
@@ -330,8 +515,9 @@ export default function MyCertificate() {
                         </div>
                       )}
                     </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </div>

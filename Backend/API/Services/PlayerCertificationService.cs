@@ -402,6 +402,7 @@ public class PlayerCertificationService : IPlayerCertificationService
         return new ReviewPageInfoDto
         {
             RequestId = request.Id,
+            PlayerId = request.StudentId,
             PlayerName = $"{request.Student.FirstName} {request.Student.LastName}",
             PlayerProfileImageUrl = request.Student.ProfileImageUrl,
             Message = request.Message,
@@ -421,13 +422,32 @@ public class PlayerCertificationService : IPlayerCertificationService
         if (request.ExpiresAt.HasValue && request.ExpiresAt.Value < DateTime.UtcNow)
             return false;
 
+        // For self-reviews, use a default knowledge level (or first available)
+        int knowledgeLevelId;
+        if (dto.IsSelfReview)
+        {
+            // Get default knowledge level for self-review
+            var defaultLevel = await _context.KnowledgeLevels
+                .Where(k => k.IsActive)
+                .OrderBy(k => k.SortOrder)
+                .FirstOrDefaultAsync();
+            knowledgeLevelId = defaultLevel?.Id ?? 1;
+        }
+        else
+        {
+            if (!dto.KnowledgeLevelId.HasValue)
+                return false; // Non-self reviews require knowledge level
+            knowledgeLevelId = dto.KnowledgeLevelId.Value;
+        }
+
         var review = new PlayerCertificationReview
         {
             RequestId = request.Id,
-            ReviewerName = dto.ReviewerName,
+            ReviewerName = dto.IsSelfReview ? "Self Review" : dto.ReviewerName,
             ReviewerEmail = dto.ReviewerEmail,
-            KnowledgeLevelId = dto.KnowledgeLevelId,
+            KnowledgeLevelId = knowledgeLevelId,
             IsAnonymous = dto.IsAnonymous,
+            IsSelfReview = dto.IsSelfReview,
             Comments = dto.Comments
         };
 
@@ -459,7 +479,7 @@ public class PlayerCertificationService : IPlayerCertificationService
         var student = await _context.Users.FindAsync(studentId);
         if (student == null) return null;
 
-        var reviews = await _context.PlayerCertificationReviews
+        var allReviews = await _context.PlayerCertificationReviews
             .Include(r => r.Request)
             .Include(r => r.KnowledgeLevel)
             .Include(r => r.Scores)
@@ -469,31 +489,107 @@ public class PlayerCertificationService : IPlayerCertificationService
             .OrderByDescending(r => r.CreatedAt)
             .ToListAsync();
 
+        // Separate self-review from peer reviews
+        var selfReview = allReviews.FirstOrDefault(r => r.IsSelfReview);
+        var peerReviews = allReviews.Where(r => !r.IsSelfReview).ToList();
+
         // Get all skill groups for weighted calculation
         var skillGroups = await _context.SkillGroups
             .Where(g => g.IsActive)
             .OrderBy(g => g.SortOrder)
             .ToListAsync();
 
-        if (!reviews.Any())
+        // Get knowledge levels for filtering
+        var knowledgeLevels = await GetKnowledgeLevelsAsync(true);
+
+        if (!peerReviews.Any() && selfReview == null)
         {
             return new CertificateSummaryDto
             {
                 StudentName = $"{student.FirstName} {student.LastName}",
                 StudentProfileImageUrl = student.ProfileImageUrl,
                 TotalReviews = 0,
+                PeerReviewCount = 0,
+                HasSelfReview = false,
                 OverallAverageScore = 0,
                 WeightedOverallScore = 0,
                 GroupScores = new List<SkillGroupScoreSummaryDto>(),
                 SkillAverages = new List<SkillAverageSummaryDto>(),
                 Reviews = new List<CertificationReviewSummaryDto>(),
+                KnowledgeLevels = knowledgeLevels,
                 LastUpdated = DateTime.UtcNow
             };
         }
 
-        // Calculate skill averages
-        var allScores = reviews.SelectMany(r => r.Scores).ToList();
-        var skillAverages = allScores
+        // Calculate skill averages (peer reviews only for main scores)
+        var peerScores = peerReviews.SelectMany(r => r.Scores).ToList();
+        var (skillAverages, groupScores, overallAverage, weightedOverallScore) =
+            CalculateWeightedScores(peerScores, skillGroups);
+
+        // Calculate self-review scores if available
+        SelfReviewSummaryDto? selfReviewSummary = null;
+        if (selfReview != null)
+        {
+            var selfScores = selfReview.Scores.ToList();
+            var (selfSkillAverages, selfGroupScores, selfOverallAverage, selfWeightedOverall) =
+                CalculateWeightedScores(selfScores, skillGroups);
+
+            selfReviewSummary = new SelfReviewSummaryDto
+            {
+                ReviewId = selfReview.Id,
+                CreatedAt = selfReview.CreatedAt,
+                OverallAverageScore = selfOverallAverage,
+                WeightedOverallScore = selfWeightedOverall,
+                GroupScores = selfGroupScores,
+                SkillAverages = selfSkillAverages
+            };
+        }
+
+        var reviewSummaries = allReviews.Select(r => new CertificationReviewSummaryDto
+        {
+            Id = r.Id,
+            ReviewerDisplayName = r.IsSelfReview ? "Self Review" : (r.IsAnonymous ? "Anonymous" : r.ReviewerName),
+            KnowledgeLevelName = r.IsSelfReview ? "Self Assessment" : r.KnowledgeLevel.Name,
+            IsSelfReview = r.IsSelfReview,
+            Comments = r.Comments,
+            CreatedAt = r.CreatedAt,
+            Scores = r.Scores.Select(s => new CertificationScoreDto
+            {
+                Id = s.Id,
+                SkillAreaId = s.SkillAreaId,
+                SkillAreaName = s.SkillArea.Name,
+                SkillAreaCategory = s.SkillArea.Category,
+                Score = s.Score
+            }).ToList()
+        }).ToList();
+
+        return new CertificateSummaryDto
+        {
+            StudentName = $"{student.FirstName} {student.LastName}",
+            StudentProfileImageUrl = student.ProfileImageUrl,
+            TotalReviews = allReviews.Count,
+            PeerReviewCount = peerReviews.Count,
+            HasSelfReview = selfReview != null,
+            OverallAverageScore = overallAverage,
+            WeightedOverallScore = weightedOverallScore,
+            GroupScores = groupScores,
+            SkillAverages = skillAverages,
+            Reviews = reviewSummaries,
+            SelfReview = selfReviewSummary,
+            KnowledgeLevels = knowledgeLevels,
+            LastUpdated = allReviews.Any() ? allReviews.Max(r => r.CreatedAt) : DateTime.UtcNow
+        };
+    }
+
+    private (List<SkillAverageSummaryDto> skillAverages, List<SkillGroupScoreSummaryDto> groupScores, double overallAverage, double weightedOverallScore)
+        CalculateWeightedScores(List<PlayerCertificationScore> scores, List<SkillGroup> skillGroups)
+    {
+        if (!scores.Any())
+        {
+            return (new List<SkillAverageSummaryDto>(), new List<SkillGroupScoreSummaryDto>(), 0, 0);
+        }
+
+        var skillAverages = scores
             .GroupBy(s => new {
                 s.SkillAreaId,
                 s.SkillArea.Name,
@@ -515,9 +611,8 @@ public class PlayerCertificationService : IPlayerCertificationService
             .ThenBy(s => s.SkillAreaId)
             .ToList();
 
-        var overallAverage = allScores.Any() ? Math.Round(allScores.Average(s => s.Score), 1) : 0;
+        var overallAverage = scores.Any() ? Math.Round(scores.Average(s => s.Score), 1) : 0;
 
-        // Calculate weighted group scores
         var groupScores = new List<SkillGroupScoreSummaryDto>();
         double weightedTotal = 0;
         int totalWeight = 0;
@@ -556,7 +651,7 @@ public class PlayerCertificationService : IPlayerCertificationService
         if (ungroupedSkillAverages.Any())
         {
             var ungroupedAverage = Math.Round(ungroupedSkillAverages.Average(s => s.AverageScore), 1);
-            var ungroupedWeight = 100 - totalWeight; // Remaining weight goes to ungrouped
+            var ungroupedWeight = 100 - totalWeight;
             if (ungroupedWeight > 0)
             {
                 var weightedContribution = (ungroupedAverage / 10.0) * ungroupedWeight;
@@ -574,40 +669,11 @@ public class PlayerCertificationService : IPlayerCertificationService
             }
         }
 
-        // Calculate final weighted score (scaled to 10)
         var weightedOverallScore = totalWeight > 0
             ? Math.Round((weightedTotal / totalWeight) * 10, 1)
             : overallAverage;
 
-        var reviewSummaries = reviews.Select(r => new CertificationReviewSummaryDto
-        {
-            Id = r.Id,
-            ReviewerDisplayName = r.IsAnonymous ? "Anonymous" : r.ReviewerName,
-            KnowledgeLevelName = r.KnowledgeLevel.Name,
-            Comments = r.Comments,
-            CreatedAt = r.CreatedAt,
-            Scores = r.Scores.Select(s => new CertificationScoreDto
-            {
-                Id = s.Id,
-                SkillAreaId = s.SkillAreaId,
-                SkillAreaName = s.SkillArea.Name,
-                SkillAreaCategory = s.SkillArea.Category,
-                Score = s.Score
-            }).ToList()
-        }).ToList();
-
-        return new CertificateSummaryDto
-        {
-            StudentName = $"{student.FirstName} {student.LastName}",
-            StudentProfileImageUrl = student.ProfileImageUrl,
-            TotalReviews = reviews.Count,
-            OverallAverageScore = overallAverage,
-            WeightedOverallScore = weightedOverallScore,
-            GroupScores = groupScores,
-            SkillAverages = skillAverages,
-            Reviews = reviewSummaries,
-            LastUpdated = reviews.Max(r => r.CreatedAt)
-        };
+        return (skillAverages, groupScores, overallAverage, weightedOverallScore);
     }
 
     #endregion

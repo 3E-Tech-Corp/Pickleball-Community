@@ -20,9 +20,13 @@ export default function PlayerReview() {
     reviewerEmail: '',
     knowledgeLevelId: '',
     isAnonymous: false,
+    isSelfReview: false,
     comments: '',
     scores: {}
   });
+
+  // Check if this is a self-review (logged-in user is the player being reviewed)
+  const isSelfReview = user && pageInfo?.playerId && user.id === pageInfo.playerId;
 
   // Prefill user info when component mounts
   useEffect(() => {
@@ -71,12 +75,12 @@ export default function PlayerReview() {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!formData.reviewerName.trim()) {
+    if (!isSelfReview && !formData.reviewerName.trim()) {
       alert('Please enter your name');
       return;
     }
 
-    if (!formData.knowledgeLevelId) {
+    if (!isSelfReview && !formData.knowledgeLevelId) {
       alert('Please select how well you know this player');
       return;
     }
@@ -86,10 +90,11 @@ export default function PlayerReview() {
       setError(null);
 
       const submitData = {
-        reviewerName: formData.reviewerName,
+        reviewerName: isSelfReview ? 'Self Review' : formData.reviewerName,
         reviewerEmail: formData.reviewerEmail || null,
-        knowledgeLevelId: parseInt(formData.knowledgeLevelId),
+        knowledgeLevelId: isSelfReview ? null : parseInt(formData.knowledgeLevelId),
         isAnonymous: formData.isAnonymous,
+        isSelfReview: isSelfReview,
         comments: formData.comments || null,
         scores: Object.entries(formData.scores).map(([skillAreaId, score]) => ({
           skillAreaId: parseInt(skillAreaId),
@@ -167,7 +172,12 @@ export default function PlayerReview() {
     <div className="min-h-screen bg-gray-50 py-8 px-4">
       <div className="max-w-3xl mx-auto">
         {/* Header */}
-        <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
+        <div className={`rounded-xl shadow-lg p-6 mb-6 ${isSelfReview ? 'bg-gradient-to-r from-purple-50 to-indigo-50' : 'bg-white'}`}>
+          {isSelfReview && (
+            <div className="mb-4 inline-flex items-center px-3 py-1 rounded-full bg-purple-100 text-purple-700 text-sm font-medium">
+              Self Assessment Mode
+            </div>
+          )}
           <div className="flex items-center gap-4">
             {pageInfo.playerProfileImageUrl ? (
               <img
@@ -182,14 +192,16 @@ export default function PlayerReview() {
             )}
             <div>
               <h1 className="text-2xl font-bold text-gray-900">
-                Rate {pageInfo.playerName}'s Skills
+                {isSelfReview ? 'Rate Your Own Skills' : `Rate ${pageInfo.playerName}'s Skills`}
               </h1>
               <p className="text-gray-600">
-                Help {pageInfo.playerName.split(' ')[0]} get certified by providing your honest assessment.
+                {isSelfReview
+                  ? 'Provide an honest self-assessment of your skills. This will be compared with peer reviews.'
+                  : `Help ${pageInfo.playerName.split(' ')[0]} get certified by providing your honest assessment.`}
               </p>
             </div>
           </div>
-          {pageInfo.message && (
+          {pageInfo.message && !isSelfReview && (
             <div className="mt-4 p-4 bg-primary-50 rounded-lg">
               <p className="text-primary-800">{pageInfo.message}</p>
             </div>
@@ -203,68 +215,72 @@ export default function PlayerReview() {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Reviewer Info */}
-          <div className="bg-white rounded-xl shadow-lg p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Your Information</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Your Name *
-                </label>
-                <input
-                  type="text"
-                  value={formData.reviewerName}
-                  onChange={(e) => setFormData(prev => ({ ...prev, reviewerName: e.target.value }))}
-                  className="w-full border border-gray-300 rounded-lg p-3 focus:ring-primary-500 focus:border-primary-500"
-                  placeholder="Enter your name"
-                  required
-                />
+          {/* Reviewer Info - Hidden for self-review */}
+          {!isSelfReview && (
+            <div className="bg-white rounded-xl shadow-lg p-6">
+              <h2 className="text-lg font-semibold text-gray-900 mb-4">Your Information</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Your Name *
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.reviewerName}
+                    onChange={(e) => setFormData(prev => ({ ...prev, reviewerName: e.target.value }))}
+                    className="w-full border border-gray-300 rounded-lg p-3 focus:ring-primary-500 focus:border-primary-500"
+                    placeholder="Enter your name"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Email (optional)
+                  </label>
+                  <input
+                    type="email"
+                    value={formData.reviewerEmail}
+                    onChange={(e) => setFormData(prev => ({ ...prev, reviewerEmail: e.target.value }))}
+                    className="w-full border border-gray-300 rounded-lg p-3 focus:ring-primary-500 focus:border-primary-500"
+                    placeholder="your@email.com"
+                  />
+                </div>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Email (optional)
+              <div className="mt-4">
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={formData.isAnonymous}
+                    onChange={(e) => setFormData(prev => ({ ...prev, isAnonymous: e.target.checked }))}
+                    className="w-4 h-4 text-primary-600 rounded focus:ring-primary-500"
+                  />
+                  <span className="text-gray-700">Keep my name hidden from the player</span>
                 </label>
-                <input
-                  type="email"
-                  value={formData.reviewerEmail}
-                  onChange={(e) => setFormData(prev => ({ ...prev, reviewerEmail: e.target.value }))}
-                  className="w-full border border-gray-300 rounded-lg p-3 focus:ring-primary-500 focus:border-primary-500"
-                  placeholder="your@email.com"
-                />
               </div>
             </div>
-            <div className="mt-4">
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={formData.isAnonymous}
-                  onChange={(e) => setFormData(prev => ({ ...prev, isAnonymous: e.target.checked }))}
-                  className="w-4 h-4 text-primary-600 rounded focus:ring-primary-500"
-                />
-                <span className="text-gray-700">Keep my name hidden from the player</span>
-              </label>
-            </div>
-          </div>
+          )}
 
-          {/* Knowledge Level */}
-          <div className="bg-white rounded-xl shadow-lg p-6">
-            <label className="block text-lg font-semibold text-gray-900 mb-2">
-              How well do you know this player? *
-            </label>
-            <select
-              value={formData.knowledgeLevelId}
-              onChange={(e) => setFormData(prev => ({ ...prev, knowledgeLevelId: e.target.value }))}
-              className="w-full border border-gray-300 rounded-lg p-3 focus:ring-primary-500 focus:border-primary-500"
-              required
-            >
-              <option value="">Select an option...</option>
-              {pageInfo.knowledgeLevels?.map(level => (
-                <option key={level.id} value={level.id}>
-                  {level.name}
-                </option>
-              ))}
-            </select>
-          </div>
+          {/* Knowledge Level - Hidden for self-review */}
+          {!isSelfReview && (
+            <div className="bg-white rounded-xl shadow-lg p-6">
+              <label className="block text-lg font-semibold text-gray-900 mb-2">
+                How well do you know this player? *
+              </label>
+              <select
+                value={formData.knowledgeLevelId}
+                onChange={(e) => setFormData(prev => ({ ...prev, knowledgeLevelId: e.target.value }))}
+                className="w-full border border-gray-300 rounded-lg p-3 focus:ring-primary-500 focus:border-primary-500"
+                required
+              >
+                <option value="">Select an option...</option>
+                {pageInfo.knowledgeLevels?.map(level => (
+                  <option key={level.id} value={level.id}>
+                    {level.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {/* Skill Ratings */}
           <div className="bg-white rounded-xl shadow-lg p-6">

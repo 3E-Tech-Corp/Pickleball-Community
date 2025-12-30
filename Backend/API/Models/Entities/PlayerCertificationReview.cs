@@ -36,6 +36,11 @@ public class PlayerCertificationReview
     public bool IsAnonymous { get; set; } = false;
 
     /// <summary>
+    /// Whether this is a self-review (player reviewing themselves)
+    /// </summary>
+    public bool IsSelfReview { get; set; } = false;
+
+    /// <summary>
     /// Optional comments from the reviewer
     /// </summary>
     [MaxLength(2000)]

@@ -180,10 +180,17 @@ public class SubmitReviewDto
     [EmailAddress]
     public string? ReviewerEmail { get; set; }
 
-    [Required]
-    public int KnowledgeLevelId { get; set; }
+    /// <summary>
+    /// Knowledge level ID (not required for self-reviews)
+    /// </summary>
+    public int? KnowledgeLevelId { get; set; }
 
     public bool IsAnonymous { get; set; } = false;
+
+    /// <summary>
+    /// Whether this is a self-review (player reviewing themselves)
+    /// </summary>
+    public bool IsSelfReview { get; set; } = false;
 
     [MaxLength(2000)]
     public string? Comments { get; set; }
@@ -218,12 +225,35 @@ public class CertificateSummaryDto
     public string StudentName { get; set; } = string.Empty;
     public string? StudentProfileImageUrl { get; set; }
     public int TotalReviews { get; set; }
+    public int PeerReviewCount { get; set; }
+    public bool HasSelfReview { get; set; }
     public double OverallAverageScore { get; set; }
     public double WeightedOverallScore { get; set; }
     public List<SkillGroupScoreSummaryDto> GroupScores { get; set; } = new();
     public List<SkillAverageSummaryDto> SkillAverages { get; set; } = new();
     public List<CertificationReviewSummaryDto> Reviews { get; set; } = new();
+
+    /// <summary>
+    /// Self-review scores (if available) for comparison
+    /// </summary>
+    public SelfReviewSummaryDto? SelfReview { get; set; }
+
+    /// <summary>
+    /// Available knowledge levels for filtering
+    /// </summary>
+    public List<KnowledgeLevelDto> KnowledgeLevels { get; set; } = new();
+
     public DateTime LastUpdated { get; set; }
+}
+
+public class SelfReviewSummaryDto
+{
+    public int ReviewId { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public double OverallAverageScore { get; set; }
+    public double WeightedOverallScore { get; set; }
+    public List<SkillGroupScoreSummaryDto> GroupScores { get; set; } = new();
+    public List<SkillAverageSummaryDto> SkillAverages { get; set; } = new();
 }
 
 public class SkillGroupScoreSummaryDto
@@ -250,8 +280,9 @@ public class SkillAverageSummaryDto
 public class CertificationReviewSummaryDto
 {
     public int Id { get; set; }
-    public string ReviewerDisplayName { get; set; } = string.Empty; // "Anonymous" if anonymous
+    public string ReviewerDisplayName { get; set; } = string.Empty; // "Anonymous" if anonymous, "Self Review" if self
     public string KnowledgeLevelName { get; set; } = string.Empty;
+    public bool IsSelfReview { get; set; }
     public string? Comments { get; set; }
     public DateTime CreatedAt { get; set; }
     public List<CertificationScoreDto> Scores { get; set; } = new();
@@ -261,6 +292,7 @@ public class CertificationReviewSummaryDto
 public class ReviewPageInfoDto
 {
     public int RequestId { get; set; }
+    public int PlayerId { get; set; }
     public string PlayerName { get; set; } = string.Empty;
     public string? PlayerProfileImageUrl { get; set; }
     public string? Message { get; set; }
