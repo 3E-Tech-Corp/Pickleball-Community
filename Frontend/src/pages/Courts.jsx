@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import { MapPin, Search, Filter, Star, Clock, Plus, Phone, Globe, CheckCircle, X, Sun, DollarSign, Layers, ThumbsUp, MessageSquare, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { MapPin, Search, Filter, Star, Clock, Plus, Phone, Globe, CheckCircle, X, Sun, DollarSign, Layers, ThumbsUp, MessageSquare, ChevronLeft, ChevronRight, ExternalLink, Calendar } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { courtsApi } from '../services/api';
 
@@ -498,6 +499,28 @@ function CourtDetailModal({ court, isAuthenticated, onClose, onConfirmationSubmi
         <div className="p-6">
           {activeTab === 'details' && (
             <div className="space-y-6">
+              {/* Action Buttons */}
+              <div className="flex gap-3">
+                {court.latitude && court.longitude && (
+                  <a
+                    href={`https://www.google.com/maps/search/?api=1&query=${court.latitude},${court.longitude}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex-1 flex items-center justify-center gap-2 py-3 px-4 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
+                  >
+                    <ExternalLink className="w-5 h-5" />
+                    Open in Google Maps
+                  </a>
+                )}
+                <Link
+                  to={`/events?courtId=${court.courtId}&courtName=${encodeURIComponent(court.name || 'Court')}`}
+                  className="flex-1 flex items-center justify-center gap-2 py-3 px-4 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors"
+                >
+                  <Calendar className="w-5 h-5" />
+                  Schedule Event Here
+                </Link>
+              </div>
+
               {/* Location Info */}
               <div>
                 <h3 className="font-medium text-gray-900 mb-3 flex items-center gap-2">
