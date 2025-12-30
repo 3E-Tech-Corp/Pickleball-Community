@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Users, Search, Filter, MapPin, Plus, Globe, Mail, Phone, ChevronLeft, ChevronRight, X, Copy, Check, Bell, UserPlus, Settings, Crown, Shield, Clock, DollarSign, Calendar, Upload, Image, Edit3 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { clubsApi, assetApi, getSharedAssetUrl } from '../services/api';
+import { clubsApi, assetApi, clubMemberRolesApi, getSharedAssetUrl } from '../services/api';
 
 export default function Clubs() {
   const { user, isAuthenticated } = useAuth();
@@ -27,7 +27,23 @@ export default function Clubs() {
   const [inviteClub, setInviteClub] = useState(null);
   const [activeTab, setActiveTab] = useState('search'); // search, my-clubs
   const [joinMessage, setJoinMessage] = useState(null); // { type: 'success'|'error', text: string }
+  const [memberRoles, setMemberRoles] = useState([]);
   const pageSize = 20;
+
+  // Load available member roles on mount
+  useEffect(() => {
+    const loadRoles = async () => {
+      try {
+        const response = await clubMemberRolesApi.getAll();
+        if (response.success) {
+          setMemberRoles(response.data || []);
+        }
+      } catch (err) {
+        console.error('Error loading member roles:', err);
+      }
+    };
+    loadRoles();
+  }, []);
 
   // Get user's location on mount
   useEffect(() => {
@@ -1058,9 +1074,17 @@ function ClubDetailModal({ club, isAuthenticated, currentUserId, onClose, onJoin
                             onChange={(e) => handleUpdateRole(member.id, e.target.value)}
                             className="text-sm border border-gray-300 rounded px-2 py-1"
                           >
-                            <option value="Member">Member</option>
-                            <option value="Moderator">Moderator</option>
-                            <option value="Admin">Admin</option>
+                            {memberRoles.length > 0 ? (
+                              memberRoles.map(role => (
+                                <option key={role.id} value={role.name}>{role.name}</option>
+                              ))
+                            ) : (
+                              <>
+                                <option value="Member">Member</option>
+                                <option value="Moderator">Moderator</option>
+                                <option value="Admin">Admin</option>
+                              </>
+                            )}
                           </select>
                           <button
                             onClick={() => setEditingMember(member)}

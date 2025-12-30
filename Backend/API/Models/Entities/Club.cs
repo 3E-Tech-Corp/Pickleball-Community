@@ -164,3 +164,31 @@ public class ClubNotification
     [ForeignKey("SentByUserId")]
     public User? SentBy { get; set; }
 }
+
+public class ClubMemberRole
+{
+    public int Id { get; set; }
+
+    [Required]
+    [MaxLength(50)]
+    public string Name { get; set; } = string.Empty;
+
+    [MaxLength(200)]
+    public string? Description { get; set; }
+
+    [MaxLength(20)]
+    public string? Color { get; set; }
+
+    public int SortOrder { get; set; } = 0;
+
+    public bool IsSystemRole { get; set; } = false; // System roles (Admin, Member) cannot be deleted
+
+    // Permissions
+    public bool CanManageMembers { get; set; } = false;
+    public bool CanManageClub { get; set; } = false;
+    public bool CanPostAnnouncements { get; set; } = false;
+
+    public bool IsActive { get; set; } = true;
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+}

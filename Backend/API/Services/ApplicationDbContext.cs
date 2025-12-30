@@ -59,6 +59,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<ClubMember> ClubMembers { get; set; }
     public DbSet<ClubJoinRequest> ClubJoinRequests { get; set; }
     public DbSet<ClubNotification> ClubNotifications { get; set; }
+    public DbSet<ClubMemberRole> ClubMemberRoles { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -417,6 +418,14 @@ public class ApplicationDbContext : DbContext
 
             entity.HasIndex(cal => new { cal.AssetId, cal.UserId }).IsUnique();
             entity.HasIndex(cal => cal.AssetId);
+        });
+
+        // Club Member Roles configuration
+        modelBuilder.Entity<ClubMemberRole>(entity =>
+        {
+            entity.Property(r => r.Name).IsRequired().HasMaxLength(50);
+            entity.HasIndex(r => r.Name).IsUnique();
+            entity.HasIndex(r => r.SortOrder);
         });
     }
 }

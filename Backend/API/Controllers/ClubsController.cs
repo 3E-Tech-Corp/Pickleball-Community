@@ -573,8 +573,9 @@ public class ClubsController : ControllerBase
             if (membership == null || membership.ClubId != id || !membership.IsActive)
                 return NotFound(new ApiResponse<bool> { Success = false, Message = "Member not found" });
 
-            // Validate role
-            if (!new[] { "Admin", "Moderator", "Member" }.Contains(dto.Role))
+            // Validate role against database
+            var validRole = await _context.ClubMemberRoles.AnyAsync(r => r.Name == dto.Role && r.IsActive);
+            if (!validRole)
                 return BadRequest(new ApiResponse<bool> { Success = false, Message = "Invalid role" });
 
             // Cannot demote the last admin
@@ -628,7 +629,9 @@ public class ClubsController : ControllerBase
             // Update fields if provided
             if (!string.IsNullOrEmpty(dto.Role))
             {
-                if (!new[] { "Admin", "Moderator", "Member" }.Contains(dto.Role))
+                // Validate role against database
+                var validRole = await _context.ClubMemberRoles.AnyAsync(r => r.Name == dto.Role && r.IsActive);
+                if (!validRole)
                     return BadRequest(new ApiResponse<ClubMemberDto> { Success = false, Message = "Invalid role" });
 
                 // Cannot demote the last admin

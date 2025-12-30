@@ -187,3 +187,44 @@ public class MyClubsDto
     public List<ClubDto> ClubsIBelong { get; set; } = new();
     public List<ClubJoinRequestDto> PendingRequests { get; set; } = new();
 }
+
+// Club Member Role DTO
+public class ClubMemberRoleDto
+{
+    public int Id { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public string? Description { get; set; }
+    public string? Color { get; set; }
+    public int SortOrder { get; set; }
+    public bool IsSystemRole { get; set; }
+    public bool CanManageMembers { get; set; }
+    public bool CanManageClub { get; set; }
+    public bool CanPostAnnouncements { get; set; }
+    public bool IsActive { get; set; }
+}
+
+// Create Club Member Role
+public class CreateClubMemberRoleDto
+{
+    public string Name { get; set; } = string.Empty;
+    public string? Description { get; set; }
+    public string? Color { get; set; }
+    public int SortOrder { get; set; } = 50;
+    public bool CanManageMembers { get; set; } = false;
+    public bool CanManageClub { get; set; } = false;
+    public bool CanPostAnnouncements { get; set; } = false;
+    public bool IsActive { get; set; } = true;
+}
+
+// Update Club Member Role
+public class UpdateClubMemberRoleDto
+{
+    public string? Name { get; set; }
+    public string? Description { get; set; }
+    public string? Color { get; set; }
+    public int? SortOrder { get; set; }
+    public bool? CanManageMembers { get; set; }
+    public bool? CanManageClub { get; set; }
+    public bool? CanPostAnnouncements { get; set; }
+    public bool? IsActive { get; set; }
+}

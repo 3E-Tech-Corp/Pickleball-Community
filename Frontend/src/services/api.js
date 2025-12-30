@@ -695,6 +695,31 @@ export const clubsApi = {
   getByInviteCode: (code) => api.get(`/clubs/join/${code}`)
 }
 
+// Club Member Roles API
+export const clubMemberRolesApi = {
+  // Get all roles
+  getAll: (includeInactive = false) =>
+    api.get(`/clubmemberroles${includeInactive ? '?includeInactive=true' : ''}`),
+
+  // Get single role
+  getById: (id) => api.get(`/clubmemberroles/${id}`),
+
+  // Create new role (Admin only)
+  create: (data) => api.post('/clubmemberroles', data),
+
+  // Update role (Admin only)
+  update: (id, data) => api.put(`/clubmemberroles/${id}`, data),
+
+  // Delete role (Admin only)
+  delete: (id) => api.delete(`/clubmemberroles/${id}`),
+
+  // Restore role (Admin only)
+  restore: (id) => api.post(`/clubmemberroles/${id}/restore`),
+
+  // Reorder roles (Admin only)
+  reorder: (orderedIds) => api.put('/clubmemberroles/reorder', orderedIds)
+}
+
 // Friends API
 export const friendsApi = {
   // Get all friends
