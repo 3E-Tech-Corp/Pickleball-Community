@@ -142,13 +142,26 @@ export default function PlayerReview() {
     );
   }
 
-  // Group skill areas by category
-  const skillsByCategory = pageInfo.skillAreas?.reduce((acc, skill) => {
-    const category = skill.category || 'Other';
-    if (!acc[category]) acc[category] = [];
-    acc[category].push(skill);
+  // Group skill areas by SkillGroup (using skillGroupId and skillGroupName)
+  const skillsByGroup = pageInfo.skillAreas?.reduce((acc, skill) => {
+    const groupKey = skill.skillGroupId || 0;
+    const groupName = skill.skillGroupName || 'Other Skills';
+    if (!acc[groupKey]) {
+      acc[groupKey] = {
+        name: groupName,
+        skills: []
+      };
+    }
+    acc[groupKey].skills.push(skill);
     return acc;
   }, {}) || {};
+
+  // Sort groups by their ID (which should match sortOrder from backend)
+  const sortedGroups = Object.entries(skillsByGroup).sort(([a], [b]) => {
+    if (a === '0') return 1; // 'Other Skills' goes last
+    if (b === '0') return -1;
+    return parseInt(a) - parseInt(b);
+  });
 
   return (
     <div className="min-h-screen bg-gray-50 py-8 px-4">
@@ -259,13 +272,13 @@ export default function PlayerReview() {
               Rate Skills (1-10)
             </h2>
             <div className="space-y-6">
-              {Object.entries(skillsByCategory).map(([category, skills]) => (
-                <div key={category}>
-                  <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wide mb-3">
-                    {category}
+              {sortedGroups.map(([groupId, group]) => (
+                <div key={groupId} className="border-b border-gray-100 pb-6 last:border-0 last:pb-0">
+                  <h3 className="text-sm font-semibold text-primary-700 uppercase tracking-wide mb-4">
+                    {group.name}
                   </h3>
                   <div className="space-y-4">
-                    {skills.map(skill => (
+                    {group.skills.map(skill => (
                       <div key={skill.id} className="flex items-center gap-4">
                         <div className="w-40 flex-shrink-0">
                           <span className="text-gray-700">{skill.name}</span>

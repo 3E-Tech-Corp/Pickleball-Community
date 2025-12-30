@@ -63,6 +63,27 @@ export default function MyCertificate() {
     return 'text-red-600 bg-red-100';
   };
 
+  // Letter grade based on 0-100 scale
+  const getLetterGrade = (score100) => {
+    if (score100 >= 93) return { letter: 'A', color: 'text-green-600 bg-green-100' };
+    if (score100 >= 90) return { letter: 'A-', color: 'text-green-600 bg-green-100' };
+    if (score100 >= 87) return { letter: 'B+', color: 'text-blue-600 bg-blue-100' };
+    if (score100 >= 83) return { letter: 'B', color: 'text-blue-600 bg-blue-100' };
+    if (score100 >= 80) return { letter: 'B-', color: 'text-blue-600 bg-blue-100' };
+    if (score100 >= 77) return { letter: 'C+', color: 'text-yellow-600 bg-yellow-100' };
+    if (score100 >= 73) return { letter: 'C', color: 'text-yellow-600 bg-yellow-100' };
+    if (score100 >= 70) return { letter: 'C-', color: 'text-yellow-600 bg-yellow-100' };
+    if (score100 >= 67) return { letter: 'D+', color: 'text-orange-600 bg-orange-100' };
+    if (score100 >= 63) return { letter: 'D', color: 'text-orange-600 bg-orange-100' };
+    if (score100 >= 60) return { letter: 'D-', color: 'text-orange-600 bg-orange-100' };
+    return { letter: 'F', color: 'text-red-600 bg-red-100' };
+  };
+
+  // Convert 0-10 score to 0-100 and get letter grade for a group
+  const getGroupScore100 = (groupAverage) => {
+    return Math.round(groupAverage * 10);
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -111,44 +132,109 @@ export default function MyCertificate() {
 
               {certificate?.totalReviews > 0 ? (
                 <>
-                  {/* Overall Score */}
-                  <div className="flex items-center gap-4 p-4 bg-primary-50 rounded-lg mb-6">
-                    <div className="flex-shrink-0">
-                      <div className={`w-16 h-16 rounded-full flex items-center justify-center text-2xl font-bold ${getScoreColor(certificate.overallAverageScore)}`}>
-                        {certificate.overallAverageScore.toFixed(1)}
-                      </div>
-                    </div>
-                    <div>
-                      <div className="text-lg font-semibold text-gray-900">Overall Rating</div>
-                      <div className="text-sm text-gray-600">
-                        Based on {certificate.totalReviews} review{certificate.totalReviews !== 1 ? 's' : ''}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Skill Breakdown */}
-                  <div className="space-y-3">
-                    {certificate.skillAverages?.map(skill => (
-                      <div key={skill.skillAreaId} className="flex items-center gap-4">
-                        <div className="w-40 flex-shrink-0">
-                          <span className="text-sm text-gray-700">{skill.skillAreaName}</span>
-                        </div>
-                        <div className="flex-1">
-                          <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-                            <div
-                              className="h-full bg-primary-500 rounded-full transition-all"
-                              style={{ width: `${(skill.averageScore / 10) * 100}%` }}
-                            />
+                  {/* Overall Score with Letter Grade */}
+                  {(() => {
+                    const totalScore100 = Math.round((certificate.weightedOverallScore || certificate.overallAverageScore) * 10);
+                    const grade = getLetterGrade(totalScore100);
+                    return (
+                      <div className="flex items-center gap-4 p-4 bg-gradient-to-r from-primary-50 to-primary-100 rounded-lg mb-6">
+                        <div className="flex-shrink-0 flex items-center gap-3">
+                          <div className={`w-16 h-16 rounded-full flex items-center justify-center text-2xl font-bold ${grade.color}`}>
+                            {grade.letter}
+                          </div>
+                          <div className="text-3xl font-bold text-gray-900">
+                            {totalScore100}
+                            <span className="text-lg text-gray-500 font-normal">/100</span>
                           </div>
                         </div>
-                        <div className="w-12 text-right">
-                          <span className={`inline-flex items-center justify-center w-8 h-8 rounded-full text-sm font-semibold ${getScoreColor(skill.averageScore)}`}>
-                            {skill.averageScore.toFixed(1)}
-                          </span>
+                        <div className="flex-1">
+                          <div className="text-lg font-semibold text-gray-900">Overall Rating</div>
+                          <div className="text-sm text-gray-600">
+                            Based on {certificate.totalReviews} review{certificate.totalReviews !== 1 ? 's' : ''}
+                          </div>
                         </div>
                       </div>
-                    ))}
-                  </div>
+                    );
+                  })()}
+
+                  {/* Group Scores with Weights */}
+                  {certificate.groupScores?.length > 0 && (
+                    <div className="space-y-5 mb-6">
+                      <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Skill Groups</h3>
+                      {certificate.groupScores.map(group => {
+                        const groupScore100 = getGroupScore100(group.averageScore);
+                        const groupGrade = getLetterGrade(groupScore100);
+                        return (
+                          <div key={group.groupId} className="border border-gray-200 rounded-lg p-4">
+                            <div className="flex items-center justify-between mb-3">
+                              <div className="flex items-center gap-3">
+                                <span className={`inline-flex items-center justify-center w-10 h-10 rounded-lg text-lg font-bold ${groupGrade.color}`}>
+                                  {groupGrade.letter}
+                                </span>
+                                <div>
+                                  <div className="font-semibold text-gray-900">{group.groupName}</div>
+                                  <div className="text-xs text-gray-500">Weight: {group.weight}%</div>
+                                </div>
+                              </div>
+                              <div className="text-right">
+                                <div className="text-xl font-bold text-gray-900">{groupScore100}<span className="text-sm text-gray-500 font-normal">/100</span></div>
+                                <div className="text-xs text-gray-500">Contributes {group.weightedContribution.toFixed(1)} pts</div>
+                              </div>
+                            </div>
+                            {/* Skills within this group */}
+                            <div className="space-y-2 pt-3 border-t border-gray-100">
+                              {group.skillAverages?.map(skill => (
+                                <div key={skill.skillAreaId} className="flex items-center gap-3">
+                                  <div className="w-32 flex-shrink-0">
+                                    <span className="text-sm text-gray-600">{skill.skillAreaName}</span>
+                                  </div>
+                                  <div className="flex-1">
+                                    <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                                      <div
+                                        className="h-full bg-primary-500 rounded-full transition-all"
+                                        style={{ width: `${(skill.averageScore / 10) * 100}%` }}
+                                      />
+                                    </div>
+                                  </div>
+                                  <div className="w-16 text-right">
+                                    <span className="text-sm font-medium text-gray-700">
+                                      {getGroupScore100(skill.averageScore)}/100
+                                    </span>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* Flat Skill Breakdown (fallback if no groups) */}
+                  {(!certificate.groupScores || certificate.groupScores.length === 0) && certificate.skillAverages?.length > 0 && (
+                    <div className="space-y-3">
+                      {certificate.skillAverages?.map(skill => (
+                        <div key={skill.skillAreaId} className="flex items-center gap-4">
+                          <div className="w-40 flex-shrink-0">
+                            <span className="text-sm text-gray-700">{skill.skillAreaName}</span>
+                          </div>
+                          <div className="flex-1">
+                            <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                              <div
+                                className="h-full bg-primary-500 rounded-full transition-all"
+                                style={{ width: `${(skill.averageScore / 10) * 100}%` }}
+                              />
+                            </div>
+                          </div>
+                          <div className="w-12 text-right">
+                            <span className={`inline-flex items-center justify-center w-8 h-8 rounded-full text-sm font-semibold ${getScoreColor(skill.averageScore)}`}>
+                              {skill.averageScore.toFixed(1)}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </>
               ) : (
                 <div className="text-center py-8">
@@ -199,14 +285,23 @@ export default function MyCertificate() {
                         <div className="border-t border-gray-200 p-4 bg-gray-50">
                           {/* Scores */}
                           <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
-                            {review.scores.map(score => (
-                              <div key={score.id} className="flex items-center justify-between bg-white rounded p-2">
-                                <span className="text-sm text-gray-600">{score.skillAreaName}</span>
-                                <span className={`px-2 py-1 rounded text-sm font-medium ${getScoreColor(score.score)}`}>
-                                  {score.score}
-                                </span>
-                              </div>
-                            ))}
+                            {review.scores.map(score => {
+                              const score100 = score.score * 10;
+                              const scoreGrade = getLetterGrade(score100);
+                              return (
+                                <div key={score.id} className="flex items-center justify-between bg-white rounded p-2">
+                                  <span className="text-sm text-gray-600">{score.skillAreaName}</span>
+                                  <div className="flex items-center gap-2">
+                                    <span className={`px-2 py-0.5 rounded text-xs font-bold ${scoreGrade.color}`}>
+                                      {scoreGrade.letter}
+                                    </span>
+                                    <span className="text-sm font-medium text-gray-700">
+                                      {score100}
+                                    </span>
+                                  </div>
+                                </div>
+                              );
+                            })}
                           </div>
 
                           {/* Comments */}
