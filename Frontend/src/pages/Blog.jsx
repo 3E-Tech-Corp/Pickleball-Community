@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { FileText, Search, Tag, Calendar, User, MessageCircle, Heart, Edit2, Plus, X, Send } from 'lucide-react';
-import Navigation from '../components/ui/Navigation';
 import { useAuth } from '../contexts/AuthContext';
 import { getAssetUrl } from '../services/api';
 
@@ -62,8 +61,6 @@ export default function Blog() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Navigation />
-
       {/* Header */}
       <div className="bg-gradient-to-r from-purple-600 to-purple-800 text-white py-12">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">

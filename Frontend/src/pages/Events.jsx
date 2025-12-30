@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Calendar, MapPin, Clock, Users, Filter, Search, ChevronDown } from 'lucide-react';
-import Navigation from '../components/ui/Navigation';
+import { Calendar, MapPin, Clock, Users, Filter, Search } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 const DISTANCE_OPTIONS = [
@@ -81,8 +80,6 @@ export default function Events() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Navigation />
-
       {/* Header */}
       <div className="bg-gradient-to-r from-primary-600 to-primary-800 text-white py-12">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">

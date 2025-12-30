@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { MapPin, Search, Filter, Star, Clock, Edit2, Plus, Phone, Globe, CheckCircle, X } from 'lucide-react';
-import Navigation from '../components/ui/Navigation';
 import { useAuth } from '../contexts/AuthContext';
 
 const COURT_TYPES = [
@@ -98,8 +97,6 @@ export default function Courts() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Navigation />
-
       {/* Header */}
       <div className="bg-gradient-to-r from-green-600 to-green-800 text-white py-12">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">

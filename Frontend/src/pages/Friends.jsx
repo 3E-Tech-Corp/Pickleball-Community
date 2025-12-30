@@ -4,7 +4,6 @@ import {
   Users, UserPlus, Search, Check, X, Clock, MessageCircle,
   User, Calendar, ChevronRight, ArrowLeft, Gamepad2
 } from 'lucide-react';
-import Navigation from '../components/ui/Navigation';
 import { useAuth } from '../contexts/AuthContext';
 import { friendsApi, getAssetUrl } from '../services/api';
 
@@ -126,8 +125,6 @@ export default function Friends() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Navigation />
-
       {/* Header */}
       <div className="bg-gradient-to-r from-blue-600 to-blue-800 text-white py-12">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
