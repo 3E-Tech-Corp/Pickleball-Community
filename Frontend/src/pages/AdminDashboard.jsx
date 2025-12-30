@@ -6,7 +6,7 @@ import {
   Users, BookOpen, Calendar, DollarSign, Search, Edit2, Trash2,
   ChevronLeft, ChevronRight, Filter, MoreVertical, Eye, X,
   Shield, GraduationCap, User, CheckCircle, XCircle, Save,
-  Palette, Upload, RefreshCw, Image, Layers, Check, Award, Tags, UserCog
+  Palette, Upload, RefreshCw, Image, Layers, Check, Award, Tags, UserCog, Video
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
@@ -31,8 +31,12 @@ const AdminDashboard = () => {
   const [savingTheme, setSavingTheme] = useState(false)
   const [uploadingLogo, setUploadingLogo] = useState(false)
   const [uploadingFavicon, setUploadingFavicon] = useState(false)
+  const [uploadingHeroVideo, setUploadingHeroVideo] = useState(false)
+  const [uploadingHeroImage, setUploadingHeroImage] = useState(false)
   const logoInputRef = useRef(null)
   const faviconInputRef = useRef(null)
+  const heroVideoInputRef = useRef(null)
+  const heroImageInputRef = useRef(null)
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1)
@@ -197,6 +201,70 @@ const AdminDashboard = () => {
       alert('Failed to upload favicon')
     } finally {
       setUploadingFavicon(false)
+    }
+  }
+
+  // Handle hero video upload
+  const handleHeroVideoUpload = async (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    setUploadingHeroVideo(true)
+    try {
+      const response = await themeApi.uploadHeroVideo(file)
+      if (response.success && response.data) {
+        setThemeSettings(prev => ({ ...prev, heroVideoUrl: response.data.url }))
+        await refreshTheme()
+      }
+    } catch (error) {
+      console.error('Error uploading hero video:', error)
+      alert('Failed to upload hero video')
+    } finally {
+      setUploadingHeroVideo(false)
+    }
+  }
+
+  // Handle hero image upload
+  const handleHeroImageUpload = async (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    setUploadingHeroImage(true)
+    try {
+      const response = await themeApi.uploadHeroImage(file)
+      if (response.success && response.data) {
+        setThemeSettings(prev => ({ ...prev, heroImageUrl: response.data.url }))
+        await refreshTheme()
+      }
+    } catch (error) {
+      console.error('Error uploading hero image:', error)
+      alert('Failed to upload hero image')
+    } finally {
+      setUploadingHeroImage(false)
+    }
+  }
+
+  // Delete hero video
+  const handleDeleteHeroVideo = async () => {
+    if (!confirm('Are you sure you want to delete the hero video?')) return
+    try {
+      await themeApi.deleteHeroVideo()
+      setThemeSettings(prev => ({ ...prev, heroVideoUrl: null, heroVideoThumbnailUrl: null }))
+      await refreshTheme()
+    } catch (error) {
+      console.error('Error deleting hero video:', error)
+    }
+  }
+
+  // Delete hero image
+  const handleDeleteHeroImage = async () => {
+    if (!confirm('Are you sure you want to delete the hero image?')) return
+    try {
+      await themeApi.deleteHeroImage()
+      setThemeSettings(prev => ({ ...prev, heroImageUrl: null }))
+      await refreshTheme()
+    } catch (error) {
+      console.error('Error deleting hero image:', error)
     }
   }
 
@@ -634,6 +702,199 @@ const AdminDashboard = () => {
                             </button>
                             <p className="text-xs text-gray-500 mt-1">ICO, PNG 32x32 or 64x64</p>
                           </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Hero Section */}
+                  <div className="bg-white rounded-xl shadow-sm p-6">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                      <Video className="w-5 h-5 mr-2 text-pink-500" />
+                      Hero Section
+                    </h3>
+                    <p className="text-sm text-gray-500 mb-6">
+                      Customize the hero section on the landing page. Video takes priority over image.
+                    </p>
+
+                    {/* Hero Video and Image */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Hero Video</label>
+                        <div className="border-2 border-dashed border-gray-300 rounded-lg p-4">
+                          {themeSettings.heroVideoUrl ? (
+                            <div className="space-y-3">
+                              <video
+                                src={getAssetUrl(themeSettings.heroVideoUrl)}
+                                className="w-full h-32 object-cover rounded-lg"
+                                muted
+                                loop
+                                autoPlay
+                                playsInline
+                              />
+                              <div className="flex items-center justify-between">
+                                <span className="text-xs text-gray-500 truncate flex-1">
+                                  {themeSettings.heroVideoUrl.split('/').pop()}
+                                </span>
+                                <button
+                                  onClick={handleDeleteHeroVideo}
+                                  className="p-1.5 text-red-500 hover:bg-red-50 rounded"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="text-center py-4">
+                              <Video className="w-10 h-10 text-gray-300 mx-auto mb-2" />
+                              <p className="text-sm text-gray-500 mb-3">No video uploaded</p>
+                              <input
+                                type="file"
+                                ref={heroVideoInputRef}
+                                onChange={handleHeroVideoUpload}
+                                accept="video/mp4,video/webm,video/ogg"
+                                className="hidden"
+                              />
+                              <button
+                                onClick={() => heroVideoInputRef.current?.click()}
+                                disabled={uploadingHeroVideo}
+                                className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center mx-auto disabled:opacity-50"
+                              >
+                                {uploadingHeroVideo ? (
+                                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                                ) : (
+                                  <Upload className="w-4 h-4 mr-2" />
+                                )}
+                                {uploadingHeroVideo ? 'Uploading...' : 'Upload Video'}
+                              </button>
+                              <p className="text-xs text-gray-400 mt-2">MP4, WebM up to 50MB</p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Hero Image (Fallback)</label>
+                        <div className="border-2 border-dashed border-gray-300 rounded-lg p-4">
+                          {themeSettings.heroImageUrl ? (
+                            <div className="space-y-3">
+                              <img
+                                src={getAssetUrl(themeSettings.heroImageUrl)}
+                                alt="Hero background"
+                                className="w-full h-32 object-cover rounded-lg"
+                              />
+                              <div className="flex items-center justify-between">
+                                <span className="text-xs text-gray-500 truncate flex-1">
+                                  {themeSettings.heroImageUrl.split('/').pop()}
+                                </span>
+                                <button
+                                  onClick={handleDeleteHeroImage}
+                                  className="p-1.5 text-red-500 hover:bg-red-50 rounded"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="text-center py-4">
+                              <Image className="w-10 h-10 text-gray-300 mx-auto mb-2" />
+                              <p className="text-sm text-gray-500 mb-3">No image uploaded</p>
+                              <input
+                                type="file"
+                                ref={heroImageInputRef}
+                                onChange={handleHeroImageUpload}
+                                accept="image/*"
+                                className="hidden"
+                              />
+                              <button
+                                onClick={() => heroImageInputRef.current?.click()}
+                                disabled={uploadingHeroImage}
+                                className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center mx-auto disabled:opacity-50"
+                              >
+                                {uploadingHeroImage ? (
+                                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                                ) : (
+                                  <Upload className="w-4 h-4 mr-2" />
+                                )}
+                                {uploadingHeroImage ? 'Uploading...' : 'Upload Image'}
+                              </button>
+                              <p className="text-xs text-gray-400 mt-2">PNG, JPG up to 5MB</p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Hero Text Content */}
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Hero Title</label>
+                        <input
+                          type="text"
+                          value={themeSettings.heroTitle || ''}
+                          onChange={(e) => handleThemeChange('heroTitle', e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                          placeholder="Your Pickleball Community Awaits"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Hero Subtitle</label>
+                        <textarea
+                          value={themeSettings.heroSubtitle || ''}
+                          onChange={(e) => handleThemeChange('heroSubtitle', e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                          rows={2}
+                          placeholder="Connect with players, find courts, join clubs, and get certified."
+                        />
+                      </div>
+                    </div>
+
+                    {/* CTA Buttons */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+                      <div className="space-y-4">
+                        <h4 className="text-sm font-medium text-gray-700">Primary CTA Button</h4>
+                        <div>
+                          <label className="block text-xs text-gray-500 mb-1">Button Text</label>
+                          <input
+                            type="text"
+                            value={themeSettings.heroCtaText || ''}
+                            onChange={(e) => handleThemeChange('heroCtaText', e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                            placeholder="Find Courts"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs text-gray-500 mb-1">Button Link</label>
+                          <input
+                            type="text"
+                            value={themeSettings.heroCtaLink || ''}
+                            onChange={(e) => handleThemeChange('heroCtaLink', e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                            placeholder="/courts"
+                          />
+                        </div>
+                      </div>
+                      <div className="space-y-4">
+                        <h4 className="text-sm font-medium text-gray-700">Secondary CTA Button</h4>
+                        <div>
+                          <label className="block text-xs text-gray-500 mb-1">Button Text</label>
+                          <input
+                            type="text"
+                            value={themeSettings.heroSecondaryCtaText || ''}
+                            onChange={(e) => handleThemeChange('heroSecondaryCtaText', e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                            placeholder="Join a Club"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs text-gray-500 mb-1">Button Link</label>
+                          <input
+                            type="text"
+                            value={themeSettings.heroSecondaryCtaLink || ''}
+                            onChange={(e) => handleThemeChange('heroSecondaryCtaLink', e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                            placeholder="/clubs"
+                          />
                         </div>
                       </div>
                     </div>

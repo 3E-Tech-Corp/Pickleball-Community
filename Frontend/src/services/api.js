@@ -289,7 +289,31 @@ export const themeApi = {
   getPresets: () => api.get('/theme/presets'),
 
   // Reset theme to default (admin only)
-  reset: () => api.post('/theme/reset')
+  reset: () => api.post('/theme/reset'),
+
+  // Upload hero video (admin only)
+  uploadHeroVideo: (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return api.post('/theme/hero-video', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+  },
+
+  // Delete hero video (admin only)
+  deleteHeroVideo: () => api.delete('/theme/hero-video'),
+
+  // Upload hero image (admin only)
+  uploadHeroImage: (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return api.post('/theme/hero-image', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+  },
+
+  // Delete hero image (admin only)
+  deleteHeroImage: () => api.delete('/theme/hero-image')
 }
 
 // User Profile API

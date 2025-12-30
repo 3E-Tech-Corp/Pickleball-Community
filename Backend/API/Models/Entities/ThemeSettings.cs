@@ -84,6 +84,34 @@ public class ThemeSettings
     // Custom CSS
     public string? CustomCss { get; set; }
 
+    // Hero Section
+    [MaxLength(500)]
+    public string? HeroVideoUrl { get; set; }
+
+    [MaxLength(500)]
+    public string? HeroVideoThumbnailUrl { get; set; }
+
+    [MaxLength(500)]
+    public string? HeroImageUrl { get; set; }
+
+    [MaxLength(200)]
+    public string? HeroTitle { get; set; } = "Your Pickleball Community Awaits";
+
+    [MaxLength(500)]
+    public string? HeroSubtitle { get; set; } = "Connect with players, find courts, join clubs, and get certified. The ultimate platform for pickleball enthusiasts.";
+
+    [MaxLength(100)]
+    public string? HeroCtaText { get; set; } = "Find Courts";
+
+    [MaxLength(200)]
+    public string? HeroCtaLink { get; set; } = "/courts";
+
+    [MaxLength(100)]
+    public string? HeroSecondaryCtaText { get; set; } = "Join a Club";
+
+    [MaxLength(200)]
+    public string? HeroSecondaryCtaLink { get; set; } = "/clubs";
+
     // Status
     public bool IsActive { get; set; } = true;
 

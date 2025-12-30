@@ -43,6 +43,17 @@ public class ThemeSettingsDto
     // Custom CSS
     public string? CustomCss { get; set; }
 
+    // Hero Section
+    public string? HeroVideoUrl { get; set; }
+    public string? HeroVideoThumbnailUrl { get; set; }
+    public string? HeroImageUrl { get; set; }
+    public string? HeroTitle { get; set; }
+    public string? HeroSubtitle { get; set; }
+    public string? HeroCtaText { get; set; }
+    public string? HeroCtaLink { get; set; }
+    public string? HeroSecondaryCtaText { get; set; }
+    public string? HeroSecondaryCtaLink { get; set; }
+
     public DateTime? UpdatedAt { get; set; }
 }
 
@@ -87,6 +98,17 @@ public class UpdateThemeRequest
 
     // Custom CSS
     public string? CustomCss { get; set; }
+
+    // Hero Section
+    public string? HeroVideoUrl { get; set; }
+    public string? HeroVideoThumbnailUrl { get; set; }
+    public string? HeroImageUrl { get; set; }
+    public string? HeroTitle { get; set; }
+    public string? HeroSubtitle { get; set; }
+    public string? HeroCtaText { get; set; }
+    public string? HeroCtaLink { get; set; }
+    public string? HeroSecondaryCtaText { get; set; }
+    public string? HeroSecondaryCtaLink { get; set; }
 }
 
 public class ThemePresetDto
