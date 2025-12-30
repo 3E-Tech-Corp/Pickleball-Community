@@ -293,8 +293,8 @@ public class CourtsController : ControllerBase
                         MostSuggestedName = reader.IsDBNull(reader.GetOrdinal("MostSuggestedName")) ? null : reader.GetString(reader.GetOrdinal("MostSuggestedName")),
                         MostConfirmedIndoorCount = reader.IsDBNull(reader.GetOrdinal("MostConfirmedIndoorCount")) ? null : reader.GetInt32(reader.GetOrdinal("MostConfirmedIndoorCount")),
                         MostConfirmedOutdoorCount = reader.IsDBNull(reader.GetOrdinal("MostConfirmedOutdoorCount")) ? null : reader.GetInt32(reader.GetOrdinal("MostConfirmedOutdoorCount")),
-                        MostConfirmedHasLights = reader.IsDBNull(reader.GetOrdinal("MostConfirmedHasLights")) ? null : reader.GetBoolean(reader.GetOrdinal("MostConfirmedHasLights")),
-                        MostConfirmedHasFee = reader.IsDBNull(reader.GetOrdinal("MostConfirmedHasFee")) ? null : reader.GetBoolean(reader.GetOrdinal("MostConfirmedHasFee")),
+                        MostConfirmedHasLights = reader.IsDBNull(reader.GetOrdinal("MostConfirmedHasLights")) ? null : reader.GetInt32(reader.GetOrdinal("MostConfirmedHasLights")) == 1,
+                        MostConfirmedHasFee = reader.IsDBNull(reader.GetOrdinal("MostConfirmedHasFee")) ? null : reader.GetInt32(reader.GetOrdinal("MostConfirmedHasFee")) == 1,
                         CommonFeeAmount = reader.IsDBNull(reader.GetOrdinal("CommonFeeAmount")) ? null : reader.GetString(reader.GetOrdinal("CommonFeeAmount")),
                         CommonHours = reader.IsDBNull(reader.GetOrdinal("CommonHours")) ? null : reader.GetString(reader.GetOrdinal("CommonHours")),
                         CommonSurfaceType = reader.IsDBNull(reader.GetOrdinal("CommonSurfaceType")) ? null : reader.GetString(reader.GetOrdinal("CommonSurfaceType"))
