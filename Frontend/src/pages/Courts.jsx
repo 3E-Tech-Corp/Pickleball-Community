@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { MapPin, Search, Filter, Star, Clock, Plus, Phone, Globe, CheckCircle, X, Sun, DollarSign, Layers, ThumbsUp, ThumbsDown, MessageSquare, ChevronLeft, ChevronRight, ExternalLink, Calendar, Navigation, List, Map, ArrowUpDown, SortAsc, SortDesc, Locate, Image, Video, Upload, Trash2, Play } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { courtsApi, sharedAssetApi, SHARED_AUTH_URL } from '../services/api';
+import { courtsApi, sharedAssetApi, getSharedAssetUrl } from '../services/api';
 
 const SURFACE_TYPES = [
   { value: 'all', label: 'All Surfaces' },
@@ -1545,7 +1545,7 @@ function CourtDetailModal({ court, isAuthenticated, onClose, onConfirmationSubmi
                       <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-2">
                           {conf.userProfileImageUrl ? (
-                            <img src={conf.userProfileImageUrl} alt="" className="w-8 h-8 rounded-full" />
+                            <img src={getSharedAssetUrl(conf.userProfileImageUrl)} alt="" className="w-8 h-8 rounded-full" />
                           ) : (
                             <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center">
                               <span className="text-green-600 font-medium text-sm">
@@ -1664,7 +1664,7 @@ function CourtDetailModal({ court, isAuthenticated, onClose, onConfirmationSubmi
                         {asset.assetType === 'video' ? (
                           <div className="relative w-full h-full">
                             <video
-                              src={asset.assetUrl}
+                              src={getSharedAssetUrl(asset.assetUrl)}
                               className="w-full h-full object-cover"
                               muted
                             />
@@ -1674,7 +1674,7 @@ function CourtDetailModal({ court, isAuthenticated, onClose, onConfirmationSubmi
                           </div>
                         ) : (
                           <img
-                            src={asset.assetUrl}
+                            src={getSharedAssetUrl(asset.assetUrl)}
                             alt={asset.description || 'Court photo'}
                             className="w-full h-full object-cover"
                             loading="lazy"
@@ -1688,7 +1688,7 @@ function CourtDetailModal({ court, isAuthenticated, onClose, onConfirmationSubmi
                           {/* User info */}
                           <div className="flex items-center gap-2 mb-2">
                             {asset.userProfileImageUrl ? (
-                              <img src={asset.userProfileImageUrl} alt="" className="w-6 h-6 rounded-full" />
+                              <img src={getSharedAssetUrl(asset.userProfileImageUrl)} alt="" className="w-6 h-6 rounded-full" />
                             ) : (
                               <div className="w-6 h-6 rounded-full bg-green-100 flex items-center justify-center">
                                 <span className="text-green-600 text-xs font-medium">
