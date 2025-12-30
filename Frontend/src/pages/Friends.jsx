@@ -1,14 +1,15 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   Users, UserPlus, Search, Check, X, Clock, MessageCircle,
-  User, Calendar, ChevronRight, ArrowLeft, Gamepad2
+  User, Calendar, ChevronRight, ArrowLeft, Gamepad2, ExternalLink
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { friendsApi, getSharedAssetUrl } from '../services/api';
 
 export default function Friends() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('friends');
   const [friends, setFriends] = useState([]);
   const [pendingRequests, setPendingRequests] = useState([]);
@@ -220,10 +221,10 @@ export default function Friends() {
             ) : friends.length > 0 ? (
               <div className="divide-y">
                 {friends.map(friend => (
-                  <div
+                  <Link
                     key={friend.id}
-                    className="p-4 hover:bg-gray-50 cursor-pointer"
-                    onClick={() => setSelectedFriend(friend)}
+                    to={`/users/${friend.id}`}
+                    className="block p-4 hover:bg-gray-50 transition-colors"
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-4">
@@ -253,7 +254,7 @@ export default function Friends() {
                       </div>
                       <ChevronRight className="w-5 h-5 text-gray-400" />
                     </div>
-                  </div>
+                  </Link>
                 ))}
               </div>
             ) : (
@@ -292,9 +293,9 @@ export default function Friends() {
                   {pendingRequests.map(request => (
                     <div key={request.id} className="p-4">
                       <div className="flex items-center justify-between">
-                        <div
-                          className="flex items-center gap-4 cursor-pointer"
-                          onClick={() => setPreviewUser(request.sender)}
+                        <Link
+                          to={`/users/${request.sender.id}`}
+                          className="flex items-center gap-4 hover:opacity-80 transition-opacity"
                         >
                           {request.sender.profileImageUrl ? (
                             <img
@@ -318,15 +319,15 @@ export default function Friends() {
                               </span>
                             )}
                           </div>
-                        </div>
+                        </Link>
                         <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => setPreviewUser(request.sender)}
+                          <Link
+                            to={`/users/${request.sender.id}`}
                             className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg"
                             title="View Profile"
                           >
-                            <User className="w-5 h-5" />
-                          </button>
+                            <ExternalLink className="w-5 h-5" />
+                          </Link>
                           <button
                             onClick={() => handleAcceptRequest(request.id)}
                             className="p-2 text-green-600 hover:bg-green-50 rounded-lg"
@@ -367,7 +368,10 @@ export default function Friends() {
                   {sentRequests.map(request => (
                     <div key={request.id} className="p-4">
                       <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-4">
+                        <Link
+                          to={`/users/${request.recipient.id}`}
+                          className="flex items-center gap-4 hover:opacity-80 transition-opacity"
+                        >
                           {request.recipient.profileImageUrl ? (
                             <img
                               src={getSharedAssetUrl(request.recipient.profileImageUrl)}
@@ -385,7 +389,7 @@ export default function Friends() {
                               Sent {formatDate(request.createdAt)}
                             </p>
                           </div>
-                        </div>
+                        </Link>
                         <button
                           onClick={() => handleCancelRequest(request.id)}
                           className="text-sm text-gray-500 hover:text-red-600"
@@ -496,7 +500,10 @@ export default function Friends() {
                       key={player.id}
                       className="flex items-center justify-between p-4 bg-gray-50 rounded-lg"
                     >
-                      <div className="flex items-center gap-4">
+                      <Link
+                        to={`/users/${player.id}`}
+                        className="flex items-center gap-4 hover:opacity-80 transition-opacity"
+                      >
                         {player.profileImageUrl ? (
                           <img
                             src={getSharedAssetUrl(player.profileImageUrl)}
@@ -519,26 +526,35 @@ export default function Friends() {
                             <p className="text-sm text-gray-500">{player.location}</p>
                           )}
                         </div>
-                      </div>
-                      {player.isFriend ? (
-                        <span className="flex items-center gap-2 px-4 py-2 bg-green-100 text-green-700 rounded-lg font-medium">
-                          <Check className="w-4 h-4" />
-                          Friends
-                        </span>
-                      ) : player.hasPendingRequest ? (
-                        <span className="flex items-center gap-2 px-4 py-2 bg-yellow-100 text-yellow-700 rounded-lg font-medium">
-                          <Clock className="w-4 h-4" />
-                          Pending
-                        </span>
-                      ) : (
-                        <button
-                          onClick={() => handleSendRequest(player.id)}
-                          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700"
+                      </Link>
+                      <div className="flex items-center gap-2">
+                        <Link
+                          to={`/users/${player.id}`}
+                          className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg"
+                          title="View Profile"
                         >
-                          <UserPlus className="w-4 h-4" />
-                          Add Friend
-                        </button>
-                      )}
+                          <ExternalLink className="w-5 h-5" />
+                        </Link>
+                        {player.isFriend ? (
+                          <span className="flex items-center gap-2 px-4 py-2 bg-green-100 text-green-700 rounded-lg font-medium">
+                            <Check className="w-4 h-4" />
+                            Friends
+                          </span>
+                        ) : player.hasPendingRequest ? (
+                          <span className="flex items-center gap-2 px-4 py-2 bg-yellow-100 text-yellow-700 rounded-lg font-medium">
+                            <Clock className="w-4 h-4" />
+                            Pending
+                          </span>
+                        ) : (
+                          <button
+                            onClick={() => handleSendRequest(player.id)}
+                            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700"
+                          >
+                            <UserPlus className="w-4 h-4" />
+                            Add Friend
+                          </button>
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>

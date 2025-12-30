@@ -411,6 +411,9 @@ export const userApi = {
   // Get current user's profile
   getProfile: () => api.get('/users/profile'),
 
+  // Get public profile by user ID
+  getPublicProfile: (userId) => api.get(`/users/${userId}/public`),
+
   // Update current user's profile
   updateProfile: (data) => api.put('/users/profile', data),
 

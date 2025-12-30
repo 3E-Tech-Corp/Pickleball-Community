@@ -16,6 +16,7 @@ import Courts from './pages/Courts'
 import Clubs from './pages/Clubs'
 import Blog from './pages/Blog'
 import Friends from './pages/Friends'
+import PublicProfile from './pages/PublicProfile'
 import ProtectedRoute from './components/ProtectedRoute'
 
 import ForgotPassword from './pages/ForgotPassword'
@@ -64,6 +65,13 @@ function App() {
       <Route path="/friends" element={
         <ProtectedRoute>
           <Friends />
+        </ProtectedRoute>
+      } />
+
+      {/* Public Profile - View other users */}
+      <Route path="/users/:userId" element={
+        <ProtectedRoute>
+          <PublicProfile />
         </ProtectedRoute>
       } />
 
