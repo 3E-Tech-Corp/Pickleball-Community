@@ -426,6 +426,44 @@ export const certificationApi = {
     api.get('/playercertification/certificate')
 }
 
+// Courts API
+export const courtsApi = {
+  // Search courts with filters
+  search: (params = {}) => {
+    const queryParams = new URLSearchParams();
+    if (params.query) queryParams.append('query', params.query);
+    if (params.latitude) queryParams.append('latitude', params.latitude);
+    if (params.longitude) queryParams.append('longitude', params.longitude);
+    if (params.radiusMiles) queryParams.append('radiusMiles', params.radiusMiles);
+    if (params.state) queryParams.append('state', params.state);
+    if (params.city) queryParams.append('city', params.city);
+    if (params.hasLights !== undefined) queryParams.append('hasLights', params.hasLights);
+    if (params.isIndoor !== undefined) queryParams.append('isIndoor', params.isIndoor);
+    if (params.page) queryParams.append('page', params.page);
+    if (params.pageSize) queryParams.append('pageSize', params.pageSize);
+    return api.get(`/courts/search?${queryParams.toString()}`);
+  },
+
+  // Get court details
+  getCourt: (id, userLat, userLng) => {
+    const params = new URLSearchParams();
+    if (userLat) params.append('userLat', userLat);
+    if (userLng) params.append('userLng', userLng);
+    return api.get(`/courts/${id}?${params.toString()}`);
+  },
+
+  // Submit court confirmation/feedback
+  submitConfirmation: (courtId, data) =>
+    api.post(`/courts/${courtId}/confirmations`, data),
+
+  // Get all confirmations for a court
+  getConfirmations: (courtId) =>
+    api.get(`/courts/${courtId}/confirmations`),
+
+  // Get list of states with courts
+  getStates: () => api.get('/courts/states')
+}
+
 // Friends API
 export const friendsApi = {
   // Get all friends

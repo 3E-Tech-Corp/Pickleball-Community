@@ -35,6 +35,16 @@ public class ApplicationDbContext : DbContext
     public DbSet<PlayerCertificationReview> PlayerCertificationReviews { get; set; }
     public DbSet<PlayerCertificationScore> PlayerCertificationScores { get; set; }
 
+    // Friends
+    public DbSet<FriendRequest> FriendRequests { get; set; }
+    public DbSet<Friendship> Friendships { get; set; }
+
+    // Courts
+    public DbSet<Court> Courts { get; set; }
+    public DbSet<CourtGeoCode> CourtGeoCodes { get; set; }
+    public DbSet<GeoCodeType> GeoCodeTypes { get; set; }
+    public DbSet<CourtConfirmation> CourtConfirmations { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<User>(entity =>
@@ -279,6 +289,86 @@ public class ApplicationDbContext : DbContext
                   .OnDelete(DeleteBehavior.Restrict);
 
             entity.HasIndex(s => new { s.ReviewId, s.SkillAreaId }).IsUnique();
+        });
+
+        // Friend Request configuration
+        modelBuilder.Entity<FriendRequest>(entity =>
+        {
+            entity.HasOne(fr => fr.Sender)
+                  .WithMany()
+                  .HasForeignKey(fr => fr.SenderId)
+                  .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(fr => fr.Recipient)
+                  .WithMany()
+                  .HasForeignKey(fr => fr.RecipientId)
+                  .OnDelete(DeleteBehavior.Restrict);
+
+            entity.Property(fr => fr.Status).IsRequired().HasMaxLength(20);
+            entity.HasIndex(fr => new { fr.RecipientId, fr.Status });
+            entity.HasIndex(fr => new { fr.SenderId, fr.Status });
+        });
+
+        // Friendship configuration
+        modelBuilder.Entity<Friendship>(entity =>
+        {
+            entity.HasOne(f => f.User1)
+                  .WithMany()
+                  .HasForeignKey(f => f.UserId1)
+                  .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(f => f.User2)
+                  .WithMany()
+                  .HasForeignKey(f => f.UserId2)
+                  .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(f => f.OriginatingRequest)
+                  .WithMany()
+                  .HasForeignKey(f => f.OriginatingRequestId)
+                  .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasIndex(f => new { f.UserId1, f.UserId2 }).IsUnique();
+            entity.HasIndex(f => f.UserId1);
+            entity.HasIndex(f => f.UserId2);
+        });
+
+        // Court configuration
+        modelBuilder.Entity<Court>(entity =>
+        {
+            entity.HasKey(c => c.CourtId);
+            entity.HasMany(c => c.GeoCodes)
+                  .WithOne(g => g.Court)
+                  .HasForeignKey(g => g.CourtId);
+            entity.HasMany(c => c.Confirmations)
+                  .WithOne(cc => cc.Court)
+                  .HasForeignKey(cc => cc.CourtId);
+        });
+
+        // Court GeoCode configuration
+        modelBuilder.Entity<CourtGeoCode>(entity =>
+        {
+            entity.HasKey(g => g.GeoId);
+            entity.HasOne(g => g.GeoCodeType)
+                  .WithMany()
+                  .HasForeignKey(g => g.GeoCodeTypeId);
+        });
+
+        // GeoCode Type configuration
+        modelBuilder.Entity<GeoCodeType>(entity =>
+        {
+            entity.HasKey(t => t.GeoCodeTypeId);
+        });
+
+        // Court Confirmation configuration
+        modelBuilder.Entity<CourtConfirmation>(entity =>
+        {
+            entity.HasOne(cc => cc.User)
+                  .WithMany()
+                  .HasForeignKey(cc => cc.UserId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasIndex(cc => new { cc.CourtId, cc.UserId }).IsUnique();
+            entity.HasIndex(cc => cc.CourtId);
         });
     }
 }
