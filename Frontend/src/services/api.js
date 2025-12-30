@@ -464,6 +464,31 @@ export const courtsApi = {
   getStates: () => api.get('/courts/states')
 }
 
+// Event Types API
+export const eventTypesApi = {
+  // Get all event types (public)
+  getAll: (includeInactive = false) =>
+    api.get(`/eventtypes${includeInactive ? '?includeInactive=true' : ''}`),
+
+  // Get single event type
+  getById: (id) => api.get(`/eventtypes/${id}`),
+
+  // Create new event type (admin)
+  create: (data) => api.post('/eventtypes', data),
+
+  // Update event type (admin)
+  update: (id, data) => api.put(`/eventtypes/${id}`, data),
+
+  // Delete/deactivate event type (admin)
+  delete: (id) => api.delete(`/eventtypes/${id}`),
+
+  // Restore event type (admin)
+  restore: (id) => api.post(`/eventtypes/${id}/restore`),
+
+  // Reorder event types (admin)
+  reorder: (orderedIds) => api.put('/eventtypes/reorder', orderedIds)
+}
+
 // Friends API
 export const friendsApi = {
   // Get all friends

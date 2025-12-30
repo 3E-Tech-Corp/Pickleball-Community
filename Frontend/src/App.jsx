@@ -9,6 +9,7 @@ import Notifications from './pages/Notifications'
 import PlayerReview from './pages/PlayerReview'
 import MyCertificate from './pages/MyCertificate'
 import CertificationAdmin from './pages/CertificationAdmin'
+import EventTypesAdmin from './pages/EventTypesAdmin'
 import Events from './pages/Events'
 import Courts from './pages/Courts'
 import Blog from './pages/Blog'
@@ -73,6 +74,12 @@ function App() {
       <Route path="/admin/certification" element={
         <ProtectedRoute role="Admin">
           <CertificationAdmin />
+        </ProtectedRoute>
+      } />
+
+      <Route path="/admin/event-types" element={
+        <ProtectedRoute role="Admin">
+          <EventTypesAdmin />
         </ProtectedRoute>
       } />
 

@@ -45,6 +45,9 @@ public class ApplicationDbContext : DbContext
     public DbSet<GeoCodeType> GeoCodeTypes { get; set; }
     public DbSet<CourtConfirmation> CourtConfirmations { get; set; }
 
+    // Events
+    public DbSet<EventType> EventTypes { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<User>(entity =>
