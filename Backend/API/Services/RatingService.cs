@@ -8,7 +8,7 @@ namespace Pickleball.Community.Services;
 public class RatingService : IRatingService
 {
     private readonly ApplicationDbContext _context;
-    private static readonly string[] ValidRatableTypes = { "Coach", "Player" };
+    private static readonly string[] ValidRatableTypes = { "Coach", "Player", "BlogPost" };
 
     public RatingService(ApplicationDbContext context)
     {
@@ -150,6 +150,7 @@ public class RatingService : IRatingService
         {
             "Coach" => await _context.Users.AnyAsync(u => u.Id == ratableId && u.Role == "Coach"),
             "Player" => await _context.Users.AnyAsync(u => u.Id == ratableId),
+            "BlogPost" => await _context.BlogPosts.AnyAsync(p => p.Id == ratableId),
             _ => false
         };
     }
