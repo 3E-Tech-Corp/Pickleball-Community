@@ -72,18 +72,12 @@ const Navigation = () => {
 
   const handleLogout = async () => {
     try {
-      await logout(); // Use the logout function from AuthContext
       setShowUserDropdown(false);
       setIsOpen(false);
-
-      // Force a full page refresh to clear any cached state
-      // window.location.href = '/home';
-      // window.location.reload(); // Force reload
-
-      // OR use navigate with force refresh
-      window.location.replace('/');
-      //   navigate('/', { replace: true });
-      setTimeout(() => window.location.reload(), 100);
+      await logout(); // Use the logout function from AuthContext
+      // ProtectedRoute will redirect to home if on a protected page
+      // For non-protected pages, navigate to home
+      window.location.href = '/';
     } catch (error) {
       console.error('Logout failed:', error);
     }

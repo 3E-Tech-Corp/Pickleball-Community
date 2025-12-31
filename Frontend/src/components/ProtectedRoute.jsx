@@ -14,8 +14,8 @@ const ProtectedRoute = ({ children, role, roles }) => {
   }
 
   if (!isAuthenticated || !user) {
-    // Redirect to local login page (which uses shared auth components)
-    return <Navigate to="/login" state={{ from: location }} replace />
+    // Redirect to home page - user can sign in from there
+    return <Navigate to="/" state={{ from: location }} replace />
   }
 
   // Handle single role check (backward compatibility)
