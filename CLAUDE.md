@@ -25,11 +25,36 @@ Store all database migration scripts in `/Backend/API/Scripts/` with naming conv
 - Frontend: `npm run dev` in `/Frontend`
 - Build Frontend: `npm run build` in `/Frontend`
 
+## Mobile-First PWA Design
+This app is designed to be installed as a Progressive Web App (PWA) on mobile devices:
+
+### Design Requirements:
+- **Mobile-first**: Design for mobile screens first, then scale up to desktop
+- **Touch-friendly**: Large tap targets (min 44x44px), proper spacing between interactive elements
+- **Responsive**: Use TailwindCSS responsive classes (`sm:`, `md:`, `lg:`) appropriately
+- **Fast loading**: Minimize bundle size, lazy load where possible
+- **Offline-capable**: Service worker handles caching (configured in VitePWA)
+
+### UI Guidelines:
+- Bottom navigation for primary actions on mobile
+- Swipe gestures where appropriate
+- Pull-to-refresh patterns
+- Native-like transitions and animations
+- Avoid hover-only interactions (touch devices don't have hover)
+- Use `min-h-screen` and proper viewport handling
+
+### PWA Configuration:
+- Manifest configured in `vite.config.js` (VitePWA plugin)
+- Icons: `/public/icon-192.png` and `/public/icon-512.png`
+- Theme color: `#3b82f6` (blue)
+- Display mode: `standalone` (appears like native app)
+
 ## Key Features
 - **Player Certification**: Peer-reviewed skill ratings with weighted skill groups
 - **User Profiles**: Detailed pickleball player profiles with equipment, experience, and play style
-- **Rating & Tagging**: General purpose rating and tagging system
-- **Community Features** (planned): Friends, clubs, events
+- **Rating & Tagging**: General purpose rating and tagging system (BlogPost, Club, Court, Event, Player, Coach)
+- **Blog System**: Community blog with categories, posts, comments, and ratings
+- **Community Features** (planned): Friends, clubs, events, messaging
 
 ## Shared Authentication (Funtime-Shared)
 This project uses shared authentication from the Funtime-Shared repository:
