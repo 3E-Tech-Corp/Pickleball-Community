@@ -3,16 +3,15 @@ import { Link } from 'react-router-dom';
 import {
   ArrowLeft, Plus, Edit2, Trash2, RotateCcw, Save, X, Search,
   // Building/Location icons
-  Building, Building2, Home, Store, Hotel, School, Warehouse, Castle,
-  Factory, Landmark, Hospital, Church, Library, Theater, Tent,
+  Building, Building2, Home, Store, Warehouse, Factory, Landmark,
   // People/Access icons
   Users, UserPlus, UserCheck, User, Users2, Lock, LockOpen, Key, Shield,
   // Nature/Outdoor icons
-  TreePine, Palmtree, Mountain, Waves, Sun, Cloud, Flower2, Leaf,
+  TreePine, Mountain, Waves, Sun, Cloud, Leaf,
   // Activity icons
   CircleDot, Target, Trophy, Medal, Award, Crown, Flame, Zap,
   // Misc icons
-  MapPin, Flag, Shuffle, DollarSign, Heart, Star, Globe, Compass
+  MapPin, Flag, Shuffle, DollarSign, Heart, Star, Globe, Compass, GraduationCap
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { courtTypesApi } from '../services/api';
@@ -24,17 +23,10 @@ const ICON_OPTIONS = [
   { value: 'Building2', label: 'Building 2', icon: Building2, category: 'Building' },
   { value: 'Home', label: 'Home', icon: Home, category: 'Building' },
   { value: 'Store', label: 'Store', icon: Store, category: 'Building' },
-  { value: 'Hotel', label: 'Hotel', icon: Hotel, category: 'Building' },
-  { value: 'School', label: 'School', icon: School, category: 'Building' },
   { value: 'Warehouse', label: 'Warehouse', icon: Warehouse, category: 'Building' },
-  { value: 'Castle', label: 'Castle', icon: Castle, category: 'Building' },
   { value: 'Factory', label: 'Factory', icon: Factory, category: 'Building' },
   { value: 'Landmark', label: 'Landmark', icon: Landmark, category: 'Building' },
-  { value: 'Hospital', label: 'Hospital', icon: Hospital, category: 'Building' },
-  { value: 'Church', label: 'Church', icon: Church, category: 'Building' },
-  { value: 'Library', label: 'Library', icon: Library, category: 'Building' },
-  { value: 'Theater', label: 'Theater', icon: Theater, category: 'Building' },
-  { value: 'Tent', label: 'Tent', icon: Tent, category: 'Building' },
+  { value: 'GraduationCap', label: 'School', icon: GraduationCap, category: 'Building' },
 
   // Access/People
   { value: 'Users', label: 'Users (Public)', icon: Users, category: 'Access' },
@@ -49,12 +41,10 @@ const ICON_OPTIONS = [
 
   // Nature/Outdoor
   { value: 'TreePine', label: 'Tree Pine', icon: TreePine, category: 'Nature' },
-  { value: 'Palmtree', label: 'Palm Tree', icon: Palmtree, category: 'Nature' },
   { value: 'Mountain', label: 'Mountain', icon: Mountain, category: 'Nature' },
   { value: 'Waves', label: 'Waves', icon: Waves, category: 'Nature' },
   { value: 'Sun', label: 'Sun', icon: Sun, category: 'Nature' },
   { value: 'Cloud', label: 'Cloud', icon: Cloud, category: 'Nature' },
-  { value: 'Flower2', label: 'Flower', icon: Flower2, category: 'Nature' },
   { value: 'Leaf', label: 'Leaf', icon: Leaf, category: 'Nature' },
 
   // Activity/Sports
