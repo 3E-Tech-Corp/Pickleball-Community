@@ -67,8 +67,9 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             // Accept multiple signing keys for shared auth compatibility
             IssuerSigningKeys = signingKeys,
             // Map role claim for [Authorize(Roles = ...)] to work with shared auth tokens
-            RoleClaimType = "role",
-            NameClaimType = "name"
+            // Use the full URI since shared auth uses Microsoft's claim type format
+            RoleClaimType = "http://schemas.microsoft.com/ws/2008/06/identity/claims/role",
+            NameClaimType = "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name"
         };
     });
 
