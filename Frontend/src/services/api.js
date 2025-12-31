@@ -1,7 +1,7 @@
 import axios from 'axios'
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || ''
-const SHARED_AUTH_URL = import.meta.env.VITE_SHARED_AUTH_URL || ''
+const SHARED_AUTH_URL = import.meta.env.VITE_SHARED_AUTH_URL || 'https://shared.funtimepb.com/api'
 const SHARED_AUTH_UI_URL = import.meta.env.VITE_SHARED_AUTH_UI_URL || ''
 
 // Helper function to get full asset URL from local API (for local assets)
