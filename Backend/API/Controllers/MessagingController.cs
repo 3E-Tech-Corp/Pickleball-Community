@@ -332,7 +332,7 @@ public class MessagingController : ControllerBase
         {
             var userId = GetCurrentUserId();
             if (!userId.HasValue)
-                return Unauthorized(new ApiResponse<ConversationMessagesResponse>> { Success = false, Message = "User not authenticated" });
+                return Unauthorized(new ApiResponse<ConversationMessagesResponse> { Success = false, Message = "User not authenticated" });
 
             // Check if user is a participant
             var isParticipant = await _context.ConversationParticipants
