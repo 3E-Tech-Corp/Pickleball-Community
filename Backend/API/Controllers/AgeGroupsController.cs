@@ -32,7 +32,7 @@ public class AgeGroupsController : ControllerBase
         var userId = GetCurrentUserId();
         if (!userId.HasValue) return false;
         var user = await _context.Users.FindAsync(userId.Value);
-        return user?.Role == UserRole.Admin;
+        return user?.Role == "Admin";
     }
 
     // GET: /agegroups - Get all active age groups

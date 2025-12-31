@@ -32,7 +32,7 @@ public class TeamUnitsController : ControllerBase
         var userId = GetCurrentUserId();
         if (!userId.HasValue) return false;
         var user = await _context.Users.FindAsync(userId.Value);
-        return user?.Role == UserRole.Admin;
+        return user?.Role == "Admin";
     }
 
     // GET: /teamunits - Get all active team units
