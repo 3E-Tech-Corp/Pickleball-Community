@@ -152,14 +152,14 @@ const Header = () => {
           <div className="flex items-center gap-6 mb-8">
             {logoHtml ? (
               <div
-                className="flex-shrink-0 drop-shadow-2xl [&_img]:w-32 [&_img]:h-32 md:[&_img]:w-40 md:[&_img]:h-40 lg:[&_img]:w-48 lg:[&_img]:h-48"
+                className="flex-shrink-0 drop-shadow-2xl [&_img]:w-48 [&_img]:h-48 md:[&_img]:w-56 md:[&_img]:h-56 lg:[&_img]:w-64 lg:[&_img]:h-64"
                 dangerouslySetInnerHTML={{ __html: logoHtml }}
               />
             ) : (
               <img
                 src="/Logo.png"
                 alt="Pickleball.Community"
-                className="w-32 h-32 md:w-40 md:h-40 lg:w-48 lg:h-48 object-contain drop-shadow-2xl flex-shrink-0"
+                className="w-48 h-48 md:w-56 md:h-56 lg:w-64 lg:h-64 object-contain drop-shadow-2xl flex-shrink-0"
               />
             )}
             <div>
