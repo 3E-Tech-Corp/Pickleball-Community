@@ -312,7 +312,7 @@ public class CourtsController : ControllerBase
                         var confirmation = new CourtConfirmationDto
                         {
                             Id = reader.GetInt32(reader.GetOrdinal("Id")),
-                            Id = reader.GetInt32(reader.GetOrdinal("CourtId")),
+                            CourtId = reader.GetInt32(reader.GetOrdinal("CourtId")),
                             UserId = reader.GetInt32(reader.GetOrdinal("UserId")),
                             UserName = reader.IsDBNull(reader.GetOrdinal("UserName")) ? null : reader.GetString(reader.GetOrdinal("UserName")),
                             UserProfileImageUrl = reader.IsDBNull(reader.GetOrdinal("UserProfileImageUrl")) ? null : reader.GetString(reader.GetOrdinal("UserProfileImageUrl")),
