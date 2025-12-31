@@ -854,7 +854,12 @@ export const clubsApi = {
   regenerateInvite: (id) => api.post(`/clubs/${id}/regenerate-invite`),
 
   // Get club by invite code
-  getByInviteCode: (code) => api.get(`/clubs/join/${code}`)
+  getByInviteCode: (code) => api.get(`/clubs/join/${code}`),
+
+  // Club chat
+  enableChat: (id) => api.post(`/clubs/${id}/chat/enable`),
+  disableChat: (id) => api.post(`/clubs/${id}/chat/disable`),
+  getChat: (id) => api.get(`/clubs/${id}/chat`)
 }
 
 // Club Member Roles API

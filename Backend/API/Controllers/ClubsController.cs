@@ -435,6 +435,10 @@ public class ClubsController : ControllerBase
                 }
 
                 await _context.SaveChangesAsync();
+
+                // Add to club chat if enabled and user allows club messages
+                await AddUserToClubChatIfEligible(club, userId.Value);
+
                 return Ok(new ApiResponse<bool> { Success = true, Data = true, Message = "Joined club successfully" });
             }
 
@@ -483,6 +487,18 @@ public class ClubsController : ControllerBase
 
                 if (adminCount == 1)
                     return BadRequest(new ApiResponse<bool> { Success = false, Message = "Cannot leave club as the only admin. Transfer admin rights first." });
+            }
+
+            // Remove from club chat if exists
+            var club = await _context.Clubs.FindAsync(id);
+            if (club?.ChatConversationId.HasValue == true)
+            {
+                var participant = await _context.ConversationParticipants
+                    .FirstOrDefaultAsync(cp => cp.ConversationId == club.ChatConversationId && cp.UserId == userId.Value);
+                if (participant != null)
+                {
+                    _context.ConversationParticipants.Remove(participant);
+                }
             }
 
             membership.IsActive = false;
@@ -1132,6 +1148,142 @@ public class ClubsController : ControllerBase
         }
     }
 
+    // POST: /clubs/{id}/chat/enable - Enable club chat (Admin only)
+    [HttpPost("{id}/chat/enable")]
+    [Authorize]
+    public async Task<ActionResult<ApiResponse<bool>>> EnableClubChat(int id)
+    {
+        try
+        {
+            var userId = GetCurrentUserId();
+            if (!userId.HasValue)
+                return Unauthorized(new ApiResponse<bool> { Success = false, Message = "User not authenticated" });
+
+            var club = await _context.Clubs.FindAsync(id);
+            if (club == null || !club.IsActive)
+                return NotFound(new ApiResponse<bool> { Success = false, Message = "Club not found" });
+
+            // Check if user is admin
+            var isAdmin = await _context.ClubMembers
+                .AnyAsync(m => m.ClubId == id && m.UserId == userId.Value && m.Role == "Admin" && m.IsActive);
+
+            if (!isAdmin)
+                return Forbid();
+
+            if (club.ChatEnabled && club.ChatConversationId.HasValue)
+                return Ok(new ApiResponse<bool> { Success = true, Data = true, Message = "Club chat is already enabled" });
+
+            // Create club conversation if it doesn't exist
+            if (!club.ChatConversationId.HasValue)
+            {
+                var conversation = new Conversation
+                {
+                    Type = "Club",
+                    Name = $"{club.Name} Chat",
+                    ClubId = id
+                };
+                _context.Conversations.Add(conversation);
+                await _context.SaveChangesAsync();
+
+                club.ChatConversationId = conversation.Id;
+
+                // Add all existing members who allow club messages to the conversation
+                var members = await _context.ClubMembers
+                    .Include(m => m.User)
+                    .Where(m => m.ClubId == id && m.IsActive && m.User!.AllowClubMessages)
+                    .ToListAsync();
+
+                foreach (var member in members)
+                {
+                    _context.ConversationParticipants.Add(new ConversationParticipant
+                    {
+                        ConversationId = conversation.Id,
+                        UserId = member.UserId,
+                        Role = member.Role == "Admin" ? "Admin" : "Member"
+                    });
+                }
+            }
+
+            club.ChatEnabled = true;
+            await _context.SaveChangesAsync();
+
+            return Ok(new ApiResponse<bool> { Success = true, Data = true, Message = "Club chat enabled" });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error enabling club chat for {ClubId}", id);
+            return StatusCode(500, new ApiResponse<bool> { Success = false, Message = "An error occurred" });
+        }
+    }
+
+    // POST: /clubs/{id}/chat/disable - Disable club chat (Admin only)
+    [HttpPost("{id}/chat/disable")]
+    [Authorize]
+    public async Task<ActionResult<ApiResponse<bool>>> DisableClubChat(int id)
+    {
+        try
+        {
+            var userId = GetCurrentUserId();
+            if (!userId.HasValue)
+                return Unauthorized(new ApiResponse<bool> { Success = false, Message = "User not authenticated" });
+
+            var club = await _context.Clubs.FindAsync(id);
+            if (club == null || !club.IsActive)
+                return NotFound(new ApiResponse<bool> { Success = false, Message = "Club not found" });
+
+            // Check if user is admin
+            var isAdmin = await _context.ClubMembers
+                .AnyAsync(m => m.ClubId == id && m.UserId == userId.Value && m.Role == "Admin" && m.IsActive);
+
+            if (!isAdmin)
+                return Forbid();
+
+            club.ChatEnabled = false;
+            await _context.SaveChangesAsync();
+
+            return Ok(new ApiResponse<bool> { Success = true, Data = true, Message = "Club chat disabled" });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error disabling club chat for {ClubId}", id);
+            return StatusCode(500, new ApiResponse<bool> { Success = false, Message = "An error occurred" });
+        }
+    }
+
+    // GET: /clubs/{id}/chat - Get club chat conversation ID
+    [HttpGet("{id}/chat")]
+    [Authorize]
+    public async Task<ActionResult<ApiResponse<int?>>> GetClubChat(int id)
+    {
+        try
+        {
+            var userId = GetCurrentUserId();
+            if (!userId.HasValue)
+                return Unauthorized(new ApiResponse<int?> { Success = false, Message = "User not authenticated" });
+
+            var club = await _context.Clubs.FindAsync(id);
+            if (club == null || !club.IsActive)
+                return NotFound(new ApiResponse<int?> { Success = false, Message = "Club not found" });
+
+            // Check if user is a member
+            var isMember = await _context.ClubMembers
+                .AnyAsync(m => m.ClubId == id && m.UserId == userId.Value && m.IsActive);
+
+            if (!isMember)
+                return Forbid();
+
+            if (!club.ChatEnabled || !club.ChatConversationId.HasValue)
+                return Ok(new ApiResponse<int?> { Success = true, Data = null, Message = "Club chat is not enabled" });
+
+            return Ok(new ApiResponse<int?> { Success = true, Data = club.ChatConversationId });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting club chat for {ClubId}", id);
+            return StatusCode(500, new ApiResponse<int?> { Success = false, Message = "An error occurred" });
+        }
+    }
+
     // Helper methods
     private static string GenerateInviteCode()
     {
@@ -1171,5 +1323,34 @@ public class ClubsController : ControllerBase
         if (!string.IsNullOrEmpty(state))
             return state;
         return null;
+    }
+
+    private async Task AddUserToClubChatIfEligible(Club club, int userId)
+    {
+        // Check if club has chat enabled
+        if (!club.ChatEnabled || !club.ChatConversationId.HasValue)
+            return;
+
+        // Check if user allows club messages
+        var user = await _context.Users.FindAsync(userId);
+        if (user == null || !user.AllowClubMessages)
+            return;
+
+        // Check if already a participant
+        var existingParticipant = await _context.ConversationParticipants
+            .AnyAsync(cp => cp.ConversationId == club.ChatConversationId && cp.UserId == userId);
+
+        if (existingParticipant)
+            return;
+
+        // Add to conversation
+        _context.ConversationParticipants.Add(new ConversationParticipant
+        {
+            ConversationId = club.ChatConversationId.Value,
+            UserId = userId,
+            Role = "Member"
+        });
+
+        await _context.SaveChangesAsync();
     }
 }

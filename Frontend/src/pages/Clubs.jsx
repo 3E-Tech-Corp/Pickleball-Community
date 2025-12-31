@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { Users, Search, Filter, MapPin, Plus, Globe, Mail, Phone, ChevronLeft, ChevronRight, X, Copy, Check, Bell, UserPlus, Settings, Crown, Shield, Clock, DollarSign, Calendar, Upload, Image, Edit3, RefreshCw, Trash2 } from 'lucide-react';
+import { Users, Search, Filter, MapPin, Plus, Globe, Mail, Phone, ChevronLeft, ChevronRight, X, Copy, Check, Bell, UserPlus, Settings, Crown, Shield, Clock, DollarSign, Calendar, Upload, Image, Edit3, RefreshCw, Trash2, MessageCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { clubsApi, sharedAssetApi, clubMemberRolesApi, getSharedAssetUrl, SHARED_AUTH_URL } from '../services/api';
 import PublicProfileModal from '../components/ui/PublicProfileModal';
@@ -645,7 +645,10 @@ function ClubDetailModal({ club, isAuthenticated, currentUserId, onClose, onJoin
   const [memberEditData, setMemberEditData] = useState({ title: '', membershipValidTo: '', membershipNotes: '' });
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [clubData, setClubData] = useState(club);
+  const [chatEnabled, setChatEnabled] = useState(club.chatEnabled || false);
+  const [togglingChat, setTogglingChat] = useState(false);
   const logoInputRef = useRef(null);
+  const navigate = useNavigate();
 
   const isAdmin = clubData.isAdmin;
   const isModerator = clubData.isModerator;
@@ -697,6 +700,34 @@ function ClubDetailModal({ club, isAuthenticated, currentUserId, onClose, onJoin
       console.error('Error loading notifications:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleToggleChat = async () => {
+    setTogglingChat(true);
+    try {
+      if (chatEnabled) {
+        await clubsApi.disableChat(club.id);
+        setChatEnabled(false);
+      } else {
+        await clubsApi.enableChat(club.id);
+        setChatEnabled(true);
+      }
+    } catch (err) {
+      console.error('Error toggling club chat:', err);
+    } finally {
+      setTogglingChat(false);
+    }
+  };
+
+  const handleOpenChat = async () => {
+    try {
+      const response = await clubsApi.getChat(club.id);
+      if (response.success && response.data) {
+        navigate(`/messages?conversation=${response.data}`);
+      }
+    } catch (err) {
+      console.error('Error opening club chat:', err);
     }
   };
 
@@ -1418,6 +1449,60 @@ function ClubDetailModal({ club, isAuthenticated, currentUserId, onClose, onJoin
                       <span className="text-gray-600">Fee Period</span>
                       <span className="font-medium capitalize">{club.membershipFeePeriod}</span>
                     </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Club Chat Section */}
+              <div>
+                <h3 className="font-medium text-gray-900 mb-3 flex items-center gap-2">
+                  <MessageCircle className="w-5 h-5 text-blue-600" />
+                  Club Chat
+                </h3>
+                <div className="bg-gray-50 rounded-lg p-4">
+                  {isAdmin ? (
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <span className="text-gray-700 font-medium">Enable Club Chat</span>
+                          <p className="text-sm text-gray-500">Allow members to chat within the club</p>
+                        </div>
+                        <button
+                          onClick={handleToggleChat}
+                          disabled={togglingChat}
+                          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                            chatEnabled ? 'bg-blue-600' : 'bg-gray-300'
+                          } ${togglingChat ? 'opacity-50' : ''}`}
+                        >
+                          <span
+                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                              chatEnabled ? 'translate-x-6' : 'translate-x-1'
+                            }`}
+                          />
+                        </button>
+                      </div>
+                      {chatEnabled && (
+                        <button
+                          onClick={handleOpenChat}
+                          className="w-full py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 flex items-center justify-center gap-2"
+                        >
+                          <MessageCircle className="w-4 h-4" />
+                          Open Club Chat
+                        </button>
+                      )}
+                    </div>
+                  ) : isMember && chatEnabled ? (
+                    <button
+                      onClick={handleOpenChat}
+                      className="w-full py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 flex items-center justify-center gap-2"
+                    >
+                      <MessageCircle className="w-4 h-4" />
+                      Open Club Chat
+                    </button>
+                  ) : isMember ? (
+                    <p className="text-sm text-gray-500">Club chat is not enabled</p>
+                  ) : (
+                    <p className="text-sm text-gray-500">Join the club to access chat</p>
                   )}
                 </div>
               </div>
