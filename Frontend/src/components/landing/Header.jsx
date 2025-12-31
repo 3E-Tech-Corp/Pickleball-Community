@@ -1,16 +1,39 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useTheme } from '../../contexts/ThemeContext';
 import { Play, Pause, Volume2, VolumeX, MapPin, Users, Award, Calendar } from 'lucide-react';
+
+const SHARED_AUTH_URL = import.meta.env.VITE_SHARED_AUTH_URL || 'https://shared.funtimepb.com/api';
+const SITE_KEY = 'community';
 
 const Header = () => {
   const { theme } = useTheme();
   const [isPlaying, setIsPlaying] = useState(true);
   const [isMuted, setIsMuted] = useState(true);
+  const [logoHtml, setLogoHtml] = useState(null);
   const videoRef = useRef(null);
 
   const hasVideo = theme?.heroVideoUrl;
   const hasImage = theme?.heroImageUrl;
+
+  // Fetch large logo HTML from shared auth
+  useEffect(() => {
+    const fetchLogoHtml = async () => {
+      try {
+        const res = await fetch(`${SHARED_AUTH_URL}/settings/logo-html?site=${SITE_KEY}&size=2xl`);
+        if (res.ok) {
+          const html = await res.text();
+          setLogoHtml(html);
+        }
+      } catch (err) {
+        console.warn('Failed to fetch logo HTML:', err);
+      }
+    };
+
+    if (SHARED_AUTH_URL) {
+      fetchLogoHtml();
+    }
+  }, []);
 
   const togglePlay = () => {
     if (videoRef.current) {
@@ -83,11 +106,18 @@ const Header = () => {
         <div className="max-w-4xl">
           {/* Logo and Title side by side */}
           <div className="flex items-center gap-6 mb-8">
-            <img
-              src="/Logo.png"
-              alt="Pickleball.Community"
-              className="w-24 h-24 md:w-32 md:h-32 lg:w-40 lg:h-40 object-contain drop-shadow-2xl flex-shrink-0"
-            />
+            {logoHtml ? (
+              <div
+                className="flex-shrink-0 drop-shadow-2xl [&_img]:w-24 [&_img]:h-24 md:[&_img]:w-32 md:[&_img]:h-32 lg:[&_img]:w-40 lg:[&_img]:h-40"
+                dangerouslySetInnerHTML={{ __html: logoHtml }}
+              />
+            ) : (
+              <img
+                src="/Logo.png"
+                alt="Pickleball.Community"
+                className="w-24 h-24 md:w-32 md:h-32 lg:w-40 lg:h-40 object-contain drop-shadow-2xl flex-shrink-0"
+              />
+            )}
             <div>
               <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white leading-tight">
                 {theme?.heroTitle || 'Pickleball.Community'}
