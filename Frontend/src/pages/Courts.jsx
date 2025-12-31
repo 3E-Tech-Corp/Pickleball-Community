@@ -331,7 +331,7 @@ export default function Courts() {
 
   const handleViewDetails = async (court) => {
     try {
-      const response = await courtsApi.getCourt(court.courtId, userLocation?.lat, userLocation?.lng);
+      const response = await courtsApi.getCourt(court.id, userLocation?.lat, userLocation?.lng);
       if (response.success) {
         setSelectedCourt(response.data);
       }
@@ -708,7 +708,7 @@ export default function Courts() {
               <div className="grid gap-6 md:grid-cols-2">
                 {courts.map(court => (
                   <CourtCard
-                    key={court.courtId}
+                    key={court.id}
                     court={court}
                     onViewDetails={() => handleViewDetails(court)}
                   />
@@ -917,7 +917,7 @@ function CourtDetailModal({ court, isAuthenticated, onClose, onConfirmationSubmi
     const loadAssets = async () => {
       setAssetsLoading(true);
       try {
-        const response = await courtsApi.getAssets(court.courtId);
+        const response = await courtsApi.getAssets(court.id);
         if (response.success) {
           setAssets(response.data || []);
         }
@@ -928,7 +928,7 @@ function CourtDetailModal({ court, isAuthenticated, onClose, onConfirmationSubmi
       }
     };
     loadAssets();
-  }, [court.courtId]);
+  }, [court.id]);
 
   // Handle asset vote (like/dislike)
   const handleAssetVote = async (assetId, isLike) => {
@@ -1005,7 +1005,7 @@ function CourtDetailModal({ court, isAuthenticated, onClose, onConfirmationSubmi
         mimeType: file.type
       };
 
-      const response = await courtsApi.uploadAsset(court.courtId, assetData);
+      const response = await courtsApi.uploadAsset(court.id, assetData);
       if (response.success) {
         setAssets(prev => [response.data, ...prev]);
       }
@@ -1046,10 +1046,10 @@ function CourtDetailModal({ court, isAuthenticated, onClose, onConfirmationSubmi
         confirmedCoveredCount: formData.confirmedCoveredCount !== '' ? parseInt(formData.confirmedCoveredCount) : null,
       };
 
-      const response = await courtsApi.submitConfirmation(court.courtId, submitData);
+      const response = await courtsApi.submitConfirmation(court.id, submitData);
       if (response.success) {
         // Reload court details
-        const updatedCourt = await courtsApi.getCourt(court.courtId);
+        const updatedCourt = await courtsApi.getCourt(court.id);
         if (updatedCourt.success) {
           onConfirmationSubmitted(updatedCourt.data);
         }
@@ -1154,7 +1154,7 @@ function CourtDetailModal({ court, isAuthenticated, onClose, onConfirmationSubmi
                   </a>
                 )}
                 <Link
-                  to={`/events?courtId=${court.courtId}&courtName=${encodeURIComponent(court.name || 'Court')}`}
+                  to={`/events?courtId=${court.id}&courtName=${encodeURIComponent(court.name || 'Court')}`}
                   className="flex-1 flex items-center justify-center gap-2 py-3 px-4 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors"
                 >
                   <Calendar className="w-5 h-5" />
@@ -2085,7 +2085,7 @@ function AddCourtModal({ onClose, onCourtAdded, userLocation, courtTypes }) {
               <div className="space-y-3">
                 {nearbyCourts.map(court => (
                   <div
-                    key={court.courtId}
+                    key={court.id}
                     className="p-4 border rounded-lg hover:border-green-500 cursor-pointer transition-colors"
                     onClick={() => {
                       // Close modal and let parent handle viewing the court

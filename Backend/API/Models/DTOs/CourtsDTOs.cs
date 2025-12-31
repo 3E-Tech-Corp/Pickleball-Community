@@ -2,7 +2,7 @@ namespace Pickleball.Community.Models.DTOs;
 
 public class CourtDto
 {
-    public int CourtId { get; set; }
+    public int Id { get; set; }
     public string? Name { get; set; }
     public string? Address { get; set; }
     public string? City { get; set; }
@@ -184,7 +184,7 @@ public class NearbyCourtsResponse
 
 public class NearbyCourtDto
 {
-    public int CourtId { get; set; }
+    public int Id { get; set; }
     public string? Name { get; set; }
     public string? Address { get; set; }
     public string? City { get; set; }

@@ -65,7 +65,7 @@ public class CourtsController : ControllerBase
                 {
                     var court = new CourtDto
                     {
-                        CourtId = reader.GetInt32(reader.GetOrdinal("CourtId")),
+                        Id = reader.GetInt32(reader.GetOrdinal("CourtId")),
                         Name = reader.IsDBNull(reader.GetOrdinal("Name")) ? null : reader.GetString(reader.GetOrdinal("Name")),
                         Address = reader.IsDBNull(reader.GetOrdinal("Address")) ? null : reader.GetString(reader.GetOrdinal("Address")),
                         City = reader.IsDBNull(reader.GetOrdinal("City")) ? null : reader.GetString(reader.GetOrdinal("City")),
@@ -197,7 +197,7 @@ public class CourtsController : ControllerBase
 
         var courtDtos = pagedCourts.Select(x => new CourtDto
         {
-            CourtId = x.court.CourtId,
+            Id = x.court.CourtId,
             Name = x.court.Name,
             Address = string.Join(" ", new[] { x.court.Addr1, x.court.Addr2 }.Where(a => !string.IsNullOrEmpty(a))),
             City = x.court.City,
@@ -261,7 +261,7 @@ public class CourtsController : ControllerBase
                 {
                     dto = new CourtDetailDto
                     {
-                        CourtId = reader.GetInt32(reader.GetOrdinal("CourtId")),
+                        Id = reader.GetInt32(reader.GetOrdinal("CourtId")),
                         Name = reader.IsDBNull(reader.GetOrdinal("Name")) ? null : reader.GetString(reader.GetOrdinal("Name")),
                         Address = reader.IsDBNull(reader.GetOrdinal("Address")) ? null : reader.GetString(reader.GetOrdinal("Address")),
                         City = reader.IsDBNull(reader.GetOrdinal("City")) ? null : reader.GetString(reader.GetOrdinal("City")),
@@ -312,7 +312,7 @@ public class CourtsController : ControllerBase
                         var confirmation = new CourtConfirmationDto
                         {
                             Id = reader.GetInt32(reader.GetOrdinal("Id")),
-                            CourtId = reader.GetInt32(reader.GetOrdinal("CourtId")),
+                            Id = reader.GetInt32(reader.GetOrdinal("CourtId")),
                             UserId = reader.GetInt32(reader.GetOrdinal("UserId")),
                             UserName = reader.IsDBNull(reader.GetOrdinal("UserName")) ? null : reader.GetString(reader.GetOrdinal("UserName")),
                             UserProfileImageUrl = reader.IsDBNull(reader.GetOrdinal("UserProfileImageUrl")) ? null : reader.GetString(reader.GetOrdinal("UserProfileImageUrl")),
@@ -396,7 +396,7 @@ public class CourtsController : ControllerBase
         var userId = GetCurrentUserId();
         var dto = new CourtDetailDto
         {
-            CourtId = court.CourtId,
+            Id = court.CourtId,
             Name = court.Name,
             Address = string.Join(" ", new[] { court.Addr1, court.Addr2 }.Where(a => !string.IsNullOrEmpty(a))),
             City = court.City,
@@ -792,7 +792,7 @@ public class CourtsController : ControllerBase
 
                     return new NearbyCourtDto
                     {
-                        CourtId = c.CourtId,
+                        Id = c.CourtId,
                         Name = c.Name,
                         Address = string.Join(" ", new[] { c.Addr1, c.Addr2 }.Where(a => !string.IsNullOrEmpty(a))),
                         City = c.City,
@@ -880,7 +880,7 @@ public class CourtsController : ControllerBase
 
             var dto = new CourtDto
             {
-                CourtId = court.CourtId,
+                Id = court.CourtId,
                 Name = court.Name,
                 Address = string.Join(" ", new[] { court.Addr1, court.Addr2 }.Where(a => !string.IsNullOrEmpty(a))),
                 City = court.City,
