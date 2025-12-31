@@ -31,13 +31,20 @@ public interface IPlayerCertificationService
 
     // Certification Requests (Student)
     Task<CertificationRequestDto> CreateRequestAsync(int studentId, CreateCertificationRequestDto dto, string baseUrl);
+    Task<CertificationRequestDto?> GetOrCreateActiveRequestAsync(int studentId, string baseUrl);
     Task<List<CertificationRequestDto>> GetStudentRequestsAsync(int studentId, string baseUrl);
     Task<CertificationRequestDto?> GetRequestAsync(int requestId, int studentId, string baseUrl);
+    Task<CertificationRequestDto?> UpdateRequestAsync(int requestId, int studentId, UpdateCertificationRequestDto dto, string baseUrl);
     Task<bool> DeactivateRequestAsync(int requestId, int studentId);
 
+    // Invitations (Student)
+    Task<InvitablePeersDto> GetInvitablePeersAsync(int studentId);
+    Task<List<CertificationInvitationDto>> GetInvitationsAsync(int requestId, int studentId);
+    Task<int> InvitePeersAsync(int requestId, int studentId, InvitePeersDto dto);
+
     // Review Page (Public)
-    Task<ReviewPageInfoDto> GetReviewPageInfoAsync(string token);
-    Task<bool> SubmitReviewAsync(string token, SubmitReviewDto dto);
+    Task<ReviewPageInfoDto> GetReviewPageInfoAsync(string token, int? currentUserId);
+    Task<bool> SubmitReviewAsync(string token, SubmitReviewDto dto, int? currentUserId);
 
     // Certificate View (Student)
     Task<CertificateSummaryDto?> GetCertificateSummaryAsync(int studentId);
@@ -307,11 +314,17 @@ public class PlayerCertificationService : IPlayerCertificationService
     {
         var token = GenerateSecureToken();
 
+        // Parse visibility
+        var visibility = ReviewVisibility.Anyone;
+        if (Enum.TryParse<ReviewVisibility>(dto.Visibility, true, out var parsed))
+            visibility = parsed;
+
         var entity = new PlayerCertificationRequest
         {
             StudentId = studentId,
             Token = token,
             Message = dto.Message,
+            Visibility = visibility,
             ExpiresAt = dto.ExpiresAt,
             IsActive = true
         };
@@ -319,10 +332,29 @@ public class PlayerCertificationService : IPlayerCertificationService
         _context.PlayerCertificationRequests.Add(entity);
         await _context.SaveChangesAsync();
 
-        // Reload with student
+        // Reload with student and invitations
         await _context.Entry(entity).Reference(r => r.Student).LoadAsync();
+        await _context.Entry(entity).Collection(r => r.Invitations).LoadAsync();
 
         return MapToRequestDto(entity, baseUrl);
+    }
+
+    public async Task<CertificationRequestDto?> GetOrCreateActiveRequestAsync(int studentId, string baseUrl)
+    {
+        // Get existing active request or create a new one
+        var existingRequest = await _context.PlayerCertificationRequests
+            .Include(r => r.Student)
+            .Include(r => r.Reviews)
+            .Include(r => r.Invitations)
+            .FirstOrDefaultAsync(r => r.StudentId == studentId && r.IsActive);
+
+        if (existingRequest != null)
+        {
+            return MapToRequestDto(existingRequest, baseUrl);
+        }
+
+        // Create a new request
+        return await CreateRequestAsync(studentId, new CreateCertificationRequestDto(), baseUrl);
     }
 
     public async Task<List<CertificationRequestDto>> GetStudentRequestsAsync(int studentId, string baseUrl)
@@ -330,6 +362,7 @@ public class PlayerCertificationService : IPlayerCertificationService
         var requests = await _context.PlayerCertificationRequests
             .Include(r => r.Student)
             .Include(r => r.Reviews)
+            .Include(r => r.Invitations)
             .Where(r => r.StudentId == studentId)
             .OrderByDescending(r => r.CreatedAt)
             .ToListAsync();
@@ -342,9 +375,31 @@ public class PlayerCertificationService : IPlayerCertificationService
         var request = await _context.PlayerCertificationRequests
             .Include(r => r.Student)
             .Include(r => r.Reviews)
+            .Include(r => r.Invitations)
             .FirstOrDefaultAsync(r => r.Id == requestId && r.StudentId == studentId);
 
         return request == null ? null : MapToRequestDto(request, baseUrl);
+    }
+
+    public async Task<CertificationRequestDto?> UpdateRequestAsync(int requestId, int studentId, UpdateCertificationRequestDto dto, string baseUrl)
+    {
+        var request = await _context.PlayerCertificationRequests
+            .Include(r => r.Student)
+            .Include(r => r.Reviews)
+            .Include(r => r.Invitations)
+            .FirstOrDefaultAsync(r => r.Id == requestId && r.StudentId == studentId);
+
+        if (request == null) return null;
+
+        if (dto.Message != null)
+            request.Message = dto.Message;
+
+        if (dto.Visibility != null && Enum.TryParse<ReviewVisibility>(dto.Visibility, true, out var visibility))
+            request.Visibility = visibility;
+
+        await _context.SaveChangesAsync();
+
+        return MapToRequestDto(request, baseUrl);
     }
 
     public async Task<bool> DeactivateRequestAsync(int requestId, int studentId)
@@ -361,12 +416,146 @@ public class PlayerCertificationService : IPlayerCertificationService
 
     #endregion
 
+    #region Invitations
+
+    public async Task<InvitablePeersDto> GetInvitablePeersAsync(int studentId)
+    {
+        // Get active request for this student
+        var request = await _context.PlayerCertificationRequests
+            .Include(r => r.Invitations)
+            .Include(r => r.Reviews)
+            .FirstOrDefaultAsync(r => r.StudentId == studentId && r.IsActive);
+
+        var invitedUserIds = request?.Invitations.Select(i => i.InvitedUserId).ToHashSet() ?? new HashSet<int>();
+        var reviewedUserIds = request?.Reviews.Where(r => r.ReviewerId.HasValue).Select(r => r.ReviewerId!.Value).ToHashSet() ?? new HashSet<int>();
+
+        // Get friends
+        var friendships = await _context.Friendships
+            .Include(f => f.User1)
+            .Include(f => f.User2)
+            .Where(f => f.UserId1 == studentId || f.UserId2 == studentId)
+            .ToListAsync();
+
+        var friends = friendships.Select(f =>
+        {
+            var friend = f.UserId1 == studentId ? f.User2 : f.User1;
+            return new InvitableUserDto
+            {
+                UserId = friend.Id,
+                Name = $"{friend.FirstName} {friend.LastName}",
+                ProfileImageUrl = friend.ProfileImageUrl,
+                AlreadyInvited = invitedUserIds.Contains(friend.Id),
+                HasReviewed = reviewedUserIds.Contains(friend.Id)
+            };
+        }).ToList();
+
+        // Get clubs where student is a member and their members
+        var studentClubIds = await _context.ClubMembers
+            .Where(m => m.UserId == studentId)
+            .Select(m => m.ClubId)
+            .ToListAsync();
+
+        var clubs = new List<ClubWithMembersDto>();
+        foreach (var clubId in studentClubIds)
+        {
+            var club = await _context.Clubs
+                .Include(c => c.Members)
+                    .ThenInclude(m => m.User)
+                .FirstOrDefaultAsync(c => c.Id == clubId);
+
+            if (club != null)
+            {
+                var members = club.Members
+                    .Where(m => m.UserId != studentId) // Exclude self
+                    .Select(m => new InvitableUserDto
+                    {
+                        UserId = m.UserId,
+                        Name = $"{m.User.FirstName} {m.User.LastName}",
+                        ProfileImageUrl = m.User.ProfileImageUrl,
+                        AlreadyInvited = invitedUserIds.Contains(m.UserId),
+                        HasReviewed = reviewedUserIds.Contains(m.UserId)
+                    })
+                    .ToList();
+
+                clubs.Add(new ClubWithMembersDto
+                {
+                    ClubId = club.Id,
+                    ClubName = club.Name,
+                    Members = members
+                });
+            }
+        }
+
+        return new InvitablePeersDto
+        {
+            Friends = friends,
+            Clubs = clubs
+        };
+    }
+
+    public async Task<List<CertificationInvitationDto>> GetInvitationsAsync(int requestId, int studentId)
+    {
+        var request = await _context.PlayerCertificationRequests
+            .FirstOrDefaultAsync(r => r.Id == requestId && r.StudentId == studentId);
+
+        if (request == null) return new List<CertificationInvitationDto>();
+
+        var invitations = await _context.PlayerCertificationInvitations
+            .Include(i => i.InvitedUser)
+            .Where(i => i.RequestId == requestId)
+            .OrderByDescending(i => i.InvitedAt)
+            .ToListAsync();
+
+        return invitations.Select(i => new CertificationInvitationDto
+        {
+            Id = i.Id,
+            UserId = i.InvitedUserId,
+            UserName = $"{i.InvitedUser.FirstName} {i.InvitedUser.LastName}",
+            ProfileImageUrl = i.InvitedUser.ProfileImageUrl,
+            HasReviewed = i.HasReviewed,
+            InvitedAt = i.InvitedAt,
+            ReviewedAt = i.ReviewedAt
+        }).ToList();
+    }
+
+    public async Task<int> InvitePeersAsync(int requestId, int studentId, InvitePeersDto dto)
+    {
+        var request = await _context.PlayerCertificationRequests
+            .Include(r => r.Invitations)
+            .FirstOrDefaultAsync(r => r.Id == requestId && r.StudentId == studentId);
+
+        if (request == null) return 0;
+
+        var existingInvitedIds = request.Invitations.Select(i => i.InvitedUserId).ToHashSet();
+        var newInvitations = 0;
+
+        foreach (var userId in dto.UserIds)
+        {
+            if (userId == studentId) continue; // Can't invite self
+            if (existingInvitedIds.Contains(userId)) continue; // Already invited
+
+            _context.PlayerCertificationInvitations.Add(new PlayerCertificationInvitation
+            {
+                RequestId = requestId,
+                InvitedUserId = userId,
+                InvitedAt = DateTime.UtcNow
+            });
+            newInvitations++;
+        }
+
+        await _context.SaveChangesAsync();
+        return newInvitations;
+    }
+
+    #endregion
+
     #region Review Page
 
-    public async Task<ReviewPageInfoDto> GetReviewPageInfoAsync(string token)
+    public async Task<ReviewPageInfoDto> GetReviewPageInfoAsync(string token, int? currentUserId)
     {
         var request = await _context.PlayerCertificationRequests
             .Include(r => r.Student)
+            .Include(r => r.Invitations)
             .FirstOrDefaultAsync(r => r.Token == token);
 
         if (request == null)
@@ -374,6 +563,7 @@ public class PlayerCertificationService : IPlayerCertificationService
             return new ReviewPageInfoDto
             {
                 IsValid = false,
+                CanReview = false,
                 ErrorMessage = "Invalid review link"
             };
         }
@@ -383,6 +573,7 @@ public class PlayerCertificationService : IPlayerCertificationService
             return new ReviewPageInfoDto
             {
                 IsValid = false,
+                CanReview = false,
                 ErrorMessage = "This review link is no longer active"
             };
         }
@@ -392,7 +583,22 @@ public class PlayerCertificationService : IPlayerCertificationService
             return new ReviewPageInfoDto
             {
                 IsValid = false,
+                CanReview = false,
                 ErrorMessage = "This review link has expired"
+            };
+        }
+
+        // Check visibility permissions
+        var canReview = await CheckReviewPermissionAsync(request, currentUserId);
+        string? visibilityError = null;
+
+        if (!canReview)
+        {
+            visibilityError = request.Visibility switch
+            {
+                ReviewVisibility.Members => "Only community members can submit reviews for this player",
+                ReviewVisibility.InvitedOnly => "Only invited users can submit reviews for this player",
+                _ => null
             };
         }
 
@@ -406,21 +612,60 @@ public class PlayerCertificationService : IPlayerCertificationService
             PlayerName = $"{request.Student.FirstName} {request.Student.LastName}",
             PlayerProfileImageUrl = request.Student.ProfileImageUrl,
             Message = request.Message,
+            Visibility = request.Visibility.ToString(),
             IsValid = true,
+            CanReview = canReview,
+            ErrorMessage = visibilityError,
             KnowledgeLevels = knowledgeLevels,
             SkillAreas = skillAreas
         };
     }
 
-    public async Task<bool> SubmitReviewAsync(string token, SubmitReviewDto dto)
+    private async Task<bool> CheckReviewPermissionAsync(PlayerCertificationRequest request, int? currentUserId)
+    {
+        // Anyone can review if visibility is Anyone
+        if (request.Visibility == ReviewVisibility.Anyone)
+            return true;
+
+        // For Members and InvitedOnly, user must be logged in
+        if (!currentUserId.HasValue)
+            return false;
+
+        // Self can always review their own request
+        if (currentUserId.Value == request.StudentId)
+            return true;
+
+        // For Members visibility, check if user exists in our community
+        if (request.Visibility == ReviewVisibility.Members)
+        {
+            var userExists = await _context.Users.AnyAsync(u => u.Id == currentUserId.Value);
+            return userExists;
+        }
+
+        // For InvitedOnly, check if user is in the invitations list
+        if (request.Visibility == ReviewVisibility.InvitedOnly)
+        {
+            var isInvited = request.Invitations.Any(i => i.InvitedUserId == currentUserId.Value);
+            return isInvited;
+        }
+
+        return false;
+    }
+
+    public async Task<bool> SubmitReviewAsync(string token, SubmitReviewDto dto, int? currentUserId)
     {
         var request = await _context.PlayerCertificationRequests
+            .Include(r => r.Invitations)
             .FirstOrDefaultAsync(r => r.Token == token && r.IsActive);
 
         if (request == null) return false;
 
         if (request.ExpiresAt.HasValue && request.ExpiresAt.Value < DateTime.UtcNow)
             return false;
+
+        // Check visibility permissions before allowing submission
+        var canReview = await CheckReviewPermissionAsync(request, currentUserId);
+        if (!canReview) return false;
 
         // For self-reviews, use a default knowledge level (or first available)
         int knowledgeLevelId;
@@ -443,6 +688,7 @@ public class PlayerCertificationService : IPlayerCertificationService
         var review = new PlayerCertificationReview
         {
             RequestId = request.Id,
+            ReviewerId = currentUserId,
             ReviewerName = dto.IsSelfReview ? "Self Review" : dto.ReviewerName,
             ReviewerEmail = dto.ReviewerEmail,
             KnowledgeLevelId = knowledgeLevelId,
@@ -464,6 +710,17 @@ public class PlayerCertificationService : IPlayerCertificationService
                 Score = scoreDto.Score
             };
             _context.PlayerCertificationScores.Add(score);
+        }
+
+        // Update invitation status if this user was invited
+        if (currentUserId.HasValue)
+        {
+            var invitation = request.Invitations.FirstOrDefault(i => i.InvitedUserId == currentUserId.Value);
+            if (invitation != null)
+            {
+                invitation.HasReviewed = true;
+                invitation.ReviewedAt = DateTime.UtcNow;
+            }
         }
 
         await _context.SaveChangesAsync();
@@ -731,10 +988,12 @@ public class PlayerCertificationService : IPlayerCertificationService
         StudentProfileImageUrl = entity.Student.ProfileImageUrl,
         Token = entity.Token,
         Message = entity.Message,
+        Visibility = entity.Visibility.ToString(),
         IsActive = entity.IsActive,
         CreatedAt = entity.CreatedAt,
         ExpiresAt = entity.ExpiresAt,
         ReviewCount = entity.Reviews?.Count ?? 0,
+        InvitationCount = entity.Invitations?.Count ?? 0,
         ShareableUrl = $"{baseUrl}/review/{entity.Token}"
     };
 

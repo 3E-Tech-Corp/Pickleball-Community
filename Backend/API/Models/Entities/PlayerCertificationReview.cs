@@ -17,6 +17,14 @@ public class PlayerCertificationReview
     [ForeignKey("RequestId")]
     public virtual PlayerCertificationRequest Request { get; set; } = null!;
 
+    /// <summary>
+    /// The user ID of the reviewer (if logged in)
+    /// </summary>
+    public int? ReviewerId { get; set; }
+
+    [ForeignKey("ReviewerId")]
+    public virtual User? Reviewer { get; set; }
+
     [Required]
     [MaxLength(100)]
     public string ReviewerName { get; set; } = string.Empty;

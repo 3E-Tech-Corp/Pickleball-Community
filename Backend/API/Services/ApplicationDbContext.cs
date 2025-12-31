@@ -34,6 +34,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<PlayerCertificationRequest> PlayerCertificationRequests { get; set; }
     public DbSet<PlayerCertificationReview> PlayerCertificationReviews { get; set; }
     public DbSet<PlayerCertificationScore> PlayerCertificationScores { get; set; }
+    public DbSet<PlayerCertificationInvitation> PlayerCertificationInvitations { get; set; }
 
     // Friends
     public DbSet<FriendRequest> FriendRequests { get; set; }

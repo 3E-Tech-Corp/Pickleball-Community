@@ -567,8 +567,20 @@ export const certificationApi = {
     api.get('/playercertification/requests'),
   getRequest: (id) =>
     api.get(`/playercertification/requests/${id}`),
+  getActiveRequest: () =>
+    api.get('/playercertification/requests/active'),
+  updateRequest: (id, data) =>
+    api.put(`/playercertification/requests/${id}`, data),
   deactivateRequest: (id) =>
     api.post(`/playercertification/requests/${id}/deactivate`),
+
+  // Invitations (Student)
+  getInvitablePeers: (requestId) =>
+    api.get(`/playercertification/requests/${requestId}/invitable-peers`),
+  getInvitations: (requestId) =>
+    api.get(`/playercertification/requests/${requestId}/invitations`),
+  invitePeers: (requestId, userIds) =>
+    api.post(`/playercertification/requests/${requestId}/invitations`, { userIds }),
 
   // Review Page (Public)
   getReviewPage: (token) =>

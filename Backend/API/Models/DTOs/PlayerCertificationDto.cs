@@ -140,10 +140,12 @@ public class CertificationRequestDto
     public string? StudentProfileImageUrl { get; set; }
     public string Token { get; set; } = string.Empty;
     public string? Message { get; set; }
+    public string Visibility { get; set; } = "Anyone"; // Anyone, Members, InvitedOnly
     public bool IsActive { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime? ExpiresAt { get; set; }
     public int ReviewCount { get; set; }
+    public int InvitationCount { get; set; }
     public string ShareableUrl { get; set; } = string.Empty;
 }
 
@@ -152,7 +154,65 @@ public class CreateCertificationRequestDto
     [MaxLength(1000)]
     public string? Message { get; set; }
 
+    /// <summary>
+    /// Visibility setting: Anyone, Members, InvitedOnly
+    /// </summary>
+    public string Visibility { get; set; } = "Anyone";
+
     public DateTime? ExpiresAt { get; set; }
+}
+
+public class UpdateCertificationRequestDto
+{
+    [MaxLength(1000)]
+    public string? Message { get; set; }
+
+    /// <summary>
+    /// Visibility setting: Anyone, Members, InvitedOnly
+    /// </summary>
+    public string? Visibility { get; set; }
+}
+
+// Invitation DTOs
+public class CertificationInvitationDto
+{
+    public int Id { get; set; }
+    public int UserId { get; set; }
+    public string UserName { get; set; } = string.Empty;
+    public string? ProfileImageUrl { get; set; }
+    public bool HasReviewed { get; set; }
+    public DateTime InvitedAt { get; set; }
+    public DateTime? ReviewedAt { get; set; }
+}
+
+public class InvitePeersDto
+{
+    /// <summary>
+    /// List of user IDs to invite
+    /// </summary>
+    public List<int> UserIds { get; set; } = new();
+}
+
+public class InvitablePeersDto
+{
+    public List<InvitableUserDto> Friends { get; set; } = new();
+    public List<ClubWithMembersDto> Clubs { get; set; } = new();
+}
+
+public class InvitableUserDto
+{
+    public int UserId { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public string? ProfileImageUrl { get; set; }
+    public bool AlreadyInvited { get; set; }
+    public bool HasReviewed { get; set; }
+}
+
+public class ClubWithMembersDto
+{
+    public int ClubId { get; set; }
+    public string ClubName { get; set; } = string.Empty;
+    public List<InvitableUserDto> Members { get; set; } = new();
 }
 
 // Review DTOs
@@ -296,7 +356,9 @@ public class ReviewPageInfoDto
     public string PlayerName { get; set; } = string.Empty;
     public string? PlayerProfileImageUrl { get; set; }
     public string? Message { get; set; }
+    public string Visibility { get; set; } = "Anyone";
     public bool IsValid { get; set; }
+    public bool CanReview { get; set; } = true; // Whether current user can submit a review
     public string? ErrorMessage { get; set; }
     public List<KnowledgeLevelDto> KnowledgeLevels { get; set; } = new();
     public List<SkillAreaDto> SkillAreas { get; set; } = new();
