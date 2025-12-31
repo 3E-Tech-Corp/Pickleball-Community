@@ -76,7 +76,8 @@ public class AuthController : ControllerBase
                     localUser.FirstName,
                     localUser.LastName,
                     localUser.Role,  // Site-specific role
-                    localUser.ProfileImageUrl
+                    localUser.ProfileImageUrl,
+                    localUser.CanWriteBlog
                 }
             });
         }
@@ -131,7 +132,7 @@ public class AuthController : ControllerBase
             return Ok(new
             {
                 Token = token,
-                User = new { user.Id, user.Email, user.FirstName, user.LastName, user.Role, user.ProfileImageUrl }
+                User = new { user.Id, user.Email, user.FirstName, user.LastName, user.Role, user.ProfileImageUrl, user.CanWriteBlog }
             });
         }
         catch (ArgumentException ex)
@@ -162,7 +163,8 @@ public class AuthController : ControllerBase
                 user.FirstName,
                 user.LastName,
                 user.Role,
-                user.ProfileImageUrl
+                user.ProfileImageUrl,
+                user.CanWriteBlog
             }
         });
     }
@@ -179,7 +181,7 @@ public class AuthController : ControllerBase
         return Ok(new
         {
             Token = token,
-            User = new { user.Id, user.Email, user.FirstName, user.LastName, user.Role, user.ProfileImageUrl }
+            User = new { user.Id, user.Email, user.FirstName, user.LastName, user.Role, user.ProfileImageUrl, user.CanWriteBlog }
         });
     }
 
