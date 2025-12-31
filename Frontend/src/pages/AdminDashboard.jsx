@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
-import { userApi, themeApi, sharedAssetApi, getAssetUrl, SHARED_AUTH_URL } from '../services/api'
+import { userApi, themeApi, sharedAssetApi, getAssetUrl, getSharedAssetUrl, SHARED_AUTH_URL } from '../services/api'
 import {
   Users, BookOpen, Calendar, DollarSign, Search, Edit2, Trash2,
   ChevronLeft, ChevronRight, Filter, MoreVertical, Eye, X,
@@ -767,7 +767,7 @@ const AdminDashboard = () => {
                                 </div>
                               ) : (
                                 <video
-                                  src={getAssetUrl(themeSettings.heroVideoUrl)}
+                                  src={getSharedAssetUrl(themeSettings.heroVideoUrl)}
                                   className="w-full h-32 object-cover rounded-lg"
                                   muted
                                   loop
