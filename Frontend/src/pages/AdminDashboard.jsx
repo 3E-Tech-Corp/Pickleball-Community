@@ -367,6 +367,7 @@ const AdminDashboard = () => {
     { id: 'users', label: 'Users', icon: Users, count: users.length },
     { id: 'theme', label: 'Theme', icon: Palette },
     { id: 'certification', label: 'Certification', icon: Award, link: '/admin/certification' },
+    { id: 'blog', label: 'Blog', icon: BookOpen, link: '/admin/blog' },
     { id: 'eventTypes', label: 'Event Types', icon: Tags, link: '/admin/event-types' },
     { id: 'courtTypes', label: 'Court Types', icon: Building2, link: '/admin/court-types' },
     { id: 'clubRoles', label: 'Club Roles', icon: UserCog, link: '/admin/club-member-roles' },

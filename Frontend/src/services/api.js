@@ -882,6 +882,54 @@ export const clubMemberRolesApi = {
   reorder: (orderedIds) => api.put('/clubmemberroles/reorder', orderedIds)
 }
 
+// Blog API
+export const blogApi = {
+  // Categories (public)
+  getCategories: (activeOnly = true) =>
+    api.get(`/blog/categories${activeOnly ? '?activeOnly=true' : '?activeOnly=false'}`),
+
+  // Category management (Admin only)
+  createCategory: (data) => api.post('/blog/categories', data),
+  updateCategory: (id, data) => api.put(`/blog/categories/${id}`, data),
+  deleteCategory: (id) => api.delete(`/blog/categories/${id}`),
+
+  // Posts (public)
+  getPosts: (params = {}) => {
+    const queryParams = new URLSearchParams();
+    if (params.categoryId) queryParams.append('categoryId', params.categoryId);
+    if (params.authorId) queryParams.append('authorId', params.authorId);
+    if (params.status) queryParams.append('status', params.status);
+    if (params.page) queryParams.append('page', params.page);
+    if (params.pageSize) queryParams.append('pageSize', params.pageSize);
+    return api.get(`/blog/posts?${queryParams.toString()}`);
+  },
+
+  getPost: (idOrSlug) => api.get(`/blog/posts/${idOrSlug}`),
+
+  // Post management (writers and admins)
+  createPost: (data) => api.post('/blog/posts', data),
+  updatePost: (id, data) => api.put(`/blog/posts/${id}`, data),
+  deletePost: (id) => api.delete(`/blog/posts/${id}`),
+  publishPost: (id) => api.post(`/blog/posts/${id}/publish`),
+  archivePost: (id) => api.post(`/blog/posts/${id}/archive`),
+
+  // Get my posts (for authors)
+  getMyPosts: () => api.get('/blog/posts/my'),
+
+  // Comments
+  getComments: (postId) => api.get(`/blog/posts/${postId}/comments`),
+  addComment: (postId, content, parentId = null) =>
+    api.post(`/blog/posts/${postId}/comments`, { content, parentId }),
+  updateComment: (commentId, content) =>
+    api.put(`/blog/comments/${commentId}`, { content }),
+  deleteComment: (commentId) => api.delete(`/blog/comments/${commentId}`),
+
+  // Writer management (Admin only)
+  getWriters: () => api.get('/blog/writers'),
+  addWriter: (userId) => api.post(`/blog/writers/${userId}`),
+  removeWriter: (userId) => api.delete(`/blog/writers/${userId}`)
+}
+
 // Friends API
 export const friendsApi = {
   // Get all friends

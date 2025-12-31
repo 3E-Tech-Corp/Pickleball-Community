@@ -80,4 +80,11 @@ public class User
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
     public bool IsActive { get; set; } = true;
+
+    // Blog permissions
+    public bool CanWriteBlog { get; set; } = false;
+
+    // Navigation
+    public virtual ICollection<BlogPost> BlogPosts { get; set; } = new List<BlogPost>();
+    public virtual ICollection<BlogComment> BlogComments { get; set; } = new List<BlogComment>();
 }

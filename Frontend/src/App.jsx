@@ -16,6 +16,7 @@ import Events from './pages/Events'
 import Courts from './pages/Courts'
 import Clubs from './pages/Clubs'
 import Blog from './pages/Blog'
+import BlogAdmin from './pages/BlogAdmin'
 import Friends from './pages/Friends'
 import PublicProfile from './pages/PublicProfile'
 import ProtectedRoute from './components/ProtectedRoute'
@@ -104,6 +105,12 @@ function App() {
       <Route path="/admin/club-member-roles" element={
         <ProtectedRoute role="Admin">
           <ClubMemberRolesAdmin />
+        </ProtectedRoute>
+      } />
+
+      <Route path="/admin/blog" element={
+        <ProtectedRoute role="Admin">
+          <BlogAdmin />
         </ProtectedRoute>
       } />
 

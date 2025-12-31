@@ -63,6 +63,11 @@ public class ApplicationDbContext : DbContext
     public DbSet<ClubNotification> ClubNotifications { get; set; }
     public DbSet<ClubMemberRole> ClubMemberRoles { get; set; }
 
+    // Blog
+    public DbSet<BlogCategory> BlogCategories { get; set; }
+    public DbSet<BlogPost> BlogPosts { get; set; }
+    public DbSet<BlogComment> BlogComments { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<User>(entity =>
@@ -439,6 +444,60 @@ public class ApplicationDbContext : DbContext
             entity.Property(r => r.Name).IsRequired().HasMaxLength(50);
             entity.HasIndex(r => r.Name).IsUnique();
             entity.HasIndex(r => r.SortOrder);
+        });
+
+        // Blog Category configuration
+        modelBuilder.Entity<BlogCategory>(entity =>
+        {
+            entity.Property(c => c.Name).IsRequired().HasMaxLength(100);
+            entity.Property(c => c.Slug).IsRequired().HasMaxLength(100);
+            entity.HasIndex(c => c.Slug).IsUnique();
+            entity.HasIndex(c => c.SortOrder);
+        });
+
+        // Blog Post configuration
+        modelBuilder.Entity<BlogPost>(entity =>
+        {
+            entity.Property(p => p.Title).IsRequired().HasMaxLength(200);
+            entity.Property(p => p.Slug).IsRequired().HasMaxLength(200);
+            entity.Property(p => p.Status).HasConversion<string>();
+            entity.HasIndex(p => p.Slug).IsUnique();
+            entity.HasIndex(p => p.Status);
+            entity.HasIndex(p => p.PublishedAt);
+
+            entity.HasOne(p => p.Author)
+                  .WithMany(u => u.BlogPosts)
+                  .HasForeignKey(p => p.AuthorId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(p => p.Category)
+                  .WithMany(c => c.Posts)
+                  .HasForeignKey(p => p.CategoryId)
+                  .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        // Blog Comment configuration
+        modelBuilder.Entity<BlogComment>(entity =>
+        {
+            entity.Property(c => c.Content).IsRequired().HasMaxLength(2000);
+            entity.HasIndex(c => c.PostId);
+            entity.HasIndex(c => c.UserId);
+            entity.HasIndex(c => c.CreatedAt);
+
+            entity.HasOne(c => c.Post)
+                  .WithMany(p => p.Comments)
+                  .HasForeignKey(c => c.PostId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(c => c.User)
+                  .WithMany(u => u.BlogComments)
+                  .HasForeignKey(c => c.UserId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(c => c.Parent)
+                  .WithMany(c => c.Replies)
+                  .HasForeignKey(c => c.ParentId)
+                  .OnDelete(DeleteBehavior.NoAction);
         });
     }
 }
