@@ -884,9 +884,9 @@ export const clubMemberRolesApi = {
 
 // Blog API
 export const blogApi = {
-  // Categories (public)
+  // Categories (public for active only, admin for all)
   getCategories: (activeOnly = true) =>
-    api.get(`/blog/categories${activeOnly ? '?activeOnly=true' : '?activeOnly=false'}`),
+    api.get(activeOnly ? '/blog/categories' : '/blog/categories/all'),
 
   // Category management (Admin only)
   createCategory: (data) => api.post('/blog/categories', data),
