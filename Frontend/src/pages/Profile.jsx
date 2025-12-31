@@ -6,7 +6,8 @@ import VideoUploadModal from '../components/ui/VideoUploadModal'
 import {
   User, Camera, Video, MapPin, Phone, Calendar,
   Edit2, Save, Upload, X, Play, Award, Target,
-  Zap, Heart, Activity, TrendingUp, ChevronRight
+  Zap, Heart, Activity, TrendingUp, ChevronRight,
+  MessageCircle, Shield
 } from 'lucide-react'
 
 const Profile = () => {
@@ -31,6 +32,11 @@ const Profile = () => {
 
   // Video modal state
   const [isVideoModalOpen, setIsVideoModalOpen] = useState(false)
+
+  // Messaging settings state
+  const [allowDirectMessages, setAllowDirectMessages] = useState(true)
+  const [allowClubMessages, setAllowClubMessages] = useState(true)
+  const [savingMessagingSettings, setSavingMessagingSettings] = useState(false)
 
   // Separate forms for each section
   const basicInfoForm = useForm({
@@ -122,6 +128,10 @@ const Profile = () => {
 
       setHandedness(user.handedness || '')
       setTempBio(user.bio || '')
+
+      // Set messaging settings
+      setAllowDirectMessages(user.allowDirectMessages !== false) // default true
+      setAllowClubMessages(user.allowClubMessages !== false) // default true
 
       // Set avatar preview from either avatar or profileImageUrl (from Funtime-Shared)
       const avatarUrl = user.avatar || user.profileImageUrl
@@ -273,6 +283,33 @@ const Profile = () => {
       updateUser({ ...user, introVideo: null })
     } catch (error) {
       console.error('Error removing video:', error)
+    }
+  }
+
+  // Handle messaging setting toggle
+  const handleMessagingSettingChange = async (setting, value) => {
+    setSavingMessagingSettings(true)
+    try {
+      const updateData = { [setting]: value }
+      await userApi.updateProfile(updateData)
+      updateUser({ ...user, ...updateData })
+
+      if (setting === 'allowDirectMessages') {
+        setAllowDirectMessages(value)
+      } else if (setting === 'allowClubMessages') {
+        setAllowClubMessages(value)
+      }
+    } catch (error) {
+      console.error('Error updating messaging settings:', error)
+      alert('Failed to update setting')
+      // Revert the toggle on error
+      if (setting === 'allowDirectMessages') {
+        setAllowDirectMessages(!value)
+      } else if (setting === 'allowClubMessages') {
+        setAllowClubMessages(!value)
+      }
+    } finally {
+      setSavingMessagingSettings(false)
     }
   }
 
@@ -858,6 +895,77 @@ const Profile = () => {
                       />
                     </div>
                   </div>
+                </div>
+              </div>
+
+              {/* Privacy & Messaging Settings Section */}
+              <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+                <div className="px-6 py-4 bg-gray-50 border-b">
+                  <h3 className="text-lg font-semibold text-gray-900 flex items-center">
+                    <Shield className="w-5 h-5 mr-2 text-green-500" />
+                    Privacy & Messaging
+                  </h3>
+                </div>
+
+                <div className="p-6 space-y-4">
+                  {/* Allow Direct Messages */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <MessageCircle className="w-5 h-5 text-blue-500" />
+                        <span className="font-medium text-gray-900">Direct Messages from Friends</span>
+                      </div>
+                      <p className="text-sm text-gray-500 mt-1 ml-7">
+                        Allow your friends to send you direct messages
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => handleMessagingSettingChange('allowDirectMessages', !allowDirectMessages)}
+                      disabled={savingMessagingSettings}
+                      className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 ${
+                        allowDirectMessages ? 'bg-blue-600' : 'bg-gray-200'
+                      }`}
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                          allowDirectMessages ? 'translate-x-5' : 'translate-x-0'
+                        }`}
+                      />
+                    </button>
+                  </div>
+
+                  {/* Allow Club Messages */}
+                  <div className="flex items-center justify-between pt-4 border-t border-gray-100">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <MessageCircle className="w-5 h-5 text-purple-500" />
+                        <span className="font-medium text-gray-900">Club Chat Auto-Join</span>
+                      </div>
+                      <p className="text-sm text-gray-500 mt-1 ml-7">
+                        Automatically join club chat when you join a club
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => handleMessagingSettingChange('allowClubMessages', !allowClubMessages)}
+                      disabled={savingMessagingSettings}
+                      className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 ${
+                        allowClubMessages ? 'bg-blue-600' : 'bg-gray-200'
+                      }`}
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                          allowClubMessages ? 'translate-x-5' : 'translate-x-0'
+                        }`}
+                      />
+                    </button>
+                  </div>
+
+                  {savingMessagingSettings && (
+                    <div className="flex items-center justify-center text-sm text-gray-500 pt-2">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
+                      Saving...
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
