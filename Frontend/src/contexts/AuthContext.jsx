@@ -22,9 +22,16 @@ export const AuthProvider = ({ children }) => {
     const storedUser = localStorage.getItem('pickleball_user')
     const token = localStorage.getItem('jwtToken')
 
+    console.log('AuthContext init:', {
+      hasStoredUser: !!storedUser,
+      hasToken: !!token,
+      tokenLength: token?.length
+    })
+
     if (storedUser && token) {
       try {
         const parsedUser = JSON.parse(storedUser)
+        console.log('AuthContext: Setting user from localStorage', parsedUser?.email)
         setUser(parsedUser)
         setIsAuthenticated(true)
 
@@ -34,6 +41,8 @@ export const AuthProvider = ({ children }) => {
         console.error('Error parsing stored user:', error)
         clearAuthData()
       }
+    } else {
+      console.log('AuthContext: No stored user or token found')
     }
     setLoading(false)
   }, [])

@@ -11,7 +11,10 @@ const ProtectedRoute = ({ children, role, roles }) => {
     loading,
     isAuthenticated,
     hasUser: !!user,
-    userRole: user?.role
+    userRole: user?.role,
+    // Also check localStorage directly
+    hasStoredUser: !!localStorage.getItem('pickleball_user'),
+    hasToken: !!localStorage.getItem('jwtToken')
   })
 
   if (loading) {
