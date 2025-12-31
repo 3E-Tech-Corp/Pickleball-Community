@@ -721,31 +721,93 @@ public class PlayerCertificationService : IPlayerCertificationService
             knowledgeLevelId = dto.KnowledgeLevelId.Value;
         }
 
-        var review = new PlayerCertificationReview
-        {
-            RequestId = request.Id,
-            ReviewerId = currentUserId,
-            ReviewerName = dto.IsSelfReview ? "Self Review" : dto.ReviewerName,
-            ReviewerEmail = dto.ReviewerEmail,
-            KnowledgeLevelId = knowledgeLevelId,
-            IsAnonymous = dto.IsAnonymous,
-            IsSelfReview = dto.IsSelfReview,
-            Comments = dto.Comments
-        };
+        // Check for existing review from the same reviewer
+        // If within 1 month, update existing review; otherwise create new
+        var oneMonthAgo = DateTime.UtcNow.AddMonths(-1);
+        PlayerCertificationReview? existingReview = null;
 
-        _context.PlayerCertificationReviews.Add(review);
-        await _context.SaveChangesAsync();
-
-        // Add scores
-        foreach (var scoreDto in dto.Scores)
+        if (currentUserId.HasValue)
         {
-            var score = new PlayerCertificationScore
+            // Find existing review by logged-in user
+            existingReview = await _context.PlayerCertificationReviews
+                .Include(r => r.Scores)
+                .Where(r => r.RequestId == request.Id
+                    && r.ReviewerId == currentUserId.Value
+                    && r.IsSelfReview == dto.IsSelfReview)
+                .OrderByDescending(r => r.CreatedAt)
+                .FirstOrDefaultAsync();
+        }
+        else if (!string.IsNullOrEmpty(dto.ReviewerEmail))
+        {
+            // Find existing review by email (for anonymous reviewers)
+            existingReview = await _context.PlayerCertificationReviews
+                .Include(r => r.Scores)
+                .Where(r => r.RequestId == request.Id
+                    && r.ReviewerId == null
+                    && r.ReviewerEmail == dto.ReviewerEmail
+                    && r.IsSelfReview == dto.IsSelfReview)
+                .OrderByDescending(r => r.CreatedAt)
+                .FirstOrDefaultAsync();
+        }
+
+        PlayerCertificationReview review;
+
+        if (existingReview != null && existingReview.CreatedAt > oneMonthAgo)
+        {
+            // Update existing review (less than 1 month old)
+            review = existingReview;
+            review.ReviewerName = dto.IsSelfReview ? "Self Review" : dto.ReviewerName;
+            review.ReviewerEmail = dto.ReviewerEmail;
+            review.KnowledgeLevelId = knowledgeLevelId;
+            review.IsAnonymous = dto.IsAnonymous;
+            review.Comments = dto.Comments;
+            review.UpdatedAt = DateTime.UtcNow;
+
+            // Remove existing scores and add new ones
+            _context.PlayerCertificationScores.RemoveRange(existingReview.Scores);
+            await _context.SaveChangesAsync();
+
+            // Add new scores
+            foreach (var scoreDto in dto.Scores)
             {
-                ReviewId = review.Id,
-                SkillAreaId = scoreDto.SkillAreaId,
-                Score = scoreDto.Score
+                var score = new PlayerCertificationScore
+                {
+                    ReviewId = review.Id,
+                    SkillAreaId = scoreDto.SkillAreaId,
+                    Score = scoreDto.Score
+                };
+                _context.PlayerCertificationScores.Add(score);
+            }
+        }
+        else
+        {
+            // Create new review (no existing or existing is over 1 month old)
+            review = new PlayerCertificationReview
+            {
+                RequestId = request.Id,
+                ReviewerId = currentUserId,
+                ReviewerName = dto.IsSelfReview ? "Self Review" : dto.ReviewerName,
+                ReviewerEmail = dto.ReviewerEmail,
+                KnowledgeLevelId = knowledgeLevelId,
+                IsAnonymous = dto.IsAnonymous,
+                IsSelfReview = dto.IsSelfReview,
+                Comments = dto.Comments
             };
-            _context.PlayerCertificationScores.Add(score);
+
+            _context.PlayerCertificationReviews.Add(review);
+            await _context.SaveChangesAsync();
+
+            // Add scores
+            foreach (var scoreDto in dto.Scores)
+            {
+                var score = new PlayerCertificationScore
+                {
+                    ReviewId = review.Id,
+                    SkillAreaId = scoreDto.SkillAreaId,
+                    Score = scoreDto.Score
+                };
+                _context.PlayerCertificationScores.Add(score);
+            }
         }
 
         // Update invitation status if this user was invited

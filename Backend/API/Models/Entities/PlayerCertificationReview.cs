@@ -56,6 +56,11 @@ public class PlayerCertificationReview
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
+    /// <summary>
+    /// When the review was last updated (null if never updated)
+    /// </summary>
+    public DateTime? UpdatedAt { get; set; }
+
     // Navigation property
     public virtual ICollection<PlayerCertificationScore> Scores { get; set; } = new List<PlayerCertificationScore>();
 }
