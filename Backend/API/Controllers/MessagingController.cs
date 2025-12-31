@@ -47,7 +47,7 @@ public class MessagingController : ControllerBase
 
             var conversations = await _context.ConversationParticipants
                 .Include(cp => cp.Conversation)
-                    .ThenInclude(c => c!.Messages.OrderByDescending(m => m.CreatedAt).Take(1))
+                    .ThenInclude(c => c!.Messages.OrderByDescending(m => m.SentAt).Take(1))
                         .ThenInclude(m => m.Sender)
                 .Include(cp => cp.Conversation)
                     .ThenInclude(c => c!.Participants)
@@ -62,7 +62,7 @@ public class MessagingController : ControllerBase
                     Participant = cp,
                     UnreadCount = _context.Messages
                         .Count(m => m.ConversationId == cp.ConversationId &&
-                                   m.CreatedAt > (cp.LastReadAt ?? DateTime.MinValue) &&
+                                   m.SentAt > (cp.LastReadAt ?? DateTime.MinValue) &&
                                    m.SenderId != userId.Value &&
                                    !m.IsDeleted)
                 })
@@ -136,7 +136,7 @@ public class MessagingController : ControllerBase
                 .Include(c => c.Participants)
                     .ThenInclude(p => p.User)
                 .Include(c => c.Club)
-                .Include(c => c.Messages.OrderByDescending(m => m.CreatedAt).Take(1))
+                .Include(c => c.Messages.OrderByDescending(m => m.SentAt).Take(1))
                     .ThenInclude(m => m.Sender)
                 .FirstOrDefaultAsync(c => c.Id == id && !c.IsDeleted);
 
@@ -146,7 +146,7 @@ public class MessagingController : ControllerBase
             var lastMessage = conversation.Messages.FirstOrDefault();
             var unreadCount = await _context.Messages
                 .CountAsync(m => m.ConversationId == id &&
-                                m.CreatedAt > (_context.ConversationParticipants
+                                m.SentAt > (_context.ConversationParticipants
                                     .Where(cp => cp.ConversationId == id && cp.UserId == userId.Value)
                                     .Select(cp => cp.LastReadAt)
                                     .FirstOrDefault() ?? DateTime.MinValue) &&
@@ -355,7 +355,7 @@ public class MessagingController : ControllerBase
             }
 
             var messages = await query
-                .OrderByDescending(m => m.CreatedAt)
+                .OrderByDescending(m => m.SentAt)
                 .Take(limit + 1) // Take one extra to check if there are more
                 .ToListAsync();
 
@@ -366,7 +366,7 @@ public class MessagingController : ControllerBase
             }
 
             var messageDtos = messages
-                .OrderBy(m => m.CreatedAt)
+                .OrderBy(m => m.SentAt)
                 .Select(m => MapToMessageDto(m, userId.Value))
                 .ToList();
 
@@ -922,11 +922,11 @@ public class MessagingController : ControllerBase
                     : null,
                 Content = message.ReplyToMessage.IsDeleted ? "[Message deleted]" : message.ReplyToMessage.Content,
                 MessageType = message.ReplyToMessage.MessageType,
-                CreatedAt = message.ReplyToMessage.CreatedAt,
+                CreatedAt = message.ReplyToMessage.SentAt,
                 IsDeleted = message.ReplyToMessage.IsDeleted,
                 IsOwn = message.ReplyToMessage.SenderId == currentUserId
             } : null,
-            CreatedAt = message.CreatedAt,
+            CreatedAt = message.SentAt,
             EditedAt = message.EditedAt,
             IsDeleted = message.IsDeleted,
             IsOwn = message.SenderId == currentUserId
