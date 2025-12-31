@@ -983,4 +983,50 @@ export const friendsApi = {
   getFriendProfile: (friendId) => api.get(`/friends/${friendId}/profile`)
 }
 
+// Messaging API
+export const messagingApi = {
+  // Conversations
+  getConversations: () => api.get('/messaging/conversations'),
+  getConversation: (id) => api.get(`/messaging/conversations/${id}`),
+  createDirectConversation: (otherUserId, initialMessage = null) =>
+    api.post('/messaging/conversations/direct', { otherUserId, initialMessage }),
+  createGroupConversation: (name, participantUserIds) =>
+    api.post('/messaging/conversations/group', { name, participantUserIds }),
+  updateConversation: (id, data) => api.put(`/messaging/conversations/${id}`, data),
+  leaveConversation: (id) => api.post(`/messaging/conversations/${id}/leave`),
+  muteConversation: (id, isMuted) =>
+    api.put(`/messaging/conversations/${id}/mute`, { isMuted }),
+
+  // Participants
+  addParticipants: (conversationId, userIds) =>
+    api.post(`/messaging/conversations/${conversationId}/participants`, { userIds }),
+  removeParticipant: (conversationId, userId) =>
+    api.delete(`/messaging/conversations/${conversationId}/participants/${userId}`),
+
+  // Messages
+  getMessages: (conversationId, beforeMessageId = null, limit = 50) => {
+    const params = new URLSearchParams();
+    if (beforeMessageId) params.append('beforeMessageId', beforeMessageId);
+    params.append('limit', limit);
+    return api.get(`/messaging/conversations/${conversationId}/messages?${params.toString()}`);
+  },
+  sendMessage: (conversationId, content, messageType = 'Text', replyToMessageId = null) =>
+    api.post(`/messaging/conversations/${conversationId}/messages`, {
+      content,
+      messageType,
+      replyToMessageId
+    }),
+  editMessage: (messageId, content) =>
+    api.put(`/messaging/messages/${messageId}`, { content }),
+  deleteMessage: (messageId) => api.delete(`/messaging/messages/${messageId}`),
+
+  // Read receipts
+  markAsRead: (conversationId) =>
+    api.post(`/messaging/conversations/${conversationId}/read`),
+
+  // Settings
+  getSettings: () => api.get('/messaging/settings'),
+  updateSettings: (settings) => api.put('/messaging/settings', settings)
+}
+
 export default api

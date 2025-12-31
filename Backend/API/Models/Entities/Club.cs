@@ -74,9 +74,16 @@ public class Club
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
     public bool IsActive { get; set; } = true;
 
+    // Chat settings (opt-in by club owner)
+    public bool ChatEnabled { get; set; } = false;
+    public int? ChatConversationId { get; set; }
+
     // Navigation
     [ForeignKey("CreatedByUserId")]
     public User? CreatedBy { get; set; }
+
+    [ForeignKey("ChatConversationId")]
+    public Conversation? ChatConversation { get; set; }
 
     public ICollection<ClubMember> Members { get; set; } = new List<ClubMember>();
     public ICollection<ClubJoinRequest> JoinRequests { get; set; } = new List<ClubJoinRequest>();

@@ -1,0 +1,790 @@
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import {
+  MessageCircle, ArrowLeft, Send, MoreVertical, Search, Users, User,
+  Check, CheckCheck, Reply, Trash2, Edit3, X, Bell, BellOff, Plus,
+  Image, Smile, ChevronLeft, Wifi, WifiOff
+} from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
+import { messagingApi, getSharedAssetUrl } from '../services/api';
+import { useSignalR, SignalREvents } from '../hooks/useSignalR';
+
+export default function Messages() {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const [conversations, setConversations] = useState([]);
+  const [selectedConversation, setSelectedConversation] = useState(null);
+  const [messages, setMessages] = useState([]);
+  const [newMessage, setNewMessage] = useState('');
+  const [replyingTo, setReplyingTo] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [loadingMessages, setLoadingMessages] = useState(false);
+  const [sendingMessage, setSendingMessage] = useState(false);
+  const [hasMoreMessages, setHasMoreMessages] = useState(false);
+  const [showMobileConversation, setShowMobileConversation] = useState(false);
+  const [conversationDetails, setConversationDetails] = useState(null);
+  const [showMenu, setShowMenu] = useState(false);
+  const [typingUsers, setTypingUsers] = useState({});
+
+  const messagesEndRef = useRef(null);
+  const messagesContainerRef = useRef(null);
+  const inputRef = useRef(null);
+  const typingTimeoutRef = useRef(null);
+
+  // SignalR for real-time messaging
+  const {
+    connect,
+    disconnect,
+    on,
+    off,
+    sendTyping,
+    isConnected,
+    connectionState
+  } = useSignalR();
+
+  // Connect to SignalR when component mounts
+  useEffect(() => {
+    if (user) {
+      connect();
+    }
+    return () => {
+      disconnect();
+    };
+  }, [user, connect, disconnect]);
+
+  // Handle SignalR events
+  useEffect(() => {
+    if (!isConnected) return;
+
+    // New message received
+    const handleReceiveMessage = (notification) => {
+      console.log('SignalR: Received message', notification);
+
+      // Update messages if this is the current conversation
+      if (selectedConversation?.id === notification.conversationId) {
+        setMessages(prev => {
+          // Check if message already exists (avoid duplicates)
+          if (prev.some(m => m.id === notification.message.id)) {
+            return prev;
+          }
+          return [...prev, notification.message];
+        });
+
+        // Scroll to bottom
+        setTimeout(() => {
+          messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        }, 100);
+      }
+
+      // Update conversation list
+      setConversations(prev => {
+        const updated = prev.map(c =>
+          c.id === notification.conversationId
+            ? {
+                ...c,
+                lastMessagePreview: notification.message.content?.substring(0, 50),
+                lastMessageAt: notification.message.createdAt,
+                lastMessageSenderName: notification.message.senderName,
+                unreadCount: selectedConversation?.id === notification.conversationId
+                  ? 0
+                  : (c.unreadCount || 0) + 1
+              }
+            : c
+        );
+        // Move conversation to top
+        const current = updated.find(c => c.id === notification.conversationId);
+        if (current) {
+          return [current, ...updated.filter(c => c.id !== notification.conversationId)];
+        }
+        return updated;
+      });
+    };
+
+    // Message edited
+    const handleMessageEdited = (message) => {
+      console.log('SignalR: Message edited', message);
+      setMessages(prev => prev.map(m =>
+        m.id === message.id ? { ...m, content: message.content, editedAt: message.editedAt } : m
+      ));
+    };
+
+    // Message deleted
+    const handleMessageDeleted = ({ messageId, conversationId }) => {
+      console.log('SignalR: Message deleted', messageId);
+      setMessages(prev => prev.map(m =>
+        m.id === messageId ? { ...m, isDeleted: true, content: '[Message deleted]' } : m
+      ));
+    };
+
+    // User typing indicator
+    const handleUserTyping = (notification) => {
+      if (notification.conversationId === selectedConversation?.id) {
+        setTypingUsers(prev => ({
+          ...prev,
+          [notification.userId]: notification.isTyping ? notification.userName : null
+        }));
+
+        // Clear typing indicator after 3 seconds
+        if (notification.isTyping) {
+          setTimeout(() => {
+            setTypingUsers(prev => ({
+              ...prev,
+              [notification.userId]: null
+            }));
+          }, 3000);
+        }
+      }
+    };
+
+    // Subscribe to events
+    on(SignalREvents.ReceiveMessage, handleReceiveMessage);
+    on(SignalREvents.MessageEdited, handleMessageEdited);
+    on(SignalREvents.MessageDeleted, handleMessageDeleted);
+    on(SignalREvents.UserTyping, handleUserTyping);
+
+    return () => {
+      off(SignalREvents.ReceiveMessage, handleReceiveMessage);
+      off(SignalREvents.MessageEdited, handleMessageEdited);
+      off(SignalREvents.MessageDeleted, handleMessageDeleted);
+      off(SignalREvents.UserTyping, handleUserTyping);
+    };
+  }, [isConnected, selectedConversation, on, off]);
+
+  // Handle typing indicator
+  const handleTyping = useCallback(() => {
+    if (!isConnected || !selectedConversation) return;
+
+    // Send typing indicator
+    sendTyping(selectedConversation.id, true).catch(console.error);
+
+    // Clear previous timeout
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+    }
+
+    // Set timeout to stop typing indicator
+    typingTimeoutRef.current = setTimeout(() => {
+      sendTyping(selectedConversation.id, false).catch(console.error);
+    }, 2000);
+  }, [isConnected, selectedConversation, sendTyping]);
+
+  // Get list of typing users for current conversation
+  const getTypingIndicator = () => {
+    const typingNames = Object.values(typingUsers).filter(Boolean);
+    if (typingNames.length === 0) return null;
+    if (typingNames.length === 1) return `${typingNames[0]} is typing...`;
+    return `${typingNames.slice(0, 2).join(', ')} are typing...`;
+  };
+
+  // Load conversations on mount
+  useEffect(() => {
+    loadConversations();
+  }, []);
+
+  // Handle conversation ID from URL
+  useEffect(() => {
+    const conversationId = searchParams.get('conversation');
+    if (conversationId && conversations.length > 0) {
+      const conv = conversations.find(c => c.id === parseInt(conversationId));
+      if (conv) {
+        handleSelectConversation(conv);
+      }
+    }
+  }, [searchParams, conversations]);
+
+  const loadConversations = async () => {
+    setLoading(true);
+    try {
+      const response = await messagingApi.getConversations();
+      setConversations(response.data || []);
+    } catch (err) {
+      console.error('Error loading conversations:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSelectConversation = async (conversation) => {
+    setSelectedConversation(conversation);
+    setShowMobileConversation(true);
+    setMessages([]);
+    setLoadingMessages(true);
+    setSearchParams({ conversation: conversation.id });
+
+    try {
+      const [messagesRes, detailsRes] = await Promise.all([
+        messagingApi.getMessages(conversation.id),
+        messagingApi.getConversation(conversation.id)
+      ]);
+
+      setMessages(messagesRes.data?.messages || []);
+      setHasMoreMessages(messagesRes.data?.hasMore || false);
+      setConversationDetails(detailsRes.data);
+
+      // Mark as read
+      if (conversation.unreadCount > 0) {
+        await messagingApi.markAsRead(conversation.id);
+        // Update local state
+        setConversations(prev => prev.map(c =>
+          c.id === conversation.id ? { ...c, unreadCount: 0 } : c
+        ));
+      }
+
+      // Scroll to bottom
+      setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      }, 100);
+    } catch (err) {
+      console.error('Error loading messages:', err);
+    } finally {
+      setLoadingMessages(false);
+    }
+  };
+
+  const handleSendMessage = async (e) => {
+    e.preventDefault();
+    if (!newMessage.trim() || !selectedConversation || sendingMessage) return;
+
+    setSendingMessage(true);
+    try {
+      const response = await messagingApi.sendMessage(
+        selectedConversation.id,
+        newMessage.trim(),
+        'Text',
+        replyingTo?.id || null
+      );
+
+      if (response.data) {
+        setMessages(prev => [...prev, response.data]);
+        setNewMessage('');
+        setReplyingTo(null);
+
+        // Update conversation in list
+        setConversations(prev => {
+          const updated = prev.map(c =>
+            c.id === selectedConversation.id
+              ? {
+                  ...c,
+                  lastMessagePreview: newMessage.trim().substring(0, 50),
+                  lastMessageAt: new Date().toISOString(),
+                  lastMessageSenderName: `${user?.firstName} ${user?.lastName}`.trim()
+                }
+              : c
+          );
+          // Move to top
+          const current = updated.find(c => c.id === selectedConversation.id);
+          return [current, ...updated.filter(c => c.id !== selectedConversation.id)];
+        });
+
+        // Scroll to bottom
+        setTimeout(() => {
+          messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        }, 100);
+      }
+    } catch (err) {
+      console.error('Error sending message:', err);
+    } finally {
+      setSendingMessage(false);
+    }
+  };
+
+  const handleLoadMoreMessages = async () => {
+    if (!hasMoreMessages || loadingMessages || messages.length === 0) return;
+
+    setLoadingMessages(true);
+    try {
+      const oldestMessage = messages[0];
+      const response = await messagingApi.getMessages(
+        selectedConversation.id,
+        oldestMessage.id
+      );
+
+      if (response.data?.messages) {
+        setMessages(prev => [...response.data.messages, ...prev]);
+        setHasMoreMessages(response.data.hasMore || false);
+      }
+    } catch (err) {
+      console.error('Error loading more messages:', err);
+    } finally {
+      setLoadingMessages(false);
+    }
+  };
+
+  const handleMuteConversation = async () => {
+    if (!selectedConversation) return;
+    try {
+      await messagingApi.muteConversation(selectedConversation.id, !selectedConversation.isMuted);
+      setSelectedConversation(prev => ({ ...prev, isMuted: !prev.isMuted }));
+      setConversations(prev => prev.map(c =>
+        c.id === selectedConversation.id ? { ...c, isMuted: !c.isMuted } : c
+      ));
+      setShowMenu(false);
+    } catch (err) {
+      console.error('Error muting conversation:', err);
+    }
+  };
+
+  const handleBackToList = () => {
+    setShowMobileConversation(false);
+    setSelectedConversation(null);
+    setSearchParams({});
+  };
+
+  const formatMessageTime = (dateString) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diff = now - date;
+    const minutes = Math.floor(diff / 60000);
+    const hours = Math.floor(diff / 3600000);
+    const days = Math.floor(diff / 86400000);
+
+    if (minutes < 1) return 'Just now';
+    if (minutes < 60) return `${minutes}m`;
+    if (hours < 24) return `${hours}h`;
+    if (days < 7) return `${days}d`;
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  };
+
+  const formatConversationTime = (dateString) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    const now = new Date();
+    const isToday = date.toDateString() === now.toDateString();
+
+    if (isToday) {
+      return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+    }
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  };
+
+  const getTotalUnread = () => {
+    return conversations.reduce((sum, c) => sum + (c.unreadCount || 0), 0);
+  };
+
+  return (
+    <div className="h-screen flex flex-col bg-gray-50">
+      {/* Header - Always visible */}
+      <div className="bg-gradient-to-r from-blue-600 to-blue-800 text-white py-4 px-4 flex-shrink-0">
+        <div className="max-w-6xl mx-auto flex items-center gap-3">
+          {showMobileConversation && selectedConversation ? (
+            <>
+              <button
+                onClick={handleBackToList}
+                className="p-2 -ml-2 rounded-lg hover:bg-white/10 md:hidden"
+              >
+                <ChevronLeft className="w-6 h-6" />
+              </button>
+              <div className="flex items-center gap-3 flex-1 min-w-0">
+                {selectedConversation.displayAvatar ? (
+                  <img
+                    src={getSharedAssetUrl(selectedConversation.displayAvatar)}
+                    alt=""
+                    className="w-10 h-10 rounded-full object-cover"
+                  />
+                ) : (
+                  <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center">
+                    {selectedConversation.type === 'Direct' ? (
+                      <User className="w-5 h-5" />
+                    ) : (
+                      <Users className="w-5 h-5" />
+                    )}
+                  </div>
+                )}
+                <div className="flex-1 min-w-0">
+                  <h1 className="text-lg font-semibold truncate">
+                    {selectedConversation.displayName || selectedConversation.name || 'Conversation'}
+                  </h1>
+                  {conversationDetails?.participants && (
+                    <p className="text-sm text-blue-100 truncate">
+                      {selectedConversation.type === 'Direct'
+                        ? 'Direct message'
+                        : `${conversationDetails.participants.length} participants`}
+                    </p>
+                  )}
+                </div>
+              </div>
+              <div className="relative">
+                <button
+                  onClick={() => setShowMenu(!showMenu)}
+                  className="p-2 rounded-lg hover:bg-white/10"
+                >
+                  <MoreVertical className="w-5 h-5" />
+                </button>
+                {showMenu && (
+                  <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-lg shadow-lg border py-1 z-50">
+                    <button
+                      onClick={handleMuteConversation}
+                      className="w-full px-4 py-2 text-left text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                    >
+                      {selectedConversation.isMuted ? (
+                        <>
+                          <Bell className="w-4 h-4" />
+                          Unmute
+                        </>
+                      ) : (
+                        <>
+                          <BellOff className="w-4 h-4" />
+                          Mute
+                        </>
+                      )}
+                    </button>
+                  </div>
+                )}
+              </div>
+            </>
+          ) : (
+            <>
+              <MessageCircle className="w-8 h-8" />
+              <div className="flex-1">
+                <h1 className="text-xl font-bold">Messages</h1>
+                {getTotalUnread() > 0 && (
+                  <p className="text-sm text-blue-100">
+                    {getTotalUnread()} unread message{getTotalUnread() !== 1 ? 's' : ''}
+                  </p>
+                )}
+              </div>
+              {/* Connection status indicator */}
+              <div className="flex items-center gap-1" title={`SignalR: ${connectionState}`}>
+                {isConnected ? (
+                  <Wifi className="w-4 h-4 text-green-300" />
+                ) : (
+                  <WifiOff className="w-4 h-4 text-red-300" />
+                )}
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div className="flex-1 flex overflow-hidden max-w-6xl w-full mx-auto">
+        {/* Conversation List - Hidden on mobile when viewing a conversation */}
+        <div className={`
+          w-full md:w-80 lg:w-96 flex-shrink-0 bg-white border-r flex flex-col
+          ${showMobileConversation ? 'hidden md:flex' : 'flex'}
+        `}>
+          {loading ? (
+            <div className="flex-1 flex items-center justify-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-600"></div>
+            </div>
+          ) : conversations.length === 0 ? (
+            <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
+              <MessageCircle className="w-16 h-16 text-gray-300 mb-4" />
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">No messages yet</h3>
+              <p className="text-gray-500 mb-4">
+                Start a conversation with a friend!
+              </p>
+              <button
+                onClick={() => navigate('/friends')}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700"
+              >
+                <Users className="w-5 h-5" />
+                Find Friends
+              </button>
+            </div>
+          ) : (
+            <div className="flex-1 overflow-y-auto">
+              {conversations.map(conversation => (
+                <button
+                  key={conversation.id}
+                  onClick={() => handleSelectConversation(conversation)}
+                  className={`
+                    w-full p-4 flex items-start gap-3 hover:bg-gray-50 border-b transition-colors text-left
+                    ${selectedConversation?.id === conversation.id ? 'bg-blue-50' : ''}
+                  `}
+                >
+                  {/* Avatar */}
+                  <div className="relative flex-shrink-0">
+                    {conversation.displayAvatar ? (
+                      <img
+                        src={getSharedAssetUrl(conversation.displayAvatar)}
+                        alt=""
+                        className="w-12 h-12 rounded-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center">
+                        {conversation.type === 'Direct' ? (
+                          <User className="w-6 h-6 text-blue-600" />
+                        ) : (
+                          <Users className="w-6 h-6 text-blue-600" />
+                        )}
+                      </div>
+                    )}
+                    {conversation.unreadCount > 0 && (
+                      <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center">
+                        {conversation.unreadCount > 9 ? '9+' : conversation.unreadCount}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Content */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between mb-1">
+                      <h3 className={`font-medium truncate ${
+                        conversation.unreadCount > 0 ? 'text-gray-900' : 'text-gray-700'
+                      }`}>
+                        {conversation.displayName || conversation.name || 'Conversation'}
+                      </h3>
+                      <span className="text-xs text-gray-500 flex-shrink-0 ml-2">
+                        {formatConversationTime(conversation.lastMessageAt)}
+                      </span>
+                    </div>
+                    <p className={`text-sm truncate ${
+                      conversation.unreadCount > 0 ? 'text-gray-900 font-medium' : 'text-gray-500'
+                    }`}>
+                      {conversation.lastMessagePreview || 'No messages yet'}
+                    </p>
+                  </div>
+
+                  {/* Muted indicator */}
+                  {conversation.isMuted && (
+                    <BellOff className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Messages View - Full screen on mobile, side panel on desktop */}
+        <div className={`
+          flex-1 flex flex-col bg-gray-50
+          ${showMobileConversation ? 'flex' : 'hidden md:flex'}
+        `}>
+          {selectedConversation ? (
+            <>
+              {/* Messages */}
+              <div
+                ref={messagesContainerRef}
+                className="flex-1 overflow-y-auto p-4 space-y-3"
+              >
+                {/* Load more button */}
+                {hasMoreMessages && (
+                  <div className="text-center">
+                    <button
+                      onClick={handleLoadMoreMessages}
+                      disabled={loadingMessages}
+                      className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+                    >
+                      {loadingMessages ? 'Loading...' : 'Load older messages'}
+                    </button>
+                  </div>
+                )}
+
+                {loadingMessages && messages.length === 0 ? (
+                  <div className="flex items-center justify-center py-12">
+                    <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-600"></div>
+                  </div>
+                ) : (
+                  messages.map((message, index) => (
+                    <MessageBubble
+                      key={message.id}
+                      message={message}
+                      isOwn={message.isOwn}
+                      showAvatar={
+                        !message.isOwn &&
+                        (index === 0 || messages[index - 1].senderId !== message.senderId)
+                      }
+                      onReply={() => {
+                        setReplyingTo(message);
+                        inputRef.current?.focus();
+                      }}
+                    />
+                  ))
+                )}
+                <div ref={messagesEndRef} />
+              </div>
+
+              {/* Typing indicator */}
+              {getTypingIndicator() && (
+                <div className="px-4 py-2 text-sm text-gray-500 italic">
+                  {getTypingIndicator()}
+                </div>
+              )}
+
+              {/* Reply preview */}
+              {replyingTo && (
+                <div className="px-4 py-2 bg-gray-100 border-t flex items-center gap-2">
+                  <Reply className="w-4 h-4 text-gray-500" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-gray-500">
+                      Replying to {replyingTo.senderName}
+                    </p>
+                    <p className="text-sm text-gray-700 truncate">
+                      {replyingTo.content}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setReplyingTo(null)}
+                    className="p-1 text-gray-400 hover:text-gray-600"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
+
+              {/* Message input */}
+              <form
+                onSubmit={handleSendMessage}
+                className="p-4 bg-white border-t flex items-end gap-2"
+              >
+                <div className="flex-1">
+                  <textarea
+                    ref={inputRef}
+                    value={newMessage}
+                    onChange={(e) => setNewMessage(e.target.value)}
+                    onInput={handleTyping}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        handleSendMessage(e);
+                      }
+                    }}
+                    placeholder="Type a message..."
+                    rows={1}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-2xl resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    style={{ maxHeight: '120px' }}
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={!newMessage.trim() || sendingMessage}
+                  className="p-3 bg-blue-600 text-white rounded-full hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
+                >
+                  <Send className="w-5 h-5" />
+                </button>
+              </form>
+            </>
+          ) : (
+            <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
+              <MessageCircle className="w-20 h-20 text-gray-300 mb-4" />
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                Select a conversation
+              </h3>
+              <p className="text-gray-500">
+                Choose a conversation from the list to start messaging
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Click outside to close menu */}
+      {showMenu && (
+        <div
+          className="fixed inset-0 z-40"
+          onClick={() => setShowMenu(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+function MessageBubble({ message, isOwn, showAvatar, onReply }) {
+  const [showActions, setShowActions] = useState(false);
+
+  return (
+    <div
+      className={`flex gap-2 ${isOwn ? 'justify-end' : 'justify-start'}`}
+      onMouseEnter={() => setShowActions(true)}
+      onMouseLeave={() => setShowActions(false)}
+    >
+      {/* Avatar for other's messages */}
+      {!isOwn && (
+        <div className="w-8 flex-shrink-0">
+          {showAvatar && (
+            message.senderAvatar ? (
+              <img
+                src={getSharedAssetUrl(message.senderAvatar)}
+                alt=""
+                className="w-8 h-8 rounded-full object-cover"
+              />
+            ) : (
+              <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
+                <User className="w-4 h-4 text-blue-600" />
+              </div>
+            )
+          )}
+        </div>
+      )}
+
+      <div className={`max-w-[75%] ${isOwn ? 'order-1' : ''}`}>
+        {/* Reply preview */}
+        {message.replyToMessage && (
+          <div className={`
+            text-xs px-3 py-1.5 rounded-t-lg border-l-2 mb-1
+            ${isOwn ? 'bg-blue-100 border-blue-400 text-blue-700' : 'bg-gray-100 border-gray-400 text-gray-600'}
+          `}>
+            <p className="font-medium">{message.replyToMessage.senderName}</p>
+            <p className="truncate">{message.replyToMessage.content}</p>
+          </div>
+        )}
+
+        {/* Message bubble */}
+        <div
+          className={`
+            px-4 py-2.5 rounded-2xl relative group
+            ${isOwn
+              ? 'bg-blue-600 text-white rounded-tr-md'
+              : 'bg-white text-gray-900 rounded-tl-md shadow-sm'
+            }
+          `}
+        >
+          {/* Sender name for group chats */}
+          {!isOwn && showAvatar && message.senderName && (
+            <p className="text-xs font-medium text-blue-600 mb-1">
+              {message.senderName}
+            </p>
+          )}
+
+          {/* Content */}
+          {message.isDeleted ? (
+            <p className={`text-sm italic ${isOwn ? 'text-blue-200' : 'text-gray-400'}`}>
+              Message deleted
+            </p>
+          ) : (
+            <p className="text-sm whitespace-pre-wrap break-words">
+              {message.content}
+            </p>
+          )}
+
+          {/* Time and status */}
+          <div className={`
+            flex items-center gap-1 mt-1
+            ${isOwn ? 'justify-end' : 'justify-start'}
+          `}>
+            <span className={`text-xs ${isOwn ? 'text-blue-200' : 'text-gray-400'}`}>
+              {new Date(message.createdAt).toLocaleTimeString('en-US', {
+                hour: 'numeric',
+                minute: '2-digit'
+              })}
+            </span>
+            {message.editedAt && (
+              <span className={`text-xs ${isOwn ? 'text-blue-200' : 'text-gray-400'}`}>
+                (edited)
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Actions */}
+        {showActions && !message.isDeleted && (
+          <div className={`
+            flex items-center gap-1 mt-1
+            ${isOwn ? 'justify-end' : 'justify-start'}
+          `}>
+            <button
+              onClick={onReply}
+              className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded"
+              title="Reply"
+            >
+              <Reply className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

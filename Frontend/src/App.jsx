@@ -19,6 +19,7 @@ import Blog from './pages/Blog'
 import BlogAdmin from './pages/BlogAdmin'
 import MyBlog from './pages/MyBlog'
 import Friends from './pages/Friends'
+import Messages from './pages/Messages'
 import PublicProfile from './pages/PublicProfile'
 import ProtectedRoute from './components/ProtectedRoute'
 
@@ -75,6 +76,13 @@ function App() {
       <Route path="/friends" element={
         <ProtectedRoute>
           <Friends />
+        </ProtectedRoute>
+      } />
+
+      {/* Messages */}
+      <Route path="/messages" element={
+        <ProtectedRoute>
+          <Messages />
         </ProtectedRoute>
       } />
 

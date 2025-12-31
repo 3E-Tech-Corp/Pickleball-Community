@@ -68,6 +68,12 @@ public class ApplicationDbContext : DbContext
     public DbSet<BlogPost> BlogPosts { get; set; }
     public DbSet<BlogComment> BlogComments { get; set; }
 
+    // Messaging
+    public DbSet<Conversation> Conversations { get; set; }
+    public DbSet<ConversationParticipant> ConversationParticipants { get; set; }
+    public DbSet<Message> Messages { get; set; }
+    public DbSet<MessageReadReceipt> MessageReadReceipts { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<User>(entity =>
@@ -498,6 +504,78 @@ public class ApplicationDbContext : DbContext
                   .WithMany(c => c.Replies)
                   .HasForeignKey(c => c.ParentId)
                   .OnDelete(DeleteBehavior.NoAction);
+        });
+
+        // Messaging configuration
+        modelBuilder.Entity<Conversation>(entity =>
+        {
+            entity.Property(c => c.Type).IsRequired().HasMaxLength(20);
+            entity.Property(c => c.Name).HasMaxLength(100);
+            entity.HasIndex(c => c.ClubId);
+            entity.HasIndex(c => c.LastMessageAt);
+
+            entity.HasOne(c => c.Club)
+                  .WithOne(club => club.ChatConversation)
+                  .HasForeignKey<Club>(club => club.ChatConversationId)
+                  .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<ConversationParticipant>(entity =>
+        {
+            entity.Property(p => p.Role).HasMaxLength(20);
+            entity.HasIndex(p => p.UserId);
+            entity.HasIndex(p => p.ConversationId);
+            entity.HasIndex(p => new { p.ConversationId, p.UserId }).IsUnique();
+
+            entity.HasOne(p => p.Conversation)
+                  .WithMany(c => c.Participants)
+                  .HasForeignKey(p => p.ConversationId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(p => p.User)
+                  .WithMany()
+                  .HasForeignKey(p => p.UserId)
+                  .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<Message>(entity =>
+        {
+            entity.Property(m => m.Content).IsRequired().HasMaxLength(4000);
+            entity.Property(m => m.MessageType).HasMaxLength(20);
+            entity.HasIndex(m => m.ConversationId);
+            entity.HasIndex(m => m.SenderId);
+            entity.HasIndex(m => new { m.ConversationId, m.SentAt });
+
+            entity.HasOne(m => m.Conversation)
+                  .WithMany(c => c.Messages)
+                  .HasForeignKey(m => m.ConversationId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(m => m.Sender)
+                  .WithMany()
+                  .HasForeignKey(m => m.SenderId)
+                  .OnDelete(DeleteBehavior.NoAction);
+
+            entity.HasOne(m => m.ReplyToMessage)
+                  .WithMany()
+                  .HasForeignKey(m => m.ReplyToMessageId)
+                  .OnDelete(DeleteBehavior.NoAction);
+        });
+
+        modelBuilder.Entity<MessageReadReceipt>(entity =>
+        {
+            entity.HasIndex(r => r.MessageId);
+            entity.HasIndex(r => new { r.MessageId, r.UserId }).IsUnique();
+
+            entity.HasOne(r => r.Message)
+                  .WithMany(m => m.ReadReceipts)
+                  .HasForeignKey(r => r.MessageId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(r => r.User)
+                  .WithMany()
+                  .HasForeignKey(r => r.UserId)
+                  .OnDelete(DeleteBehavior.Cascade);
         });
     }
 }

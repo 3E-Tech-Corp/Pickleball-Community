@@ -84,6 +84,10 @@ public class User
     // Blog permissions
     public bool CanWriteBlog { get; set; } = false;
 
+    // Messaging preferences (opt-in)
+    public bool AllowDirectMessages { get; set; } = true;
+    public bool AllowClubMessages { get; set; } = true;
+
     // Navigation
     public virtual ICollection<BlogPost> BlogPosts { get; set; } = new List<BlogPost>();
     public virtual ICollection<BlogComment> BlogComments { get; set; } = new List<BlogComment>();

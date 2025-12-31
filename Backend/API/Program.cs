@@ -3,9 +3,10 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using Pickleball.Community.Database;
-using Pickleball.Community.Services; 
+using Pickleball.Community.Services;
 using Pickleball.Community.Models.Entities;
 using Pickleball.Community.Models.Configuration;
+using Pickleball.Community.Hubs;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -13,6 +14,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+builder.Services.AddSignalR();
 
 // Configuration
 builder.Services.Configure<FileStorageOptions>(
@@ -70,6 +72,23 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             // Use the full URI since shared auth uses Microsoft's claim type format
             RoleClaimType = "http://schemas.microsoft.com/ws/2008/06/identity/claims/role",
             NameClaimType = "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name"
+        };
+
+        // Support SignalR authentication via query string
+        options.Events = new JwtBearerEvents
+        {
+            OnMessageReceived = context =>
+            {
+                var accessToken = context.Request.Query["access_token"];
+                var path = context.HttpContext.Request.Path;
+
+                // If the request is for the SignalR hub
+                if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/hubs/chat"))
+                {
+                    context.Token = accessToken;
+                }
+                return Task.CompletedTask;
+            }
         };
     });
 
@@ -136,6 +155,7 @@ app.UseStaticFiles(); // Enable serving static files from wwwroot
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
+app.MapHub<ChatHub>("/hubs/chat");
 
 // Initialize database
 using (var scope = app.Services.CreateScope())

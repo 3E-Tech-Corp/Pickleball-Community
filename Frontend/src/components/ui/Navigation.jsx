@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Menu, X, LogOut, HomeIcon, School2Icon, User, Bell, FileText, Calendar, MapPin, Users } from 'lucide-react';
+import { Menu, X, LogOut, HomeIcon, School2Icon, User, Bell, FileText, Calendar, MapPin, Users, MessageCircle } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { getAssetUrl, getSharedAssetUrl } from '../../services/api';
 import { useSharedAuth } from '../../hooks/useSharedAuth';
@@ -106,6 +106,7 @@ const Navigation = () => {
       isDashboard: true
     },
     { name: 'Profile', href: '/profile', icon: User },
+    { name: 'Messages', href: '/messages', icon: MessageCircle },
     { name: 'Notifications', href: '/notifications', icon: Bell },
     { name: 'Sign Out', action: handleLogout, icon: LogOut, isDestructive: true },
   ];
@@ -422,6 +423,14 @@ const Navigation = () => {
                     >
                       <User className="w-4 h-4" />
                       <span>Profile</span>
+                    </Link>
+                    <Link
+                      to="/messages"
+                      className="flex items-center space-x-2 px-4 py-3 text-gray-700 hover:bg-gray-50 rounded-xl transition-colors"
+                      onClick={() => setIsOpen(false)}
+                    >
+                      <MessageCircle className="w-4 h-4" />
+                      <span>Messages</span>
                     </Link>
                     <Link
                       to="/notifications"
