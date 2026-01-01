@@ -678,14 +678,29 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, formatDate, f
 
   // Initialize edit form data when entering edit mode
   const startEditing = () => {
+    // Extract date and time directly from ISO string without timezone conversion
+    const extractDateTime = (isoString) => {
+      if (!isoString) return { date: '', time: '' };
+      // Handle both "2024-03-15T14:00:00" and "2024-03-15T14:00:00Z" formats
+      const cleaned = isoString.replace('Z', '');
+      const [datePart, timePart] = cleaned.split('T');
+      return {
+        date: datePart || '',
+        time: timePart ? timePart.slice(0, 5) : ''
+      };
+    };
+
+    const start = extractDateTime(event.startDate);
+    const end = extractDateTime(event.endDate);
+
     setEditFormData({
       name: event.name || '',
       description: event.description || '',
       eventTypeId: event.eventTypeId,
-      startDate: event.startDate ? new Date(event.startDate).toISOString().split('T')[0] : '',
-      startTime: event.startDate ? new Date(event.startDate).toTimeString().slice(0, 5) : '09:00',
-      endDate: event.endDate ? new Date(event.endDate).toISOString().split('T')[0] : '',
-      endTime: event.endDate ? new Date(event.endDate).toTimeString().slice(0, 5) : '17:00',
+      startDate: start.date,
+      startTime: start.time || '09:00',
+      endDate: end.date,
+      endTime: end.time || '17:00',
       courtId: event.courtId,
       venueName: event.venueName || '',
       address: event.address || '',
@@ -747,10 +762,11 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, formatDate, f
     setEditError(null);
 
     try {
-      const startDateTime = new Date(`${editFormData.startDate}T${editFormData.startTime}`);
+      // Combine date and time directly without timezone conversion
+      const startDateTime = `${editFormData.startDate}T${editFormData.startTime}:00`;
       const endDateTime = editFormData.endDate
-        ? new Date(`${editFormData.endDate}T${editFormData.endTime}`)
-        : new Date(`${editFormData.startDate}T${editFormData.endTime}`);
+        ? `${editFormData.endDate}T${editFormData.endTime}:00`
+        : `${editFormData.startDate}T${editFormData.endTime}:00`;
 
       // Prepare divisions for update
       const divisionsToSave = editDivisions.map(d => ({
@@ -764,8 +780,8 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, formatDate, f
 
       const response = await eventsApi.update(event.id, {
         ...editFormData,
-        startDate: startDateTime.toISOString(),
-        endDate: endDateTime.toISOString(),
+        startDate: startDateTime,
+        endDate: endDateTime,
         registrationFee: parseFloat(editFormData.registrationFee) || 0,
         perDivisionFee: parseFloat(editFormData.perDivisionFee) || 0,
         maxParticipants: editFormData.maxParticipants ? parseInt(editFormData.maxParticipants) : null,
@@ -1648,15 +1664,16 @@ function CreateEventModal({ eventTypes, courtId, courtName, onClose, onCreate, u
     setError(null);
 
     try {
-      const startDateTime = new Date(`${formData.startDate}T${formData.startTime}`);
+      // Combine date and time directly without timezone conversion
+      const startDateTime = `${formData.startDate}T${formData.startTime}:00`;
       const endDateTime = formData.endDate
-        ? new Date(`${formData.endDate}T${formData.endTime}`)
-        : new Date(`${formData.startDate}T${formData.endTime}`);
+        ? `${formData.endDate}T${formData.endTime}:00`
+        : `${formData.startDate}T${formData.endTime}:00`;
 
       const response = await eventsApi.create({
         ...formData,
-        startDate: startDateTime.toISOString(),
-        endDate: endDateTime.toISOString(),
+        startDate: startDateTime,
+        endDate: endDateTime,
         courtId: selectedCourt?.courtId || undefined
       });
 
