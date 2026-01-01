@@ -542,8 +542,7 @@ public class EventsController : ControllerBase
                             MinSkillRating = divDto.MinSkillRating,
                             MaxSkillRating = divDto.MaxSkillRating,
                             MaxUnits = divDto.MaxUnits,
-                            SortOrder = divDto.SortOrder,
-                            CreatedAt = DateTime.UtcNow
+                            SortOrder = divDto.SortOrder
                         };
                         evt.Divisions.Add(newDivision);
                     }
