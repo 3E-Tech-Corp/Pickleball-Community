@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
-import { Calendar, MapPin, Clock, Users, Filter, Search, Plus, DollarSign, ChevronLeft, ChevronRight, X, UserPlus, Trophy, Layers, Check, AlertCircle, Navigation, Building2, Loader2, MessageCircle, CheckCircle, Edit3, ChevronDown, ChevronUp } from 'lucide-react';
+import { Calendar, MapPin, Clock, Users, Filter, Search, Plus, DollarSign, ChevronLeft, ChevronRight, X, UserPlus, Trophy, Layers, Check, AlertCircle, Navigation, Building2, Loader2, MessageCircle, CheckCircle, Edit3, ChevronDown, ChevronUp, Trash2 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { eventsApi, eventTypesApi, courtsApi, getSharedAssetUrl } from '../services/api';
 
@@ -583,7 +583,10 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, formatDate, f
   const [searchedCourts, setSearchedCourts] = useState([]);
   const [searchingCourts, setSearchingCourts] = useState(false);
   const [selectedCourt, setSelectedCourt] = useState(null);
-  const [editStep, setEditStep] = useState(1); // 1: court, 2: details
+  const [showCourtPicker, setShowCourtPicker] = useState(false);
+  const [editDivisions, setEditDivisions] = useState([]);
+  const [showAddDivision, setShowAddDivision] = useState(false);
+  const [newDivision, setNewDivision] = useState({ name: '', description: '', teamSize: 2, maxTeams: null, entryFee: 0 });
 
   const isOrganizer = event.isOrganizer;
   const isRegistered = event.isRegistered;
@@ -697,19 +700,41 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, formatDate, f
       isPublished: event.isPublished,
       isPrivate: event.isPrivate
     });
-    setSelectedCourt(event.courtId ? { courtId: event.courtId, courtName: event.courtName || event.venueName } : null);
+    setSelectedCourt(event.courtId ? {
+      courtId: event.courtId,
+      courtName: event.courtName || event.venueName,
+      address: event.address,
+      city: event.city,
+      state: event.state
+    } : null);
+    setEditDivisions(event.divisions ? [...event.divisions] : []);
     setIsEditing(true);
-    setEditStep(1);
     setEditError(null);
-    loadTopCourts();
   };
 
   const cancelEditing = () => {
     setIsEditing(false);
     setEditFormData(null);
     setEditError(null);
-    setEditStep(1);
     setSelectedCourt(null);
+    setEditDivisions([]);
+    setShowCourtPicker(false);
+    setShowAddDivision(false);
+  };
+
+  const handleAddDivision = () => {
+    if (!newDivision.name.trim()) return;
+    setEditDivisions(prev => [...prev, {
+      ...newDivision,
+      id: `new-${Date.now()}`,
+      isNew: true
+    }]);
+    setNewDivision({ name: '', description: '', teamSize: 2, maxTeams: null, entryFee: 0 });
+    setShowAddDivision(false);
+  };
+
+  const handleRemoveDivision = (divisionId) => {
+    setEditDivisions(prev => prev.filter(d => d.id !== divisionId));
   };
 
   const saveEdit = async () => {
@@ -727,6 +752,16 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, formatDate, f
         ? new Date(`${editFormData.endDate}T${editFormData.endTime}`)
         : new Date(`${editFormData.startDate}T${editFormData.endTime}`);
 
+      // Prepare divisions for update
+      const divisionsToSave = editDivisions.map(d => ({
+        id: d.isNew ? null : d.id,
+        name: d.name,
+        description: d.description || '',
+        teamSize: d.teamSize || 2,
+        maxTeams: d.maxTeams || null,
+        entryFee: d.entryFee || 0
+      }));
+
       const response = await eventsApi.update(event.id, {
         ...editFormData,
         startDate: startDateTime.toISOString(),
@@ -734,13 +769,13 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, formatDate, f
         registrationFee: parseFloat(editFormData.registrationFee) || 0,
         perDivisionFee: parseFloat(editFormData.perDivisionFee) || 0,
         maxParticipants: editFormData.maxParticipants ? parseInt(editFormData.maxParticipants) : null,
-        divisions: [] // Keep existing divisions
+        divisions: divisionsToSave
       });
 
       if (response.success) {
         setIsEditing(false);
         setEditFormData(null);
-        setEditStep(1);
+        setEditDivisions([]);
         onUpdate();
       } else {
         setEditError(response.message || 'Failed to update event');
@@ -1083,12 +1118,10 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, formatDate, f
           {activeTab === 'manage' && isOrganizer && (
             <div className="space-y-6">
               {isEditing ? (
-                // Edit Form with Steps
+                // Edit Form - Single Page
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
-                    <h3 className="font-medium text-gray-900">
-                      Edit Event - Step {editStep}: {editStep === 1 ? 'Select Venue/Court' : 'Event Details'}
-                    </h3>
+                    <h3 className="font-medium text-gray-900">Edit Event</h3>
                     <button onClick={cancelEditing} className="text-gray-500 hover:text-gray-700">
                       <X className="w-5 h-5" />
                     </button>
@@ -1100,147 +1133,205 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, formatDate, f
                     </div>
                   )}
 
-                  {editStep === 1 ? (
-                    // Step 1: Court Selection
-                    <div className="space-y-4">
-                      {selectedCourt && (
-                        <div className="p-3 bg-green-50 border border-green-200 rounded-lg flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <CheckCircle className="w-5 h-5 text-green-600" />
-                            <div>
-                              <span className="font-medium text-green-800">{selectedCourt.courtName || 'UnNamed'}</span>
-                              {selectedCourt.address && <div className="text-sm text-green-600">{selectedCourt.address}</div>}
-                              {selectedCourt.city && <div className="text-sm text-green-600">{selectedCourt.city}, {selectedCourt.state}</div>}
+                  {/* Venue/Court Field */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Venue/Court</label>
+                    <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <MapPin className="w-5 h-5 text-gray-400" />
+                        <div>
+                          <span className="font-medium text-gray-900">{selectedCourt?.courtName || editFormData?.venueName || 'No venue selected'}</span>
+                          {(selectedCourt?.address || editFormData?.address) && (
+                            <div className="text-sm text-gray-500">{selectedCourt?.address || editFormData?.address}</div>
+                          )}
+                          {(selectedCourt?.city || editFormData?.city) && (
+                            <div className="text-sm text-gray-500">
+                              {selectedCourt?.city || editFormData?.city}, {selectedCourt?.state || editFormData?.state}
                             </div>
+                          )}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => { setShowCourtPicker(true); loadTopCourts(); }}
+                        className="px-3 py-1 text-sm text-orange-600 hover:text-orange-700 font-medium"
+                      >
+                        Change
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Event Name *</label>
+                    <input type="text" value={editFormData?.name || ''} onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })} className="w-full border border-gray-300 rounded-lg p-2" />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                    <textarea value={editFormData?.description || ''} onChange={(e) => setEditFormData({ ...editFormData, description: e.target.value })} rows={3} className="w-full border border-gray-300 rounded-lg p-2" />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Start Date *</label>
+                      <input type="date" value={editFormData?.startDate || ''} onChange={(e) => setEditFormData({ ...editFormData, startDate: e.target.value })} className="w-full border border-gray-300 rounded-lg p-2" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Start Time</label>
+                      <input type="time" value={editFormData?.startTime || ''} onChange={(e) => setEditFormData({ ...editFormData, startTime: e.target.value })} className="w-full border border-gray-300 rounded-lg p-2" />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">End Date</label>
+                      <input type="date" value={editFormData?.endDate || ''} onChange={(e) => setEditFormData({ ...editFormData, endDate: e.target.value })} className="w-full border border-gray-300 rounded-lg p-2" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">End Time</label>
+                      <input type="time" value={editFormData?.endTime || ''} onChange={(e) => setEditFormData({ ...editFormData, endTime: e.target.value })} className="w-full border border-gray-300 rounded-lg p-2" />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Registration Fee ($)</label>
+                      <input type="number" min="0" step="0.01" value={editFormData?.registrationFee || 0} onChange={(e) => setEditFormData({ ...editFormData, registrationFee: e.target.value })} className="w-full border border-gray-300 rounded-lg p-2" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Per Division Fee ($)</label>
+                      <input type="number" min="0" step="0.01" value={editFormData?.perDivisionFee || 0} onChange={(e) => setEditFormData({ ...editFormData, perDivisionFee: e.target.value })} className="w-full border border-gray-300 rounded-lg p-2" />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Contact Email</label>
+                      <input type="email" value={editFormData?.contactEmail || ''} onChange={(e) => setEditFormData({ ...editFormData, contactEmail: e.target.value })} className="w-full border border-gray-300 rounded-lg p-2" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Contact Phone</label>
+                      <input type="tel" value={editFormData?.contactPhone || ''} onChange={(e) => setEditFormData({ ...editFormData, contactPhone: e.target.value })} className="w-full border border-gray-300 rounded-lg p-2" />
+                    </div>
+                  </div>
+
+                  {/* Divisions Section */}
+                  <div className="border-t pt-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <label className="block text-sm font-medium text-gray-700">Divisions</label>
+                      <button
+                        type="button"
+                        onClick={() => setShowAddDivision(true)}
+                        className="text-sm text-orange-600 hover:text-orange-700 font-medium flex items-center gap-1"
+                      >
+                        <Plus className="w-4 h-4" /> Add Division
+                      </button>
+                    </div>
+
+                    {editDivisions.length === 0 ? (
+                      <p className="text-sm text-gray-500 text-center py-4">No divisions configured</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {editDivisions.map(division => (
+                          <div key={division.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                            <div>
+                              <div className="font-medium text-gray-900">{division.name}</div>
+                              <div className="text-sm text-gray-500">
+                                Team size: {division.teamSize}
+                                {division.maxTeams && ` • Max: ${division.maxTeams} teams`}
+                                {division.entryFee > 0 && ` • $${division.entryFee}`}
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveDivision(division.id)}
+                              className="p-1 text-red-500 hover:text-red-700 hover:bg-red-50 rounded"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
                           </div>
-                          <button onClick={() => setSelectedCourt(null)} className="text-green-600 hover:text-green-800 text-sm">
-                            Change
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Add Division Form */}
+                    {showAddDivision && (
+                      <div className="mt-3 p-3 border border-orange-200 bg-orange-50 rounded-lg space-y-3">
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">Division Name *</label>
+                          <input
+                            type="text"
+                            value={newDivision.name}
+                            onChange={(e) => setNewDivision({ ...newDivision, name: e.target.value })}
+                            placeholder="e.g., Men's Doubles 4.0+"
+                            className="w-full border border-gray-300 rounded p-2 text-sm"
+                          />
+                        </div>
+                        <div className="grid grid-cols-3 gap-2">
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">Team Size</label>
+                            <select
+                              value={newDivision.teamSize}
+                              onChange={(e) => setNewDivision({ ...newDivision, teamSize: parseInt(e.target.value) })}
+                              className="w-full border border-gray-300 rounded p-2 text-sm"
+                            >
+                              <option value={1}>Singles</option>
+                              <option value={2}>Doubles</option>
+                              <option value={4}>4-Player</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">Max Teams</label>
+                            <input
+                              type="number"
+                              min="1"
+                              value={newDivision.maxTeams || ''}
+                              onChange={(e) => setNewDivision({ ...newDivision, maxTeams: e.target.value ? parseInt(e.target.value) : null })}
+                              placeholder="Unlimited"
+                              className="w-full border border-gray-300 rounded p-2 text-sm"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">Entry Fee ($)</label>
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={newDivision.entryFee || 0}
+                              onChange={(e) => setNewDivision({ ...newDivision, entryFee: parseFloat(e.target.value) || 0 })}
+                              className="w-full border border-gray-300 rounded p-2 text-sm"
+                            />
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setShowAddDivision(false)}
+                            className="flex-1 py-1.5 border border-gray-300 text-gray-700 rounded text-sm"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleAddDivision}
+                            disabled={!newDivision.name.trim()}
+                            className="flex-1 py-1.5 bg-orange-600 text-white rounded text-sm disabled:opacity-50"
+                          >
+                            Add
                           </button>
                         </div>
-                      )}
-
-                      <div className="relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
-                        <input
-                          type="text"
-                          placeholder="Search courts..."
-                          value={courtSearchQuery}
-                          onChange={(e) => setCourtSearchQuery(e.target.value)}
-                          className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg"
-                        />
                       </div>
+                    )}
+                  </div>
 
-                      {courtsLoading || searchingCourts ? (
-                        <div className="flex justify-center py-4">
-                          <Loader2 className="w-6 h-6 animate-spin text-orange-600" />
-                        </div>
-                      ) : (
-                        <div className="space-y-2 max-h-64 overflow-y-auto">
-                          {(courtSearchQuery ? searchedCourts : topCourts).map(court => (
-                            <button
-                              key={court.courtId || court.id}
-                              onClick={() => handleSelectCourt(court)}
-                              className={`w-full p-3 text-left border rounded-lg hover:bg-gray-50 transition-colors ${
-                                selectedCourt?.courtId === (court.courtId || court.id) ? 'border-orange-500 bg-orange-50' : 'border-gray-200'
-                              }`}
-                            >
-                              <div className="font-medium text-gray-900">{court.courtName || court.name || 'UnNamed'}</div>
-                              {(court.address || court.addr1) && (
-                                <div className="text-sm text-gray-600">{court.address || court.addr1}</div>
-                              )}
-                              <div className="text-sm text-gray-500">
-                                {court.city}{court.state && `, ${court.state}`}
-                                {court.distanceMiles && <span className="ml-2">({court.distanceMiles.toFixed(1)} mi)</span>}
-                              </div>
-                            </button>
-                          ))}
-                        </div>
-                      )}
-
-                      <div className="flex gap-3 pt-4 border-t">
-                        <button type="button" onClick={cancelEditing} className="flex-1 py-2 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50">
-                          Cancel
-                        </button>
-                        <button type="button" onClick={() => setEditStep(2)} className="flex-1 py-2 bg-orange-600 text-white rounded-lg font-medium hover:bg-orange-700">
-                          Next: Event Details
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    // Step 2: Event Details
-                    <div className="space-y-4">
-                      {selectedCourt && (
-                        <div className="p-2 bg-gray-50 rounded-lg text-sm">
-                          <span className="font-medium">Venue:</span> {selectedCourt.courtName || 'UnNamed'}
-                          {selectedCourt.address && <span className="text-gray-600"> - {selectedCourt.address}</span>}
-                          {selectedCourt.city && <span className="text-gray-500"> ({selectedCourt.city}, {selectedCourt.state})</span>}
-                        </div>
-                      )}
-
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Event Name *</label>
-                        <input type="text" value={editFormData?.name || ''} onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })} className="w-full border border-gray-300 rounded-lg p-2" />
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
-                        <textarea value={editFormData?.description || ''} onChange={(e) => setEditFormData({ ...editFormData, description: e.target.value })} rows={3} className="w-full border border-gray-300 rounded-lg p-2" />
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Start Date *</label>
-                          <input type="date" value={editFormData?.startDate || ''} onChange={(e) => setEditFormData({ ...editFormData, startDate: e.target.value })} className="w-full border border-gray-300 rounded-lg p-2" />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Start Time</label>
-                          <input type="time" value={editFormData?.startTime || ''} onChange={(e) => setEditFormData({ ...editFormData, startTime: e.target.value })} className="w-full border border-gray-300 rounded-lg p-2" />
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">End Date</label>
-                          <input type="date" value={editFormData?.endDate || ''} onChange={(e) => setEditFormData({ ...editFormData, endDate: e.target.value })} className="w-full border border-gray-300 rounded-lg p-2" />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">End Time</label>
-                          <input type="time" value={editFormData?.endTime || ''} onChange={(e) => setEditFormData({ ...editFormData, endTime: e.target.value })} className="w-full border border-gray-300 rounded-lg p-2" />
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Registration Fee ($)</label>
-                          <input type="number" min="0" step="0.01" value={editFormData?.registrationFee || 0} onChange={(e) => setEditFormData({ ...editFormData, registrationFee: e.target.value })} className="w-full border border-gray-300 rounded-lg p-2" />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Per Division Fee ($)</label>
-                          <input type="number" min="0" step="0.01" value={editFormData?.perDivisionFee || 0} onChange={(e) => setEditFormData({ ...editFormData, perDivisionFee: e.target.value })} className="w-full border border-gray-300 rounded-lg p-2" />
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Contact Email</label>
-                          <input type="email" value={editFormData?.contactEmail || ''} onChange={(e) => setEditFormData({ ...editFormData, contactEmail: e.target.value })} className="w-full border border-gray-300 rounded-lg p-2" />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Contact Phone</label>
-                          <input type="tel" value={editFormData?.contactPhone || ''} onChange={(e) => setEditFormData({ ...editFormData, contactPhone: e.target.value })} className="w-full border border-gray-300 rounded-lg p-2" />
-                        </div>
-                      </div>
-
-                      <div className="flex gap-3 pt-4 border-t">
-                        <button type="button" onClick={() => setEditStep(1)} className="flex-1 py-2 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50">
-                          Back
-                        </button>
-                        <button type="button" onClick={saveEdit} disabled={savingEdit} className="flex-1 py-2 bg-orange-600 text-white rounded-lg font-medium hover:bg-orange-700 disabled:opacity-50">
-                          {savingEdit ? 'Saving...' : 'Save Changes'}
-                        </button>
-                      </div>
-                    </div>
-                  )}
+                  <div className="flex gap-3 pt-4 border-t">
+                    <button type="button" onClick={cancelEditing} className="flex-1 py-2 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50">
+                      Cancel
+                    </button>
+                    <button type="button" onClick={saveEdit} disabled={savingEdit} className="flex-1 py-2 bg-orange-600 text-white rounded-lg font-medium hover:bg-orange-700 disabled:opacity-50">
+                      {savingEdit ? 'Saving...' : 'Save Changes'}
+                    </button>
+                  </div>
                 </div>
               ) : (
                 // Normal Manage View
@@ -1371,6 +1462,69 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, formatDate, f
           )}
         </div>
       </div>
+
+      {/* Court Picker Modal */}
+      {showCourtPicker && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-[60]">
+          <div className="bg-white rounded-xl shadow-xl max-w-lg w-full max-h-[80vh] flex flex-col">
+            <div className="p-4 border-b flex items-center justify-between">
+              <h3 className="font-semibold text-gray-900">Select Venue/Court</h3>
+              <button onClick={() => setShowCourtPicker(false)} className="text-gray-400 hover:text-gray-600">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-4 border-b">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
+                <input
+                  type="text"
+                  placeholder="Search courts..."
+                  value={courtSearchQuery}
+                  onChange={(e) => setCourtSearchQuery(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg"
+                />
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-4">
+              {courtsLoading || searchingCourts ? (
+                <div className="flex justify-center py-8">
+                  <Loader2 className="w-8 h-8 animate-spin text-orange-600" />
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {(courtSearchQuery ? searchedCourts : topCourts).map(court => (
+                    <button
+                      key={court.courtId || court.id}
+                      onClick={() => {
+                        handleSelectCourt(court);
+                        setShowCourtPicker(false);
+                        setCourtSearchQuery('');
+                      }}
+                      className={`w-full p-3 text-left border rounded-lg hover:bg-gray-50 transition-colors ${
+                        selectedCourt?.courtId === (court.courtId || court.id) ? 'border-orange-500 bg-orange-50' : 'border-gray-200'
+                      }`}
+                    >
+                      <div className="font-medium text-gray-900">{court.courtName || court.name || 'UnNamed'}</div>
+                      {(court.address || court.addr1) && (
+                        <div className="text-sm text-gray-600">{court.address || court.addr1}</div>
+                      )}
+                      <div className="text-sm text-gray-500">
+                        {court.city}{court.state && `, ${court.state}`}
+                        {court.distanceMiles && <span className="ml-2">({court.distanceMiles.toFixed(1)} mi)</span>}
+                      </div>
+                    </button>
+                  ))}
+                  {!courtsLoading && !searchingCourts && (courtSearchQuery ? searchedCourts : topCourts).length === 0 && (
+                    <p className="text-center text-gray-500 py-4">No courts found</p>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
