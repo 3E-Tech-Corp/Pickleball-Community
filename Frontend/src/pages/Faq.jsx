@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { ChevronDown, ChevronUp, Search, HelpCircle, ArrowLeft } from 'lucide-react';
 import { faqApi } from '../services/api';
-import NavBar from '../components/layout/NavBar';
 
 // Icon mapping for categories
 const getIconComponent = (iconName) => {
@@ -88,8 +87,6 @@ export default function Faq() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <NavBar />
-
       {/* Header */}
       <div className="bg-gradient-to-r from-green-600 to-green-700 text-white">
         <div className="max-w-4xl mx-auto px-4 py-12">
