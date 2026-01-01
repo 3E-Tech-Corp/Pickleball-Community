@@ -12,6 +12,8 @@ import CertificationAdmin from './pages/CertificationAdmin'
 import EventTypesAdmin from './pages/EventTypesAdmin'
 import CourtTypesAdmin from './pages/CourtTypesAdmin'
 import ClubMemberRolesAdmin from './pages/ClubMemberRolesAdmin'
+import TeamUnitsAdmin from './pages/TeamUnitsAdmin'
+import SkillLevelsAdmin from './pages/SkillLevelsAdmin'
 import Events from './pages/Events'
 import Courts from './pages/Courts'
 import Clubs from './pages/Clubs'
@@ -121,6 +123,18 @@ function App() {
       <Route path="/admin/club-member-roles" element={
         <ProtectedRoute role="Admin">
           <ClubMemberRolesAdmin />
+        </ProtectedRoute>
+      } />
+
+      <Route path="/admin/team-units" element={
+        <ProtectedRoute role="Admin">
+          <TeamUnitsAdmin />
+        </ProtectedRoute>
+      } />
+
+      <Route path="/admin/skill-levels" element={
+        <ProtectedRoute role="Admin">
+          <SkillLevelsAdmin />
         </ProtectedRoute>
       } />
 

@@ -57,6 +57,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<EventPartnerRequest> EventPartnerRequests { get; set; }
     public DbSet<TeamUnit> TeamUnits { get; set; }
     public DbSet<AgeGroup> AgeGroups { get; set; }
+    public DbSet<SkillLevel> SkillLevels { get; set; }
     public DbSet<DivisionReward> DivisionRewards { get; set; }
 
     // Clubs
@@ -503,6 +504,26 @@ public class ApplicationDbContext : DbContext
                   .OnDelete(DeleteBehavior.Cascade);
         });
 
+        // Skill Level configuration
+        modelBuilder.Entity<SkillLevel>(entity =>
+        {
+            entity.Property(s => s.Name).IsRequired().HasMaxLength(50);
+            entity.HasIndex(s => s.SortOrder);
+
+            // Seed default skill levels
+            entity.HasData(
+                new SkillLevel { Id = 1, Name = "2.0", Description = "Beginner", Value = 2.0m, SortOrder = 1, IsActive = true, CreatedAt = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc), UpdatedAt = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc) },
+                new SkillLevel { Id = 2, Name = "2.5", Description = "Beginner+", Value = 2.5m, SortOrder = 2, IsActive = true, CreatedAt = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc), UpdatedAt = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc) },
+                new SkillLevel { Id = 3, Name = "3.0", Description = "Intermediate", Value = 3.0m, SortOrder = 3, IsActive = true, CreatedAt = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc), UpdatedAt = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc) },
+                new SkillLevel { Id = 4, Name = "3.5", Description = "Intermediate+", Value = 3.5m, SortOrder = 4, IsActive = true, CreatedAt = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc), UpdatedAt = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc) },
+                new SkillLevel { Id = 5, Name = "4.0", Description = "Advanced", Value = 4.0m, SortOrder = 5, IsActive = true, CreatedAt = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc), UpdatedAt = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc) },
+                new SkillLevel { Id = 6, Name = "4.5", Description = "Advanced+", Value = 4.5m, SortOrder = 6, IsActive = true, CreatedAt = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc), UpdatedAt = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc) },
+                new SkillLevel { Id = 7, Name = "5.0", Description = "Expert", Value = 5.0m, SortOrder = 7, IsActive = true, CreatedAt = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc), UpdatedAt = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc) },
+                new SkillLevel { Id = 8, Name = "5.5+", Description = "Pro/Tour", Value = 5.5m, SortOrder = 8, IsActive = true, CreatedAt = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc), UpdatedAt = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc) },
+                new SkillLevel { Id = 9, Name = "Open", Description = "All skill levels welcome", Value = null, SortOrder = 9, IsActive = true, CreatedAt = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc), UpdatedAt = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc) }
+            );
+        });
+
         // Event Division configuration (add navigation for new entities)
         modelBuilder.Entity<EventDivision>(entity =>
         {
@@ -514,6 +535,11 @@ public class ApplicationDbContext : DbContext
             entity.HasOne(d => d.AgeGroupEntity)
                   .WithMany()
                   .HasForeignKey(d => d.AgeGroupId)
+                  .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasOne(d => d.SkillLevel)
+                  .WithMany()
+                  .HasForeignKey(d => d.SkillLevelId)
                   .OnDelete(DeleteBehavior.SetNull);
         });
 

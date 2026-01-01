@@ -371,6 +371,8 @@ const AdminDashboard = () => {
     { id: 'eventTypes', label: 'Event Types', icon: Tags, link: '/admin/event-types' },
     { id: 'courtTypes', label: 'Court Types', icon: Building2, link: '/admin/court-types' },
     { id: 'clubRoles', label: 'Club Roles', icon: UserCog, link: '/admin/club-member-roles' },
+    { id: 'teamUnits', label: 'Team Units', icon: Users, link: '/admin/team-units' },
+    { id: 'skillLevels', label: 'Skill Levels', icon: Award, link: '/admin/skill-levels' },
     { id: 'events', label: 'Events', icon: Calendar, count: 0, disabled: true },
     { id: 'transactions', label: 'Transactions', icon: DollarSign, count: 0, disabled: true }
   ]

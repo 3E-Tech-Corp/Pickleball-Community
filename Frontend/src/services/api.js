@@ -1008,6 +1008,48 @@ export const friendsApi = {
   getFriendProfile: (friendId) => api.get(`/friends/${friendId}/profile`)
 }
 
+// Team Units API (for event divisions)
+export const teamUnitsApi = {
+  // Get all active team units
+  getAll: () => api.get('/teamunits'),
+
+  // Get all team units including inactive (admin only)
+  getAllIncludingInactive: () => api.get('/teamunits/all'),
+
+  // Get single team unit
+  getById: (id) => api.get(`/teamunits/${id}`),
+
+  // Create new team unit (admin only)
+  create: (data) => api.post('/teamunits', data),
+
+  // Update team unit (admin only)
+  update: (id, data) => api.put(`/teamunits/${id}`, data),
+
+  // Delete team unit (admin only - soft delete)
+  delete: (id) => api.delete(`/teamunits/${id}`)
+}
+
+// Skill Levels API (for event divisions)
+export const skillLevelsApi = {
+  // Get all active skill levels
+  getAll: () => api.get('/skilllevels'),
+
+  // Get all skill levels including inactive (admin only)
+  getAllIncludingInactive: () => api.get('/skilllevels/all'),
+
+  // Get single skill level
+  getById: (id) => api.get(`/skilllevels/${id}`),
+
+  // Create new skill level (admin only)
+  create: (data) => api.post('/skilllevels', data),
+
+  // Update skill level (admin only)
+  update: (id, data) => api.put(`/skilllevels/${id}`, data),
+
+  // Delete skill level (admin only - soft delete)
+  delete: (id) => api.delete(`/skilllevels/${id}`)
+}
+
 // Messaging API
 export const messagingApi = {
   // Conversations

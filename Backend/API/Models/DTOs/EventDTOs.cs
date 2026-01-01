@@ -68,6 +68,8 @@ public class EventDivisionDto
     public string? TeamUnitName { get; set; }
     public int? AgeGroupId { get; set; }
     public string? AgeGroupName { get; set; }
+    public int? SkillLevelId { get; set; }
+    public string? SkillLevelName { get; set; }
     public decimal? MinSkillRating { get; set; }
     public decimal? MaxSkillRating { get; set; }
     public int? MaxUnits { get; set; }
@@ -185,6 +187,7 @@ public class CreateEventDivisionDto
     // New structure
     public int? TeamUnitId { get; set; }
     public int? AgeGroupId { get; set; }
+    public int? SkillLevelId { get; set; }
     public decimal? MinSkillRating { get; set; }
     public decimal? MaxSkillRating { get; set; }
     public int? MaxUnits { get; set; }

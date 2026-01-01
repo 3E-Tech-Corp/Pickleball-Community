@@ -125,13 +125,20 @@ public class EventDivision
     public int? AgeGroupId { get; set; }
 
     /// <summary>
+    /// Reference to skill level (admin managed)
+    /// </summary>
+    public int? SkillLevelId { get; set; }
+
+    /// <summary>
     /// Minimum skill rating for this division (e.g., 3.0)
+    /// Legacy field - use SkillLevelId for new divisions
     /// </summary>
     [Column(TypeName = "decimal(4,2)")]
     public decimal? MinSkillRating { get; set; }
 
     /// <summary>
     /// Maximum skill rating for this division (e.g., 3.5)
+    /// Legacy field - use SkillLevelId for new divisions
     /// </summary>
     [Column(TypeName = "decimal(4,2)")]
     public decimal? MaxSkillRating { get; set; }
@@ -173,6 +180,9 @@ public class EventDivision
 
     [ForeignKey("AgeGroupId")]
     public AgeGroup? AgeGroupEntity { get; set; }
+
+    [ForeignKey("SkillLevelId")]
+    public SkillLevel? SkillLevel { get; set; }
 
     public ICollection<EventRegistration> Registrations { get; set; } = new List<EventRegistration>();
     public ICollection<EventPartnerRequest> PartnerRequests { get; set; } = new List<EventPartnerRequest>();

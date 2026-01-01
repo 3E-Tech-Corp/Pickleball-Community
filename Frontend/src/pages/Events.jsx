@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { Calendar, MapPin, Clock, Users, Filter, Search, Plus, DollarSign, ChevronLeft, ChevronRight, X, UserPlus, Trophy, Layers, Check, AlertCircle, Navigation, Building2, Loader2, MessageCircle, CheckCircle, Edit3, ChevronDown, ChevronUp, Trash2 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { eventsApi, eventTypesApi, courtsApi, getSharedAssetUrl } from '../services/api';
+import { eventsApi, eventTypesApi, courtsApi, teamUnitsApi, skillLevelsApi, getSharedAssetUrl } from '../services/api';
 
 export default function Events() {
   const { user, isAuthenticated } = useAuth();
@@ -13,6 +13,8 @@ export default function Events() {
 
   const [events, setEvents] = useState([]);
   const [eventTypes, setEventTypes] = useState([]);
+  const [teamUnits, setTeamUnits] = useState([]);
+  const [skillLevels, setSkillLevels] = useState([]);
   const [myEvents, setMyEvents] = useState(null);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -46,7 +48,7 @@ export default function Events() {
     }
   }, []);
 
-  // Load event types
+  // Load event types, team units, and skill levels
   useEffect(() => {
     const loadEventTypes = async () => {
       try {
@@ -58,7 +60,29 @@ export default function Events() {
         console.error('Error loading event types:', err);
       }
     };
+    const loadTeamUnits = async () => {
+      try {
+        const response = await teamUnitsApi.getAll();
+        if (response.success) {
+          setTeamUnits(response.data || []);
+        }
+      } catch (err) {
+        console.error('Error loading team units:', err);
+      }
+    };
+    const loadSkillLevels = async () => {
+      try {
+        const response = await skillLevelsApi.getAll();
+        if (response.success) {
+          setSkillLevels(response.data || []);
+        }
+      } catch (err) {
+        console.error('Error loading skill levels:', err);
+      }
+    };
     loadEventTypes();
+    loadTeamUnits();
+    loadSkillLevels();
   }, []);
 
   // Load my events when authenticated
@@ -480,6 +504,8 @@ export default function Events() {
       {showCreateModal && (
         <CreateEventModal
           eventTypes={eventTypes}
+          teamUnits={teamUnits}
+          skillLevels={skillLevels}
           courtId={courtIdParam}
           courtName={courtNameParam}
           userLocation={userLocation}
@@ -589,7 +615,41 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, formatDate, f
   const [showCourtPicker, setShowCourtPicker] = useState(false);
   const [editDivisions, setEditDivisions] = useState([]);
   const [showAddDivision, setShowAddDivision] = useState(false);
-  const [newDivision, setNewDivision] = useState({ name: '', description: '', teamSize: 2, maxTeams: null, entryFee: 0 });
+  const [newDivision, setNewDivision] = useState({ name: '', description: '', teamSize: 2, maxTeams: null, entryFee: 0, teamUnitId: null, skillLevelId: null });
+
+  // Auto-generate division name when team unit or skill level changes
+  const generateDivisionName = (teamUnitId, skillLevelId) => {
+    const teamUnit = teamUnits.find(t => t.id === teamUnitId);
+    const skillLevel = skillLevels.find(s => s.id === skillLevelId);
+    if (teamUnit && skillLevel) {
+      return `${teamUnit.name} - ${skillLevel.name}`;
+    } else if (teamUnit) {
+      return teamUnit.name;
+    } else if (skillLevel) {
+      return skillLevel.name;
+    }
+    return '';
+  };
+
+  const handleTeamUnitChange = (teamUnitId) => {
+    const newName = generateDivisionName(teamUnitId ? parseInt(teamUnitId) : null, newDivision.skillLevelId);
+    const teamUnit = teamUnits.find(t => t.id === parseInt(teamUnitId));
+    setNewDivision({
+      ...newDivision,
+      teamUnitId: teamUnitId ? parseInt(teamUnitId) : null,
+      teamSize: teamUnit?.totalPlayers || 2,
+      name: newName
+    });
+  };
+
+  const handleSkillLevelChange = (skillLevelId) => {
+    const newName = generateDivisionName(newDivision.teamUnitId, skillLevelId ? parseInt(skillLevelId) : null);
+    setNewDivision({
+      ...newDivision,
+      skillLevelId: skillLevelId ? parseInt(skillLevelId) : null,
+      name: newName
+    });
+  };
 
   const isOrganizer = event.isOrganizer;
   const isRegistered = event.isRegistered;
@@ -747,7 +807,7 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, formatDate, f
       id: `new-${Date.now()}`,
       isNew: true
     }]);
-    setNewDivision({ name: '', description: '', teamSize: 2, maxTeams: null, entryFee: 0 });
+    setNewDivision({ name: '', description: '', teamSize: 2, maxTeams: null, entryFee: 0, teamUnitId: null, skillLevelId: null });
     setShowAddDivision(false);
   };
 
@@ -778,7 +838,9 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, formatDate, f
         description: d.description || '',
         teamSize: d.teamSize || 2,
         maxTeams: d.maxTeams || null,
-        divisionFee: d.divisionFee || d.entryFee || 0
+        divisionFee: d.divisionFee || d.entryFee || 0,
+        teamUnitId: d.teamUnitId || null,
+        skillLevelId: d.skillLevelId || null
       }));
 
       const response = await eventsApi.update(event.id, {
@@ -1277,29 +1339,50 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, formatDate, f
                     {/* Add Division Form */}
                     {showAddDivision && (
                       <div className="mt-3 p-3 border border-orange-200 bg-orange-50 rounded-lg space-y-3">
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">Team Unit *</label>
+                            <select
+                              value={newDivision.teamUnitId || ''}
+                              onChange={(e) => handleTeamUnitChange(e.target.value)}
+                              className="w-full border border-gray-300 rounded p-2 text-sm"
+                            >
+                              <option value="">Select team unit...</option>
+                              {teamUnits.map(unit => (
+                                <option key={unit.id} value={unit.id}>
+                                  {unit.name}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">Skill Level *</label>
+                            <select
+                              value={newDivision.skillLevelId || ''}
+                              onChange={(e) => handleSkillLevelChange(e.target.value)}
+                              className="w-full border border-gray-300 rounded p-2 text-sm"
+                            >
+                              <option value="">Select skill level...</option>
+                              {skillLevels.map(level => (
+                                <option key={level.id} value={level.id}>
+                                  {level.name}{level.description ? ` - ${level.description}` : ''}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
                         <div>
-                          <label className="block text-xs font-medium text-gray-700 mb-1">Division Name *</label>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">Division Name</label>
                           <input
                             type="text"
                             value={newDivision.name}
                             onChange={(e) => setNewDivision({ ...newDivision, name: e.target.value })}
-                            placeholder="e.g., Men's Doubles 4.0+"
-                            className="w-full border border-gray-300 rounded p-2 text-sm"
+                            placeholder="Auto-generated from Team Unit and Skill Level"
+                            className="w-full border border-gray-300 rounded p-2 text-sm bg-gray-50"
                           />
+                          <p className="text-xs text-gray-500 mt-1">Auto-generated when Team Unit and Skill Level are selected. You can edit if needed.</p>
                         </div>
-                        <div className="grid grid-cols-3 gap-2">
-                          <div>
-                            <label className="block text-xs font-medium text-gray-700 mb-1">Team Size</label>
-                            <select
-                              value={newDivision.teamSize}
-                              onChange={(e) => setNewDivision({ ...newDivision, teamSize: parseInt(e.target.value) })}
-                              className="w-full border border-gray-300 rounded p-2 text-sm"
-                            >
-                              <option value={1}>Singles</option>
-                              <option value={2}>Doubles</option>
-                              <option value={4}>4-Player</option>
-                            </select>
-                          </div>
+                        <div className="grid grid-cols-2 gap-2">
                           <div>
                             <label className="block text-xs font-medium text-gray-700 mb-1">Max Teams</label>
                             <input
@@ -1549,7 +1632,7 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, formatDate, f
   );
 }
 
-function CreateEventModal({ eventTypes, courtId, courtName, onClose, onCreate, userLocation }) {
+function CreateEventModal({ eventTypes, teamUnits = [], skillLevels = [], courtId, courtName, onClose, onCreate, userLocation }) {
   // State for courts
   const [topCourts, setTopCourts] = useState([]);
   const [courtsLoading, setCourtsLoading] = useState(true);
@@ -1693,12 +1776,26 @@ function CreateEventModal({ eventTypes, courtId, courtName, onClose, onCreate, u
     }
   };
 
+  // Helper to generate division name from team unit and skill level
+  const generateDivisionName = (teamUnitId, skillLevelId) => {
+    const teamUnit = teamUnits.find(t => t.id === teamUnitId);
+    const skillLevel = skillLevels.find(s => s.id === skillLevelId);
+    if (teamUnit && skillLevel) {
+      return `${teamUnit.name} - ${skillLevel.name}`;
+    } else if (teamUnit) {
+      return teamUnit.name;
+    } else if (skillLevel) {
+      return skillLevel.name;
+    }
+    return '';
+  };
+
   const addDivision = () => {
     setFormData({
       ...formData,
       divisions: [
         ...formData.divisions,
-        { name: '', teamSize: 2, gender: 'Open', skillLevelMin: '', skillLevelMax: '' }
+        { name: '', teamSize: 2, teamUnitId: null, skillLevelId: null, maxTeams: null, entryFee: 0 }
       ]
     });
   };
@@ -1706,6 +1803,22 @@ function CreateEventModal({ eventTypes, courtId, courtName, onClose, onCreate, u
   const updateDivision = (index, field, value) => {
     const updated = [...formData.divisions];
     updated[index][field] = value;
+
+    // Auto-generate name when team unit or skill level changes
+    if (field === 'teamUnitId' || field === 'skillLevelId') {
+      const teamUnitId = field === 'teamUnitId' ? (value ? parseInt(value) : null) : updated[index].teamUnitId;
+      const skillLevelId = field === 'skillLevelId' ? (value ? parseInt(value) : null) : updated[index].skillLevelId;
+      updated[index].name = generateDivisionName(teamUnitId, skillLevelId);
+
+      // Also set team size from team unit
+      if (field === 'teamUnitId' && value) {
+        const teamUnit = teamUnits.find(t => t.id === parseInt(value));
+        if (teamUnit) {
+          updated[index].teamSize = teamUnit.totalPlayers || 2;
+        }
+      }
+    }
+
     setFormData({ ...formData, divisions: updated });
   };
 
@@ -2076,8 +2189,8 @@ function CreateEventModal({ eventTypes, courtId, courtName, onClose, onCreate, u
               ) : (
                 <div className="space-y-4">
                   {formData.divisions.map((div, index) => (
-                    <div key={index} className="p-4 border rounded-lg">
-                      <div className="flex justify-between mb-3">
+                    <div key={index} className="p-4 border rounded-lg space-y-3">
+                      <div className="flex justify-between">
                         <span className="font-medium text-sm text-gray-700">Division {index + 1}</span>
                         <button
                           type="button"
@@ -2088,38 +2201,70 @@ function CreateEventModal({ eventTypes, courtId, courtName, onClose, onCreate, u
                         </button>
                       </div>
                       <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">Team Unit *</label>
+                          <select
+                            value={div.teamUnitId || ''}
+                            onChange={(e) => updateDivision(index, 'teamUnitId', e.target.value)}
+                            className="w-full border border-gray-300 rounded-lg p-2 text-sm"
+                          >
+                            <option value="">Select team unit...</option>
+                            {teamUnits.map(unit => (
+                              <option key={unit.id} value={unit.id}>
+                                {unit.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">Skill Level *</label>
+                          <select
+                            value={div.skillLevelId || ''}
+                            onChange={(e) => updateDivision(index, 'skillLevelId', e.target.value)}
+                            className="w-full border border-gray-300 rounded-lg p-2 text-sm"
+                          >
+                            <option value="">Select skill level...</option>
+                            {skillLevels.map(level => (
+                              <option key={level.id} value={level.id}>
+                                {level.name}{level.description ? ` - ${level.description}` : ''}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Division Name</label>
                         <input
                           type="text"
-                          placeholder="Division Name"
+                          placeholder="Auto-generated from Team Unit and Skill Level"
                           value={div.name}
                           onChange={(e) => updateDivision(index, 'name', e.target.value)}
-                          className="border border-gray-300 rounded-lg p-2 text-sm"
+                          className="w-full border border-gray-300 rounded-lg p-2 text-sm bg-gray-50"
                         />
-                        <select
-                          value={div.teamSize}
-                          onChange={(e) => updateDivision(index, 'teamSize', parseInt(e.target.value))}
-                          className="border border-gray-300 rounded-lg p-2 text-sm"
-                        >
-                          <option value={1}>Singles</option>
-                          <option value={2}>Doubles</option>
-                        </select>
-                        <select
-                          value={div.gender}
-                          onChange={(e) => updateDivision(index, 'gender', e.target.value)}
-                          className="border border-gray-300 rounded-lg p-2 text-sm"
-                        >
-                          <option value="Open">Open</option>
-                          <option value="Men">Men</option>
-                          <option value="Women">Women</option>
-                          <option value="Mixed">Mixed</option>
-                        </select>
-                        <input
-                          type="text"
-                          placeholder="Skill Level (e.g., 3.5-4.0)"
-                          value={div.skillLevelMin}
-                          onChange={(e) => updateDivision(index, 'skillLevelMin', e.target.value)}
-                          className="border border-gray-300 rounded-lg p-2 text-sm"
-                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">Max Teams</label>
+                          <input
+                            type="number"
+                            min="1"
+                            placeholder="Unlimited"
+                            value={div.maxTeams || ''}
+                            onChange={(e) => updateDivision(index, 'maxTeams', e.target.value ? parseInt(e.target.value) : null)}
+                            className="w-full border border-gray-300 rounded-lg p-2 text-sm"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">Entry Fee ($)</label>
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={div.entryFee || 0}
+                            onChange={(e) => updateDivision(index, 'entryFee', parseFloat(e.target.value) || 0)}
+                            className="w-full border border-gray-300 rounded-lg p-2 text-sm"
+                          />
+                        </div>
                       </div>
                     </div>
                   ))}

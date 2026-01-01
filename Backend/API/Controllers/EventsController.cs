@@ -225,6 +225,8 @@ public class EventsController : ControllerBase
                 .Include(e => e.Divisions.Where(d => d.IsActive))
                     .ThenInclude(d => d.AgeGroupEntity)
                 .Include(e => e.Divisions.Where(d => d.IsActive))
+                    .ThenInclude(d => d.SkillLevel)
+                .Include(e => e.Divisions.Where(d => d.IsActive))
                     .ThenInclude(d => d.Rewards)
                 .Include(e => e.Registrations)
                 .FirstOrDefaultAsync(e => e.Id == id && e.IsActive);
@@ -292,6 +294,8 @@ public class EventsController : ControllerBase
                         TeamUnitName = d.TeamUnit?.Name,
                         AgeGroupId = d.AgeGroupId,
                         AgeGroupName = d.AgeGroupEntity?.Name,
+                        SkillLevelId = d.SkillLevelId,
+                        SkillLevelName = d.SkillLevel?.Name,
                         MinSkillRating = d.MinSkillRating,
                         MaxSkillRating = d.MaxSkillRating,
                         MaxUnits = d.MaxUnits,
@@ -390,6 +394,7 @@ public class EventsController : ControllerBase
                     // New fields
                     TeamUnitId = divDto.TeamUnitId,
                     AgeGroupId = divDto.AgeGroupId,
+                    SkillLevelId = divDto.SkillLevelId,
                     MinSkillRating = divDto.MinSkillRating,
                     MaxSkillRating = divDto.MaxSkillRating,
                     MaxUnits = divDto.MaxUnits,
@@ -521,6 +526,7 @@ public class EventsController : ControllerBase
                             existingDiv.DivisionFee = divDto.DivisionFee;
                             existingDiv.TeamUnitId = divDto.TeamUnitId;
                             existingDiv.AgeGroupId = divDto.AgeGroupId;
+                            existingDiv.SkillLevelId = divDto.SkillLevelId;
                             existingDiv.MinSkillRating = divDto.MinSkillRating;
                             existingDiv.MaxSkillRating = divDto.MaxSkillRating;
                             existingDiv.MaxUnits = divDto.MaxUnits;
@@ -539,6 +545,7 @@ public class EventsController : ControllerBase
                             DivisionFee = divDto.DivisionFee,
                             TeamUnitId = divDto.TeamUnitId,
                             AgeGroupId = divDto.AgeGroupId,
+                            SkillLevelId = divDto.SkillLevelId,
                             MinSkillRating = divDto.MinSkillRating,
                             MaxSkillRating = divDto.MaxSkillRating,
                             MaxUnits = divDto.MaxUnits,
@@ -992,6 +999,7 @@ public class EventsController : ControllerBase
                 // New fields
                 TeamUnitId = dto.TeamUnitId,
                 AgeGroupId = dto.AgeGroupId,
+                SkillLevelId = dto.SkillLevelId,
                 MinSkillRating = dto.MinSkillRating,
                 MaxSkillRating = dto.MaxSkillRating,
                 MaxUnits = dto.MaxUnits,
@@ -1026,9 +1034,10 @@ public class EventsController : ControllerBase
             }
             await _context.SaveChangesAsync();
 
-            // Load team unit and age group for response
+            // Load team unit, age group, and skill level for response
             var teamUnit = dto.TeamUnitId.HasValue ? await _context.TeamUnits.FindAsync(dto.TeamUnitId.Value) : null;
             var ageGroup = dto.AgeGroupId.HasValue ? await _context.AgeGroups.FindAsync(dto.AgeGroupId.Value) : null;
+            var skillLevel = dto.SkillLevelId.HasValue ? await _context.SkillLevels.FindAsync(dto.SkillLevelId.Value) : null;
 
             return Ok(new ApiResponse<EventDivisionDto>
             {
@@ -1044,6 +1053,8 @@ public class EventsController : ControllerBase
                     TeamUnitName = teamUnit?.Name,
                     AgeGroupId = division.AgeGroupId,
                     AgeGroupName = ageGroup?.Name,
+                    SkillLevelId = division.SkillLevelId,
+                    SkillLevelName = skillLevel?.Name,
                     MinSkillRating = division.MinSkillRating,
                     MaxSkillRating = division.MaxSkillRating,
                     MaxUnits = division.MaxUnits,
