@@ -624,7 +624,7 @@ export default function VenueTypesAdmin({ embedded = false }) {
               </Link>
               <div>
                 <h1 className="text-2xl font-bold text-gray-900">Venue Types</h1>
-                <p className="text-sm text-gray-500">Manage court categories (Public, Private, Commercial, etc.)</p>
+                <p className="text-sm text-gray-500">Manage venue categories (Public, Private, Commercial, etc.)</p>
               </div>
             </div>
             <button

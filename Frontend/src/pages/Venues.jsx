@@ -140,13 +140,13 @@ export default function Venues() {
           setLocationError('Location access was denied. Use Full Search or allow location in browser settings.');
           setSortBy('name'); // Fall back to name sort
         } else if (error.code === error.POSITION_UNAVAILABLE) {
-          setLocationError('Location unavailable. Use Full Search to find courts by address.');
+          setLocationError('Location unavailable. Use Full Search to find venues by address.');
           setSortBy('name'); // Fall back to name sort
         } else if (error.code === error.TIMEOUT) {
-          setLocationError('Location request timed out. Use Full Search to find courts by address.');
+          setLocationError('Location request timed out. Use Full Search to find venues by address.');
           setSortBy('name'); // Fall back to name sort
         } else {
-          setLocationError('Unable to get your location. Use Full Search to find courts by address.');
+          setLocationError('Unable to get your location. Use Full Search to find venues by address.');
           setSortBy('name'); // Fall back to name sort
         }
         setGettingLocation(false);
@@ -380,9 +380,9 @@ export default function Venues() {
             <div className="flex items-center gap-4">
               <MapPin className="w-12 h-12" />
               <div>
-                <h1 className="text-3xl font-bold">Find Pickleball Courts</h1>
+                <h1 className="text-3xl font-bold">Find Pickleball Venues</h1>
                 <p className="text-green-100 mt-1">
-                  Search {totalCount.toLocaleString()} courts and help keep information up to date
+                  Search {totalCount.toLocaleString()} venues and help keep information up to date
                 </p>
               </div>
             </div>
@@ -392,7 +392,7 @@ export default function Venues() {
                 className="flex items-center gap-2 px-4 py-2 bg-white text-green-700 rounded-lg font-medium hover:bg-green-50 transition-colors"
               >
                 <Plus className="w-5 h-5" />
-                Add Court
+                Add Venue
               </button>
             )}
           </div>
@@ -745,7 +745,7 @@ export default function Venues() {
                               </span>
                               <div className="flex-1 min-w-0">
                                 <h4 className="font-medium text-gray-900 text-sm truncate">
-                                  {court.name || 'Unnamed Court'}
+                                  {court.name || 'Unnamed Venue'}
                                 </h4>
                                 <p className="text-xs text-gray-500 truncate">
                                   {[court.city, court.state].filter(Boolean).join(', ')}
@@ -828,15 +828,15 @@ export default function Venues() {
         ) : (
           <div className="bg-white rounded-xl shadow-sm p-12 text-center">
             <MapPin className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">No Courts Found</h3>
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">No Venues Found</h3>
             <p className="text-gray-500 mb-6">
               {searchMode === 'distance' && !userLocation
-                ? 'Enable location access to find courts near you, or use Full Search.'
+                ? 'Enable location access to find venues near you, or use Full Search.'
                 : searchMode === 'distance' && userLocation
-                ? `No courts found within ${radiusMiles} miles. Try increasing the distance.`
+                ? `No venues found within ${radiusMiles} miles. Try increasing the distance.`
                 : selectedCountry || selectedState || courtNameSearch
-                ? 'No courts match your search criteria. Try adjusting your filters.'
-                : 'Select a country to start searching for courts.'}
+                ? 'No venues match your search criteria. Try adjusting your filters.'
+                : 'Select a country to start searching for venues.'}
             </p>
           </div>
         )}
@@ -905,7 +905,7 @@ function CourtCard({ court, onViewDetails }) {
           )}
         </div>
 
-        <h3 className="font-semibold text-gray-900 mb-2">{court.name || 'Unnamed Court'}</h3>
+        <h3 className="font-semibold text-gray-900 mb-2">{court.name || 'Unnamed Venue'}</h3>
 
         <div className="space-y-2 text-sm text-gray-600">
           <div className="flex items-center gap-2">
@@ -1163,7 +1163,7 @@ function CourtDetailModal({ court, isAuthenticated, onClose, onConfirmationSubmi
       <div className="bg-white rounded-xl shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <div className="sticky top-0 bg-white px-6 py-4 border-b flex items-center justify-between z-10">
           <div>
-            <h2 className="text-xl font-semibold text-gray-900">{court.name || 'Unnamed Court'}</h2>
+            <h2 className="text-xl font-semibold text-gray-900">{court.name || 'Unnamed Venue'}</h2>
             <p className="text-sm text-gray-500">
               {court.city}{court.state && `, ${court.state}`}
               {court.distance && ` - ${court.distance.toFixed(1)} miles away`}
@@ -1349,8 +1349,8 @@ function CourtDetailModal({ court, isAuthenticated, onClose, onConfirmationSubmi
               {!isAuthenticated ? (
                 <div className="text-center py-8">
                   <ThumbsUp className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2">Sign in to Confirm Court Info</h3>
-                  <p className="text-gray-500">Help keep court information accurate by confirming or updating details.</p>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">Sign in to Confirm Venue Info</h3>
+                  <p className="text-gray-500">Help keep venue information accurate by confirming or updating details.</p>
                 </div>
               ) : (
                 <form onSubmit={handleSubmitConfirmation} className="space-y-6">
@@ -1364,7 +1364,7 @@ function CourtDetailModal({ court, isAuthenticated, onClose, onConfirmationSubmi
                         className="w-5 h-5 text-red-600 border-gray-300 rounded focus:ring-red-500"
                       />
                       <div>
-                        <span className="font-medium text-red-700">This is not a pickleball court anymore</span>
+                        <span className="font-medium text-red-700">This venue no longer has pickleball courts</span>
                         <p className="text-sm text-red-600">Check this if the location no longer has pickleball courts (closed, converted, etc.)</p>
                       </div>
                     </label>
@@ -1729,7 +1729,7 @@ function CourtDetailModal({ court, isAuthenticated, onClose, onConfirmationSubmi
               ) : (
                 <div className="text-center py-8 text-gray-500">
                   <MessageSquare className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-                  <p>No user confirmations yet. Be the first to confirm info about this court!</p>
+                  <p>No user confirmations yet. Be the first to confirm info about this venue!</p>
                 </div>
               )}
             </div>
@@ -1885,8 +1885,8 @@ function CourtDetailModal({ court, isAuthenticated, onClose, onConfirmationSubmi
                   <h3 className="font-medium text-gray-900 mb-2">No Photos Yet</h3>
                   <p className="text-sm">
                     {isAuthenticated
-                      ? 'Be the first to share a photo of this court!'
-                      : 'Sign in to share photos of this court.'}
+                      ? 'Be the first to share a photo of this venue!'
+                      : 'Sign in to share photos of this venue.'}
                   </p>
                 </div>
               )}
@@ -2066,11 +2066,11 @@ function AddCourtModal({ onClose, onCourtAdded, userLocation, courtTypes }) {
               <Plus className="w-5 h-5 text-green-600" />
             </div>
             <div>
-              <h2 className="text-xl font-semibold text-gray-900">Add New Court</h2>
+              <h2 className="text-xl font-semibold text-gray-900">Add New Venue</h2>
               <p className="text-sm text-gray-500">
                 {step === 'location' && 'Step 1: Select location'}
                 {step === 'duplicates' && 'Possible duplicates found'}
-                {step === 'details' && 'Step 2: Enter court details'}
+                {step === 'details' && 'Step 2: Enter venue details'}
               </p>
             </div>
           </div>
@@ -2089,7 +2089,7 @@ function AddCourtModal({ onClose, onCourtAdded, userLocation, courtTypes }) {
           {step === 'location' && (
             <div className="space-y-4">
               <div className="text-sm text-gray-600 mb-4">
-                Click on the map or drag the marker to select the exact location of the court.
+                Click on the map or drag the marker to select the exact location of the venue.
               </div>
 
               {/* Use My Location button */}
@@ -2110,7 +2110,7 @@ function AddCourtModal({ onClose, onCourtAdded, userLocation, courtTypes }) {
                   className="w-full py-3 bg-blue-50 border-2 border-blue-200 text-blue-700 rounded-lg font-medium hover:bg-blue-100 transition-colors flex items-center justify-center gap-2"
                 >
                   <Locate className="w-5 h-5" />
-                  I'm at the court - Use my current location
+                  I'm at the venue - Use my current location
                 </button>
               )}
 
@@ -2138,7 +2138,7 @@ function AddCourtModal({ onClose, onCourtAdded, userLocation, courtTypes }) {
                 {loading ? (
                   <>
                     <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-white"></div>
-                    Checking for nearby courts...
+                    Checking for nearby venues...
                   </>
                 ) : (
                   <>
@@ -2157,10 +2157,10 @@ function AddCourtModal({ onClose, onCourtAdded, userLocation, courtTypes }) {
                   <MapPin className="w-5 h-5 text-yellow-600 mt-0.5" />
                   <div>
                     <h3 className="font-medium text-yellow-800">
-                      {nearbyCourts.length} court{nearbyCourts.length !== 1 ? 's' : ''} found within 200 yards
+                      {nearbyCourts.length} venue{nearbyCourts.length !== 1 ? 's' : ''} found within 200 yards
                     </h3>
                     <p className="text-sm text-yellow-700 mt-1">
-                      Please check if your court already exists below. If it does, you can update its information instead of adding a duplicate.
+                      Please check if your venue already exists below. If it does, you can update its information instead of adding a duplicate.
                     </p>
                   </div>
                 </div>
@@ -2179,7 +2179,7 @@ function AddCourtModal({ onClose, onCourtAdded, userLocation, courtTypes }) {
                   >
                     <div className="flex items-start justify-between">
                       <div>
-                        <h4 className="font-medium text-gray-900">{court.name || 'Unnamed Court'}</h4>
+                        <h4 className="font-medium text-gray-900">{court.name || 'Unnamed Venue'}</h4>
                         <p className="text-sm text-gray-500">{court.address}</p>
                         <p className="text-sm text-gray-500">{court.city}, {court.state}</p>
                       </div>
@@ -2209,7 +2209,7 @@ function AddCourtModal({ onClose, onCourtAdded, userLocation, courtTypes }) {
                   onClick={() => setStep('details')}
                   className="flex-1 py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors"
                 >
-                  This is a New Court
+                  This is a New Venue
                 </button>
               </div>
             </div>
@@ -2217,10 +2217,10 @@ function AddCourtModal({ onClose, onCourtAdded, userLocation, courtTypes }) {
 
           {step === 'details' && (
             <form onSubmit={handleSubmit} className="space-y-4">
-              {/* Court Name */}
+              {/* Venue Name */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Court Name <span className="text-red-500">*</span>
+                  Venue Name <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
@@ -2323,10 +2323,10 @@ function AddCourtModal({ onClose, onCourtAdded, userLocation, courtTypes }) {
                 </div>
               </div>
 
-              {/* Court Type */}
+              {/* Venue Type */}
               {courtTypes.length > 0 && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Court Type</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Venue Type</label>
                   <select
                     value={formData.courtTypeId}
                     onChange={(e) => setFormData({ ...formData, courtTypeId: e.target.value })}
@@ -2425,12 +2425,12 @@ function AddCourtModal({ onClose, onCourtAdded, userLocation, courtTypes }) {
                   {submitting ? (
                     <>
                       <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-white"></div>
-                      Adding Court...
+                      Adding Venue...
                     </>
                   ) : (
                     <>
                       <Plus className="w-5 h-5" />
-                      Add Court
+                      Add Venue
                     </>
                   )}
                 </button>

@@ -2178,12 +2178,12 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, formatDate, f
         </div>
       </div>
 
-      {/* Court Picker Modal */}
+      {/* Venue Picker Modal */}
       {showCourtPicker && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-[60]">
           <div className="bg-white rounded-xl shadow-xl max-w-lg w-full max-h-[80vh] flex flex-col">
             <div className="p-4 border-b flex items-center justify-between">
-              <h3 className="font-semibold text-gray-900">Select Venue/Court</h3>
+              <h3 className="font-semibold text-gray-900">Select Venue</h3>
               <button onClick={() => setShowCourtPicker(false)} className="text-gray-400 hover:text-gray-600">
                 <X className="w-5 h-5" />
               </button>
@@ -2194,7 +2194,7 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, formatDate, f
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
                 <input
                   type="text"
-                  placeholder="Search courts..."
+                  placeholder="Search venues..."
                   value={courtSearchQuery}
                   onChange={(e) => setCourtSearchQuery(e.target.value)}
                   className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg"
@@ -2232,7 +2232,7 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, formatDate, f
                     </button>
                   ))}
                   {!courtsLoading && !searchingCourts && (courtSearchQuery ? searchedCourts : topCourts).length === 0 && (
-                    <p className="text-center text-gray-500 py-4">No courts found</p>
+                    <p className="text-center text-gray-500 py-4">No venues found</p>
                   )}
                 </div>
               )}
@@ -2562,7 +2562,7 @@ function CreateEventModal({ eventTypes, teamUnits = [], skillLevels = [], courtI
     });
   };
 
-  const stepLabels = ['Court', 'Event Info', 'Date & Time', 'Fees', 'Divisions'];
+  const stepLabels = ['Venue', 'Event Info', 'Date & Time', 'Fees', 'Divisions'];
   const totalSteps = 5;
 
   return (
@@ -2585,12 +2585,12 @@ function CreateEventModal({ eventTypes, teamUnits = [], skillLevels = [], courtI
             </div>
           )}
 
-          {/* Step 1: Court Selection */}
+          {/* Step 1: Venue Selection */}
           {step === 1 && (
             <>
               <div className="flex items-center gap-2 text-gray-700 mb-4">
                 <Building2 className="w-5 h-5 text-orange-600" />
-                <span className="font-medium">Select a Court for Your Event</span>
+                <span className="font-medium">Select a Venue for Your Event</span>
               </div>
 
               {/* Search */}
@@ -2598,7 +2598,7 @@ function CreateEventModal({ eventTypes, teamUnits = [], skillLevels = [], courtI
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                 <input
                   type="text"
-                  placeholder="Search courts by name or location..."
+                  placeholder="Search venues by name or location..."
                   value={courtSearchQuery}
                   onChange={(e) => setCourtSearchQuery(e.target.value)}
                   className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-orange-500 focus:border-orange-500"

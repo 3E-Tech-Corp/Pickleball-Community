@@ -248,7 +248,7 @@ export default function VenueMap({
       <div style="min-width: 180px;">
         <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
           ${number ? `<span style="display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; background: #2563eb; color: white; border-radius: 50%; font-size: 12px; font-weight: 600;">${number}</span>` : ''}
-          <h3 style="margin: 0; font-size: 14px; font-weight: 600; color: #111;">${court.name || 'Unnamed Court'}</h3>
+          <h3 style="margin: 0; font-size: 14px; font-weight: 600; color: #111;">${court.name || 'Unnamed Venue'}</h3>
         </div>
         <p style="margin: 0 0 8px 0; font-size: 12px; color: #666;">${address}</p>
         ${courtTypes ? `<div style="margin-bottom: 8px;">${courtTypes}</div>` : ''}
@@ -273,9 +273,9 @@ export default function VenueMap({
       <div className="h-full flex items-center justify-center bg-gray-100 rounded-lg">
         <div className="text-center p-8">
           <MapPin className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">No Courts with Coordinates</h3>
+          <h3 className="text-lg font-medium text-gray-900 mb-2">No Venues with Coordinates</h3>
           <p className="text-gray-500">
-            The courts matching your filters don't have GPS coordinates yet.
+            The venues matching your filters don't have GPS coordinates yet.
           </p>
         </div>
       </div>
