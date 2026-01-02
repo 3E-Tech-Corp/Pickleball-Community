@@ -1,7 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
-namespace API.Models.Entities;
+namespace Pickleball.Community.Models.Entities;
 
 public class FeedbackEntry
 {

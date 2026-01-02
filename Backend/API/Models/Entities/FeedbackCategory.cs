@@ -1,6 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 
-namespace API.Models.Entities;
+namespace Pickleball.Community.Models.Entities;
 
 public class FeedbackCategory
 {
