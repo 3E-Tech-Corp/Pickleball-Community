@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { Calendar, MapPin, Clock, Users, Filter, Search, Plus, DollarSign, ChevronLeft, ChevronRight, X, UserPlus, Trophy, Layers, Check, AlertCircle, Navigation, Building2, Loader2, MessageCircle, CheckCircle, Edit3, ChevronDown, ChevronUp, Trash2, List, Map } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { eventsApi, eventTypesApi, courtsApi, teamUnitsApi, skillLevelsApi, getSharedAssetUrl } from '../services/api';
+import { eventsApi, eventTypesApi, courtsApi, teamUnitsApi, skillLevelsApi, tournamentApi, getSharedAssetUrl } from '../services/api';
 import CourtMap from '../components/ui/CourtMap';
 import { getIconByName } from '../utils/iconMap';
 import { getColorValues } from '../utils/colorMap';
@@ -885,6 +885,12 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, formatDate, f
   const [showAddDivision, setShowAddDivision] = useState(false);
   const [newDivision, setNewDivision] = useState({ name: '', description: '', teamSize: 2, maxTeams: null, entryFee: 0, teamUnitId: null, skillLevelId: null });
 
+  // Team registration state
+  const [showTeamRegistration, setShowTeamRegistration] = useState(false);
+  const [selectedDivisionForRegistration, setSelectedDivisionForRegistration] = useState(null);
+  const [unitsLookingForPartners, setUnitsLookingForPartners] = useState([]);
+  const [loadingUnits, setLoadingUnits] = useState(false);
+
   // Auto-generate division name when team unit or skill level changes
   const generateDivisionName = (teamUnitId, skillLevelId) => {
     const teamUnit = teamUnits.find(t => t.id === teamUnitId);
@@ -1195,13 +1201,36 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, formatDate, f
     }
   };
 
-  const handleRegister = async (divisionId) => {
+  const handleRegister = async (divisionId, partnerUserId = null) => {
     if (!isAuthenticated) return;
+
+    // Find the division to check team size
+    const division = event.divisions?.find(d => d.id === divisionId);
+    const teamSize = division?.teamUnitId
+      ? teamUnits.find(t => t.id === division.teamUnitId)?.totalPlayers || division?.teamSize
+      : division?.teamSize || 1;
+
+    // For team events (doubles/teams), show the team registration modal
+    if (teamSize > 1 && !partnerUserId) {
+      setSelectedDivisionForRegistration(division);
+      setShowTeamRegistration(true);
+      // Load units looking for partners
+      loadUnitsLookingForPartners(divisionId);
+      return;
+    }
+
     setRegisteringDivision(divisionId);
     try {
-      const response = await eventsApi.register(event.id, { divisionId });
+      // partnerUserId of -1 means "create team without partner for now"
+      const response = await tournamentApi.registerForEvent(event.id, {
+        eventId: event.id,
+        divisionIds: [divisionId],
+        partnerUserId: partnerUserId > 0 ? partnerUserId : null
+      });
       if (response.success) {
         onUpdate();
+        setShowTeamRegistration(false);
+        setSelectedDivisionForRegistration(null);
         // Refresh event data
         const updated = await eventsApi.getEvent(event.id);
         if (updated.success) {
@@ -1212,6 +1241,37 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, formatDate, f
       console.error('Error registering:', err);
     } finally {
       setRegisteringDivision(null);
+    }
+  };
+
+  const loadUnitsLookingForPartners = async (divisionId) => {
+    setLoadingUnits(true);
+    try {
+      const response = await tournamentApi.getEventUnits(event.id, divisionId);
+      if (response.success) {
+        // Filter to only incomplete units (looking for partners)
+        const incomplete = (response.data || []).filter(u =>
+          u.members && u.members.length < u.requiredPlayers && !u.isComplete
+        );
+        setUnitsLookingForPartners(incomplete);
+      }
+    } catch (err) {
+      console.error('Error loading units:', err);
+    } finally {
+      setLoadingUnits(false);
+    }
+  };
+
+  const handleJoinUnit = async (unitId) => {
+    try {
+      const response = await tournamentApi.requestToJoinUnit(unitId, 'I would like to join your team');
+      if (response.success) {
+        setShowTeamRegistration(false);
+        setSelectedDivisionForRegistration(null);
+        onUpdate();
+      }
+    } catch (err) {
+      console.error('Error joining unit:', err);
     }
   };
 
@@ -1435,57 +1495,88 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, formatDate, f
                 </div>
               )}
 
-              {event.divisions?.map(division => (
-                <div key={division.id} className="border rounded-lg overflow-hidden">
-                  <div className="p-4 bg-gray-50 flex items-center justify-between">
-                    <div>
-                      <h4 className="font-medium text-gray-900">{division.name}</h4>
-                      <div className="flex gap-4 text-sm text-gray-500 mt-1">
-                        <span>{division.teamSize === 1 ? 'Singles' : 'Doubles'}</span>
-                        {division.skillLevelMin && (
-                          <span>Skill: {division.skillLevelMin}{division.skillLevelMax && ` - ${division.skillLevelMax}`}</span>
+              {event.divisions?.map(division => {
+                const teamUnit = division.teamUnitId ? teamUnits.find(t => t.id === division.teamUnitId) : null;
+                const teamSize = teamUnit?.totalPlayers || division.teamSize || 1;
+                const isFull = division.maxUnits && division.registeredCount >= division.maxUnits;
+
+                return (
+                  <div key={division.id} className="border rounded-lg overflow-hidden">
+                    <div className="p-4 bg-gray-50 flex items-center justify-between">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h4 className="font-medium text-gray-900">{division.name}</h4>
+                          {isFull && (
+                            <span className="px-2 py-0.5 text-xs font-medium bg-yellow-100 text-yellow-700 rounded-full">
+                              Full - Waitlist
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-gray-500 mt-1">
+                          <span>{teamUnit?.name || (teamSize === 1 ? 'Singles' : teamSize === 2 ? 'Doubles' : `${teamSize}-Player Team`)}</span>
+                          {division.skillLevelName && <span>{division.skillLevelName}</span>}
+                          {division.ageGroupName && <span>{division.ageGroupName}</span>}
+                          {!division.skillLevelName && division.skillLevelMin && (
+                            <span>Skill: {division.skillLevelMin}{division.skillLevelMax && ` - ${division.skillLevelMax}`}</span>
+                          )}
+                          {division.gender && <span>{division.gender}</span>}
+                          <span>
+                            {division.registeredCount} registered
+                            {division.maxUnits && ` / ${division.maxUnits}`}
+                          </span>
+                          {division.waitlistedCount > 0 && (
+                            <span className="text-yellow-600">+{division.waitlistedCount} waitlisted</span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {division.divisionFee && division.divisionFee > 0 && (
+                          <span className="text-sm text-gray-600">+${division.divisionFee}</span>
                         )}
-                        {division.gender && <span>{division.gender}</span>}
-                        <span>{division.registeredCount} registered</span>
+                        {event.registeredDivisionIds?.includes(division.id) ? (
+                          <button
+                            onClick={() => handleCancelRegistration(division.id)}
+                            className="px-4 py-2 text-red-600 border border-red-300 rounded-lg text-sm font-medium hover:bg-red-50"
+                          >
+                            Cancel
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => handleRegister(division.id)}
+                            disabled={!isAuthenticated || !canRegister() || registeringDivision === division.id}
+                            className="px-4 py-2 bg-orange-600 text-white rounded-lg text-sm font-medium hover:bg-orange-700 disabled:opacity-50"
+                          >
+                            {registeringDivision === division.id ? 'Registering...' : (isFull ? 'Join Waitlist' : 'Register')}
+                          </button>
+                        )}
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      {division.divisionFee && division.divisionFee > 0 && (
-                        <span className="text-sm text-gray-600">+${division.divisionFee}</span>
-                      )}
-                      {event.registeredDivisionIds?.includes(division.id) ? (
-                        <button
-                          onClick={() => handleCancelRegistration(division.id)}
-                          className="px-4 py-2 text-red-600 border border-red-300 rounded-lg text-sm font-medium hover:bg-red-50"
-                        >
-                          Cancel
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => handleRegister(division.id)}
-                          disabled={!isAuthenticated || !canRegister() || registeringDivision === division.id}
-                          className="px-4 py-2 bg-orange-600 text-white rounded-lg text-sm font-medium hover:bg-orange-700 disabled:opacity-50"
-                        >
-                          {registeringDivision === division.id ? 'Registering...' : 'Register'}
-                        </button>
-                      )}
-                    </div>
+
+                    {division.description && (
+                      <div className="px-4 py-2 text-sm text-gray-600 border-t">
+                        {division.description}
+                      </div>
+                    )}
+
+                    {teamSize > 1 && division.lookingForPartnerCount > 0 && (
+                      <button
+                        onClick={() => {
+                          setSelectedDivisionForRegistration(division);
+                          setShowTeamRegistration(true);
+                          loadUnitsLookingForPartners(division.id);
+                        }}
+                        className="w-full px-4 py-2 border-t bg-blue-50 flex items-center justify-between gap-2 text-sm text-blue-700 hover:bg-blue-100 transition-colors"
+                      >
+                        <span className="flex items-center gap-2">
+                          <UserPlus className="w-4 h-4" />
+                          {division.lookingForPartnerCount} player{division.lookingForPartnerCount !== 1 ? 's' : ''} looking for a partner
+                        </span>
+                        <ChevronRight className="w-4 h-4" />
+                      </button>
+                    )}
                   </div>
-
-                  {division.description && (
-                    <div className="px-4 py-2 text-sm text-gray-600 border-t">
-                      {division.description}
-                    </div>
-                  )}
-
-                  {division.teamSize > 1 && division.lookingForPartnerCount > 0 && (
-                    <div className="px-4 py-2 border-t bg-blue-50 flex items-center gap-2 text-sm text-blue-700">
-                      <UserPlus className="w-4 h-4" />
-                      <span>{division.lookingForPartnerCount} player{division.lookingForPartnerCount !== 1 ? 's' : ''} looking for a partner</span>
-                    </div>
-                  )}
-                </div>
-              ))}
+                );
+              })}
 
               {(!event.divisions || event.divisions.length === 0) && (
                 <p className="text-center text-gray-500 py-8">No divisions configured yet</p>
@@ -1921,6 +2012,127 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, formatDate, f
                   )}
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Team Registration Modal */}
+      {showTeamRegistration && selectedDivisionForRegistration && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-[60]">
+          <div className="bg-white rounded-xl shadow-xl max-w-lg w-full max-h-[80vh] flex flex-col">
+            <div className="p-4 border-b flex items-center justify-between">
+              <div>
+                <h3 className="font-semibold text-gray-900">Register for {selectedDivisionForRegistration.name}</h3>
+                <p className="text-sm text-gray-500 mt-1">
+                  {selectedDivisionForRegistration.teamSize === 2 ? 'Doubles' : 'Team'} Division
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  setShowTeamRegistration(false);
+                  setSelectedDivisionForRegistration(null);
+                }}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-4 space-y-6">
+              {/* Create New Team Option */}
+              <div>
+                <h4 className="font-medium text-gray-900 mb-3 flex items-center gap-2">
+                  <Plus className="w-4 h-4" />
+                  Create New Team
+                </h4>
+                <p className="text-sm text-gray-600 mb-3">
+                  Register as team captain and find or invite a partner later.
+                </p>
+                <button
+                  onClick={() => handleRegister(selectedDivisionForRegistration.id, -1)}
+                  disabled={registeringDivision === selectedDivisionForRegistration.id}
+                  className="w-full px-4 py-3 bg-orange-600 text-white rounded-lg font-medium hover:bg-orange-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {registeringDivision === selectedDivisionForRegistration.id ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Registering...
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="w-4 h-4" />
+                      Create Team & Find Partner Later
+                    </>
+                  )}
+                </button>
+              </div>
+
+              {/* Join Existing Team */}
+              <div>
+                <h4 className="font-medium text-gray-900 mb-3 flex items-center gap-2">
+                  <UserPlus className="w-4 h-4" />
+                  Join Existing Team
+                </h4>
+                {loadingUnits ? (
+                  <div className="flex items-center justify-center py-6">
+                    <Loader2 className="w-6 h-6 animate-spin text-orange-600" />
+                  </div>
+                ) : unitsLookingForPartners.length === 0 ? (
+                  <p className="text-sm text-gray-500 py-4 text-center">
+                    No teams are currently looking for partners in this division.
+                  </p>
+                ) : (
+                  <div className="space-y-3">
+                    {unitsLookingForPartners.map(unit => (
+                      <div key={unit.id} className="border rounded-lg p-3 hover:border-orange-300 transition-colors">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            {unit.captainProfileImageUrl ? (
+                              <img
+                                src={getSharedAssetUrl(unit.captainProfileImageUrl)}
+                                alt=""
+                                className="w-10 h-10 rounded-full object-cover"
+                              />
+                            ) : (
+                              <div className="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center text-orange-600 font-medium">
+                                {unit.captainName?.charAt(0) || '?'}
+                              </div>
+                            )}
+                            <div>
+                              <div className="font-medium text-gray-900">{unit.name}</div>
+                              <div className="text-sm text-gray-500">
+                                Captain: {unit.captainName || 'Unknown'}
+                              </div>
+                              <div className="text-xs text-gray-400">
+                                {unit.members?.length || 1} / {unit.requiredPlayers} players
+                              </div>
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => handleJoinUnit(unit.id)}
+                            className="px-3 py-1.5 bg-orange-100 text-orange-700 rounded-lg text-sm font-medium hover:bg-orange-200 transition-colors"
+                          >
+                            Request to Join
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="p-4 border-t bg-gray-50">
+              <button
+                onClick={() => {
+                  setShowTeamRegistration(false);
+                  setSelectedDivisionForRegistration(null);
+                }}
+                className="w-full px-4 py-2 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-100 transition-colors"
+              >
+                Cancel
+              </button>
             </div>
           </div>
         </div>
