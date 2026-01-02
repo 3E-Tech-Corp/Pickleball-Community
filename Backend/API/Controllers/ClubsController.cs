@@ -139,6 +139,75 @@ public class ClubsController : ControllerBase
         }
     }
 
+    // GET: /clubs/countries - Get countries with club counts
+    [HttpGet("countries")]
+    public async Task<ActionResult<ApiResponse<List<LocationCountDto>>>> GetCountries()
+    {
+        try
+        {
+            var countries = await _context.Clubs
+                .Where(c => c.IsActive && c.IsPublic && !string.IsNullOrEmpty(c.Country))
+                .GroupBy(c => c.Country!)
+                .Select(g => new LocationCountDto { Name = g.Key, Count = g.Count() })
+                .OrderByDescending(x => x.Count)
+                .ThenBy(x => x.Name)
+                .ToListAsync();
+
+            return Ok(new ApiResponse<List<LocationCountDto>> { Success = true, Data = countries });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error fetching countries");
+            return StatusCode(500, new ApiResponse<List<LocationCountDto>> { Success = false, Message = "An error occurred" });
+        }
+    }
+
+    // GET: /clubs/countries/{country}/states - Get states for a country with club counts
+    [HttpGet("countries/{country}/states")]
+    public async Task<ActionResult<ApiResponse<List<LocationCountDto>>>> GetStatesByCountry(string country)
+    {
+        try
+        {
+            var states = await _context.Clubs
+                .Where(c => c.IsActive && c.IsPublic && c.Country == country && !string.IsNullOrEmpty(c.State))
+                .GroupBy(c => c.State!)
+                .Select(g => new LocationCountDto { Name = g.Key, Count = g.Count() })
+                .OrderByDescending(x => x.Count)
+                .ThenBy(x => x.Name)
+                .ToListAsync();
+
+            return Ok(new ApiResponse<List<LocationCountDto>> { Success = true, Data = states });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error fetching states for country {Country}", country);
+            return StatusCode(500, new ApiResponse<List<LocationCountDto>> { Success = false, Message = "An error occurred" });
+        }
+    }
+
+    // GET: /clubs/countries/{country}/states/{state}/cities - Get cities for a state with club counts
+    [HttpGet("countries/{country}/states/{state}/cities")]
+    public async Task<ActionResult<ApiResponse<List<LocationCountDto>>>> GetCitiesByState(string country, string state)
+    {
+        try
+        {
+            var cities = await _context.Clubs
+                .Where(c => c.IsActive && c.IsPublic && c.Country == country && c.State == state && !string.IsNullOrEmpty(c.City))
+                .GroupBy(c => c.City!)
+                .Select(g => new LocationCountDto { Name = g.Key, Count = g.Count() })
+                .OrderByDescending(x => x.Count)
+                .ThenBy(x => x.Name)
+                .ToListAsync();
+
+            return Ok(new ApiResponse<List<LocationCountDto>> { Success = true, Data = cities });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error fetching cities for {Country}/{State}", country, state);
+            return StatusCode(500, new ApiResponse<List<LocationCountDto>> { Success = false, Message = "An error occurred" });
+        }
+    }
+
     // GET: /clubs/{id} - Get club details
     [HttpGet("{id}")]
     public async Task<ActionResult<ApiResponse<ClubDetailDto>>> GetClub(int id)

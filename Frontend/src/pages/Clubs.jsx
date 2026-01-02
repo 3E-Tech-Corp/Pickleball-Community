@@ -19,6 +19,9 @@ export default function Clubs() {
   const [country, setCountry] = useState('');
   const [state, setState] = useState('');
   const [city, setCity] = useState('');
+  const [countries, setCountries] = useState([]);
+  const [statesWithCounts, setStatesWithCounts] = useState([]);
+  const [citiesWithCounts, setCitiesWithCounts] = useState([]);
   const [userLocation, setUserLocation] = useState(null);
   const [radiusMiles, setRadiusMiles] = useState(100);
   const [selectedClub, setSelectedClub] = useState(null);
@@ -62,6 +65,67 @@ export default function Clubs() {
     };
     loadRoles();
   }, []);
+
+  // Load countries on mount
+  useEffect(() => {
+    const loadCountries = async () => {
+      try {
+        const response = await clubsApi.getCountries();
+        if (response.success) {
+          setCountries(response.data || []);
+        }
+      } catch (err) {
+        console.error('Error loading countries:', err);
+      }
+    };
+    loadCountries();
+  }, []);
+
+  // Load states when country is selected
+  useEffect(() => {
+    if (!country) {
+      setStatesWithCounts([]);
+      setState('');
+      setCitiesWithCounts([]);
+      setCity('');
+      return;
+    }
+
+    const loadStates = async () => {
+      try {
+        const response = await clubsApi.getStatesByCountry(country);
+        if (response.success) {
+          const sorted = (response.data || []).sort((a, b) => a.name.localeCompare(b.name));
+          setStatesWithCounts(sorted);
+        }
+      } catch (err) {
+        console.error('Error loading states:', err);
+      }
+    };
+    loadStates();
+  }, [country]);
+
+  // Load cities when state is selected
+  useEffect(() => {
+    if (!country || !state) {
+      setCitiesWithCounts([]);
+      setCity('');
+      return;
+    }
+
+    const loadCities = async () => {
+      try {
+        const response = await clubsApi.getCitiesByState(country, state);
+        if (response.success) {
+          const sorted = (response.data || []).sort((a, b) => a.name.localeCompare(b.name));
+          setCitiesWithCounts(sorted);
+        }
+      } catch (err) {
+        console.error('Error loading cities:', err);
+      }
+    };
+    loadCities();
+  }, [country, state]);
 
   // Get user's location on mount with improved two-stage approach
   const getLocation = useCallback(async () => {
@@ -409,31 +473,48 @@ export default function Clubs() {
                 </div>
 
                 {/* Country Filter */}
-                <input
-                  type="text"
-                  placeholder="Country"
+                <select
                   value={country}
                   onChange={(e) => { setCountry(e.target.value); setPage(1); }}
-                  className="w-32 border border-gray-300 rounded-lg px-3 py-2 focus:ring-purple-500 focus:border-purple-500"
-                />
+                  className="w-40 border border-gray-300 rounded-lg px-3 py-2 focus:ring-purple-500 focus:border-purple-500"
+                >
+                  <option value="">All Countries</option>
+                  {countries.map(c => (
+                    <option key={c.name} value={c.name}>
+                      {c.name} ({c.count})
+                    </option>
+                  ))}
+                </select>
 
                 {/* State Filter */}
-                <input
-                  type="text"
-                  placeholder="State"
+                <select
                   value={state}
                   onChange={(e) => { setState(e.target.value); setPage(1); }}
-                  className="w-32 border border-gray-300 rounded-lg px-3 py-2 focus:ring-purple-500 focus:border-purple-500"
-                />
+                  className="w-40 border border-gray-300 rounded-lg px-3 py-2 focus:ring-purple-500 focus:border-purple-500"
+                  disabled={!country}
+                >
+                  <option value="">All States</option>
+                  {statesWithCounts.map(s => (
+                    <option key={s.name} value={s.name}>
+                      {s.name} ({s.count})
+                    </option>
+                  ))}
+                </select>
 
                 {/* City Filter */}
-                <input
-                  type="text"
-                  placeholder="City"
+                <select
                   value={city}
                   onChange={(e) => { setCity(e.target.value); setPage(1); }}
-                  className="w-32 border border-gray-300 rounded-lg px-3 py-2 focus:ring-purple-500 focus:border-purple-500"
-                />
+                  className="w-40 border border-gray-300 rounded-lg px-3 py-2 focus:ring-purple-500 focus:border-purple-500"
+                  disabled={!state}
+                >
+                  <option value="">All Cities</option>
+                  {citiesWithCounts.map(c => (
+                    <option key={c.name} value={c.name}>
+                      {c.name} ({c.count})
+                    </option>
+                  ))}
+                </select>
 
                 {/* Distance Filter (only if location available) */}
                 {userLocation && (

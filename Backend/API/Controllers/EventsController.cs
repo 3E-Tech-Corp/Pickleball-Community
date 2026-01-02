@@ -145,6 +145,75 @@ public class EventsController : ControllerBase
         }
     }
 
+    // GET: /events/countries - Get countries with event counts
+    [HttpGet("countries")]
+    public async Task<ActionResult<ApiResponse<List<LocationCountDto>>>> GetCountries()
+    {
+        try
+        {
+            var countries = await _context.Events
+                .Where(e => e.IsActive && e.IsPublished && !string.IsNullOrEmpty(e.Country))
+                .GroupBy(e => e.Country!)
+                .Select(g => new LocationCountDto { Name = g.Key, Count = g.Count() })
+                .OrderByDescending(x => x.Count)
+                .ThenBy(x => x.Name)
+                .ToListAsync();
+
+            return Ok(new ApiResponse<List<LocationCountDto>> { Success = true, Data = countries });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error fetching countries");
+            return StatusCode(500, new ApiResponse<List<LocationCountDto>> { Success = false, Message = "An error occurred" });
+        }
+    }
+
+    // GET: /events/countries/{country}/states - Get states for a country with event counts
+    [HttpGet("countries/{country}/states")]
+    public async Task<ActionResult<ApiResponse<List<LocationCountDto>>>> GetStatesByCountry(string country)
+    {
+        try
+        {
+            var states = await _context.Events
+                .Where(e => e.IsActive && e.IsPublished && e.Country == country && !string.IsNullOrEmpty(e.State))
+                .GroupBy(e => e.State!)
+                .Select(g => new LocationCountDto { Name = g.Key, Count = g.Count() })
+                .OrderByDescending(x => x.Count)
+                .ThenBy(x => x.Name)
+                .ToListAsync();
+
+            return Ok(new ApiResponse<List<LocationCountDto>> { Success = true, Data = states });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error fetching states for country {Country}", country);
+            return StatusCode(500, new ApiResponse<List<LocationCountDto>> { Success = false, Message = "An error occurred" });
+        }
+    }
+
+    // GET: /events/countries/{country}/states/{state}/cities - Get cities for a state with event counts
+    [HttpGet("countries/{country}/states/{state}/cities")]
+    public async Task<ActionResult<ApiResponse<List<LocationCountDto>>>> GetCitiesByState(string country, string state)
+    {
+        try
+        {
+            var cities = await _context.Events
+                .Where(e => e.IsActive && e.IsPublished && e.Country == country && e.State == state && !string.IsNullOrEmpty(e.City))
+                .GroupBy(e => e.City!)
+                .Select(g => new LocationCountDto { Name = g.Key, Count = g.Count() })
+                .OrderByDescending(x => x.Count)
+                .ThenBy(x => x.Name)
+                .ToListAsync();
+
+            return Ok(new ApiResponse<List<LocationCountDto>> { Success = true, Data = cities });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error fetching cities for {Country}/{State}", country, state);
+            return StatusCode(500, new ApiResponse<List<LocationCountDto>> { Success = false, Message = "An error occurred" });
+        }
+    }
+
     // GET: /events/featured - Get featured events for home page
     [HttpGet("featured")]
     public async Task<ActionResult<ApiResponse<FeaturedEventsDto>>> GetFeaturedEvents([FromQuery] int limit = 6, [FromQuery] int pastDays = 7)

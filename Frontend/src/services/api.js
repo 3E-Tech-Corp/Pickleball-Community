@@ -748,6 +748,11 @@ export const eventsApi = {
     return api.get(`/events/search?${queryParams.toString()}`);
   },
 
+  // Location dropdowns
+  getCountries: () => api.get('/events/countries'),
+  getStatesByCountry: (country) => api.get(`/events/countries/${encodeURIComponent(country)}/states`),
+  getCitiesByState: (country, state) => api.get(`/events/countries/${encodeURIComponent(country)}/states/${encodeURIComponent(state)}/cities`),
+
   // Get featured events for home page
   getFeatured: (limit = 6) => api.get(`/events/featured?limit=${limit}`),
 
@@ -821,6 +826,11 @@ export const clubsApi = {
     if (params.pageSize) queryParams.append('pageSize', params.pageSize);
     return api.get(`/clubs/search?${queryParams.toString()}`);
   },
+
+  // Location dropdowns
+  getCountries: () => api.get('/clubs/countries'),
+  getStatesByCountry: (country) => api.get(`/clubs/countries/${encodeURIComponent(country)}/states`),
+  getCitiesByState: (country, state) => api.get(`/clubs/countries/${encodeURIComponent(country)}/states/${encodeURIComponent(state)}/cities`),
 
   // Get club details
   getClub: (id) => api.get(`/clubs/${id}`),

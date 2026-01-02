@@ -26,6 +26,9 @@ export default function Events() {
   const [country, setCountry] = useState('');
   const [state, setState] = useState('');
   const [city, setCity] = useState('');
+  const [countries, setCountries] = useState([]);
+  const [statesWithCounts, setStatesWithCounts] = useState([]);
+  const [citiesWithCounts, setCitiesWithCounts] = useState([]);
   const [userLocation, setUserLocation] = useState(null);
   const [radiusMiles, setRadiusMiles] = useState(100);
   const [selectedEvent, setSelectedEvent] = useState(null);
@@ -173,6 +176,67 @@ export default function Events() {
     loadTeamUnits();
     loadSkillLevels();
   }, []);
+
+  // Load countries on mount
+  useEffect(() => {
+    const loadCountries = async () => {
+      try {
+        const response = await eventsApi.getCountries();
+        if (response.success) {
+          setCountries(response.data || []);
+        }
+      } catch (err) {
+        console.error('Error loading countries:', err);
+      }
+    };
+    loadCountries();
+  }, []);
+
+  // Load states when country is selected
+  useEffect(() => {
+    if (!country) {
+      setStatesWithCounts([]);
+      setState('');
+      setCitiesWithCounts([]);
+      setCity('');
+      return;
+    }
+
+    const loadStates = async () => {
+      try {
+        const response = await eventsApi.getStatesByCountry(country);
+        if (response.success) {
+          const sorted = (response.data || []).sort((a, b) => a.name.localeCompare(b.name));
+          setStatesWithCounts(sorted);
+        }
+      } catch (err) {
+        console.error('Error loading states:', err);
+      }
+    };
+    loadStates();
+  }, [country]);
+
+  // Load cities when state is selected
+  useEffect(() => {
+    if (!country || !state) {
+      setCitiesWithCounts([]);
+      setCity('');
+      return;
+    }
+
+    const loadCities = async () => {
+      try {
+        const response = await eventsApi.getCitiesByState(country, state);
+        if (response.success) {
+          const sorted = (response.data || []).sort((a, b) => a.name.localeCompare(b.name));
+          setCitiesWithCounts(sorted);
+        }
+      } catch (err) {
+        console.error('Error loading cities:', err);
+      }
+    };
+    loadCities();
+  }, [country, state]);
 
   // Load my events and units when authenticated, set appropriate tab
   useEffect(() => {
@@ -416,21 +480,46 @@ export default function Events() {
                 </select>
 
                 {/* Location Filters */}
-                <input
-                  type="text"
-                  placeholder="State"
+                <select
+                  value={country}
+                  onChange={(e) => { setCountry(e.target.value); setPage(1); }}
+                  className="w-40 border border-gray-300 rounded-lg px-3 py-2 focus:ring-orange-500 focus:border-orange-500"
+                >
+                  <option value="">All Countries</option>
+                  {countries.map(c => (
+                    <option key={c.name} value={c.name}>
+                      {c.name} ({c.count})
+                    </option>
+                  ))}
+                </select>
+
+                <select
                   value={state}
                   onChange={(e) => { setState(e.target.value); setPage(1); }}
-                  className="w-24 border border-gray-300 rounded-lg px-3 py-2 focus:ring-orange-500 focus:border-orange-500"
-                />
+                  className="w-40 border border-gray-300 rounded-lg px-3 py-2 focus:ring-orange-500 focus:border-orange-500"
+                  disabled={!country}
+                >
+                  <option value="">All States</option>
+                  {statesWithCounts.map(s => (
+                    <option key={s.name} value={s.name}>
+                      {s.name} ({s.count})
+                    </option>
+                  ))}
+                </select>
 
-                <input
-                  type="text"
-                  placeholder="City"
+                <select
                   value={city}
                   onChange={(e) => { setCity(e.target.value); setPage(1); }}
-                  className="w-28 border border-gray-300 rounded-lg px-3 py-2 focus:ring-orange-500 focus:border-orange-500"
-                />
+                  className="w-40 border border-gray-300 rounded-lg px-3 py-2 focus:ring-orange-500 focus:border-orange-500"
+                  disabled={!state}
+                >
+                  <option value="">All Cities</option>
+                  {citiesWithCounts.map(c => (
+                    <option key={c.name} value={c.name}>
+                      {c.name} ({c.count})
+                    </option>
+                  ))}
+                </select>
 
                 {/* Distance Filter */}
                 {userLocation && (
