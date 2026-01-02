@@ -594,7 +594,7 @@ public class UsersController : ControllerBase
             return StatusCode(500, new ApiResponse<List<UserProfileDto>>
             {
                 Success = false,
-                Message = "An error occurred while fetching users"
+                Message = $"Error fetching users: {ex.Message}"
             });
         }
     }
