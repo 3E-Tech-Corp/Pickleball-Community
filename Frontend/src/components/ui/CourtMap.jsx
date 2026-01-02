@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { MapPin, Sun, Moon, Phone, Globe, ExternalLink } from 'lucide-react';
+import { MapPin } from 'lucide-react';
 import L from 'leaflet';
 
 export default function CourtMap({
@@ -7,8 +7,11 @@ export default function CourtMap({
   center,
   zoom = 10,
   onCourtClick,
+  onMarkerSelect,
+  selectedCourtId,
   userLocation,
-  fitBounds = true
+  fitBounds = true,
+  showNumbers = false
 }) {
   const mapRef = useRef(null);
   const mapInstanceRef = useRef(null);
@@ -22,10 +25,11 @@ export default function CourtMap({
       const lat = parseFloat(court.latitude || court.gpsLat);
       const lng = parseFloat(court.longitude || court.gpsLng);
       return !isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0;
-    }).map(court => ({
+    }).map((court, index) => ({
       ...court,
       lat: parseFloat(court.latitude || court.gpsLat),
-      lng: parseFloat(court.longitude || court.gpsLng)
+      lng: parseFloat(court.longitude || court.gpsLng),
+      listIndex: index + 1
     }));
   }, [courts]);
 
@@ -75,6 +79,34 @@ export default function CourtMap({
     };
   }, [isClient]);
 
+  // Create numbered marker icon
+  const createNumberedIcon = (number, isSelected) => {
+    const bgColor = isSelected ? '#16a34a' : '#2563eb';
+    const size = isSelected ? 32 : 28;
+
+    return L.divIcon({
+      html: `<div style="
+        width: ${size}px;
+        height: ${size}px;
+        background: ${bgColor};
+        border: 2px solid white;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-weight: 600;
+        font-size: ${isSelected ? '14px' : '12px'};
+        box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+        ${isSelected ? 'transform: scale(1.1);' : ''}
+      ">${number}</div>`,
+      className: 'numbered-marker',
+      iconSize: [size, size],
+      iconAnchor: [size/2, size/2],
+      popupAnchor: [0, -size/2]
+    });
+  };
+
   // Update markers when courts change
   useEffect(() => {
     if (!mapInstanceRef.current) return;
@@ -85,28 +117,44 @@ export default function CourtMap({
     markersRef.current.forEach(marker => marker.remove());
     markersRef.current = [];
 
-    // Create court icon
-    const courtIcon = L.icon({
-      iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
-      iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
-      shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
-      iconSize: [25, 41],
-      iconAnchor: [12, 41],
-      popupAnchor: [1, -34],
-      shadowSize: [41, 41]
-    });
-
     // Add court markers
-    courtsWithCoords.forEach(court => {
-      const popupContent = createPopupContent(court);
-      const marker = L.marker([court.lat, court.lng], { icon: courtIcon })
-        .addTo(map)
-        .bindPopup(popupContent, { maxWidth: 300 });
+    courtsWithCoords.forEach((court, index) => {
+      const number = index + 1;
+      const isSelected = selectedCourtId === court.courtId || selectedCourtId === court.id;
+
+      let marker;
+
+      if (showNumbers) {
+        // Numbered marker
+        const icon = createNumberedIcon(number, isSelected);
+        marker = L.marker([court.lat, court.lng], { icon })
+          .addTo(map);
+      } else {
+        // Default marker
+        const courtIcon = L.icon({
+          iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
+          iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
+          shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+          iconSize: [25, 41],
+          iconAnchor: [12, 41],
+          popupAnchor: [1, -34],
+          shadowSize: [41, 41]
+        });
+        marker = L.marker([court.lat, court.lng], { icon: courtIcon })
+          .addTo(map);
+      }
+
+      // Bind popup
+      const popupContent = createPopupContent(court, number);
+      marker.bindPopup(popupContent, { maxWidth: 300 });
 
       marker.on('click', () => {
+        if (onMarkerSelect) onMarkerSelect(court);
         if (onCourtClick) onCourtClick(court);
       });
 
+      // Store court reference for later
+      marker.courtData = court;
       markersRef.current.push(marker);
     });
 
@@ -134,10 +182,32 @@ export default function CourtMap({
       }
       map.fitBounds(bounds, { padding: [50, 50], maxZoom: 13 });
     }
-  }, [courtsWithCoords, userLocation, fitBounds, onCourtClick]);
+  }, [courtsWithCoords, userLocation, fitBounds, onCourtClick, onMarkerSelect, selectedCourtId, showNumbers]);
+
+  // Update marker styles when selection changes
+  useEffect(() => {
+    if (!mapInstanceRef.current || !showNumbers) return;
+
+    markersRef.current.forEach((marker, index) => {
+      if (!marker.courtData) return; // Skip user location marker
+
+      const court = marker.courtData;
+      const isSelected = selectedCourtId === court.courtId || selectedCourtId === court.id;
+      const number = index + 1;
+
+      const icon = createNumberedIcon(number, isSelected);
+      marker.setIcon(icon);
+
+      // Open popup if selected
+      if (isSelected && mapInstanceRef.current) {
+        marker.openPopup();
+        mapInstanceRef.current.panTo([court.lat, court.lng]);
+      }
+    });
+  }, [selectedCourtId, showNumbers]);
 
   // Create popup HTML content
-  const createPopupContent = (court) => {
+  const createPopupContent = (court, number) => {
     const address = [court.city, court.state].filter(Boolean).join(', ');
 
     let courtTypes = '';
@@ -169,7 +239,10 @@ export default function CourtMap({
 
     return `
       <div style="min-width: 180px;">
-        <h3 style="margin: 0 0 4px 0; font-size: 14px; font-weight: 600; color: #111;">${court.name || 'Unnamed Court'}</h3>
+        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+          ${number ? `<span style="display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; background: #2563eb; color: white; border-radius: 50%; font-size: 12px; font-weight: 600;">${number}</span>` : ''}
+          <h3 style="margin: 0; font-size: 14px; font-weight: 600; color: #111;">${court.name || 'Unnamed Court'}</h3>
+        </div>
         <p style="margin: 0 0 8px 0; font-size: 12px; color: #666;">${address}</p>
         ${courtTypes ? `<div style="margin-bottom: 8px;">${courtTypes}</div>` : ''}
         ${lights}

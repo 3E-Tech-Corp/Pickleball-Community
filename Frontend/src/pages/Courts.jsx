@@ -63,6 +63,7 @@ export default function Courts() {
 
   // Results
   const [selectedCourt, setSelectedCourt] = useState(null);
+  const [hoveredCourtId, setHoveredCourtId] = useState(null); // For map list highlight
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
@@ -712,25 +713,78 @@ export default function Courts() {
         ) : courts.length > 0 ? (
           <>
             {viewMode === 'map' ? (
-              /* Map View */
+              /* Map View with Side List */
               <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-                <div className="h-[600px]">
-                  <CourtMap
-                    courts={courts}
-                    userLocation={userLocation}
-                    onCourtClick={(court) => handleViewDetails(court)}
-                  />
-                </div>
-                {/* Court count */}
-                <div className="p-4 border-t bg-gray-50">
-                  <p className="text-sm text-gray-600 text-center">
-                    Showing {courts.filter(c => c.latitude || c.gpsLat).length} courts with coordinates
-                    {courts.length > courts.filter(c => c.latitude || c.gpsLat).length && (
-                      <span className="text-gray-400">
-                        {' '}({courts.length - courts.filter(c => c.latitude || c.gpsLat).length} without coordinates)
-                      </span>
-                    )}
-                  </p>
+                <div className="flex h-[600px]">
+                  {/* Compact Court List */}
+                  <div className="w-80 border-r border-gray-200 flex flex-col">
+                    <div className="p-3 border-b bg-gray-50">
+                      <p className="text-sm font-medium text-gray-700">
+                        {courts.filter(c => c.latitude || c.gpsLat).length} courts on map
+                      </p>
+                    </div>
+                    <div className="flex-1 overflow-y-auto">
+                      {courts.filter(c => c.latitude || c.gpsLat).map((court, index) => {
+                        const courtId = court.courtId || court.id;
+                        const isSelected = hoveredCourtId === courtId;
+                        return (
+                          <div
+                            key={courtId}
+                            className={`p-3 border-b border-gray-100 cursor-pointer transition-colors ${
+                              isSelected ? 'bg-green-50 border-l-4 border-l-green-500' : 'hover:bg-gray-50'
+                            }`}
+                            onClick={() => handleViewDetails(court)}
+                            onMouseEnter={() => setHoveredCourtId(courtId)}
+                            onMouseLeave={() => setHoveredCourtId(null)}
+                          >
+                            <div className="flex items-start gap-2">
+                              <span className={`flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-semibold text-white ${
+                                isSelected ? 'bg-green-600' : 'bg-blue-600'
+                              }`}>
+                                {index + 1}
+                              </span>
+                              <div className="flex-1 min-w-0">
+                                <h4 className="font-medium text-gray-900 text-sm truncate">
+                                  {court.name || 'Unnamed Court'}
+                                </h4>
+                                <p className="text-xs text-gray-500 truncate">
+                                  {[court.city, court.state].filter(Boolean).join(', ')}
+                                </p>
+                                <div className="flex items-center gap-2 mt-1">
+                                  {court.distance && (
+                                    <span className="text-xs text-green-600 font-medium">
+                                      {court.distance.toFixed(1)} mi
+                                    </span>
+                                  )}
+                                  {(court.indoorNum > 0 || court.outdoorNum > 0) && (
+                                    <span className="text-xs text-gray-400">
+                                      {(court.indoorNum || 0) + (court.outdoorNum || 0) + (court.coveredNum || 0)} courts
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                      {courts.filter(c => !(c.latitude || c.gpsLat)).length > 0 && (
+                        <div className="p-3 text-xs text-gray-400 text-center">
+                          {courts.filter(c => !(c.latitude || c.gpsLat)).length} courts without coordinates
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  {/* Map */}
+                  <div className="flex-1">
+                    <CourtMap
+                      courts={courts}
+                      userLocation={userLocation}
+                      onCourtClick={(court) => handleViewDetails(court)}
+                      onMarkerSelect={(court) => setHoveredCourtId(court.courtId || court.id)}
+                      selectedCourtId={hoveredCourtId}
+                      showNumbers={true}
+                    />
+                  </div>
                 </div>
               </div>
             ) : (
