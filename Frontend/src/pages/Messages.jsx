@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   MessageCircle, ArrowLeft, Send, MoreVertical, Search, Users, User,
   Check, CheckCheck, Reply, Trash2, Edit3, X, Bell, BellOff, Plus,
-  Image, Smile, ChevronLeft, Wifi, WifiOff, UserPlus
+  Image, Smile, ChevronLeft, ChevronRight, Wifi, WifiOff, UserPlus, PanelLeftClose, PanelLeft, Info
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { messagingApi, friendsApi, getSharedAssetUrl } from '../services/api';
@@ -31,6 +31,9 @@ export default function Messages() {
   const [friends, setFriends] = useState([]);
   const [loadingFriends, setLoadingFriends] = useState(false);
   const [addingParticipants, setAddingParticipants] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [showParticipants, setShowParticipants] = useState(false);
+  const [selectedParticipant, setSelectedParticipant] = useState(null);
 
   const messagesEndRef = useRef(null);
   const messagesContainerRef = useRef(null);
@@ -515,27 +518,43 @@ export default function Messages() {
       <div className="flex-1 flex overflow-hidden max-w-6xl w-full mx-auto">
         {/* Conversation List - Hidden on mobile when viewing a conversation */}
         <div className={`
-          w-full md:w-80 lg:w-96 flex-shrink-0 bg-white border-r flex flex-col
+          flex-shrink-0 bg-white border-r flex flex-col transition-all duration-300
           ${showMobileConversation ? 'hidden md:flex' : 'flex'}
+          ${sidebarCollapsed ? 'w-16' : 'w-full md:w-80 lg:w-96'}
         `}>
+          {/* Collapse toggle - desktop only */}
+          <div className="hidden md:flex items-center justify-end p-2 border-b">
+            <button
+              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+              className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+              title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            >
+              {sidebarCollapsed ? <PanelLeft className="w-5 h-5" /> : <PanelLeftClose className="w-5 h-5" />}
+            </button>
+          </div>
+
           {loading ? (
             <div className="flex-1 flex items-center justify-center">
               <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-600"></div>
             </div>
           ) : conversations.length === 0 ? (
-            <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
-              <MessageCircle className="w-16 h-16 text-gray-300 mb-4" />
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">No messages yet</h3>
-              <p className="text-gray-500 mb-4">
-                Start a conversation with a friend!
-              </p>
-              <button
-                onClick={() => navigate('/friends')}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700"
-              >
-                <Users className="w-5 h-5" />
-                Find Friends
-              </button>
+            <div className={`flex-1 flex flex-col items-center justify-center text-center ${sidebarCollapsed ? 'p-2' : 'p-6'}`}>
+              <MessageCircle className={`text-gray-300 mb-4 ${sidebarCollapsed ? 'w-8 h-8' : 'w-16 h-16'}`} />
+              {!sidebarCollapsed && (
+                <>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">No messages yet</h3>
+                  <p className="text-gray-500 mb-4">
+                    Start a conversation with a friend!
+                  </p>
+                  <button
+                    onClick={() => navigate('/friends')}
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700"
+                  >
+                    <Users className="w-5 h-5" />
+                    Find Friends
+                  </button>
+                </>
+              )}
             </div>
           ) : (
             <div className="flex-1 overflow-y-auto">
@@ -544,9 +563,11 @@ export default function Messages() {
                   key={conversation.id}
                   onClick={() => handleSelectConversation(conversation)}
                   className={`
-                    w-full p-4 flex items-start gap-3 hover:bg-gray-50 border-b transition-colors text-left
+                    w-full hover:bg-gray-50 border-b transition-colors text-left
                     ${selectedConversation?.id === conversation.id ? 'bg-blue-50' : ''}
+                    ${sidebarCollapsed ? 'p-2 flex items-center justify-center' : 'p-4 flex items-start gap-3'}
                   `}
+                  title={sidebarCollapsed ? (conversation.displayName || conversation.name || 'Conversation') : undefined}
                 >
                   {/* Avatar */}
                   <div className="relative flex-shrink-0">
@@ -554,14 +575,14 @@ export default function Messages() {
                       <img
                         src={getSharedAssetUrl(conversation.displayAvatar)}
                         alt=""
-                        className="w-12 h-12 rounded-full object-cover"
+                        className={`rounded-full object-cover ${sidebarCollapsed ? 'w-10 h-10' : 'w-12 h-12'}`}
                       />
                     ) : (
-                      <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center">
+                      <div className={`rounded-full bg-blue-100 flex items-center justify-center ${sidebarCollapsed ? 'w-10 h-10' : 'w-12 h-12'}`}>
                         {conversation.type === 'Direct' ? (
-                          <User className="w-6 h-6 text-blue-600" />
+                          <User className={sidebarCollapsed ? 'w-5 h-5 text-blue-600' : 'w-6 h-6 text-blue-600'} />
                         ) : (
-                          <Users className="w-6 h-6 text-blue-600" />
+                          <Users className={sidebarCollapsed ? 'w-5 h-5 text-blue-600' : 'w-6 h-6 text-blue-600'} />
                         )}
                       </div>
                     )}
@@ -572,27 +593,29 @@ export default function Messages() {
                     )}
                   </div>
 
-                  {/* Content */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between mb-1">
-                      <h3 className={`font-medium truncate ${
-                        conversation.unreadCount > 0 ? 'text-gray-900' : 'text-gray-700'
+                  {/* Content - hidden when collapsed */}
+                  {!sidebarCollapsed && (
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between mb-1">
+                        <h3 className={`font-medium truncate ${
+                          conversation.unreadCount > 0 ? 'text-gray-900' : 'text-gray-700'
+                        }`}>
+                          {conversation.displayName || conversation.name || 'Conversation'}
+                        </h3>
+                        <span className="text-xs text-gray-500 flex-shrink-0 ml-2">
+                          {formatConversationTime(conversation.lastMessageAt)}
+                        </span>
+                      </div>
+                      <p className={`text-sm truncate ${
+                        conversation.unreadCount > 0 ? 'text-gray-900 font-medium' : 'text-gray-500'
                       }`}>
-                        {conversation.displayName || conversation.name || 'Conversation'}
-                      </h3>
-                      <span className="text-xs text-gray-500 flex-shrink-0 ml-2">
-                        {formatConversationTime(conversation.lastMessageAt)}
-                      </span>
+                        {conversation.lastMessagePreview || 'No messages yet'}
+                      </p>
                     </div>
-                    <p className={`text-sm truncate ${
-                      conversation.unreadCount > 0 ? 'text-gray-900 font-medium' : 'text-gray-500'
-                    }`}>
-                      {conversation.lastMessagePreview || 'No messages yet'}
-                    </p>
-                  </div>
+                  )}
 
-                  {/* Muted indicator */}
-                  {conversation.isMuted && (
+                  {/* Muted indicator - hidden when collapsed */}
+                  {!sidebarCollapsed && conversation.isMuted && (
                     <BellOff className="w-4 h-4 text-gray-400 flex-shrink-0" />
                   )}
                 </button>
@@ -603,113 +626,219 @@ export default function Messages() {
 
         {/* Messages View - Full screen on mobile, side panel on desktop */}
         <div className={`
-          flex-1 flex flex-col bg-gray-50
+          flex-1 flex bg-gray-50
           ${showMobileConversation ? 'flex' : 'hidden md:flex'}
         `}>
           {selectedConversation ? (
             <>
-              {/* Messages */}
-              <div
-                ref={messagesContainerRef}
-                className="flex-1 overflow-y-auto p-4 space-y-3"
-              >
-                {/* Load more button */}
-                {hasMoreMessages && (
-                  <div className="text-center">
+              {/* Main messages area */}
+              <div className="flex-1 flex flex-col min-w-0">
+                {/* Messages */}
+                <div
+                  ref={messagesContainerRef}
+                  className="flex-1 overflow-y-auto p-4 space-y-3"
+                >
+                  {/* Load more button */}
+                  {hasMoreMessages && (
+                    <div className="text-center">
+                      <button
+                        onClick={handleLoadMoreMessages}
+                        disabled={loadingMessages}
+                        className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+                      >
+                        {loadingMessages ? 'Loading...' : 'Load older messages'}
+                      </button>
+                    </div>
+                  )}
+
+                  {loadingMessages && messages.length === 0 ? (
+                    <div className="flex items-center justify-center py-12">
+                      <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-600"></div>
+                    </div>
+                  ) : (
+                    messages.map((message, index) => (
+                      <MessageBubble
+                        key={message.id}
+                        message={message}
+                        isOwn={message.isOwn}
+                        showAvatar={
+                          !message.isOwn &&
+                          (index === 0 || messages[index - 1].senderId !== message.senderId)
+                        }
+                        isGroupChat={selectedConversation?.type !== 'Direct'}
+                        onReply={() => {
+                          setReplyingTo(message);
+                          inputRef.current?.focus();
+                        }}
+                      />
+                    ))
+                  )}
+                  <div ref={messagesEndRef} />
+                </div>
+
+                {/* Typing indicator */}
+                {getTypingIndicator() && (
+                  <div className="px-4 py-2 text-sm text-gray-500 italic">
+                    {getTypingIndicator()}
+                  </div>
+                )}
+
+                {/* Reply preview */}
+                {replyingTo && (
+                  <div className="px-4 py-2 bg-gray-100 border-t flex items-center gap-2">
+                    <Reply className="w-4 h-4 text-gray-500" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs text-gray-500">
+                        Replying to {replyingTo.senderName}
+                      </p>
+                      <p className="text-sm text-gray-700 truncate">
+                        {replyingTo.content}
+                      </p>
+                    </div>
                     <button
-                      onClick={handleLoadMoreMessages}
-                      disabled={loadingMessages}
-                      className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+                      onClick={() => setReplyingTo(null)}
+                      className="p-1 text-gray-400 hover:text-gray-600"
                     >
-                      {loadingMessages ? 'Loading...' : 'Load older messages'}
+                      <X className="w-4 h-4" />
                     </button>
                   </div>
                 )}
 
-                {loadingMessages && messages.length === 0 ? (
-                  <div className="flex items-center justify-center py-12">
-                    <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-600"></div>
-                  </div>
-                ) : (
-                  messages.map((message, index) => (
-                    <MessageBubble
-                      key={message.id}
-                      message={message}
-                      isOwn={message.isOwn}
-                      showAvatar={
-                        !message.isOwn &&
-                        (index === 0 || messages[index - 1].senderId !== message.senderId)
-                      }
-                      isGroupChat={selectedConversation?.type !== 'Direct'}
-                      onReply={() => {
-                        setReplyingTo(message);
-                        inputRef.current?.focus();
+                {/* Message input */}
+                <form
+                  onSubmit={handleSendMessage}
+                  className="p-4 bg-white border-t flex items-end gap-2"
+                >
+                  <div className="flex-1">
+                    <textarea
+                      ref={inputRef}
+                      value={newMessage}
+                      onChange={(e) => setNewMessage(e.target.value)}
+                      onInput={handleTyping}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault();
+                          handleSendMessage(e);
+                        }
                       }}
+                      placeholder="Type a message..."
+                      rows={1}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-2xl resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      style={{ maxHeight: '120px' }}
                     />
-                  ))
-                )}
-                <div ref={messagesEndRef} />
-              </div>
-
-              {/* Typing indicator */}
-              {getTypingIndicator() && (
-                <div className="px-4 py-2 text-sm text-gray-500 italic">
-                  {getTypingIndicator()}
-                </div>
-              )}
-
-              {/* Reply preview */}
-              {replyingTo && (
-                <div className="px-4 py-2 bg-gray-100 border-t flex items-center gap-2">
-                  <Reply className="w-4 h-4 text-gray-500" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs text-gray-500">
-                      Replying to {replyingTo.senderName}
-                    </p>
-                    <p className="text-sm text-gray-700 truncate">
-                      {replyingTo.content}
-                    </p>
                   </div>
                   <button
-                    onClick={() => setReplyingTo(null)}
-                    className="p-1 text-gray-400 hover:text-gray-600"
+                    type="submit"
+                    disabled={!newMessage.trim() || sendingMessage}
+                    className="p-3 bg-blue-600 text-white rounded-full hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
                   >
-                    <X className="w-4 h-4" />
+                    <Send className="w-5 h-5" />
                   </button>
-                </div>
-              )}
+                </form>
+              </div>
 
-              {/* Message input */}
-              <form
-                onSubmit={handleSendMessage}
-                className="p-4 bg-white border-t flex items-end gap-2"
-              >
-                <div className="flex-1">
-                  <textarea
-                    ref={inputRef}
-                    value={newMessage}
-                    onChange={(e) => setNewMessage(e.target.value)}
-                    onInput={handleTyping}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && !e.shiftKey) {
-                        e.preventDefault();
-                        handleSendMessage(e);
-                      }
-                    }}
-                    placeholder="Type a message..."
-                    rows={1}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-2xl resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    style={{ maxHeight: '120px' }}
-                  />
-                </div>
-                <button
-                  type="submit"
-                  disabled={!newMessage.trim() || sendingMessage}
-                  className="p-3 bg-blue-600 text-white rounded-full hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
-                >
-                  <Send className="w-5 h-5" />
-                </button>
-              </form>
+              {/* Participants Panel Toggle - Right side */}
+              <div className="hidden md:flex flex-shrink-0 border-l bg-white">
+                {/* Toggle button when collapsed */}
+                {!showParticipants && (
+                  <button
+                    onClick={() => setShowParticipants(true)}
+                    className="w-12 h-full flex flex-col items-center pt-4 text-gray-500 hover:text-gray-700 hover:bg-gray-50"
+                    title="Show participants"
+                  >
+                    <Users className="w-5 h-5 mb-2" />
+                    <span className="text-xs font-medium">
+                      {conversationDetails?.participants?.length || 0}
+                    </span>
+                  </button>
+                )}
+
+                {/* Expanded participants panel */}
+                {showParticipants && (
+                  <div className="w-64 flex flex-col">
+                    <div className="p-3 border-b flex items-center justify-between">
+                      <h3 className="font-medium text-gray-900">Participants</h3>
+                      <button
+                        onClick={() => setShowParticipants(false)}
+                        className="p-1 text-gray-400 hover:text-gray-600 rounded"
+                        title="Hide participants"
+                      >
+                        <ChevronRight className="w-5 h-5" />
+                      </button>
+                    </div>
+                    <div className="flex-1 overflow-y-auto p-2">
+                      {conversationDetails?.participants?.map(participant => (
+                        <button
+                          key={participant.userId}
+                          onClick={() => setSelectedParticipant(
+                            selectedParticipant?.userId === participant.userId ? null : participant
+                          )}
+                          className={`w-full p-2 rounded-lg flex items-center gap-3 hover:bg-gray-100 transition-colors ${
+                            selectedParticipant?.userId === participant.userId ? 'bg-blue-50' : ''
+                          }`}
+                        >
+                          {participant.avatar ? (
+                            <img
+                              src={getSharedAssetUrl(participant.avatar)}
+                              alt=""
+                              className="w-10 h-10 rounded-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
+                              <User className="w-5 h-5 text-blue-600" />
+                            </div>
+                          )}
+                          <div className="flex-1 min-w-0 text-left">
+                            <p className="font-medium text-gray-900 truncate text-sm">
+                              {participant.displayName || 'Unknown'}
+                              {participant.userId === user?.id && ' (You)'}
+                            </p>
+                            {participant.role && participant.role !== 'Member' && (
+                              <p className="text-xs text-blue-600">{participant.role}</p>
+                            )}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Selected participant details */}
+                    {selectedParticipant && selectedParticipant.userId !== user?.id && (
+                      <div className="p-3 border-t bg-gray-50">
+                        <div className="flex items-center gap-3 mb-3">
+                          {selectedParticipant.avatar ? (
+                            <img
+                              src={getSharedAssetUrl(selectedParticipant.avatar)}
+                              alt=""
+                              className="w-12 h-12 rounded-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center">
+                              <User className="w-6 h-6 text-blue-600" />
+                            </div>
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-gray-900 truncate">
+                              {selectedParticipant.displayName}
+                            </p>
+                            {selectedParticipant.city && (
+                              <p className="text-sm text-gray-500 truncate">
+                                {selectedParticipant.city}{selectedParticipant.state && `, ${selectedParticipant.state}`}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => navigate(`/users/${selectedParticipant.userId}`)}
+                          className="w-full py-2 px-3 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 flex items-center justify-center gap-2"
+                        >
+                          <User className="w-4 h-4" />
+                          View Profile
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             </>
           ) : (
             <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
