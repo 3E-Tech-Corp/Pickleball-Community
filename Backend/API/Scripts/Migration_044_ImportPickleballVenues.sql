@@ -15,7 +15,7 @@ IF NOT EXISTS (
       AND ABS(TRY_CAST(GPSLng AS FLOAT) - (-80.2716685)) < @CoordTolerance
 )
 BEGIN
-    INSERT INTO Venues (Name, Addr1, City, State, Zip, Country, GPSLat, GPSLng, OutdoorNum, Lights)
+    INSERT INTO Venues (Name, Addr1, City, State, Zip, Country, GPSLat, GPSLng, Outdoor_Num, Lights)
     VALUES (
         'Plantation Central Park (Pickleball Courts)',
         '9151 NW 2nd St',
@@ -44,7 +44,7 @@ IF NOT EXISTS (
       AND ABS(TRY_CAST(GPSLng AS FLOAT) - (-81.763739921)) < @CoordTolerance
 )
 BEGIN
-    INSERT INTO Venues (Name, Addr1, City, State, Zip, Country, GPSLat, GPSLng, OutdoorNum, Lights)
+    INSERT INTO Venues (Name, Addr1, City, State, Zip, Country, GPSLat, GPSLng, Outdoor_Num, Lights)
     VALUES (
         'East Naples Community Park (USOP National Pickleball Center)',
         '3500 Thomasson Dr',
@@ -73,7 +73,7 @@ IF NOT EXISTS (
       AND ABS(TRY_CAST(GPSLng AS FLOAT) - (-117.2348861)) < @CoordTolerance
 )
 BEGIN
-    INSERT INTO Venues (Name, Addr1, City, State, Zip, Country, GPSLat, GPSLng, OutdoorNum, Lights)
+    INSERT INTO Venues (Name, Addr1, City, State, Zip, Country, GPSLat, GPSLng, Outdoor_Num, Lights)
     VALUES (
         'Barnes Tennis Center (USA Pickleball Nationals)',
         '4490 W Point Loma Blvd',
@@ -102,7 +102,7 @@ IF NOT EXISTS (
       AND ABS(TRY_CAST(GPSLng AS FLOAT) - (-80.1510102)) < @CoordTolerance
 )
 BEGIN
-    INSERT INTO Venues (Name, Addr1, City, State, Zip, Country, GPSLat, GPSLng, IndoorNum, Lights)
+    INSERT INTO Venues (Name, Addr1, City, State, Zip, Country, GPSLat, GPSLng, Indoor_Num, Lights)
     VALUES (
         'The Fort (Fort Lauderdale Pickleball Club)',
         '891 Southwest 34th Street',
@@ -131,7 +131,7 @@ IF NOT EXISTS (
       AND ABS(TRY_CAST(GPSLng AS FLOAT) - (-80.132745)) < @CoordTolerance
 )
 BEGIN
-    INSERT INTO Venues (Name, Addr1, City, State, Zip, Country, GPSLat, GPSLng, OutdoorNum, Lights)
+    INSERT INTO Venues (Name, Addr1, City, State, Zip, Country, GPSLat, GPSLng, Outdoor_Num, Lights)
     VALUES (
         'Holiday Park (Pickleball Courts)',
         '1150 G Harold Martin Dr',
@@ -160,7 +160,7 @@ IF NOT EXISTS (
       AND ABS(TRY_CAST(GPSLng AS FLOAT) - (-80.11586)) < @CoordTolerance
 )
 BEGIN
-    INSERT INTO Venues (Name, Addr1, City, State, Zip, Country, GPSLat, GPSLng, OutdoorNum, Lights)
+    INSERT INTO Venues (Name, Addr1, City, State, Zip, Country, GPSLat, GPSLng, Outdoor_Num, Lights)
     VALUES (
         'George English Park (Pickleball Courts)',
         '1101 Bayview Dr',
@@ -189,7 +189,7 @@ IF NOT EXISTS (
       AND ABS(TRY_CAST(GPSLng AS FLOAT) - (-80.190198)) < @CoordTolerance
 )
 BEGIN
-    INSERT INTO Venues (Name, Addr1, City, State, Zip, Country, GPSLat, GPSLng, OutdoorNum, Lights)
+    INSERT INTO Venues (Name, Addr1, City, State, Zip, Country, GPSLat, GPSLng, Outdoor_Num, Lights)
     VALUES (
         'Benenson Park (Pickleball Courts)',
         '1330 SW 33rd Terrace',
@@ -218,7 +218,7 @@ IF NOT EXISTS (
       AND ABS(TRY_CAST(GPSLng AS FLOAT) - (-81.04128)) < @CoordTolerance
 )
 BEGIN
-    INSERT INTO Venues (Name, Addr1, City, State, Zip, Country, GPSLat, GPSLng, OutdoorNum, CoveredNum, Lights)
+    INSERT INTO Venues (Name, Addr1, City, State, Zip, Country, GPSLat, GPSLng, Outdoor_Num, Covered_Num, Lights)
     VALUES (
         'Pictona at Holly Hill',
         '1060 Ridgewood Ave',
