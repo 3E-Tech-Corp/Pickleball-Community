@@ -76,6 +76,7 @@ export default function Courts() {
     if (!navigator.geolocation) {
       setLocationError('Geolocation is not supported by your browser');
       setSearchMode('search'); // Auto-switch to Full Search
+      setSortBy('name'); // Fall back to name sort
       return;
     }
 
@@ -87,6 +88,7 @@ export default function Courts() {
           setLocationBlocked(true);
           setLocationError('Location access is blocked. Use Full Search or enable location in browser settings.');
           setSearchMode('search'); // Auto-switch to Full Search
+          setSortBy('name'); // Fall back to name sort
           return;
         }
         setLocationBlocked(false);
@@ -118,6 +120,7 @@ export default function Courts() {
       });
       setGettingLocation(false);
       setLocationBlocked(false);
+      setSortBy('distance'); // Default to distance sort when location is available
     } catch (firstError) {
       // Second try: high accuracy (GPS) - 15 second timeout
       try {
@@ -128,20 +131,24 @@ export default function Courts() {
         });
         setGettingLocation(false);
         setLocationBlocked(false);
+        setSortBy('distance'); // Default to distance sort when location is available
       } catch (error) {
         console.warn('Geolocation error:', error);
         if (error.code === error.PERMISSION_DENIED) {
           setLocationBlocked(true);
           setLocationError('Location access was denied. Use Full Search or allow location in browser settings.');
+          setSortBy('name'); // Fall back to name sort
         } else if (error.code === error.POSITION_UNAVAILABLE) {
           setLocationError('Location unavailable. Use Full Search to find courts by address.');
+          setSortBy('name'); // Fall back to name sort
         } else if (error.code === error.TIMEOUT) {
           setLocationError('Location request timed out. Use Full Search to find courts by address.');
+          setSortBy('name'); // Fall back to name sort
         } else {
           setLocationError('Unable to get your location. Use Full Search to find courts by address.');
+          setSortBy('name'); // Fall back to name sort
         }
         setGettingLocation(false);
-        // Don't auto-switch for timeout - user might want to try again
       }
     }
   }, []);
