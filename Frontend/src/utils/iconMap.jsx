@@ -36,7 +36,6 @@ import {
   Bike,
   Compass,
   Rocket,
-  Handshake,
   Gift,
   Cake,
   Ticket,
@@ -63,7 +62,6 @@ import {
   Tent,
   Mountain,
   TreePine,
-  Volleyball,
   Stethoscope,
   Bookmark,
   Tag,
@@ -95,8 +93,6 @@ const iconMap = {
   swords: Swords,
   Shield: Shield,
   shield: Shield,
-  Volleyball: Volleyball,
-  volleyball: Volleyball,
 
   // Calendar/Time
   Calendar: Calendar,
@@ -238,8 +234,6 @@ const iconMap = {
   'at-sign': AtSign,
   Ticket: Ticket,
   ticket: Ticket,
-  Handshake: Handshake,
-  handshake: Handshake,
 
   // Gaming & Entertainment
   Gamepad2: Gamepad2,
