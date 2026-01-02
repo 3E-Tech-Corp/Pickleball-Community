@@ -1113,6 +1113,56 @@ export const skillLevelsApi = {
   delete: (id) => api.delete(`/skilllevels/${id}`)
 }
 
+// Tournament API
+export const tournamentApi = {
+  // Score Formats
+  getScoreFormats: () => api.get('/tournament/score-formats'),
+
+  // Event Details with Divisions
+  getEventDetails: (eventId) => api.get(`/tournament/events/${eventId}/details`),
+
+  // Registration
+  registerForEvent: (eventId, data) => api.post(`/tournament/events/${eventId}/register`, data),
+
+  // Units
+  getEventUnits: (eventId, divisionId = null) => {
+    const params = divisionId ? `?divisionId=${divisionId}` : ''
+    return api.get(`/tournament/events/${eventId}/units${params}`)
+  },
+  requestToJoinUnit: (unitId, message) => api.post(`/tournament/units/${unitId}/join-request`, { unitId, message }),
+  respondToJoinRequest: (requestId, accept, message = null) =>
+    api.post('/tournament/units/join-request/respond', { requestId, accept, message }),
+
+  // Tournament Courts
+  getTournamentCourts: (eventId) => api.get(`/tournament/events/${eventId}/courts`),
+  createTournamentCourt: (eventId, data) => api.post(`/tournament/events/${eventId}/courts`, data),
+
+  // Match Scheduling
+  generateSchedule: (divisionId, data) => api.post(`/tournament/divisions/${divisionId}/generate-schedule`, data),
+  assignUnitNumbers: (divisionId) => api.post(`/tournament/divisions/${divisionId}/assign-unit-numbers`),
+  getSchedule: (divisionId) => api.get(`/tournament/divisions/${divisionId}/schedule`),
+
+  // Game Management
+  assignGameToCourt: (gameId, courtId) =>
+    api.post('/tournament/games/assign-court', { gameId, tournamentCourtId: courtId }),
+  updateGameStatus: (gameId, status) =>
+    api.post('/tournament/games/update-status', { gameId, status }),
+  submitScore: (gameId, unit1Score, unit2Score) =>
+    api.post('/tournament/games/submit-score', { gameId, unit1Score, unit2Score }),
+  confirmScore: (gameId, confirm, disputeReason = null) =>
+    api.post('/tournament/games/confirm-score', { gameId, confirm, disputeReason }),
+
+  // Check-in
+  checkIn: (eventId, divisionId = null) =>
+    api.post(`/tournament/events/${eventId}/check-in`, { eventId, divisionId }),
+  getCheckInStatus: (eventId) => api.get(`/tournament/events/${eventId}/check-in-status`),
+
+  // Dashboard
+  getDashboard: (eventId) => api.get(`/tournament/events/${eventId}/dashboard`),
+  updateTournamentStatus: (eventId, status) =>
+    api.put(`/tournament/events/${eventId}/status?status=${status}`)
+}
+
 // Messaging API
 export const messagingApi = {
   // Conversations

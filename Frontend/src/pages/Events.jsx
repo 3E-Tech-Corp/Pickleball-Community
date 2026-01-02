@@ -4,6 +4,8 @@ import { Calendar, MapPin, Clock, Users, Filter, Search, Plus, DollarSign, Chevr
 import { useAuth } from '../contexts/AuthContext';
 import { eventsApi, eventTypesApi, courtsApi, teamUnitsApi, skillLevelsApi, getSharedAssetUrl } from '../services/api';
 import CourtMap from '../components/ui/CourtMap';
+import { getIconByName } from '../utils/iconMap';
+import { getColorValues } from '../utils/colorMap';
 
 export default function Events() {
   const { user, isAuthenticated } = useAuth();
@@ -528,9 +530,19 @@ export default function Events() {
                                           {event.distance.toFixed(1)} mi
                                         </span>
                                       )}
-                                      <span className="text-xs text-gray-400">
-                                        {event.eventTypeName || 'Event'}
-                                      </span>
+                                      {(() => {
+                                        const EventIcon = event.eventTypeIcon ? getIconByName(event.eventTypeIcon, null) : null;
+                                        const colors = getColorValues(event.eventTypeColor);
+                                        return (
+                                          <span
+                                            className="text-xs flex items-center gap-1"
+                                            style={{ color: colors.text }}
+                                          >
+                                            {EventIcon && <EventIcon className="w-3 h-3" />}
+                                            {event.eventTypeName || 'Event'}
+                                          </span>
+                                        );
+                                      })()}
                                     </div>
                                   </div>
                                 </div>
@@ -783,9 +795,22 @@ function EventCard({ event, formatDate, formatTime, onViewDetails, showManage = 
       )}
       <div className="p-5">
         <div className="flex items-start justify-between mb-2">
-          <span className="px-2 py-1 text-xs font-medium rounded-full bg-orange-100 text-orange-700">
-            {event.eventTypeName || 'Event'}
-          </span>
+          {(() => {
+            const EventIcon = event.eventTypeIcon ? getIconByName(event.eventTypeIcon, Trophy) : Trophy;
+            const colors = getColorValues(event.eventTypeColor);
+            return (
+              <span
+                className="px-2 py-1 text-xs font-medium rounded-full flex items-center gap-1"
+                style={{
+                  backgroundColor: colors.bg,
+                  color: colors.text
+                }}
+              >
+                <EventIcon className="w-3 h-3" />
+                {event.eventTypeName || 'Event'}
+              </span>
+            );
+          })()}
           {event.registrationFee > 0 && (
             <span className="text-sm font-medium text-gray-700">
               ${event.registrationFee}
@@ -1240,19 +1265,48 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, formatDate, f
                 <X className="w-5 h-5" />
               </button>
               <div className="absolute bottom-4 left-6 text-white">
-                <span className={`px-2 py-1 text-xs font-medium rounded-full bg-${status.color}-500`}>
-                  Registration {status.text}
-                </span>
-                <h2 className="text-2xl font-bold mt-2">{event.name}</h2>
+                <div className="flex items-center gap-2 mb-2">
+                  <span className={`px-2 py-1 text-xs font-medium rounded-full bg-${status.color}-500`}>
+                    Registration {status.text}
+                  </span>
+                  {event.eventTypeName && (() => {
+                    const EventTypeIcon = event.eventTypeIcon ? getIconByName(event.eventTypeIcon, Trophy) : Trophy;
+                    return (
+                      <span className="px-2 py-1 text-xs font-medium rounded-full bg-white/20 flex items-center gap-1">
+                        <EventTypeIcon className="w-3 h-3" />
+                        {event.eventTypeName}
+                      </span>
+                    );
+                  })()}
+                </div>
+                <h2 className="text-2xl font-bold">{event.name}</h2>
               </div>
             </div>
           ) : (
             <div className="px-6 py-4 border-b flex items-center justify-between">
               <div>
-                <span className={`px-2 py-1 text-xs font-medium rounded-full bg-${status.color}-100 text-${status.color}-700`}>
-                  Registration {status.text}
-                </span>
-                <h2 className="text-xl font-semibold text-gray-900 mt-1">{event.name}</h2>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className={`px-2 py-1 text-xs font-medium rounded-full bg-${status.color}-100 text-${status.color}-700`}>
+                    Registration {status.text}
+                  </span>
+                  {event.eventTypeName && (() => {
+                    const EventTypeIcon = event.eventTypeIcon ? getIconByName(event.eventTypeIcon, Trophy) : Trophy;
+                    const colors = getColorValues(event.eventTypeColor);
+                    return (
+                      <span
+                        className="px-2 py-1 text-xs font-medium rounded-full flex items-center gap-1"
+                        style={{
+                          backgroundColor: colors.bg,
+                          color: colors.text
+                        }}
+                      >
+                        <EventTypeIcon className="w-3 h-3" />
+                        {event.eventTypeName}
+                      </span>
+                    );
+                  })()}
+                </div>
+                <h2 className="text-xl font-semibold text-gray-900">{event.name}</h2>
               </div>
               <button onClick={onClose} className="p-2 text-gray-400 hover:text-gray-600">
                 <X className="w-5 h-5" />
