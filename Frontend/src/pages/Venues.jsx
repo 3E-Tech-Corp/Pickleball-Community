@@ -309,13 +309,13 @@ export default function Venues() {
           });
         }
 
-        setCourts(items);
+        setVenues(items);
         setTotalPages(response.data.totalPages || 1);
         setTotalCount(response.data.totalCount || 0);
       }
     } catch (err) {
-      console.error('Error loading courts:', err);
-      setCourts([]);
+      console.error('Error loading venues:', err);
+      setVenues([]);
     } finally {
       setLoading(false);
     }
@@ -695,9 +695,9 @@ export default function Venues() {
         </div>
 
         {/* Results Count */}
-        {!loading && courts.length > 0 && (
+        {!loading && venues.length > 0 && (
           <div className="mb-4 text-sm text-gray-600">
-            Showing {courts.length} of {totalCount.toLocaleString()} courts
+            Showing {venues.length} of {totalCount.toLocaleString()} venues
             {searchMode === 'distance' && userLocation && ` within ${radiusMiles} miles`}
             {searchMode === 'full' && selectedCountry && ` in ${selectedCountry}`}
             {searchMode === 'full' && selectedState && `, ${selectedState}`}
@@ -710,21 +710,21 @@ export default function Venues() {
           <div className="flex items-center justify-center py-12">
             <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-green-600"></div>
           </div>
-        ) : courts.length > 0 ? (
+        ) : venues.length > 0 ? (
           <>
             {viewMode === 'map' ? (
               /* Map View with Side List */
               <div className="bg-white rounded-xl shadow-sm overflow-hidden">
                 <div className="flex h-[600px]">
-                  {/* Compact Court List */}
+                  {/* Compact Venue List */}
                   <div className="w-80 border-r border-gray-200 flex flex-col">
                     <div className="p-3 border-b bg-gray-50">
                       <p className="text-sm font-medium text-gray-700">
-                        {courts.filter(c => c.latitude || c.gpsLat).length} courts on map
+                        {venues.filter(c => c.latitude || c.gpsLat).length} venues on map
                       </p>
                     </div>
                     <div className="flex-1 overflow-y-auto">
-                      {courts.filter(c => c.latitude || c.gpsLat).map((court, index) => {
+                      {venues.filter(c => c.latitude || c.gpsLat).map((court, index) => {
                         const courtId = court.courtId || court.id;
                         const isSelected = hoveredCourtId === courtId;
                         return (
@@ -767,9 +767,9 @@ export default function Venues() {
                           </div>
                         );
                       })}
-                      {courts.filter(c => !(c.latitude || c.gpsLat)).length > 0 && (
+                      {venues.filter(c => !(c.latitude || c.gpsLat)).length > 0 && (
                         <div className="p-3 text-xs text-gray-400 text-center">
-                          {courts.filter(c => !(c.latitude || c.gpsLat)).length} courts without coordinates
+                          {venues.filter(c => !(c.latitude || c.gpsLat)).length} venues without coordinates
                         </div>
                       )}
                     </div>
@@ -777,11 +777,11 @@ export default function Venues() {
                   {/* Map */}
                   <div className="flex-1">
                     <VenueMap
-                      courts={courts}
+                      venues={venues}
                       userLocation={userLocation}
-                      onCourtClick={(court) => handleViewDetails(court)}
+                      onVenueClick={(court) => handleViewDetails(court)}
                       onMarkerSelect={(court) => setHoveredCourtId(court.courtId || court.id)}
-                      selectedCourtId={hoveredCourtId}
+                      selectedVenueId={hoveredCourtId}
                       showNumbers={true}
                     />
                   </div>
@@ -790,7 +790,7 @@ export default function Venues() {
             ) : (
               /* List View */
               <div className="grid gap-6 md:grid-cols-2">
-                {courts.map(court => (
+                {venues.map(court => (
                   <CourtCard
                     key={court.id}
                     court={court}
