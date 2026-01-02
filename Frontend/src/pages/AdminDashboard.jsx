@@ -34,6 +34,7 @@ const AdminDashboard = () => {
   const [selectedUser, setSelectedUser] = useState(null)
   const [isUserModalOpen, setIsUserModalOpen] = useState(false)
   const [savingUser, setSavingUser] = useState(false)
+  const [usersError, setUsersError] = useState(null)
 
   // Theme state
   const [themeSettings, setThemeSettings] = useState(null)
@@ -73,13 +74,24 @@ const AdminDashboard = () => {
 
   const fetchUsers = async () => {
     setLoading(true)
+    setUsersError(null)
     try {
       const response = await userApi.getAllUsers()
       if (response.success && response.data) {
         setUsers(response.data)
+      } else if (response.success === false) {
+        setUsersError(response.message || 'Failed to load users')
+      } else if (Array.isArray(response)) {
+        // Handle case where API returns array directly
+        setUsers(response)
+      } else {
+        setUsersError('Unexpected response format from server')
       }
     } catch (error) {
       console.error('Error fetching users:', error)
+      const errorMessage = typeof error === 'string' ? error :
+        error?.message || 'Failed to fetch users. Please check your permissions.'
+      setUsersError(errorMessage)
     } finally {
       setLoading(false)
     }
@@ -629,10 +641,25 @@ const AdminDashboard = () => {
                       </div>
                     )}
 
-                    {filteredUsers.length === 0 && (
+                    {filteredUsers.length === 0 && !usersError && (
                       <div className="p-12 text-center">
                         <Users className="w-12 h-12 text-gray-300 mx-auto mb-4" />
                         <p className="text-gray-500">No users found</p>
+                      </div>
+                    )}
+
+                    {usersError && (
+                      <div className="p-12 text-center">
+                        <XCircle className="w-12 h-12 text-red-300 mx-auto mb-4" />
+                        <p className="text-red-600 font-medium mb-2">Error loading users</p>
+                        <p className="text-gray-500 mb-4">{usersError}</p>
+                        <button
+                          onClick={fetchUsers}
+                          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 inline-flex items-center"
+                        >
+                          <RefreshCw className="w-4 h-4 mr-2" />
+                          Retry
+                        </button>
                       </div>
                     )}
                   </>
