@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Users, Search, Filter, MapPin, Plus, Globe, Mail, Phone, ChevronLeft, ChevronRight, X, Copy, Check, Bell, UserPlus, Settings, Crown, Shield, Clock, DollarSign, Calendar, Upload, Image, Edit3, RefreshCw, Trash2, MessageCircle, List, Map, Loader2 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { clubsApi, sharedAssetApi, clubMemberRolesApi, getSharedAssetUrl, SHARED_AUTH_URL } from '../services/api';
+import { clubsApi, sharedAssetApi, clubMemberRolesApi, venuesApi, getSharedAssetUrl, SHARED_AUTH_URL } from '../services/api';
 import PublicProfileModal from '../components/ui/PublicProfileModal';
 import VenueMap from '../components/ui/VenueMap';
 
@@ -952,6 +952,13 @@ function ClubDetailModal({ club, isAuthenticated, currentUserId, onClose, onJoin
   const [clubData, setClubData] = useState(club);
   const [chatEnabled, setChatEnabled] = useState(club.chatEnabled || false);
   const [togglingChat, setTogglingChat] = useState(false);
+  const [isEditingInfo, setIsEditingInfo] = useState(false);
+  const [editFormData, setEditFormData] = useState({});
+  const [savingInfo, setSavingInfo] = useState(false);
+  const [venueSearch, setVenueSearch] = useState('');
+  const [venueResults, setVenueResults] = useState([]);
+  const [searchingVenues, setSearchingVenues] = useState(false);
+  const [selectedVenue, setSelectedVenue] = useState(null);
   const logoInputRef = useRef(null);
   const navigate = useNavigate();
 
@@ -959,6 +966,8 @@ function ClubDetailModal({ club, isAuthenticated, currentUserId, onClose, onJoin
   const isModerator = clubData.isModerator;
   const isMember = clubData.isMember;
   const canManage = isAdmin || isModerator;
+  const isCreator = clubData.createdByUserId === currentUserId;
+  const canEdit = isAdmin || isCreator;
 
   useEffect(() => {
     if (activeTab === 'members') loadMembers();
@@ -1196,6 +1205,88 @@ function ClubDetailModal({ club, isAuthenticated, currentUserId, onClose, onJoin
     }
   };
 
+  // Search venues for home venue selection
+  useEffect(() => {
+    if (!venueSearch || venueSearch.length < 2) {
+      setVenueResults([]);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      setSearchingVenues(true);
+      try {
+        const response = await venuesApi.search({ query: venueSearch, pageSize: 10 });
+        if (response.success) {
+          setVenueResults(response.data?.items || []);
+        }
+      } catch (err) {
+        console.error('Error searching venues:', err);
+      } finally {
+        setSearchingVenues(false);
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [venueSearch]);
+
+  // Start editing club info
+  const handleStartEditInfo = () => {
+    setEditFormData({
+      name: clubData.name || '',
+      description: clubData.description || '',
+      address: clubData.address || '',
+      city: clubData.city || '',
+      state: clubData.state || '',
+      country: clubData.country || '',
+      postalCode: clubData.postalCode || '',
+      website: clubData.website || '',
+      email: clubData.email || '',
+      phone: clubData.phone || '',
+      isPublic: clubData.isPublic ?? true,
+      requiresApproval: clubData.requiresApproval ?? true,
+      hasMembershipFee: clubData.hasMembershipFee ?? false,
+      membershipFeeAmount: clubData.membershipFeeAmount || '',
+      membershipFeePeriod: clubData.membershipFeePeriod || '',
+      paymentInstructions: clubData.paymentInstructions || '',
+      homeVenueId: clubData.homeVenueId || null,
+    });
+    setSelectedVenue(clubData.homeVenueName ? { id: clubData.homeVenueId, name: clubData.homeVenueName } : null);
+    setVenueSearch('');
+    setVenueResults([]);
+    setIsEditingInfo(true);
+  };
+
+  // Save club info
+  const handleSaveInfo = async () => {
+    setSavingInfo(true);
+    try {
+      const dataToSave = {
+        ...editFormData,
+        homeVenueId: selectedVenue?.id || null,
+      };
+      const response = await clubsApi.update(clubData.id, dataToSave);
+      if (response.success) {
+        // Refresh club data
+        const refreshed = await clubsApi.getClub(clubData.id);
+        if (refreshed.success) {
+          setClubData(refreshed.data);
+        }
+        setIsEditingInfo(false);
+        onUpdate();
+      }
+    } catch (err) {
+      console.error('Error saving club info:', err);
+      alert('Failed to save club info');
+    } finally {
+      setSavingInfo(false);
+    }
+  };
+
+  // Select a venue from search results
+  const handleSelectVenue = (venue) => {
+    setSelectedVenue(venue);
+    setVenueSearch('');
+    setVenueResults([]);
+  };
+
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 overflow-y-auto">
       <div className="bg-white rounded-xl shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
@@ -1267,7 +1358,7 @@ function ClubDetailModal({ club, isAuthenticated, currentUserId, onClose, onJoin
                 Join Requests
               </button>
             )}
-            {isAdmin && (
+            {canEdit && (
               <button
                 onClick={() => setActiveTab('manage')}
                 className={`px-6 py-3 font-medium text-sm border-b-2 transition-colors whitespace-nowrap ${
@@ -1318,14 +1409,17 @@ function ClubDetailModal({ club, isAuthenticated, currentUserId, onClose, onJoin
                 </div>
               )}
 
-              {/* Location */}
-              {(club.address || club.city) && (
+              {/* Home Venue & Location */}
+              {(club.homeVenueName || club.address || club.city) && (
                 <div>
                   <h3 className="font-medium text-gray-900 mb-2 flex items-center gap-2">
                     <MapPin className="w-5 h-5 text-purple-600" />
-                    Location
+                    {club.homeVenueName ? 'Home Venue' : 'Location'}
                   </h3>
                   <div className="bg-gray-50 rounded-lg p-4 text-sm">
+                    {club.homeVenueName && (
+                      <p className="font-medium text-purple-700 mb-1">{club.homeVenueName}</p>
+                    )}
                     {club.address && <p>{club.address}</p>}
                     <p>{club.city}{club.state && `, ${club.state}`} {club.postalCode}</p>
                     {club.country && <p>{club.country}</p>}
@@ -1635,7 +1729,7 @@ function ClubDetailModal({ club, isAuthenticated, currentUserId, onClose, onJoin
           )}
 
           {/* Manage Tab */}
-          {activeTab === 'manage' && isAdmin && (
+          {activeTab === 'manage' && canEdit && (
             <div className="space-y-6">
               {/* Invite Link */}
               <div>
@@ -1732,30 +1826,275 @@ function ClubDetailModal({ club, isAuthenticated, currentUserId, onClose, onJoin
 
               {/* Club Settings */}
               <div>
-                <h3 className="font-medium text-gray-900 mb-3 flex items-center gap-2">
-                  <Settings className="w-5 h-5 text-purple-600" />
-                  Settings
-                </h3>
-                <div className="bg-gray-50 rounded-lg p-4 space-y-3 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Visibility</span>
-                    <span className="font-medium">{club.isPublic ? 'Public' : 'Private'}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Approval Required</span>
-                    <span className="font-medium">{club.requiresApproval ? 'Yes' : 'No'}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Membership Fee</span>
-                    <span className="font-medium">{club.hasMembershipFee ? (club.membershipFeeAmount || 'Yes') : 'No'}</span>
-                  </div>
-                  {club.hasMembershipFee && club.membershipFeePeriod && (
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Fee Period</span>
-                      <span className="font-medium capitalize">{club.membershipFeePeriod}</span>
-                    </div>
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="font-medium text-gray-900 flex items-center gap-2">
+                    <Settings className="w-5 h-5 text-purple-600" />
+                    Club Info & Settings
+                  </h3>
+                  {!isEditingInfo && (
+                    <button
+                      onClick={handleStartEditInfo}
+                      className="px-3 py-1 text-sm text-purple-600 border border-purple-600 rounded-lg hover:bg-purple-50 flex items-center gap-1"
+                    >
+                      <Edit3 className="w-3 h-3" />
+                      Edit
+                    </button>
                   )}
                 </div>
+
+                {isEditingInfo ? (
+                  <div className="bg-gray-50 rounded-lg p-4 space-y-4">
+                    {/* Edit Form */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Club Name</label>
+                      <input
+                        type="text"
+                        value={editFormData.name || ''}
+                        onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
+                        className="w-full border border-gray-300 rounded-lg p-2 focus:ring-purple-500 focus:border-purple-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                      <textarea
+                        value={editFormData.description || ''}
+                        onChange={(e) => setEditFormData({ ...editFormData, description: e.target.value })}
+                        rows={3}
+                        className="w-full border border-gray-300 rounded-lg p-2 focus:ring-purple-500 focus:border-purple-500"
+                      />
+                    </div>
+
+                    {/* Home Venue Search */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Home Venue</label>
+                      {selectedVenue ? (
+                        <div className="flex items-center justify-between bg-purple-50 border border-purple-200 rounded-lg p-3">
+                          <div>
+                            <span className="font-medium text-purple-700">{selectedVenue.name}</span>
+                            {selectedVenue.city && <span className="text-sm text-gray-500 ml-2">({selectedVenue.city})</span>}
+                          </div>
+                          <button
+                            onClick={() => setSelectedVenue(null)}
+                            className="text-gray-400 hover:text-gray-600"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="relative">
+                          <input
+                            type="text"
+                            value={venueSearch}
+                            onChange={(e) => setVenueSearch(e.target.value)}
+                            placeholder="Search for a venue..."
+                            className="w-full border border-gray-300 rounded-lg p-2 focus:ring-purple-500 focus:border-purple-500"
+                          />
+                          {searchingVenues && (
+                            <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                              <Loader2 className="w-4 h-4 animate-spin text-gray-400" />
+                            </div>
+                          )}
+                          {venueResults.length > 0 && (
+                            <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                              {venueResults.map(venue => (
+                                <button
+                                  key={venue.venueId || venue.id}
+                                  onClick={() => handleSelectVenue({ id: venue.venueId || venue.id, name: venue.name, city: venue.city })}
+                                  className="w-full px-3 py-2 text-left hover:bg-gray-50 flex flex-col"
+                                >
+                                  <span className="font-medium">{venue.name}</span>
+                                  <span className="text-xs text-gray-500">{[venue.city, venue.state].filter(Boolean).join(', ')}</span>
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      <p className="text-xs text-gray-500 mt-1">The club's home venue location will be used for the club address</p>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">City</label>
+                        <input
+                          type="text"
+                          value={editFormData.city || ''}
+                          onChange={(e) => setEditFormData({ ...editFormData, city: e.target.value })}
+                          className="w-full border border-gray-300 rounded-lg p-2 focus:ring-purple-500 focus:border-purple-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">State</label>
+                        <input
+                          type="text"
+                          value={editFormData.state || ''}
+                          onChange={(e) => setEditFormData({ ...editFormData, state: e.target.value })}
+                          className="w-full border border-gray-300 rounded-lg p-2 focus:ring-purple-500 focus:border-purple-500"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Country</label>
+                        <input
+                          type="text"
+                          value={editFormData.country || ''}
+                          onChange={(e) => setEditFormData({ ...editFormData, country: e.target.value })}
+                          className="w-full border border-gray-300 rounded-lg p-2 focus:ring-purple-500 focus:border-purple-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Website</label>
+                        <input
+                          type="url"
+                          value={editFormData.website || ''}
+                          onChange={(e) => setEditFormData({ ...editFormData, website: e.target.value })}
+                          className="w-full border border-gray-300 rounded-lg p-2 focus:ring-purple-500 focus:border-purple-500"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                        <input
+                          type="email"
+                          value={editFormData.email || ''}
+                          onChange={(e) => setEditFormData({ ...editFormData, email: e.target.value })}
+                          className="w-full border border-gray-300 rounded-lg p-2 focus:ring-purple-500 focus:border-purple-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+                        <input
+                          type="tel"
+                          value={editFormData.phone || ''}
+                          onChange={(e) => setEditFormData({ ...editFormData, phone: e.target.value })}
+                          className="w-full border border-gray-300 rounded-lg p-2 focus:ring-purple-500 focus:border-purple-500"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Checkboxes */}
+                    <div className="space-y-2 pt-2">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={editFormData.isPublic ?? true}
+                          onChange={(e) => setEditFormData({ ...editFormData, isPublic: e.target.checked })}
+                          className="w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+                        />
+                        <span className="text-sm text-gray-700">Public Club (visible in search)</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={editFormData.requiresApproval ?? true}
+                          onChange={(e) => setEditFormData({ ...editFormData, requiresApproval: e.target.checked })}
+                          className="w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+                        />
+                        <span className="text-sm text-gray-700">Require Approval to Join</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={editFormData.hasMembershipFee ?? false}
+                          onChange={(e) => setEditFormData({ ...editFormData, hasMembershipFee: e.target.checked })}
+                          className="w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+                        />
+                        <span className="text-sm text-gray-700">Has Membership Fee</span>
+                      </label>
+                    </div>
+
+                    {/* Membership Fee Details */}
+                    {editFormData.hasMembershipFee && (
+                      <div className="bg-green-50 border border-green-200 rounded-lg p-3 space-y-3">
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Fee Amount</label>
+                            <input
+                              type="text"
+                              value={editFormData.membershipFeeAmount || ''}
+                              onChange={(e) => setEditFormData({ ...editFormData, membershipFeeAmount: e.target.value })}
+                              placeholder="$25"
+                              className="w-full border border-gray-300 rounded-lg p-2 focus:ring-purple-500 focus:border-purple-500 text-sm"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Fee Period</label>
+                            <select
+                              value={editFormData.membershipFeePeriod || ''}
+                              onChange={(e) => setEditFormData({ ...editFormData, membershipFeePeriod: e.target.value })}
+                              className="w-full border border-gray-300 rounded-lg p-2 focus:ring-purple-500 focus:border-purple-500 text-sm"
+                            >
+                              <option value="">Select...</option>
+                              <option value="monthly">Monthly</option>
+                              <option value="quarterly">Quarterly</option>
+                              <option value="yearly">Yearly</option>
+                              <option value="one-time">One-time</option>
+                            </select>
+                          </div>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Payment Instructions</label>
+                          <textarea
+                            value={editFormData.paymentInstructions || ''}
+                            onChange={(e) => setEditFormData({ ...editFormData, paymentInstructions: e.target.value })}
+                            rows={2}
+                            placeholder="Venmo, PayPal, etc."
+                            className="w-full border border-gray-300 rounded-lg p-2 focus:ring-purple-500 focus:border-purple-500 text-sm"
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Save/Cancel buttons */}
+                    <div className="flex gap-2 pt-2">
+                      <button
+                        onClick={() => setIsEditingInfo(false)}
+                        className="flex-1 py-2 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={handleSaveInfo}
+                        disabled={savingInfo}
+                        className="flex-1 py-2 bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700 disabled:opacity-50 flex items-center justify-center gap-2"
+                      >
+                        {savingInfo && <Loader2 className="w-4 h-4 animate-spin" />}
+                        Save Changes
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="bg-gray-50 rounded-lg p-4 space-y-3 text-sm">
+                    {clubData.homeVenueName && (
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Home Venue</span>
+                        <span className="font-medium text-purple-700">{clubData.homeVenueName}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Visibility</span>
+                      <span className="font-medium">{clubData.isPublic ? 'Public' : 'Private'}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Approval Required</span>
+                      <span className="font-medium">{clubData.requiresApproval ? 'Yes' : 'No'}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Membership Fee</span>
+                      <span className="font-medium">{clubData.hasMembershipFee ? (clubData.membershipFeeAmount || 'Yes') : 'No'}</span>
+                    </div>
+                    {clubData.hasMembershipFee && clubData.membershipFeePeriod && (
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Fee Period</span>
+                        <span className="font-medium capitalize">{clubData.membershipFeePeriod}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Club Chat Section */}
@@ -1911,11 +2250,50 @@ function CreateClubModal({ onClose, onCreate }) {
     hasMembershipFee: false,
     membershipFeeAmount: '',
     membershipFeePeriod: '',
-    paymentInstructions: ''
+    paymentInstructions: '',
+    homeVenueId: null
   });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
   const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [venueSearch, setVenueSearch] = useState('');
+  const [venueResults, setVenueResults] = useState([]);
+  const [searchingVenues, setSearchingVenues] = useState(false);
+  const [selectedVenue, setSelectedVenue] = useState(null);
+
+  // Search venues for home venue selection
+  useEffect(() => {
+    if (!venueSearch || venueSearch.length < 2) {
+      setVenueResults([]);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      setSearchingVenues(true);
+      try {
+        const response = await venuesApi.search({ query: venueSearch, pageSize: 10 });
+        if (response.success) {
+          setVenueResults(response.data?.items || []);
+        }
+      } catch (err) {
+        console.error('Error searching venues:', err);
+      } finally {
+        setSearchingVenues(false);
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [venueSearch]);
+
+  const handleSelectVenue = (venue) => {
+    setSelectedVenue(venue);
+    setFormData({ ...formData, homeVenueId: venue.id });
+    setVenueSearch('');
+    setVenueResults([]);
+  };
+
+  const handleClearVenue = () => {
+    setSelectedVenue(null);
+    setFormData({ ...formData, homeVenueId: null });
+  };
 
   const handleLogoUpload = async (e) => {
     const file = e.target.files?.[0];
@@ -2021,7 +2399,7 @@ function CreateClubModal({ onClose, onCreate }) {
             <div className="flex items-center gap-4">
               {formData.logoUrl ? (
                 <div className="relative">
-                  <img src={formData.logoUrl} alt="Club logo" className="w-20 h-20 rounded-lg object-cover" />
+                  <img src={getSharedAssetUrl(formData.logoUrl)} alt="Club logo" className="w-20 h-20 rounded-lg object-cover" />
                   <button
                     type="button"
                     onClick={() => setFormData({ ...formData, logoUrl: '' })}
@@ -2051,6 +2429,57 @@ function CreateClubModal({ onClose, onCreate }) {
               )}
               <p className="text-xs text-gray-500">Max 5MB. JPG or PNG recommended.</p>
             </div>
+          </div>
+
+          {/* Home Venue Selection */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Home Venue (Optional)</label>
+            {selectedVenue ? (
+              <div className="flex items-center justify-between bg-purple-50 border border-purple-200 rounded-lg p-3">
+                <div>
+                  <span className="font-medium text-purple-700">{selectedVenue.name}</span>
+                  {selectedVenue.city && <span className="text-sm text-gray-500 ml-2">({selectedVenue.city})</span>}
+                </div>
+                <button
+                  type="button"
+                  onClick={handleClearVenue}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            ) : (
+              <div className="relative">
+                <input
+                  type="text"
+                  value={venueSearch}
+                  onChange={(e) => setVenueSearch(e.target.value)}
+                  placeholder="Search for a venue..."
+                  className="w-full border border-gray-300 rounded-lg p-2 focus:ring-purple-500 focus:border-purple-500"
+                />
+                {searchingVenues && (
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                    <Loader2 className="w-4 h-4 animate-spin text-gray-400" />
+                  </div>
+                )}
+                {venueResults.length > 0 && (
+                  <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                    {venueResults.map(venue => (
+                      <button
+                        key={venue.venueId || venue.id}
+                        type="button"
+                        onClick={() => handleSelectVenue({ id: venue.venueId || venue.id, name: venue.name, city: venue.city })}
+                        className="w-full px-3 py-2 text-left hover:bg-gray-50 flex flex-col"
+                      >
+                        <span className="font-medium">{venue.name}</span>
+                        <span className="text-xs text-gray-500">{[venue.city, venue.state].filter(Boolean).join(', ')}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+            <p className="text-xs text-gray-500 mt-1">Select a home venue for the club. The venue's address will be used as the club location.</p>
           </div>
 
           <div className="grid grid-cols-2 gap-4">

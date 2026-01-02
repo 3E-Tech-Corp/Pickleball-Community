@@ -69,6 +69,9 @@ public class Club
     [MaxLength(2000)]
     public string? PaymentInstructions { get; set; } // How to pay, Venmo/PayPal info, etc.
 
+    // Home venue - the primary location for this club
+    public int? HomeVenueId { get; set; }
+
     public int CreatedByUserId { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
@@ -79,6 +82,9 @@ public class Club
     public int? ChatConversationId { get; set; }
 
     // Navigation
+    [ForeignKey("HomeVenueId")]
+    public Venue? HomeVenue { get; set; }
+
     [ForeignKey("CreatedByUserId")]
     public User? CreatedBy { get; set; }
 

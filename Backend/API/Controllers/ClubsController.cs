@@ -34,6 +34,7 @@ public class ClubsController : ControllerBase
         try
         {
             var query = _context.Clubs
+                .Include(c => c.HomeVenue)
                 .Where(c => c.IsActive && c.IsPublic)
                 .AsQueryable();
 
@@ -109,15 +110,17 @@ public class ClubsController : ControllerBase
                 Name = x.club.Name,
                 Description = x.club.Description,
                 LogoUrl = x.club.LogoUrl,
-                City = x.club.City,
-                State = x.club.State,
-                Country = x.club.Country,
+                City = x.club.HomeVenue?.City ?? x.club.City,
+                State = x.club.HomeVenue?.State ?? x.club.State,
+                Country = x.club.HomeVenue?.Country ?? x.club.Country,
                 IsPublic = x.club.IsPublic,
                 HasMembershipFee = x.club.HasMembershipFee,
                 MembershipFeeAmount = x.club.MembershipFeeAmount,
                 MemberCount = x.memberCount,
                 Distance = x.distance,
-                CreatedAt = x.club.CreatedAt
+                CreatedAt = x.club.CreatedAt,
+                HomeVenueId = x.club.HomeVenueId,
+                HomeVenueName = x.club.HomeVenue?.Name
             }).ToList();
 
             return Ok(new ApiResponse<PagedResult<ClubDto>>
@@ -216,6 +219,7 @@ public class ClubsController : ControllerBase
         {
             var club = await _context.Clubs
                 .Include(c => c.CreatedBy)
+                .Include(c => c.HomeVenue)
                 .Include(c => c.Members.Where(m => m.IsActive))
                     .ThenInclude(m => m.User)
                 .FirstOrDefaultAsync(c => c.Id == id && c.IsActive);
@@ -234,6 +238,11 @@ public class ClubsController : ControllerBase
             var isAdmin = membership?.Role == "Admin";
             var isModerator = membership?.Role == "Moderator";
 
+            // Use home venue address if no club address specified
+            var venueAddress = club.HomeVenue != null
+                ? string.Join(" ", new[] { club.HomeVenue.Addr1, club.HomeVenue.Addr2 }.Where(a => !string.IsNullOrEmpty(a)))
+                : null;
+
             var dto = new ClubDetailDto
             {
                 Id = club.Id,
@@ -241,13 +250,13 @@ public class ClubsController : ControllerBase
                 Description = club.Description,
                 LogoUrl = club.LogoUrl,
                 BannerUrl = club.BannerUrl,
-                Address = club.Address,
-                City = club.City,
-                State = club.State,
-                Country = club.Country,
-                PostalCode = club.PostalCode,
-                Latitude = club.Latitude,
-                Longitude = club.Longitude,
+                Address = club.Address ?? venueAddress,
+                City = club.HomeVenue?.City ?? club.City,
+                State = club.HomeVenue?.State ?? club.State,
+                Country = club.HomeVenue?.Country ?? club.Country,
+                PostalCode = club.HomeVenue?.Zip ?? club.PostalCode,
+                Latitude = club.HomeVenue != null && double.TryParse(club.HomeVenue.GpsLat, out var lat) ? lat : club.Latitude,
+                Longitude = club.HomeVenue != null && double.TryParse(club.HomeVenue.GpsLng, out var lng) ? lng : club.Longitude,
                 Website = club.Website,
                 Email = club.Email,
                 Phone = club.Phone,
@@ -268,6 +277,8 @@ public class ClubsController : ControllerBase
                 HasPendingRequest = hasPendingRequest,
                 MyMembershipValidTo = membership?.MembershipValidTo,
                 MyTitle = membership?.Title,
+                HomeVenueId = club.HomeVenueId,
+                HomeVenueName = club.HomeVenue?.Name,
                 RecentMembers = club.Members
                     .OrderByDescending(m => m.JoinedAt)
                     .Take(10)
@@ -333,6 +344,7 @@ public class ClubsController : ControllerBase
                 MembershipFeeAmount = dto.MembershipFeeAmount,
                 MembershipFeePeriod = dto.MembershipFeePeriod,
                 PaymentInstructions = dto.PaymentInstructions,
+                HomeVenueId = dto.HomeVenueId,
                 InviteCode = inviteCode,
                 CreatedByUserId = userId.Value
             };
@@ -376,11 +388,12 @@ public class ClubsController : ControllerBase
             if (club == null || !club.IsActive)
                 return NotFound(new ApiResponse<ClubDetailDto> { Success = false, Message = "Club not found" });
 
-            // Check if user is admin
+            // Check if user is admin or creator
             var isAdmin = await _context.ClubMembers
                 .AnyAsync(m => m.ClubId == id && m.UserId == userId.Value && m.Role == "Admin" && m.IsActive);
+            var isCreator = club.CreatedByUserId == userId.Value;
 
-            if (!isAdmin)
+            if (!isAdmin && !isCreator)
                 return Forbid();
 
             club.Name = dto.Name;
@@ -403,6 +416,7 @@ public class ClubsController : ControllerBase
             club.MembershipFeeAmount = dto.MembershipFeeAmount;
             club.MembershipFeePeriod = dto.MembershipFeePeriod;
             club.PaymentInstructions = dto.PaymentInstructions;
+            club.HomeVenueId = dto.HomeVenueId;
             club.UpdatedAt = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();

@@ -16,6 +16,10 @@ public class ClubDto
     public int MemberCount { get; set; }
     public double? Distance { get; set; } // Calculated distance from user
     public DateTime CreatedAt { get; set; }
+
+    // Home venue
+    public int? HomeVenueId { get; set; }
+    public string? HomeVenueName { get; set; }
 }
 
 // Club detail view
@@ -123,6 +127,7 @@ public class CreateClubDto
     public string? MembershipFeeAmount { get; set; }
     public string? MembershipFeePeriod { get; set; }
     public string? PaymentInstructions { get; set; }
+    public int? HomeVenueId { get; set; }
 }
 
 // Update club request
