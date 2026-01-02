@@ -77,14 +77,21 @@ const AdminDashboard = () => {
     setUsersError(null)
     try {
       const response = await userApi.getAllUsers()
-      if (response.success && response.data) {
-        setUsers(response.data)
-      } else if (response.success === false) {
-        setUsersError(response.message || 'Failed to load users')
+      console.log('fetchUsers response:', response)
+      // Handle both camelCase and PascalCase property names
+      const success = response?.success ?? response?.Success
+      const data = response?.data ?? response?.Data
+      const message = response?.message ?? response?.Message
+
+      if (success && data) {
+        setUsers(data)
+      } else if (success === false) {
+        setUsersError(message || 'Failed to load users')
       } else if (Array.isArray(response)) {
         // Handle case where API returns array directly
         setUsers(response)
       } else {
+        console.error('Unexpected response format:', response)
         setUsersError('Unexpected response format from server')
       }
     } catch (error) {
