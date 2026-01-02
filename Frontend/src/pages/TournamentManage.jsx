@@ -240,7 +240,7 @@ export default function TournamentManage() {
       <div className="bg-white border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex overflow-x-auto">
-            {['overview', 'divisions', 'courts', 'schedule'].map(tab => (
+            {['overview', 'divisions', 'courts', 'schedule', 'checkin', 'scoring'].map(tab => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
@@ -250,7 +250,7 @@ export default function TournamentManage() {
                     : 'border-transparent text-gray-500 hover:text-gray-700'
                 }`}
               >
-                {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                {tab === 'checkin' ? 'Check-in' : tab.charAt(0).toUpperCase() + tab.slice(1)}
               </button>
             ))}
           </div>
@@ -656,6 +656,171 @@ export default function TournamentManage() {
                 </p>
               </div>
             )}
+          </div>
+        )}
+
+        {/* Check-in Tab */}
+        {activeTab === 'checkin' && (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-gray-900">Player Check-in</h2>
+              <button
+                onClick={loadDashboard}
+                className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100"
+              >
+                <RefreshCw className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Check-in stats */}
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              <div className="bg-white rounded-xl shadow-sm p-4">
+                <div className="text-2xl font-bold text-gray-900">
+                  {dashboard?.stats?.checkedInPlayers || 0}
+                </div>
+                <div className="text-sm text-gray-500">Checked In</div>
+              </div>
+              <div className="bg-white rounded-xl shadow-sm p-4">
+                <div className="text-2xl font-bold text-gray-900">
+                  {(dashboard?.stats?.totalRegistrations || 0) - (dashboard?.stats?.checkedInPlayers || 0)}
+                </div>
+                <div className="text-sm text-gray-500">Pending</div>
+              </div>
+              <div className="bg-white rounded-xl shadow-sm p-4">
+                <div className="text-2xl font-bold text-gray-900">
+                  {dashboard?.stats?.totalRegistrations || 0}
+                </div>
+                <div className="text-sm text-gray-500">Total Registered</div>
+              </div>
+            </div>
+
+            {/* Division check-in status */}
+            <div className="bg-white rounded-xl shadow-sm p-6">
+              <h3 className="font-medium text-gray-900 mb-4">Check-in by Division</h3>
+              <div className="space-y-4">
+                {dashboard?.divisions?.map(div => (
+                  <div key={div.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <div>
+                      <div className="font-medium text-gray-900">{div.name}</div>
+                      <div className="text-sm text-gray-500">
+                        {div.checkedInUnits} / {div.registeredUnits} teams checked in
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-24 h-2 bg-gray-200 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-green-500 transition-all"
+                          style={{ width: `${div.registeredUnits > 0 ? (div.checkedInUnits / div.registeredUnits) * 100 : 0}%` }}
+                        />
+                      </div>
+                      <span className="text-sm font-medium text-gray-600 w-12 text-right">
+                        {div.registeredUnits > 0 ? Math.round((div.checkedInUnits / div.registeredUnits) * 100) : 0}%
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-blue-700">
+              <div className="flex items-center gap-2 mb-2">
+                <AlertCircle className="w-5 h-5" />
+                <span className="font-medium">Player Check-in</span>
+              </div>
+              <p className="text-sm">
+                Players can check in from their Events page by viewing the event and clicking "Check In".
+                Check-in is typically enabled when the tournament status is set to "Running".
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Scoring Tab */}
+        {activeTab === 'scoring' && (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-gray-900">Score Management</h2>
+              <button
+                onClick={loadDashboard}
+                className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100"
+              >
+                <RefreshCw className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Scoring stats */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="bg-white rounded-xl shadow-sm p-4">
+                <div className="text-2xl font-bold text-gray-900">
+                  {dashboard?.stats?.completedMatches || 0}
+                </div>
+                <div className="text-sm text-gray-500">Completed</div>
+              </div>
+              <div className="bg-white rounded-xl shadow-sm p-4">
+                <div className="text-2xl font-bold text-orange-600">
+                  {dashboard?.stats?.inProgressGames || 0}
+                </div>
+                <div className="text-sm text-gray-500">In Progress</div>
+              </div>
+              <div className="bg-white rounded-xl shadow-sm p-4">
+                <div className="text-2xl font-bold text-gray-900">
+                  {(dashboard?.stats?.totalMatches || 0) - (dashboard?.stats?.completedMatches || 0) - (dashboard?.stats?.inProgressGames || 0)}
+                </div>
+                <div className="text-sm text-gray-500">Pending</div>
+              </div>
+              <div className="bg-white rounded-xl shadow-sm p-4">
+                <div className="text-2xl font-bold text-gray-900">
+                  {dashboard?.stats?.totalMatches || 0}
+                </div>
+                <div className="text-sm text-gray-500">Total Matches</div>
+              </div>
+            </div>
+
+            {/* Scoring workflow explanation */}
+            <div className="bg-white rounded-xl shadow-sm p-6">
+              <h3 className="font-medium text-gray-900 mb-4">Score Submission Workflow</h3>
+              <div className="space-y-4">
+                <div className="flex items-start gap-3">
+                  <div className="w-8 h-8 rounded-full bg-orange-100 flex items-center justify-center text-orange-600 font-medium">1</div>
+                  <div>
+                    <div className="font-medium text-gray-900">Game Assigned to Court</div>
+                    <div className="text-sm text-gray-500">Tournament director assigns a game to an available court</div>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <div className="w-8 h-8 rounded-full bg-orange-100 flex items-center justify-center text-orange-600 font-medium">2</div>
+                  <div>
+                    <div className="font-medium text-gray-900">Players Notified</div>
+                    <div className="text-sm text-gray-500">Both teams receive notification to report to their assigned court</div>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <div className="w-8 h-8 rounded-full bg-orange-100 flex items-center justify-center text-orange-600 font-medium">3</div>
+                  <div>
+                    <div className="font-medium text-gray-900">Score Submitted</div>
+                    <div className="text-sm text-gray-500">After the game, one team submits the score</div>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center text-green-600 font-medium">4</div>
+                  <div>
+                    <div className="font-medium text-gray-900">Score Confirmed</div>
+                    <div className="text-sm text-gray-500">The opposing team confirms the score, completing the game</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-blue-700">
+              <div className="flex items-center gap-2 mb-2">
+                <AlertCircle className="w-5 h-5" />
+                <span className="font-medium">Score Submission</span>
+              </div>
+              <p className="text-sm">
+                Players submit and confirm scores from their Events page. When a score is disputed,
+                the tournament director can manually enter the correct score.
+              </p>
+            </div>
           </div>
         )}
       </div>
