@@ -9,7 +9,7 @@ using System.Security.Claims;
 namespace Pickleball.Community.Controllers;
 
 [ApiController]
-[Route("api/[controller]")]
+[Route("[controller]")]
 public class FeedbackController : ControllerBase
 {
     private readonly ApplicationDbContext _context;
