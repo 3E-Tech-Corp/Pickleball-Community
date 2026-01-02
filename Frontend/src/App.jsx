@@ -19,6 +19,7 @@ import FaqAdmin from './pages/FaqAdmin'
 import Feedback from './pages/Feedback'
 import FeedbackAdmin from './pages/FeedbackAdmin'
 import Events from './pages/Events'
+import TournamentManage from './pages/TournamentManage'
 import Courts from './pages/Courts'
 import Clubs from './pages/Clubs'
 import Blog from './pages/Blog'
@@ -50,6 +51,11 @@ function App() {
 
       {/* Community Features - Public */}
       <Route path="/events" element={<Events />} />
+      <Route path="/tournament/:eventId/manage" element={
+        <ProtectedRoute>
+          <TournamentManage />
+        </ProtectedRoute>
+      } />
       <Route path="/courts" element={<Courts />} />
       <Route path="/clubs" element={<Clubs />} />
       <Route path="/blog" element={<Blog />} />

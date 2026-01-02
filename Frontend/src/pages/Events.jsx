@@ -1793,6 +1793,21 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, formatDate, f
           {/* Manage Tab */}
           {activeTab === 'manage' && isOrganizer && (
             <div className="space-y-6">
+              {/* Tournament Dashboard Link */}
+              <Link
+                to={`/tournament/${event.id}/manage`}
+                className="w-full flex items-center justify-between p-4 bg-orange-50 border border-orange-200 rounded-lg text-orange-700 hover:bg-orange-100 transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  <Trophy className="w-5 h-5" />
+                  <div>
+                    <div className="font-medium">Tournament Dashboard</div>
+                    <div className="text-sm text-orange-600">Manage matches, courts, check-ins, and scores</div>
+                  </div>
+                </div>
+                <ChevronRight className="w-5 h-5" />
+              </Link>
+
               {isEditing ? (
                 // Edit Form - Single Page
                 <div className="space-y-4">
