@@ -599,7 +599,7 @@ public class TournamentController : ControllerBase
                 Id = c.Id,
                 EventId = c.EventId,
                 CourtId = c.CourtId,
-                CourtName = c.Court != null ? c.Court.CourtName : null,
+                CourtName = c.Court != null ? c.Court.Name : null,
                 CourtLabel = c.CourtLabel,
                 Status = c.Status,
                 CurrentGameId = c.CurrentGameId,
