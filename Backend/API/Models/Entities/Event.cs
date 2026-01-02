@@ -80,6 +80,12 @@ public class Event
     // Capacity
     public int? MaxParticipants { get; set; }
 
+    /// <summary>
+    /// Tournament status: Draft, RegistrationOpen, RegistrationClosed, ScheduleReady, Running, Completed, Cancelled
+    /// </summary>
+    [MaxLength(20)]
+    public string TournamentStatus { get; set; } = "Draft";
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
     public bool IsActive { get; set; } = true;
@@ -99,6 +105,9 @@ public class Event
 
     public ICollection<EventDivision> Divisions { get; set; } = new List<EventDivision>();
     public ICollection<EventRegistration> Registrations { get; set; } = new List<EventRegistration>();
+    public ICollection<EventUnit> Units { get; set; } = new List<EventUnit>();
+    public ICollection<TournamentCourt> TournamentCourts { get; set; } = new List<TournamentCourt>();
+    public ICollection<EventMatch> Matches { get; set; } = new List<EventMatch>();
 }
 
 public class EventDivision
@@ -151,6 +160,14 @@ public class EventDivision
     [Column(TypeName = "decimal(10,2)")]
     public decimal? DivisionFee { get; set; } // Override event's per-division fee
 
+    // Tournament structure
+    public int? DefaultScoreFormatId { get; set; }
+    public int? PoolCount { get; set; } // Number of pools for round robin
+    [MaxLength(20)]
+    public string? BracketType { get; set; } // SingleElimination, DoubleElimination, RoundRobin, Hybrid
+    public int? PlayoffFromPools { get; set; } // How many from each pool advance to playoffs
+    public int GamesPerMatch { get; set; } = 1; // Best of X
+
     public int SortOrder { get; set; } = 0;
     public bool IsActive { get; set; } = true;
 
@@ -184,9 +201,14 @@ public class EventDivision
     [ForeignKey("SkillLevelId")]
     public SkillLevel? SkillLevel { get; set; }
 
+    [ForeignKey("DefaultScoreFormatId")]
+    public ScoreFormat? DefaultScoreFormat { get; set; }
+
     public ICollection<EventRegistration> Registrations { get; set; } = new List<EventRegistration>();
     public ICollection<EventPartnerRequest> PartnerRequests { get; set; } = new List<EventPartnerRequest>();
     public ICollection<DivisionReward> Rewards { get; set; } = new List<DivisionReward>();
+    public ICollection<EventUnit> Units { get; set; } = new List<EventUnit>();
+    public ICollection<EventMatch> Matches { get; set; } = new List<EventMatch>();
 }
 
 public class EventRegistration
