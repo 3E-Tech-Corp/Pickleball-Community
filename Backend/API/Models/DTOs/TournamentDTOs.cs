@@ -1,6 +1,40 @@
 namespace Pickleball.Community.Models.DTOs;
 
 // ============================================
+// Score Method DTOs (Admin-configurable scoring types)
+// ============================================
+public class ScoreMethodDto
+{
+    public int Id { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public string? Description { get; set; }
+    public string BaseType { get; set; } = "Rally"; // Classic or Rally
+    public int SortOrder { get; set; }
+    public bool IsActive { get; set; }
+    public bool IsDefault { get; set; }
+}
+
+public class CreateScoreMethodDto
+{
+    public string Name { get; set; } = string.Empty;
+    public string? Description { get; set; }
+    public string BaseType { get; set; } = "Rally";
+    public int SortOrder { get; set; } = 0;
+    public bool IsActive { get; set; } = true;
+    public bool IsDefault { get; set; } = false;
+}
+
+public class UpdateScoreMethodDto
+{
+    public string? Name { get; set; }
+    public string? Description { get; set; }
+    public string? BaseType { get; set; }
+    public int? SortOrder { get; set; }
+    public bool? IsActive { get; set; }
+    public bool? IsDefault { get; set; }
+}
+
+// ============================================
 // Score Format DTOs
 // ============================================
 public class ScoreFormatDto
@@ -8,9 +42,12 @@ public class ScoreFormatDto
     public int Id { get; set; }
     public string Name { get; set; } = string.Empty;
     public string? Description { get; set; }
+    public int? ScoreMethodId { get; set; }
+    public string? ScoreMethodName { get; set; }
     public string ScoringType { get; set; } = "Rally";
     public int MaxPoints { get; set; }
     public int WinByMargin { get; set; }
+    public int CapAfter { get; set; }
     public bool SwitchEndsAtMidpoint { get; set; }
     public int? MidpointScore { get; set; }
     public int? TimeLimitMinutes { get; set; }

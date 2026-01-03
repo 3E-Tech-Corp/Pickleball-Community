@@ -930,6 +930,25 @@ export const clubMemberRolesApi = {
   reorder: (orderedIds) => api.put('/clubmemberroles/reorder', orderedIds)
 }
 
+// Score Methods API (Admin-configurable scoring types)
+export const scoreMethodsApi = {
+  // Get all score methods (public for active, admin for all)
+  getAll: (includeInactive = false) =>
+    api.get(`/scoremethods${includeInactive ? '?includeInactive=true' : ''}`),
+
+  // Get single score method
+  getById: (id) => api.get(`/scoremethods/${id}`),
+
+  // Create new score method (Admin only)
+  create: (data) => api.post('/scoremethods', data),
+
+  // Update score method (Admin only)
+  update: (id, data) => api.put(`/scoremethods/${id}`, data),
+
+  // Delete score method (Admin only)
+  delete: (id) => api.delete(`/scoremethods/${id}`)
+}
+
 // Blog API
 export const blogApi = {
   // Categories (public for active only, admin for all)

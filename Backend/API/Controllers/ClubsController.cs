@@ -1415,16 +1415,17 @@ public class ClubsController : ControllerBase
                 }
             }
 
-            // Build visibility filter based on access level
-            var visibilities = new List<string> { "Public" };
-            if (accessLevel == "Member" || accessLevel == "Admin")
-                visibilities.Add("Member");
-            if (accessLevel == "Admin")
-                visibilities.Add("Admin");
+            // Build visibility filter based on access level using explicit OR conditions
+            // (Avoids EF Core OPENJSON issue with list.Contains)
+            bool canViewMember = accessLevel == "Member" || accessLevel == "Admin";
+            bool canViewAdmin = accessLevel == "Admin";
 
             var documents = await _context.ClubDocuments
                 .Include(d => d.UploadedBy)
-                .Where(d => d.ClubId == id && d.IsActive && visibilities.Contains(d.Visibility))
+                .Where(d => d.ClubId == id && d.IsActive &&
+                    (d.Visibility == "Public" ||
+                     (canViewMember && d.Visibility == "Member") ||
+                     (canViewAdmin && d.Visibility == "Admin")))
                 .OrderBy(d => d.SortOrder)
                 .ThenByDescending(d => d.CreatedAt)
                 .Select(d => new ClubDocumentDto

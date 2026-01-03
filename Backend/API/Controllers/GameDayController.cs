@@ -98,6 +98,7 @@ public class GameDayController : ControllerBase
 
         // Get score formats
         var scoreFormats = await _context.ScoreFormats
+            .Include(s => s.ScoreMethod)
             .Where(s => s.IsActive)
             .OrderBy(s => s.SortOrder)
             .ToListAsync();
@@ -137,13 +138,16 @@ public class GameDayController : ControllerBase
                 CurrentGameId = c.CurrentGameId
             }).ToList(),
             Games = matches.Select(m => MapToGameDto(m)).ToList(),
-            ScoreFormats = scoreFormats.Select(s => new ScoreFormatDto
+            ScoreFormats = scoreFormats.Select(s => new GameDayScoreFormatDto
             {
                 Id = s.Id,
                 Name = s.Name,
+                ScoreMethodId = s.ScoreMethodId,
+                ScoreMethodName = s.ScoreMethod?.Name,
                 ScoringType = s.ScoringType,
                 MaxPoints = s.MaxPoints,
                 WinByMargin = s.WinByMargin,
+                CapAfter = s.CapAfter,
                 SwitchEndsAtMidpoint = s.SwitchEndsAtMidpoint,
                 MidpointScore = s.MidpointScore,
                 IsDefault = s.IsDefault
@@ -628,9 +632,11 @@ public class GameDayController : ControllerBase
         {
             Name = dto.Name,
             Description = dto.Description,
+            ScoreMethodId = dto.ScoreMethodId,
             ScoringType = dto.ScoringType ?? "Rally",
             MaxPoints = dto.MaxPoints ?? 11,
             WinByMargin = dto.WinByMargin ?? 2,
+            CapAfter = dto.CapAfter ?? 0,
             SwitchEndsAtMidpoint = dto.SwitchEndsAtMidpoint ?? false,
             MidpointScore = dto.MidpointScore,
             TimeLimitMinutes = dto.TimeLimitMinutes,
@@ -642,13 +648,24 @@ public class GameDayController : ControllerBase
         _context.ScoreFormats.Add(format);
         await _context.SaveChangesAsync();
 
-        return Ok(new { success = true, data = new ScoreFormatDto
+        // Load the score method name if set
+        string? scoreMethodName = null;
+        if (format.ScoreMethodId.HasValue)
+        {
+            var method = await _context.ScoreMethods.FindAsync(format.ScoreMethodId.Value);
+            scoreMethodName = method?.Name;
+        }
+
+        return Ok(new { success = true, data = new GameDayScoreFormatDto
         {
             Id = format.Id,
             Name = format.Name,
+            ScoreMethodId = format.ScoreMethodId,
+            ScoreMethodName = scoreMethodName,
             ScoringType = format.ScoringType,
             MaxPoints = format.MaxPoints,
             WinByMargin = format.WinByMargin,
+            CapAfter = format.CapAfter,
             SwitchEndsAtMidpoint = format.SwitchEndsAtMidpoint,
             MidpointScore = format.MidpointScore
         }});
@@ -755,7 +772,7 @@ public class GameDayOverviewDto
     public List<GameDayDivisionDto> Divisions { get; set; } = new();
     public List<GameDayCourtDto> Courts { get; set; } = new();
     public List<GameDayGameDto> Games { get; set; } = new();
-    public List<ScoreFormatDto> ScoreFormats { get; set; } = new();
+    public List<GameDayScoreFormatDto> ScoreFormats { get; set; } = new();
     public GameDayStatsDto Stats { get; set; } = new();
 }
 
@@ -834,13 +851,16 @@ public class GameDayStatsDto
     public int InProgressGames { get; set; }
 }
 
-public class ScoreFormatDto
+public class GameDayScoreFormatDto
 {
     public int Id { get; set; }
     public string Name { get; set; } = string.Empty;
+    public int? ScoreMethodId { get; set; }
+    public string? ScoreMethodName { get; set; }
     public string ScoringType { get; set; } = string.Empty;
     public int MaxPoints { get; set; }
     public int WinByMargin { get; set; }
+    public int CapAfter { get; set; }
     public bool SwitchEndsAtMidpoint { get; set; }
     public int? MidpointScore { get; set; }
     public bool IsDefault { get; set; }
@@ -890,10 +910,12 @@ public class CreateScoreFormatDto
 {
     public string Name { get; set; } = string.Empty;
     public string? Description { get; set; }
+    public int? ScoreMethodId { get; set; }
     public string? ScoringType { get; set; }
-    public int? MaxPoints { get; set; }
-    public int? WinByMargin { get; set; }
-    public bool? SwitchEndsAtMidpoint { get; set; }
+    public int? MaxPoints { get; set; } // Play To (7-39)
+    public int? WinByMargin { get; set; } // Win By (1 or 2)
+    public int? CapAfter { get; set; } // Cap After (0-9)
+    public bool? SwitchEndsAtMidpoint { get; set; } // Change Ends
     public int? MidpointScore { get; set; }
     public int? TimeLimitMinutes { get; set; }
 }

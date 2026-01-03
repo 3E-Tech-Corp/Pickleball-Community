@@ -61,6 +61,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<DivisionReward> DivisionRewards { get; set; }
 
     // Tournament Management
+    public DbSet<ScoreMethod> ScoreMethods { get; set; }
     public DbSet<ScoreFormat> ScoreFormats { get; set; }
     public DbSet<EventUnit> EventUnits { get; set; }
     public DbSet<EventUnitMember> EventUnitMembers { get; set; }
@@ -570,11 +571,24 @@ public class ApplicationDbContext : DbContext
                   .OnDelete(DeleteBehavior.SetNull);
         });
 
+        // Score Method configuration (admin-managed scoring types)
+        modelBuilder.Entity<ScoreMethod>(entity =>
+        {
+            entity.Property(s => s.Name).IsRequired().HasMaxLength(100);
+            entity.HasIndex(s => s.SortOrder);
+            entity.HasIndex(s => s.IsActive);
+        });
+
         // Score Format configuration
         modelBuilder.Entity<ScoreFormat>(entity =>
         {
             entity.Property(s => s.Name).IsRequired().HasMaxLength(100);
             entity.HasIndex(s => s.SortOrder);
+
+            entity.HasOne(s => s.ScoreMethod)
+                  .WithMany()
+                  .HasForeignKey(s => s.ScoreMethodId)
+                  .OnDelete(DeleteBehavior.SetNull);
         });
 
         // Event Unit configuration

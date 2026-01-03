@@ -2,9 +2,9 @@ import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Users, LayoutGrid, Play, Settings, Plus, Trash2, ChevronDown, ChevronUp,
-  Clock, CheckCircle, XCircle, Pause, RefreshCw, ArrowLeft, Edit2, Save, X
+  Clock, CheckCircle, XCircle, Pause, RefreshCw, ArrowLeft, Edit2, Save, X, Info
 } from 'lucide-react';
-import api from '../services/api';
+import api, { scoreMethodsApi } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import { getSharedAssetUrl } from '../services/api';
 
@@ -596,8 +596,10 @@ const SettingsTab = ({ data, onNewFormat, onRefresh, eventId }) => {
               <div>
                 <div className="font-medium text-gray-900">{format.name}</div>
                 <div className="text-sm text-gray-500">
-                  {format.scoringType} • {format.maxPoints} pts • Win by {format.winByMargin}
-                  {format.switchEndsAtMidpoint && ' • Switch ends'}
+                  {format.scoreMethodName || format.scoringType} • Play to {format.maxPoints}
+                  {format.capAfter > 0 && ` (cap ${format.maxPoints + format.capAfter})`}
+                  {' '}• Win by {format.winByMargin}
+                  {format.switchEndsAtMidpoint && ' • Change ends'}
                 </div>
               </div>
               {format.isDefault && (
@@ -1120,11 +1122,39 @@ const ScoreEditModal = ({ game, data, onClose, onSuccess }) => {
 
 const NewFormatModal = ({ eventId, onClose, onSuccess }) => {
   const [name, setName] = useState('');
-  const [scoringType, setScoringType] = useState('Rally');
+  const [scoreMethodId, setScoreMethodId] = useState('');
   const [maxPoints, setMaxPoints] = useState(11);
   const [winByMargin, setWinByMargin] = useState(2);
+  const [capAfter, setCapAfter] = useState(0);
   const [switchEnds, setSwitchEnds] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [scoreMethods, setScoreMethods] = useState([]);
+  const [loadingMethods, setLoadingMethods] = useState(true);
+  const [showMethodDescription, setShowMethodDescription] = useState(false);
+
+  // Load score methods on mount
+  useEffect(() => {
+    const loadScoreMethods = async () => {
+      try {
+        const response = await scoreMethodsApi.getAll();
+        if (response.success) {
+          setScoreMethods(response.data || []);
+          // Set default score method if one exists
+          const defaultMethod = response.data?.find(m => m.isDefault);
+          if (defaultMethod) {
+            setScoreMethodId(defaultMethod.id.toString());
+          }
+        }
+      } catch (err) {
+        console.error('Error loading score methods:', err);
+      } finally {
+        setLoadingMethods(false);
+      }
+    };
+    loadScoreMethods();
+  }, []);
+
+  const selectedMethod = scoreMethods.find(m => m.id.toString() === scoreMethodId);
 
   const handleSubmit = async () => {
     if (!name.trim()) return;
@@ -1132,9 +1162,11 @@ const NewFormatModal = ({ eventId, onClose, onSuccess }) => {
     try {
       await gamedayApi.createScoreFormat(eventId, {
         name: name.trim(),
-        scoringType,
+        scoreMethodId: scoreMethodId ? parseInt(scoreMethodId) : null,
+        scoringType: selectedMethod?.baseType || 'Rally',
         maxPoints,
         winByMargin,
+        capAfter,
         switchEndsAtMidpoint: switchEnds
       });
       onSuccess();
@@ -1145,9 +1177,21 @@ const NewFormatModal = ({ eventId, onClose, onSuccess }) => {
     }
   };
 
+  // Generate Play To options (7 to 39)
+  const playToOptions = [];
+  for (let i = 7; i <= 39; i++) {
+    playToOptions.push(i);
+  }
+
+  // Generate Cap After options (0 to 9)
+  const capAfterOptions = [];
+  for (let i = 0; i <= 9; i++) {
+    capAfterOptions.push(i);
+  }
+
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl max-w-md w-full p-6">
+      <div className="bg-white rounded-xl max-w-md w-full p-6 max-h-[90vh] overflow-y-auto">
         <h2 className="text-lg font-bold text-gray-900 mb-4">New Score Format</h2>
 
         <div className="space-y-4">
@@ -1163,43 +1207,53 @@ const NewFormatModal = ({ eventId, onClose, onSuccess }) => {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Scoring Type</label>
-            <div className="flex gap-2">
-              <button
-                onClick={() => setScoringType('Rally')}
-                className={`flex-1 px-4 py-2 rounded-lg border ${
-                  scoringType === 'Rally'
-                    ? 'bg-blue-50 border-blue-500 text-blue-700'
-                    : 'border-gray-300 text-gray-700'
-                }`}
-              >
-                Rally Scoring
-              </button>
-              <button
-                onClick={() => setScoringType('Classic')}
-                className={`flex-1 px-4 py-2 rounded-lg border ${
-                  scoringType === 'Classic'
-                    ? 'bg-blue-50 border-blue-500 text-blue-700'
-                    : 'border-gray-300 text-gray-700'
-                }`}
-              >
-                Classic (Side-out)
-              </button>
-            </div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Score Method</label>
+            {loadingMethods ? (
+              <div className="text-sm text-gray-500">Loading...</div>
+            ) : (
+              <div className="relative">
+                <select
+                  value={scoreMethodId}
+                  onChange={(e) => setScoreMethodId(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg pr-10"
+                >
+                  <option value="">-- Select Score Method --</option>
+                  {scoreMethods.map(method => (
+                    <option key={method.id} value={method.id}>
+                      {method.name}
+                    </option>
+                  ))}
+                </select>
+                {selectedMethod?.description && (
+                  <button
+                    type="button"
+                    onClick={() => setShowMethodDescription(!showMethodDescription)}
+                    className="absolute right-10 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-blue-600"
+                    title="View description"
+                  >
+                    <Info className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+            )}
+            {showMethodDescription && selectedMethod?.description && (
+              <div className="mt-2 p-3 bg-blue-50 rounded-lg text-sm text-blue-800">
+                {selectedMethod.description}
+              </div>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Max Points</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Play To</label>
               <select
                 value={maxPoints}
                 onChange={(e) => setMaxPoints(parseInt(e.target.value))}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg"
               >
-                <option value={11}>11</option>
-                <option value={15}>15</option>
-                <option value={21}>21</option>
-                <option value={25}>25</option>
+                {playToOptions.map(pts => (
+                  <option key={pts} value={pts}>{pts}</option>
+                ))}
               </select>
             </div>
             <div>
@@ -1215,6 +1269,24 @@ const NewFormatModal = ({ eventId, onClose, onSuccess }) => {
             </div>
           </div>
 
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Cap After
+              <span className="text-gray-500 font-normal ml-1">(0 = no cap)</span>
+            </label>
+            <select
+              value={capAfter}
+              onChange={(e) => setCapAfter(parseInt(e.target.value))}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+            >
+              {capAfterOptions.map(cap => (
+                <option key={cap} value={cap}>
+                  {cap === 0 ? 'No cap' : `+${cap} (cap at ${maxPoints + cap})`}
+                </option>
+              ))}
+            </select>
+          </div>
+
           <label className="flex items-center gap-2">
             <input
               type="checkbox"
@@ -1222,7 +1294,7 @@ const NewFormatModal = ({ eventId, onClose, onSuccess }) => {
               onChange={(e) => setSwitchEnds(e.target.checked)}
               className="rounded border-gray-300"
             />
-            <span className="text-sm text-gray-700">Switch ends at midpoint</span>
+            <span className="text-sm text-gray-700">Change Ends at midpoint</span>
           </label>
         </div>
 

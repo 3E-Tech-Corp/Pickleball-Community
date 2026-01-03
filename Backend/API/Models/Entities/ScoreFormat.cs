@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace Pickleball.Community.Models.Entities;
 
@@ -17,13 +18,19 @@ public class ScoreFormat
     public string? Description { get; set; }
 
     /// <summary>
+    /// Reference to the scoring method type (e.g., Rally Score, Classic Side Out)
+    /// </summary>
+    public int? ScoreMethodId { get; set; }
+
+    /// <summary>
     /// Scoring type: Classic (side-out) or Rally (rally scoring)
+    /// Legacy field - use ScoreMethodId for new formats
     /// </summary>
     [MaxLength(20)]
     public string ScoringType { get; set; } = "Rally";
 
     /// <summary>
-    /// Points needed to win
+    /// Points needed to win (Play To: 7-39)
     /// </summary>
     public int MaxPoints { get; set; } = 11;
 
@@ -33,7 +40,13 @@ public class ScoreFormat
     public int WinByMargin { get; set; } = 2;
 
     /// <summary>
-    /// Whether to switch ends at midpoint
+    /// Cap after this many points above MaxPoints (0-9, 0 = no cap)
+    /// E.g., if MaxPoints=11 and CapAfter=4, game is capped at 15
+    /// </summary>
+    public int CapAfter { get; set; } = 0;
+
+    /// <summary>
+    /// Whether to switch ends (Change Ends)
     /// </summary>
     public bool SwitchEndsAtMidpoint { get; set; } = false;
 
@@ -58,4 +71,8 @@ public class ScoreFormat
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+
+    // Navigation
+    [ForeignKey("ScoreMethodId")]
+    public ScoreMethod? ScoreMethod { get; set; }
 }
