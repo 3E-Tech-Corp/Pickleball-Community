@@ -1243,10 +1243,14 @@ public class TournamentController : ControllerBase
 
     private async Task<int> GetNextWaitlistPosition(int divisionId)
     {
-        var max = await _context.EventUnits
-            .Where(u => u.DivisionId == divisionId && u.Status == "Waitlisted")
-            .MaxAsync(u => (int?)u.WaitlistPosition) ?? 0;
-        return max + 1;
+        // Use OrderByDescending + FirstOrDefault instead of MaxAsync to avoid SQL generation issues
+        var maxUnit = await _context.EventUnits
+            .Where(u => u.DivisionId == divisionId && u.Status == "Waitlisted" && u.WaitlistPosition != null)
+            .OrderByDescending(u => u.WaitlistPosition)
+            .Select(u => u.WaitlistPosition)
+            .FirstOrDefaultAsync();
+
+        return (maxUnit ?? 0) + 1;
     }
 
     private EventUnitDto MapToUnitDto(EventUnit u)
