@@ -96,6 +96,9 @@ public class ApplicationDbContext : DbContext
     public DbSet<FeedbackCategory> FeedbackCategories { get; set; }
     public DbSet<FeedbackEntry> FeedbackEntries { get; set; }
 
+    // User Notifications
+    public DbSet<Notification> Notifications { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<User>(entity =>

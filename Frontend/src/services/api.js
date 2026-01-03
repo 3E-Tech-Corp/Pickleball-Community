@@ -1229,4 +1229,36 @@ export const messagingApi = {
   updateSettings: (settings) => api.put('/messaging/settings', settings)
 }
 
+// Notifications API
+export const notificationsApi = {
+  // Get notifications with optional filters
+  getNotifications: (params = {}) => {
+    const queryParams = new URLSearchParams();
+    if (params.unreadOnly) queryParams.append('unreadOnly', params.unreadOnly);
+    if (params.type) queryParams.append('type', params.type);
+    if (params.page) queryParams.append('page', params.page);
+    if (params.pageSize) queryParams.append('pageSize', params.pageSize);
+    const queryString = queryParams.toString();
+    return api.get(`/notifications${queryString ? `?${queryString}` : ''}`);
+  },
+
+  // Get unread count
+  getUnreadCount: () => api.get('/notifications/count'),
+
+  // Mark single notification as read
+  markAsRead: (id) => api.put(`/notifications/${id}/read`),
+
+  // Mark all as read
+  markAllAsRead: () => api.put('/notifications/read-all'),
+
+  // Delete single notification
+  delete: (id) => api.delete(`/notifications/${id}`),
+
+  // Delete all read notifications
+  deleteRead: () => api.delete('/notifications/read'),
+
+  // Delete all notifications
+  deleteAll: () => api.delete('/notifications/all')
+}
+
 export default api
