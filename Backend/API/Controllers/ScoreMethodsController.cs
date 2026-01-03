@@ -1,10 +1,10 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Pickleball.Community.Database;
 using Pickleball.Community.Models;
 using Pickleball.Community.Models.DTOs;
 using Pickleball.Community.Models.Entities;
-using Pickleball.Community.Services;
 using System.Security.Claims;
 
 namespace Pickleball.Community.Controllers;
