@@ -289,14 +289,14 @@ public class LeaguesController : ControllerBase
             // Get all active leagues
             var leagues = await _context.Leagues
                 .Where(l => l.IsActive)
-                .Select(l => new
+                .Select(l => new LeagueFlatNode
                 {
-                    l.Id,
-                    l.Name,
-                    l.Scope,
-                    l.AvatarUrl,
-                    l.ParentLeagueId,
-                    l.SortOrder,
+                    Id = l.Id,
+                    Name = l.Name,
+                    Scope = l.Scope,
+                    AvatarUrl = l.AvatarUrl,
+                    ParentLeagueId = l.ParentLeagueId,
+                    SortOrder = l.SortOrder,
                     ClubCount = l.Clubs.Count(c => c.Status == "Active")
                 })
                 .ToListAsync();
@@ -306,7 +306,7 @@ public class LeaguesController : ControllerBase
                 .Where(l => l.ParentLeagueId == null)
                 .OrderBy(l => l.SortOrder)
                 .ThenBy(l => l.Name)
-                .Select(l => BuildTreeNode(l.Id, l.Name, l.Scope, l.AvatarUrl, l.ClubCount, leagues))
+                .Select(l => BuildTreeNode(l, leagues))
                 .ToList();
 
             return Ok(new ApiResponse<List<LeagueTreeNodeDto>> { Success = true, Data = rootNodes });
@@ -318,23 +318,34 @@ public class LeaguesController : ControllerBase
         }
     }
 
-    private LeagueTreeNodeDto BuildTreeNode(int id, string name, string scope, string? avatarUrl, int clubCount,
-        List<dynamic> allLeagues)
+    // Helper class for building tree
+    private class LeagueFlatNode
     {
-        var children = ((IEnumerable<dynamic>)allLeagues)
-            .Where(l => l.ParentLeagueId == id)
+        public int Id { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public string Scope { get; set; } = string.Empty;
+        public string? AvatarUrl { get; set; }
+        public int? ParentLeagueId { get; set; }
+        public int SortOrder { get; set; }
+        public int ClubCount { get; set; }
+    }
+
+    private LeagueTreeNodeDto BuildTreeNode(LeagueFlatNode node, List<LeagueFlatNode> allLeagues)
+    {
+        var children = allLeagues
+            .Where(l => l.ParentLeagueId == node.Id)
             .OrderBy(l => l.SortOrder)
             .ThenBy(l => l.Name)
-            .Select(l => BuildTreeNode(l.Id, l.Name, l.Scope, l.AvatarUrl, l.ClubCount, allLeagues))
+            .Select(l => BuildTreeNode(l, allLeagues))
             .ToList();
 
         return new LeagueTreeNodeDto
         {
-            Id = id,
-            Name = name,
-            Scope = scope,
-            AvatarUrl = avatarUrl,
-            ClubCount = clubCount,
+            Id = node.Id,
+            Name = node.Name,
+            Scope = node.Scope,
+            AvatarUrl = node.AvatarUrl,
+            ClubCount = node.ClubCount,
             Children = children
         };
     }
