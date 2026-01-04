@@ -72,7 +72,13 @@ public class UserAutoSyncMiddleware
                         Phone = phone,
                         Role = "Student",  // Default role
                         PasswordHash = null,  // No local password - auth via shared service
+                        Bio = string.Empty,
+                        ProfileImageUrl = string.Empty,
+                        RefreshToken = string.Empty,
                         IsActive = true,
+                        AllowDirectMessages = true,
+                        AllowClubMessages = true,
+                        CanWriteBlog = false,
                         CreatedAt = DateTime.UtcNow,
                         UpdatedAt = DateTime.UtcNow
                     };

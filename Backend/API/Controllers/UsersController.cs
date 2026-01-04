@@ -287,7 +287,8 @@ public class UsersController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error updating profile");
+            _logger.LogError(ex, "Error updating profile for user {UserId}. Message: {Message}, InnerException: {Inner}",
+                GetCurrentUserId(), ex.Message, ex.InnerException?.Message);
             return StatusCode(500, new ApiResponse<UserProfileDto>
             {
                 Success = false,
