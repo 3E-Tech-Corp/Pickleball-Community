@@ -1,14 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { useForm } from 'react-hook-form'
-import { userApi, assetApi, sharedUserApi, getAssetUrl, getSharedAssetUrl, SHARED_AUTH_URL } from '../services/api'
+import { userApi, authApi, assetApi, sharedUserApi, getAssetUrl, getSharedAssetUrl, SHARED_AUTH_URL } from '../services/api'
 import VideoUploadModal from '../components/ui/VideoUploadModal'
 import PublicProfileModal from '../components/ui/PublicProfileModal'
+import ChangeCredentialModal from '../components/ui/ChangeCredentialModal'
 import {
   User, Camera, Video, MapPin, Phone, Calendar,
   Edit2, Save, Upload, X, Play, Award, Target,
   Zap, Heart, Activity, TrendingUp, ChevronRight,
-  MessageCircle, Shield, Eye
+  MessageCircle, Shield, Eye, Mail
 } from 'lucide-react'
 
 const Profile = () => {
@@ -36,6 +37,10 @@ const Profile = () => {
 
   // Video modal state
   const [isVideoModalOpen, setIsVideoModalOpen] = useState(false)
+
+  // Credential change modal state
+  const [credentialModalOpen, setCredentialModalOpen] = useState(false)
+  const [credentialModalType, setCredentialModalType] = useState('email') // 'email' or 'phone'
 
   // Messaging settings state
   const [allowDirectMessages, setAllowDirectMessages] = useState(true)
@@ -290,6 +295,33 @@ const Profile = () => {
       updateUser({ ...user, introVideo: null })
     } catch (error) {
       console.error('Error removing video:', error)
+    }
+  }
+
+  // Handle credential change success (email or phone updated via shared auth)
+  const handleCredentialChangeSuccess = async (newValue) => {
+    try {
+      // Update local state
+      const updateData = credentialModalType === 'email'
+        ? { email: newValue }
+        : { phone: newValue }
+
+      // Update the form display
+      if (credentialModalType === 'email') {
+        basicInfoForm.setValue('email', newValue)
+      } else {
+        basicInfoForm.setValue('phone', newValue)
+      }
+
+      // Sync with local backend
+      await userApi.updateProfile(updateData)
+      updateUser({ ...user, ...updateData })
+
+      setCredentialModalOpen(false)
+    } catch (error) {
+      console.error('Error syncing credential change:', error)
+      // Still close the modal since shared auth was successful
+      setCredentialModalOpen(false)
     }
   }
 
@@ -697,22 +729,48 @@ const Profile = () => {
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                      <input
-                        {...basicInfoForm.register('email')}
-                        type="email"
-                        disabled={!isEditingBasicInfo}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg disabled:bg-gray-50 disabled:text-gray-600"
-                      />
+                      <div className="flex gap-2">
+                        <input
+                          {...basicInfoForm.register('email')}
+                          type="email"
+                          disabled
+                          className="flex-1 px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-600"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCredentialModalType('email')
+                            setCredentialModalOpen(true)
+                          }}
+                          className="px-3 py-2 text-sm text-blue-600 hover:bg-blue-50 border border-blue-300 rounded-lg transition whitespace-nowrap"
+                        >
+                          Change
+                        </button>
+                      </div>
+                      <p className="text-xs text-gray-500 mt-1">Managed by shared auth</p>
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
-                      <input
-                        {...basicInfoForm.register('phone')}
-                        type="tel"
-                        disabled={!isEditingBasicInfo}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg disabled:bg-gray-50 disabled:text-gray-600"
-                        placeholder="(123) 456-7890"
-                      />
+                      <div className="flex gap-2">
+                        <input
+                          {...basicInfoForm.register('phone')}
+                          type="tel"
+                          disabled
+                          className="flex-1 px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-600"
+                          placeholder="(123) 456-7890"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCredentialModalType('phone')
+                            setCredentialModalOpen(true)
+                          }}
+                          className="px-3 py-2 text-sm text-blue-600 hover:bg-blue-50 border border-blue-300 rounded-lg transition whitespace-nowrap"
+                        >
+                          Change
+                        </button>
+                      </div>
+                      <p className="text-xs text-gray-500 mt-1">Managed by shared auth</p>
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Gender</label>
@@ -1085,6 +1143,15 @@ const Profile = () => {
           onClose={() => setShowProfileModal(false)}
         />
       )}
+
+      {/* Change Email/Phone Modal */}
+      <ChangeCredentialModal
+        isOpen={credentialModalOpen}
+        onClose={() => setCredentialModalOpen(false)}
+        type={credentialModalType}
+        currentValue={credentialModalType === 'email' ? user?.email : user?.phone}
+        onSuccess={handleCredentialChangeSuccess}
+      />
     </div>
   )
 }
