@@ -1400,7 +1400,7 @@ public class EventsController : ControllerBase
             IsPublished = evt.IsPublished,
             IsPrivate = evt.IsPrivate,
             VenueName = evt.VenueName ?? evt.Venue?.Name,
-            Address = evt.Address ?? evt.Venue?.Address,
+            Address = evt.Address ?? evt.Venue?.Addr1,
             City = evt.City,
             State = evt.State,
             Country = evt.Country,
