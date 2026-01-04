@@ -101,6 +101,12 @@ public class ApplicationDbContext : DbContext
     // User Notifications
     public DbSet<Notification> Notifications { get; set; }
 
+    // Leagues
+    public DbSet<League> Leagues { get; set; }
+    public DbSet<LeagueManager> LeagueManagers { get; set; }
+    public DbSet<LeagueClub> LeagueClubs { get; set; }
+    public DbSet<LeagueClubRequest> LeagueClubRequests { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<User>(entity =>
@@ -961,6 +967,88 @@ public class ApplicationDbContext : DbContext
                   .WithMany()
                   .HasForeignKey(e => e.UserId)
                   .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        // League configuration
+        modelBuilder.Entity<League>(entity =>
+        {
+            entity.Property(l => l.Name).IsRequired().HasMaxLength(100);
+            entity.Property(l => l.Scope).IsRequired().HasMaxLength(20);
+            entity.HasIndex(l => l.ParentLeagueId);
+            entity.HasIndex(l => l.Scope);
+            entity.HasIndex(l => l.IsActive);
+
+            entity.HasOne(l => l.ParentLeague)
+                  .WithMany(l => l.ChildLeagues)
+                  .HasForeignKey(l => l.ParentLeagueId)
+                  .OnDelete(DeleteBehavior.NoAction);
+        });
+
+        // League Manager configuration
+        modelBuilder.Entity<LeagueManager>(entity =>
+        {
+            entity.Property(m => m.Role).IsRequired().HasMaxLength(50);
+            entity.HasIndex(m => m.LeagueId);
+            entity.HasIndex(m => m.UserId);
+            entity.HasIndex(m => new { m.LeagueId, m.UserId }).IsUnique();
+
+            entity.HasOne(m => m.League)
+                  .WithMany(l => l.Managers)
+                  .HasForeignKey(m => m.LeagueId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(m => m.User)
+                  .WithMany()
+                  .HasForeignKey(m => m.UserId)
+                  .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // League Club configuration
+        modelBuilder.Entity<LeagueClub>(entity =>
+        {
+            entity.Property(c => c.Status).HasMaxLength(20);
+            entity.HasIndex(c => c.LeagueId);
+            entity.HasIndex(c => c.ClubId);
+            entity.HasIndex(c => new { c.LeagueId, c.ClubId }).IsUnique();
+
+            entity.HasOne(c => c.League)
+                  .WithMany(l => l.Clubs)
+                  .HasForeignKey(c => c.LeagueId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(c => c.Club)
+                  .WithMany()
+                  .HasForeignKey(c => c.ClubId)
+                  .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // League Club Request configuration
+        modelBuilder.Entity<LeagueClubRequest>(entity =>
+        {
+            entity.Property(r => r.Status).HasMaxLength(20);
+            entity.HasIndex(r => r.LeagueId);
+            entity.HasIndex(r => r.ClubId);
+            entity.HasIndex(r => r.Status);
+
+            entity.HasOne(r => r.League)
+                  .WithMany(l => l.ClubRequests)
+                  .HasForeignKey(r => r.LeagueId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(r => r.Club)
+                  .WithMany()
+                  .HasForeignKey(r => r.ClubId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(r => r.RequestedBy)
+                  .WithMany()
+                  .HasForeignKey(r => r.RequestedByUserId)
+                  .OnDelete(DeleteBehavior.NoAction);
+
+            entity.HasOne(r => r.ProcessedBy)
+                  .WithMany()
+                  .HasForeignKey(r => r.ProcessedByUserId)
+                  .OnDelete(DeleteBehavior.NoAction);
         });
     }
 }
