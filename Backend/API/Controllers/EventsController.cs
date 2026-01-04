@@ -1363,6 +1363,26 @@ public class EventsController : ControllerBase
     // Helper methods
     private EventDto MapToEventDto(Event evt, double? distance)
     {
+        // Try to get coordinates from venue first, then fall back to event's own coordinates
+        double? latitude = null;
+        double? longitude = null;
+
+        if (evt.Venue != null && !string.IsNullOrEmpty(evt.Venue.GpsLat) && !string.IsNullOrEmpty(evt.Venue.GpsLng))
+        {
+            if (double.TryParse(evt.Venue.GpsLat, out var venueLat) && double.TryParse(evt.Venue.GpsLng, out var venueLng))
+            {
+                latitude = venueLat;
+                longitude = venueLng;
+            }
+        }
+
+        // Fall back to event's own coordinates if venue doesn't have GPS
+        if (!latitude.HasValue || !longitude.HasValue)
+        {
+            latitude = evt.Latitude;
+            longitude = evt.Longitude;
+        }
+
         return new EventDto
         {
             Id = evt.Id,
@@ -1379,10 +1399,14 @@ public class EventsController : ControllerBase
             RegistrationCloseDate = evt.RegistrationCloseDate,
             IsPublished = evt.IsPublished,
             IsPrivate = evt.IsPrivate,
-            VenueName = evt.VenueName,
+            VenueName = evt.VenueName ?? evt.Venue?.Name,
+            Address = evt.Address ?? evt.Venue?.Address,
             City = evt.City,
             State = evt.State,
             Country = evt.Country,
+            Latitude = latitude,
+            Longitude = longitude,
+            CourtId = evt.CourtId,
             PosterImageUrl = evt.PosterImageUrl,
             RegistrationFee = evt.RegistrationFee,
             PerDivisionFee = evt.PerDivisionFee,

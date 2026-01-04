@@ -18,9 +18,13 @@ public class EventDto
     public bool IsPublished { get; set; }
     public bool IsPrivate { get; set; }
     public string? VenueName { get; set; }
+    public string? Address { get; set; }
     public string? City { get; set; }
     public string? State { get; set; }
     public string? Country { get; set; }
+    public double? Latitude { get; set; }
+    public double? Longitude { get; set; }
+    public int? CourtId { get; set; }
     public string? PosterImageUrl { get; set; }
     public decimal RegistrationFee { get; set; }
     public decimal PerDivisionFee { get; set; }
@@ -39,10 +43,6 @@ public class EventDto
 public class EventDetailDto : EventDto
 {
     public string? BannerImageUrl { get; set; }
-    public string? Address { get; set; }
-    public double? Latitude { get; set; }
-    public double? Longitude { get; set; }
-    public int? CourtId { get; set; }
     public string? CourtName { get; set; }
     public string? ContactEmail { get; set; }
     public string? ContactPhone { get; set; }
