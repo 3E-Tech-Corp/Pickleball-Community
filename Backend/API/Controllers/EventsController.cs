@@ -27,6 +27,15 @@ public class EventsController : ControllerBase
         return int.TryParse(userIdClaim, out var userId) ? userId : null;
     }
 
+    private async Task<bool> IsAdminAsync()
+    {
+        var userId = GetCurrentUserId();
+        if (!userId.HasValue) return false;
+
+        var user = await _context.Users.FindAsync(userId.Value);
+        return user?.Role == "Admin";
+    }
+
     // GET: /events/search - Search for events
     [HttpGet("search")]
     public async Task<ActionResult<ApiResponse<PagedResult<EventDto>>>> SearchEvents([FromQuery] EventSearchRequest request)
@@ -547,8 +556,9 @@ public class EventsController : ControllerBase
             if (evt == null)
                 return NotFound(new ApiResponse<EventDetailDto> { Success = false, Message = "Event not found" });
 
-            // Check if user is organizer
-            if (evt.OrganizedByUserId != userId.Value)
+            // Check if user is organizer or admin
+            var isAdmin = await IsAdminAsync();
+            if (evt.OrganizedByUserId != userId.Value && !isAdmin)
                 return Forbid();
 
             evt.Name = dto.Name;
@@ -674,7 +684,9 @@ public class EventsController : ControllerBase
             if (evt == null || !evt.IsActive)
                 return NotFound(new ApiResponse<bool> { Success = false, Message = "Event not found" });
 
-            if (evt.OrganizedByUserId != userId.Value)
+            // Check if user is organizer or admin
+            var isAdmin = await IsAdminAsync();
+            if (evt.OrganizedByUserId != userId.Value && !isAdmin)
                 return Forbid();
 
             evt.IsPublished = true;
@@ -705,7 +717,9 @@ public class EventsController : ControllerBase
             if (evt == null || !evt.IsActive)
                 return NotFound(new ApiResponse<bool> { Success = false, Message = "Event not found" });
 
-            if (evt.OrganizedByUserId != userId.Value)
+            // Check if user is organizer or admin
+            var isAdmin = await IsAdminAsync();
+            if (evt.OrganizedByUserId != userId.Value && !isAdmin)
                 return Forbid();
 
             evt.IsActive = false;
