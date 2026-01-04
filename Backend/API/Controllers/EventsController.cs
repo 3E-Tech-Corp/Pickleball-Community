@@ -301,22 +301,23 @@ public class EventsController : ControllerBase
     {
         try
         {
+            // Load event with all related data (avoiding filtered includes that can cause SQL Server issues)
             var evt = await _context.Events
                 .Include(e => e.EventType)
                 .Include(e => e.OrganizedBy)
                 .Include(e => e.OrganizedByClub)
                 .Include(e => e.Venue)
-                .Include(e => e.Divisions.Where(d => d.IsActive))
+                .Include(e => e.Divisions)
                     .ThenInclude(d => d.Registrations)
-                .Include(e => e.Divisions.Where(d => d.IsActive))
-                    .ThenInclude(d => d.PartnerRequests.Where(p => p.Status == "Open"))
-                .Include(e => e.Divisions.Where(d => d.IsActive))
+                .Include(e => e.Divisions)
+                    .ThenInclude(d => d.PartnerRequests)
+                .Include(e => e.Divisions)
                     .ThenInclude(d => d.TeamUnit)
-                .Include(e => e.Divisions.Where(d => d.IsActive))
+                .Include(e => e.Divisions)
                     .ThenInclude(d => d.AgeGroupEntity)
-                .Include(e => e.Divisions.Where(d => d.IsActive))
+                .Include(e => e.Divisions)
                     .ThenInclude(d => d.SkillLevel)
-                .Include(e => e.Divisions.Where(d => d.IsActive))
+                .Include(e => e.Divisions)
                     .ThenInclude(d => d.Rewards)
                 .Include(e => e.Registrations)
                 .FirstOrDefaultAsync(e => e.Id == id && e.IsActive);

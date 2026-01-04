@@ -1672,10 +1672,12 @@ public class ClubsController : ControllerBase
             if (!isAdmin)
                 return Forbid();
 
-            var documentIds = orders.Select(o => o.DocumentId).ToList();
-            var documents = await _context.ClubDocuments
-                .Where(d => d.ClubId == id && documentIds.Contains(d.Id) && d.IsActive)
+            // Load all active documents for this club and filter in-memory to avoid OPENJSON issues
+            var documentIdsSet = orders.Select(o => o.DocumentId).ToHashSet();
+            var allDocs = await _context.ClubDocuments
+                .Where(d => d.ClubId == id && d.IsActive)
                 .ToListAsync();
+            var documents = allDocs.Where(d => documentIdsSet.Contains(d.Id)).ToList();
 
             foreach (var order in orders)
             {

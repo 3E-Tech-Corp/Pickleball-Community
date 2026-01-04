@@ -162,15 +162,14 @@ public class TagService : ITagService
             _logger.LogWarning(ex, "Failed to execute GetCommonTags stored procedure, falling back to EF query");
 
             // Fallback: use EF query if stored procedure fails
-            // Get tags already on this object
-            var existingTagIds = await _context.ObjectTags
-                .Where(ot => ot.ObjectType == objectType && ot.ObjectId == objectId)
-                .Select(ot => ot.TagId)
-                .ToListAsync();
-
             // Get most common tags for this object type, excluding already applied
+            // Using subquery to avoid OPENJSON issues with List.Contains()
             commonTags = await _context.ObjectTags
-                .Where(ot => ot.ObjectType == objectType && !existingTagIds.Contains(ot.TagId))
+                .Where(ot => ot.ObjectType == objectType &&
+                    !_context.ObjectTags.Any(existing =>
+                        existing.ObjectType == objectType &&
+                        existing.ObjectId == objectId &&
+                        existing.TagId == ot.TagId))
                 .GroupBy(ot => new { ot.TagId, ot.Tag.Name })
                 .Select(g => new CommonTagDto
                 {

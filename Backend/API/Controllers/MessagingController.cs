@@ -273,13 +273,16 @@ public class MessagingController : ControllerBase
             if (!userId.HasValue)
                 return Unauthorized(new ApiResponse<ConversationDto> { Success = false, Message = "User not authenticated" });
 
-            // Verify all participants exist
-            var validUserIds = await _context.Users
-                .Where(u => request.ParticipantUserIds.Contains(u.Id))
-                .Select(u => u.Id)
-                .ToListAsync();
+            // Verify all participants exist (check each individually to avoid OPENJSON issues)
+            var participantIdsSet = request.ParticipantUserIds.ToHashSet();
+            var validUserIds = new List<int>();
+            foreach (var participantId in participantIdsSet)
+            {
+                if (await _context.Users.AnyAsync(u => u.Id == participantId))
+                    validUserIds.Add(participantId);
+            }
 
-            if (validUserIds.Count != request.ParticipantUserIds.Count)
+            if (validUserIds.Count != participantIdsSet.Count)
                 return BadRequest(new ApiResponse<ConversationDto> { Success = false, Message = "Some users not found" });
 
             // Create conversation

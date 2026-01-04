@@ -266,14 +266,25 @@ public class TournamentController : ControllerBase
         }
 
         // Reload with members
-        var unitIds = createdUnits.Select(u => u.Id).ToList();
-        var units = await _context.EventUnits
+        if (!createdUnits.Any())
+        {
+            return Ok(new ApiResponse<List<EventUnitDto>>
+            {
+                Success = true,
+                Data = new List<EventUnitDto>()
+            });
+        }
+
+        // Load all units for this event and filter in-memory to avoid OPENJSON issues with List.Contains()
+        var unitIdsSet = createdUnits.Select(c => c.Id).ToHashSet();
+        var allUnits = await _context.EventUnits
             .Include(u => u.Members)
                 .ThenInclude(m => m.User)
             .Include(u => u.Division)
                 .ThenInclude(d => d!.TeamUnit)
-            .Where(u => unitIds.Contains(u.Id))
+            .Where(u => u.EventId == eventId)
             .ToListAsync();
+        var units = allUnits.Where(u => unitIdsSet.Contains(u.Id)).ToList();
 
         return Ok(new ApiResponse<List<EventUnitDto>>
         {
