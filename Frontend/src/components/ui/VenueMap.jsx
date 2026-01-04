@@ -24,6 +24,7 @@ export default function VenueMap({
   const mapInstanceRef = useRef(null);
   const markersRef = useRef([]);
   const [isClient, setIsClient] = useState(false);
+  const [mapReady, setMapReady] = useState(false);
 
   // Filter venues with valid coordinates
   const venuesWithCoords = useMemo(() => {
@@ -78,10 +79,14 @@ export default function VenueMap({
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
     }).addTo(map);
 
+    // Mark map as ready so markers can be added
+    setMapReady(true);
+
     return () => {
       if (mapInstanceRef.current) {
         mapInstanceRef.current.remove();
         mapInstanceRef.current = null;
+        setMapReady(false);
       }
     };
   }, [isClient]);
@@ -116,7 +121,7 @@ export default function VenueMap({
 
   // Update markers when courts change
   useEffect(() => {
-    if (!mapInstanceRef.current) return;
+    if (!mapReady || !mapInstanceRef.current) return;
 
     const map = mapInstanceRef.current;
 
@@ -189,11 +194,11 @@ export default function VenueMap({
       }
       map.fitBounds(bounds, { padding: [50, 50], maxZoom: 13 });
     }
-  }, [venuesWithCoords, userLocation, fitBounds, onCourtClick, onMarkerSelect, selectedCourtId, showNumbers]);
+  }, [mapReady, venuesWithCoords, userLocation, fitBounds, onCourtClick, onMarkerSelect, selectedCourtId, showNumbers]);
 
   // Update marker styles when selection changes
   useEffect(() => {
-    if (!mapInstanceRef.current || !showNumbers) return;
+    if (!mapReady || !mapInstanceRef.current || !showNumbers) return;
 
     markersRef.current.forEach((marker, index) => {
       if (!marker.courtData) return; // Skip user location marker
