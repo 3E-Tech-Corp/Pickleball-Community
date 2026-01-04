@@ -17,6 +17,10 @@ public class ClubDto
     public double? Distance { get; set; } // Calculated distance from user
     public DateTime CreatedAt { get; set; }
 
+    // GPS coordinates for map view
+    public double? Latitude { get; set; }
+    public double? Longitude { get; set; }
+
     // Home venue
     public int? HomeVenueId { get; set; }
     public string? HomeVenueName { get; set; }
