@@ -362,8 +362,7 @@ public class GrantsController : ControllerBase
                 Items = transactions,
                 TotalCount = totalCount,
                 Page = request.Page,
-                PageSize = request.PageSize,
-                TotalPages = (int)Math.Ceiling((double)totalCount / request.PageSize)
+                PageSize = request.PageSize
             };
 
             return Ok(new ApiResponse<PagedResult<ClubGrantTransactionDto>> { Success = true, Data = result });
