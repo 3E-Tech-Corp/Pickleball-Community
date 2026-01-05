@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { Users, Search, Filter, MapPin, Plus, Globe, Mail, Phone, ChevronLeft, ChevronRight, X, Copy, Check, Bell, UserPlus, Settings, Crown, Shield, Clock, DollarSign, Calendar, Upload, Image, Edit3, RefreshCw, Trash2, MessageCircle, List, Map, Loader2, Star, Heart, Award, Briefcase, ClipboardList, Flag, Key, Medal, Trophy, Wrench, Zap, Megaphone, UserCog, FileText, Download, File, Video, Table, Presentation, Eye, EyeOff, Lock, GripVertical, Building2, AlertCircle, Send } from 'lucide-react';
+import { Users, Search, Filter, MapPin, Plus, Globe, Mail, Phone, ChevronLeft, ChevronRight, X, Copy, Check, Bell, UserPlus, Settings, Crown, Shield, Clock, DollarSign, Calendar, Upload, Image, Edit3, RefreshCw, Trash2, MessageCircle, List, Map, Loader2, Star, Heart, Award, Briefcase, ClipboardList, Flag, Key, Medal, Trophy, Wrench, Zap, Megaphone, UserCog, FileText, Download, File, Video, Table, Presentation, Eye, EyeOff, Lock, GripVertical, Building2, AlertCircle, Send, Network, ExternalLink } from 'lucide-react';
 
 // Icon mapping for role icons
 const ROLE_ICON_MAP = {
@@ -2666,10 +2666,21 @@ function ClubDetailModal({ club, isAuthenticated, currentUserId, onClose, onJoin
 
               {/* League Affiliation Section */}
               <div>
-                <h3 className="font-medium text-gray-900 mb-3 flex items-center gap-2">
-                  <Building2 className="w-5 h-5 text-indigo-600" />
-                  League Affiliation
-                </h3>
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="font-medium text-gray-900 flex items-center gap-2">
+                    <Building2 className="w-5 h-5 text-indigo-600" />
+                    League Affiliation
+                  </h3>
+                  <Link
+                    to="/leagues/structure"
+                    target="_blank"
+                    className="flex items-center gap-1 text-sm text-indigo-600 hover:text-indigo-800"
+                  >
+                    <Network className="w-4 h-4" />
+                    View Structure
+                    <ExternalLink className="w-3 h-3" />
+                  </Link>
+                </div>
                 <div className="bg-gray-50 rounded-lg p-4">
                   {leaguesLoading ? (
                     <div className="flex items-center justify-center py-4">

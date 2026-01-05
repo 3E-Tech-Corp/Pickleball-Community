@@ -106,6 +106,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<LeagueManager> LeagueManagers { get; set; }
     public DbSet<LeagueClub> LeagueClubs { get; set; }
     public DbSet<LeagueClubRequest> LeagueClubRequests { get; set; }
+    public DbSet<LeagueDocument> LeagueDocuments { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

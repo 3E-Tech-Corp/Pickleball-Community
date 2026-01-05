@@ -167,6 +167,8 @@ public class LeaguesController : ControllerBase
                     .ThenInclude(r => r.Club)
                 .Include(l => l.ClubRequests.Where(r => r.Status == "Pending"))
                     .ThenInclude(r => r.RequestedBy)
+                .Include(l => l.Documents.Where(d => d.IsActive))
+                    .ThenInclude(d => d.UploadedBy)
                 .FirstOrDefaultAsync(l => l.Id == id);
 
             if (league == null)
@@ -240,7 +242,27 @@ public class LeaguesController : ControllerBase
                     JoinedAt = c.JoinedAt,
                     ExpiresAt = c.ExpiresAt,
                     Notes = c.Notes
-                }).ToList()
+                }).ToList(),
+                Documents = league.Documents
+                    .Where(d => d.IsPublic || canManage)
+                    .OrderBy(d => d.SortOrder)
+                    .Select(d => new LeagueDocumentDto
+                    {
+                        Id = d.Id,
+                        LeagueId = d.LeagueId,
+                        Title = d.Title,
+                        Description = d.Description,
+                        FileUrl = d.FileUrl,
+                        FileName = d.FileName,
+                        FileType = d.FileType,
+                        FileSize = d.FileSize,
+                        SortOrder = d.SortOrder,
+                        IsPublic = d.IsPublic,
+                        IsActive = d.IsActive,
+                        CreatedAt = d.CreatedAt,
+                        UploadedByUserId = d.UploadedByUserId,
+                        UploadedByName = d.UploadedBy != null ? $"{d.UploadedBy.FirstName} {d.UploadedBy.LastName}".Trim() : null
+                    }).ToList()
             };
 
             // Only include pending requests if user can manage
@@ -1073,4 +1095,242 @@ public class LeaguesController : ControllerBase
 
         return false;
     }
+
+    // =====================
+    // DOCUMENT ENDPOINTS
+    // =====================
+
+    // POST: /leagues/{id}/documents - Add document
+    [HttpPost("{id}/documents")]
+    [Authorize]
+    public async Task<ActionResult<ApiResponse<LeagueDocumentDto>>> AddDocument(int id, [FromBody] CreateLeagueDocumentDto request)
+    {
+        try
+        {
+            if (!await CanManageLeagueAsync(id))
+                return Forbid();
+
+            var league = await _context.Leagues.FindAsync(id);
+            if (league == null || !league.IsActive)
+                return NotFound(new ApiResponse<LeagueDocumentDto> { Success = false, Message = "League not found" });
+
+            var userId = GetCurrentUserId();
+
+            // Get next sort order
+            var maxSortOrder = await _context.LeagueDocuments
+                .Where(d => d.LeagueId == id && d.IsActive)
+                .MaxAsync(d => (int?)d.SortOrder) ?? 0;
+
+            var document = new LeagueDocument
+            {
+                LeagueId = id,
+                Title = request.Title,
+                Description = request.Description,
+                FileUrl = request.FileUrl,
+                FileName = request.FileName,
+                FileType = request.FileType,
+                FileSize = request.FileSize,
+                SortOrder = request.SortOrder > 0 ? request.SortOrder : maxSortOrder + 1,
+                IsPublic = request.IsPublic,
+                IsActive = true,
+                UploadedByUserId = userId,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            };
+
+            _context.LeagueDocuments.Add(document);
+            await _context.SaveChangesAsync();
+
+            var user = userId.HasValue ? await _context.Users.FindAsync(userId.Value) : null;
+
+            var dto = new LeagueDocumentDto
+            {
+                Id = document.Id,
+                LeagueId = document.LeagueId,
+                Title = document.Title,
+                Description = document.Description,
+                FileUrl = document.FileUrl,
+                FileName = document.FileName,
+                FileType = document.FileType,
+                FileSize = document.FileSize,
+                SortOrder = document.SortOrder,
+                IsPublic = document.IsPublic,
+                IsActive = document.IsActive,
+                CreatedAt = document.CreatedAt,
+                UploadedByUserId = document.UploadedByUserId,
+                UploadedByName = user != null ? $"{user.FirstName} {user.LastName}".Trim() : null
+            };
+
+            return Ok(new ApiResponse<LeagueDocumentDto> { Success = true, Data = dto });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error adding document to league {LeagueId}", id);
+            return StatusCode(500, new ApiResponse<LeagueDocumentDto> { Success = false, Message = "An error occurred" });
+        }
+    }
+
+    // PUT: /leagues/{id}/documents/{documentId} - Update document
+    [HttpPut("{id}/documents/{documentId}")]
+    [Authorize]
+    public async Task<ActionResult<ApiResponse<LeagueDocumentDto>>> UpdateDocument(int id, int documentId, [FromBody] CreateLeagueDocumentDto request)
+    {
+        try
+        {
+            if (!await CanManageLeagueAsync(id))
+                return Forbid();
+
+            var document = await _context.LeagueDocuments
+                .Include(d => d.UploadedBy)
+                .FirstOrDefaultAsync(d => d.Id == documentId && d.LeagueId == id);
+
+            if (document == null)
+                return NotFound(new ApiResponse<LeagueDocumentDto> { Success = false, Message = "Document not found" });
+
+            document.Title = request.Title;
+            document.Description = request.Description;
+            document.FileUrl = request.FileUrl;
+            document.FileName = request.FileName;
+            document.FileType = request.FileType;
+            document.FileSize = request.FileSize;
+            document.SortOrder = request.SortOrder;
+            document.IsPublic = request.IsPublic;
+            document.UpdatedAt = DateTime.UtcNow;
+
+            await _context.SaveChangesAsync();
+
+            var dto = new LeagueDocumentDto
+            {
+                Id = document.Id,
+                LeagueId = document.LeagueId,
+                Title = document.Title,
+                Description = document.Description,
+                FileUrl = document.FileUrl,
+                FileName = document.FileName,
+                FileType = document.FileType,
+                FileSize = document.FileSize,
+                SortOrder = document.SortOrder,
+                IsPublic = document.IsPublic,
+                IsActive = document.IsActive,
+                CreatedAt = document.CreatedAt,
+                UploadedByUserId = document.UploadedByUserId,
+                UploadedByName = document.UploadedBy != null ? $"{document.UploadedBy.FirstName} {document.UploadedBy.LastName}".Trim() : null
+            };
+
+            return Ok(new ApiResponse<LeagueDocumentDto> { Success = true, Data = dto });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating document {DocumentId} in league {LeagueId}", documentId, id);
+            return StatusCode(500, new ApiResponse<LeagueDocumentDto> { Success = false, Message = "An error occurred" });
+        }
+    }
+
+    // DELETE: /leagues/{id}/documents/{documentId} - Remove document
+    [HttpDelete("{id}/documents/{documentId}")]
+    [Authorize]
+    public async Task<ActionResult<ApiResponse<object>>> DeleteDocument(int id, int documentId)
+    {
+        try
+        {
+            if (!await CanManageLeagueAsync(id))
+                return Forbid();
+
+            var document = await _context.LeagueDocuments
+                .FirstOrDefaultAsync(d => d.Id == documentId && d.LeagueId == id);
+
+            if (document == null)
+                return NotFound(new ApiResponse<object> { Success = false, Message = "Document not found" });
+
+            // Soft delete
+            document.IsActive = false;
+            document.UpdatedAt = DateTime.UtcNow;
+
+            await _context.SaveChangesAsync();
+
+            return Ok(new ApiResponse<object> { Success = true, Message = "Document deleted" });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error deleting document {DocumentId} from league {LeagueId}", documentId, id);
+            return StatusCode(500, new ApiResponse<object> { Success = false, Message = "An error occurred" });
+        }
+    }
+
+    // PUT: /leagues/{id}/documents/reorder - Reorder documents
+    [HttpPut("{id}/documents/reorder")]
+    [Authorize]
+    public async Task<ActionResult<ApiResponse<object>>> ReorderDocuments(int id, [FromBody] UpdateDocumentOrderDto request)
+    {
+        try
+        {
+            if (!await CanManageLeagueAsync(id))
+                return Forbid();
+
+            var documents = await _context.LeagueDocuments
+                .Where(d => d.LeagueId == id && d.IsActive && request.DocumentIds.Contains(d.Id))
+                .ToListAsync();
+
+            for (int i = 0; i < request.DocumentIds.Count; i++)
+            {
+                var doc = documents.FirstOrDefault(d => d.Id == request.DocumentIds[i]);
+                if (doc != null)
+                {
+                    doc.SortOrder = i + 1;
+                    doc.UpdatedAt = DateTime.UtcNow;
+                }
+            }
+
+            await _context.SaveChangesAsync();
+
+            return Ok(new ApiResponse<object> { Success = true, Message = "Documents reordered" });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error reordering documents for league {LeagueId}", id);
+            return StatusCode(500, new ApiResponse<object> { Success = false, Message = "An error occurred" });
+        }
+    }
+
+    // POST: /leagues/{id}/avatar - Upload avatar (accepts URL)
+    [HttpPost("{id}/avatar")]
+    [Authorize]
+    public async Task<ActionResult<ApiResponse<LeagueDto>>> UpdateAvatar(int id, [FromBody] UpdateAvatarDto request)
+    {
+        try
+        {
+            if (!await CanManageLeagueAsync(id))
+                return Forbid();
+
+            var league = await _context.Leagues.FindAsync(id);
+            if (league == null || !league.IsActive)
+                return NotFound(new ApiResponse<LeagueDto> { Success = false, Message = "League not found" });
+
+            league.AvatarUrl = request.AvatarUrl;
+            league.UpdatedAt = DateTime.UtcNow;
+
+            await _context.SaveChangesAsync();
+
+            var dto = new LeagueDto
+            {
+                Id = league.Id,
+                Name = league.Name,
+                AvatarUrl = league.AvatarUrl,
+                Scope = league.Scope
+            };
+
+            return Ok(new ApiResponse<LeagueDto> { Success = true, Data = dto, Message = "Avatar updated" });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating avatar for league {LeagueId}", id);
+            return StatusCode(500, new ApiResponse<LeagueDto> { Success = false, Message = "An error occurred" });
+        }
+    }
+}
+
+// DTO for avatar update
+public class UpdateAvatarDto
+{
+    public string? AvatarUrl { get; set; }
 }

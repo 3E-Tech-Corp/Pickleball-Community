@@ -31,6 +31,7 @@ public class LeagueDetailDto : LeagueDto
     public List<LeagueManagerDto> Managers { get; set; } = new();
     public List<LeagueClubDto> Clubs { get; set; } = new();
     public List<LeagueClubRequestDto> PendingRequests { get; set; } = new();
+    public List<LeagueDocumentDto> Documents { get; set; } = new();
 
     // Hierarchy path (e.g., "USA Pickleball > Southeast Region > Florida")
     public List<LeagueBreadcrumbDto> Breadcrumbs { get; set; } = new();
@@ -173,4 +174,42 @@ public class LeagueSearchRequest
     public bool? RootOnly { get; set; } // Only return top-level leagues
     public int Page { get; set; } = 1;
     public int PageSize { get; set; } = 20;
+}
+
+// League document
+public class LeagueDocumentDto
+{
+    public int Id { get; set; }
+    public int LeagueId { get; set; }
+    public string Title { get; set; } = string.Empty;
+    public string? Description { get; set; }
+    public string FileUrl { get; set; } = string.Empty;
+    public string? FileName { get; set; }
+    public string? FileType { get; set; }
+    public long? FileSize { get; set; }
+    public int SortOrder { get; set; }
+    public bool IsPublic { get; set; }
+    public bool IsActive { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public int? UploadedByUserId { get; set; }
+    public string? UploadedByName { get; set; }
+}
+
+// Create/Update league document
+public class CreateLeagueDocumentDto
+{
+    public string Title { get; set; } = string.Empty;
+    public string? Description { get; set; }
+    public string FileUrl { get; set; } = string.Empty;
+    public string? FileName { get; set; }
+    public string? FileType { get; set; }
+    public long? FileSize { get; set; }
+    public int SortOrder { get; set; } = 0;
+    public bool IsPublic { get; set; } = true;
+}
+
+// Update document order
+public class UpdateDocumentOrderDto
+{
+    public List<int> DocumentIds { get; set; } = new();
 }

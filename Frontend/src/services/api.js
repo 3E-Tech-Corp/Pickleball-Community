@@ -1318,7 +1318,21 @@ export const leaguesApi = {
     api.delete(`/leagues/${leagueId}/clubs/${membershipId}`),
 
   // Get leagues a club belongs to
-  getClubLeagues: (clubId) => api.get(`/clubs/${clubId}/leagues`)
+  getClubLeagues: (clubId) => api.get(`/clubs/${clubId}/leagues`),
+
+  // Avatar management
+  updateAvatar: (leagueId, avatarUrl) =>
+    api.post(`/leagues/${leagueId}/avatar`, { avatarUrl }),
+
+  // Document management
+  addDocument: (leagueId, data) =>
+    api.post(`/leagues/${leagueId}/documents`, data),
+  updateDocument: (leagueId, documentId, data) =>
+    api.put(`/leagues/${leagueId}/documents/${documentId}`, data),
+  deleteDocument: (leagueId, documentId) =>
+    api.delete(`/leagues/${leagueId}/documents/${documentId}`),
+  reorderDocuments: (leagueId, documentIds) =>
+    api.put(`/leagues/${leagueId}/documents/reorder`, { documentIds })
 }
 
 // Notifications API

@@ -3,10 +3,11 @@ import { Link, useNavigate } from 'react-router-dom';
 import {
   Building2, Plus, Search, Edit, Trash2, ChevronRight, ChevronDown,
   Users, MapPin, Globe, Network, Shield, Check, X, Loader2,
-  AlertCircle, Building, Clock, Save, ArrowLeft
+  AlertCircle, Building, Clock, Save, ArrowLeft, ExternalLink,
+  Upload, FileText, GripVertical, Eye, EyeOff, Image
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { leaguesApi, getAssetUrl, getSharedAssetUrl } from '../services/api';
+import { leaguesApi, sharedAssetApi, getAssetUrl, getSharedAssetUrl } from '../services/api';
 import PublicProfileModal from '../components/ui/PublicProfileModal';
 
 // Scope config
@@ -57,6 +58,18 @@ export default function LeagueAdmin({ embedded = false }) {
 
   // Profile modal
   const [profileModalUserId, setProfileModalUserId] = useState(null);
+
+  // Avatar upload
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+
+  // Document management
+  const [showDocumentModal, setShowDocumentModal] = useState(false);
+  const [editingDocument, setEditingDocument] = useState(null);
+  const [documentData, setDocumentData] = useState({
+    title: '', description: '', fileUrl: '', fileName: '', fileType: '', fileSize: 0, isPublic: true
+  });
+  const [savingDocument, setSavingDocument] = useState(false);
+  const [uploadingDocument, setUploadingDocument] = useState(false);
 
   useEffect(() => {
     loadLeagues();
@@ -238,6 +251,122 @@ export default function LeagueAdmin({ embedded = false }) {
     }
   };
 
+  // Avatar upload handler
+  const handleAvatarUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadingAvatar(true);
+    try {
+      const response = await sharedAssetApi.upload(file, 'image', 'league-avatar');
+      if (response.data?.url) {
+        await leaguesApi.updateAvatar(selectedLeague.id, response.data.url);
+        loadLeagueDetail(selectedLeague.id);
+      }
+    } catch (err) {
+      console.error('Error uploading avatar:', err);
+      alert('Failed to upload avatar');
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
+
+  // Document handlers
+  const openDocumentModal = (doc = null) => {
+    if (doc) {
+      setEditingDocument(doc);
+      setDocumentData({
+        title: doc.title || '',
+        description: doc.description || '',
+        fileUrl: doc.fileUrl || '',
+        fileName: doc.fileName || '',
+        fileType: doc.fileType || '',
+        fileSize: doc.fileSize || 0,
+        isPublic: doc.isPublic !== false
+      });
+    } else {
+      setEditingDocument(null);
+      setDocumentData({
+        title: '', description: '', fileUrl: '', fileName: '', fileType: '', fileSize: 0, isPublic: true
+      });
+    }
+    setShowDocumentModal(true);
+  };
+
+  const handleDocumentFileUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadingDocument(true);
+    try {
+      const response = await sharedAssetApi.upload(file, 'document', 'league-document');
+      if (response.data?.url) {
+        setDocumentData(prev => ({
+          ...prev,
+          fileUrl: response.data.url,
+          fileName: file.name,
+          fileType: file.type,
+          fileSize: file.size
+        }));
+      }
+    } catch (err) {
+      console.error('Error uploading document:', err);
+      alert('Failed to upload document');
+    } finally {
+      setUploadingDocument(false);
+    }
+  };
+
+  const handleSaveDocument = async () => {
+    if (!documentData.title.trim() || !documentData.fileUrl) {
+      alert('Title and file are required');
+      return;
+    }
+
+    setSavingDocument(true);
+    try {
+      let response;
+      if (editingDocument) {
+        response = await leaguesApi.updateDocument(selectedLeague.id, editingDocument.id, documentData);
+      } else {
+        response = await leaguesApi.addDocument(selectedLeague.id, documentData);
+      }
+
+      if (response.success) {
+        setShowDocumentModal(false);
+        loadLeagueDetail(selectedLeague.id);
+      } else {
+        alert(response.message || 'Failed to save document');
+      }
+    } catch (err) {
+      console.error('Error saving document:', err);
+      alert('Failed to save document');
+    } finally {
+      setSavingDocument(false);
+    }
+  };
+
+  const handleDeleteDocument = async (docId) => {
+    if (!confirm('Delete this document?')) return;
+    try {
+      const response = await leaguesApi.deleteDocument(selectedLeague.id, docId);
+      if (response.success) {
+        loadLeagueDetail(selectedLeague.id);
+      }
+    } catch (err) {
+      console.error('Error deleting document:', err);
+    }
+  };
+
+  const handleReorderDocuments = async (docs) => {
+    try {
+      const documentIds = docs.map(d => d.id);
+      await leaguesApi.reorderDocuments(selectedLeague.id, documentIds);
+    } catch (err) {
+      console.error('Error reordering documents:', err);
+    }
+  };
+
   // Get available parent leagues (exclude current and children)
   const availableParentLeagues = leagues.filter(l =>
     !selectedLeague || (l.id !== selectedLeague.id)
@@ -253,13 +382,24 @@ export default function LeagueAdmin({ embedded = false }) {
             <Building2 className="w-7 h-7 text-indigo-600" />
             League Management
           </h2>
-          <button
-            onClick={handleCreateNew}
-            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
-          >
-            <Plus className="w-4 h-4" />
-            Create League
-          </button>
+          <div className="flex items-center gap-3">
+            <Link
+              to="/leagues/structure"
+              target="_blank"
+              className="flex items-center gap-2 px-3 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50"
+            >
+              <Network className="w-4 h-4" />
+              View Structure
+              <ExternalLink className="w-3 h-3" />
+            </Link>
+            <button
+              onClick={handleCreateNew}
+              className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+            >
+              <Plus className="w-4 h-4" />
+              Create League
+            </button>
+          </div>
         </div>
       )}
 
@@ -364,6 +504,45 @@ export default function LeagueAdmin({ embedded = false }) {
                       </button>
                     )}
                   </div>
+
+                  {/* Avatar Section - only for existing leagues */}
+                  {!isCreating && selectedLeague && (
+                    <div className="flex items-center gap-4 mb-6 pb-6 border-b border-gray-200">
+                      <div className="relative">
+                        {selectedLeague.avatarUrl ? (
+                          <img
+                            src={getSharedAssetUrl(selectedLeague.avatarUrl)}
+                            alt={selectedLeague.name}
+                            className="w-20 h-20 rounded-lg object-cover border border-gray-200"
+                          />
+                        ) : (
+                          <div className="w-20 h-20 rounded-lg bg-gray-100 flex items-center justify-center border border-gray-200">
+                            <Building2 className="w-10 h-10 text-gray-400" />
+                          </div>
+                        )}
+                        {uploadingAvatar && (
+                          <div className="absolute inset-0 bg-white/80 rounded-lg flex items-center justify-center">
+                            <Loader2 className="w-6 h-6 animate-spin text-indigo-600" />
+                          </div>
+                        )}
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">League Avatar</label>
+                        <label className="inline-flex items-center gap-2 px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg cursor-pointer hover:bg-gray-200">
+                          <Image className="w-4 h-4" />
+                          <span className="text-sm">Upload Image</span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={handleAvatarUpload}
+                            className="hidden"
+                            disabled={uploadingAvatar}
+                          />
+                        </label>
+                        <p className="text-xs text-gray-500 mt-1">Recommended: 200x200px</p>
+                      </div>
+                    </div>
+                  )}
 
                   <div className="grid grid-cols-2 gap-4">
                     <div className="col-span-2">
@@ -613,6 +792,98 @@ export default function LeagueAdmin({ embedded = false }) {
                     </div>
                   </div>
                 )}
+
+                {/* Documents Section */}
+                {!isCreating && selectedLeague && (
+                  <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+                        <FileText className="w-5 h-5 text-blue-600" />
+                        Documents
+                        {selectedLeague.documents?.length > 0 && (
+                          <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs rounded-full">
+                            {selectedLeague.documents.length}
+                          </span>
+                        )}
+                      </h3>
+                      <button
+                        onClick={() => openDocumentModal()}
+                        className="flex items-center gap-1 px-3 py-1.5 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                      >
+                        <Plus className="w-4 h-4" />
+                        Add Document
+                      </button>
+                    </div>
+
+                    {selectedLeague.documents?.length > 0 ? (
+                      <div className="space-y-2">
+                        {selectedLeague.documents.map((doc, index) => (
+                          <div
+                            key={doc.id}
+                            className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg group"
+                          >
+                            <div className="p-2 bg-blue-100 rounded">
+                              <FileText className="w-5 h-5 text-blue-600" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className="font-medium text-gray-900 truncate">{doc.title}</span>
+                                {!doc.isPublic && (
+                                  <span className="flex items-center gap-1 text-xs text-gray-500">
+                                    <EyeOff className="w-3 h-3" />
+                                    Private
+                                  </span>
+                                )}
+                              </div>
+                              {doc.description && (
+                                <p className="text-sm text-gray-500 truncate">{doc.description}</p>
+                              )}
+                              {doc.fileName && (
+                                <p className="text-xs text-gray-400">{doc.fileName}</p>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <a
+                                href={getSharedAssetUrl(doc.fileUrl)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="p-1.5 text-gray-500 hover:bg-gray-200 rounded"
+                                title="Download"
+                              >
+                                <ExternalLink className="w-4 h-4" />
+                              </a>
+                              <button
+                                onClick={() => openDocumentModal(doc)}
+                                className="p-1.5 text-gray-500 hover:bg-gray-200 rounded"
+                                title="Edit"
+                              >
+                                <Edit className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteDocument(doc.id)}
+                                className="p-1.5 text-red-500 hover:bg-red-50 rounded"
+                                title="Delete"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center py-6">
+                        <FileText className="w-10 h-10 mx-auto text-gray-300 mb-2" />
+                        <p className="text-sm text-gray-500">No documents yet</p>
+                        <button
+                          onClick={() => openDocumentModal()}
+                          className="mt-2 text-sm text-blue-600 hover:text-blue-800"
+                        >
+                          Add your first document
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -680,6 +951,106 @@ export default function LeagueAdmin({ embedded = false }) {
           userId={profileModalUserId}
           onClose={() => setProfileModalUserId(null)}
         />
+      )}
+
+      {/* Document Modal */}
+      {showDocumentModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl shadow-xl max-w-lg w-full p-6">
+            <h3 className="text-lg font-semibold mb-4">
+              {editingDocument ? 'Edit Document' : 'Add Document'}
+            </h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Title *</label>
+                <input
+                  type="text"
+                  value={documentData.title}
+                  onChange={(e) => setDocumentData({ ...documentData, title: e.target.value })}
+                  className="w-full border border-gray-300 rounded-lg p-2"
+                  placeholder="e.g., League Rules 2026"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                <textarea
+                  value={documentData.description}
+                  onChange={(e) => setDocumentData({ ...documentData, description: e.target.value })}
+                  rows={2}
+                  className="w-full border border-gray-300 rounded-lg p-2"
+                  placeholder="Brief description of this document..."
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">File *</label>
+                {documentData.fileUrl ? (
+                  <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                    <FileText className="w-8 h-8 text-blue-600" />
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-gray-900 truncate">{documentData.fileName || 'Uploaded file'}</p>
+                      {documentData.fileSize > 0 && (
+                        <p className="text-xs text-gray-500">
+                          {(documentData.fileSize / 1024).toFixed(1)} KB
+                        </p>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => setDocumentData(prev => ({ ...prev, fileUrl: '', fileName: '', fileType: '', fileSize: 0 }))}
+                      className="p-1.5 text-gray-500 hover:bg-gray-200 rounded"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <label className="flex flex-col items-center justify-center w-full h-24 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100">
+                    {uploadingDocument ? (
+                      <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
+                    ) : (
+                      <>
+                        <Upload className="w-6 h-6 text-gray-400 mb-1" />
+                        <span className="text-sm text-gray-500">Click to upload</span>
+                      </>
+                    )}
+                    <input
+                      type="file"
+                      onChange={handleDocumentFileUpload}
+                      className="hidden"
+                      disabled={uploadingDocument}
+                    />
+                  </label>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="isPublic"
+                  checked={documentData.isPublic}
+                  onChange={(e) => setDocumentData({ ...documentData, isPublic: e.target.checked })}
+                  className="w-4 h-4 text-indigo-600 rounded"
+                />
+                <label htmlFor="isPublic" className="text-sm text-gray-700 flex items-center gap-1">
+                  <Eye className="w-4 h-4" />
+                  Publicly visible
+                </label>
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button
+                  onClick={() => setShowDocumentModal(false)}
+                  className="flex-1 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveDocument}
+                  disabled={!documentData.title || !documentData.fileUrl || savingDocument}
+                  className="flex-1 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {savingDocument ? 'Saving...' : (editingDocument ? 'Update' : 'Add Document')}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </>
   );

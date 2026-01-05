@@ -88,6 +88,7 @@ public class League
     public ICollection<LeagueManager> Managers { get; set; } = new List<LeagueManager>();
     public ICollection<LeagueClub> Clubs { get; set; } = new List<LeagueClub>();
     public ICollection<LeagueClubRequest> ClubRequests { get; set; } = new List<LeagueClubRequest>();
+    public ICollection<LeagueDocument> Documents { get; set; } = new List<LeagueDocument>();
 }
 
 /// <summary>
@@ -221,4 +222,77 @@ public class LeagueClubRequest
 
     [ForeignKey("ProcessedByUserId")]
     public User? ProcessedBy { get; set; }
+}
+
+/// <summary>
+/// Document attachment for a league (rules, forms, etc.)
+/// </summary>
+public class LeagueDocument
+{
+    public int Id { get; set; }
+
+    public int LeagueId { get; set; }
+
+    /// <summary>
+    /// Document title
+    /// </summary>
+    [Required]
+    [MaxLength(200)]
+    public string Title { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Document description
+    /// </summary>
+    [MaxLength(1000)]
+    public string? Description { get; set; }
+
+    /// <summary>
+    /// File URL
+    /// </summary>
+    [Required]
+    [MaxLength(500)]
+    public string FileUrl { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Original file name
+    /// </summary>
+    [MaxLength(255)]
+    public string? FileName { get; set; }
+
+    /// <summary>
+    /// File type/MIME type
+    /// </summary>
+    [MaxLength(100)]
+    public string? FileType { get; set; }
+
+    /// <summary>
+    /// File size in bytes
+    /// </summary>
+    public long? FileSize { get; set; }
+
+    /// <summary>
+    /// Sort order for display
+    /// </summary>
+    public int SortOrder { get; set; } = 0;
+
+    /// <summary>
+    /// Whether the document is publicly visible
+    /// </summary>
+    public bool IsPublic { get; set; } = true;
+
+    public bool IsActive { get; set; } = true;
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+
+    /// <summary>
+    /// User who uploaded the document
+    /// </summary>
+    public int? UploadedByUserId { get; set; }
+
+    // Navigation
+    [ForeignKey("LeagueId")]
+    public League? League { get; set; }
+
+    [ForeignKey("UploadedByUserId")]
+    public User? UploadedBy { get; set; }
 }
