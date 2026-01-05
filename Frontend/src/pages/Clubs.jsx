@@ -1273,11 +1273,18 @@ function ClubDetailModal({ club, isAuthenticated, currentUserId, onClose, onJoin
 
     setUploadingDocument(true);
     try {
-      const response = await sharedAssetApi.upload(file);
-      if (response.url) {
+      // Determine asset type based on file MIME type
+      let assetType = 'document';
+      if (file.type.startsWith('image/')) assetType = 'image';
+      else if (file.type.startsWith('video/')) assetType = 'video';
+      else if (file.type.startsWith('audio/')) assetType = 'audio';
+
+      const response = await sharedAssetApi.upload(file, assetType, 'club-document');
+      // Response structure: { data: { success: true, url: "/asset/123", ... } }
+      if (response.data?.url) {
         setNewDocument({
           ...newDocument,
-          fileUrl: response.url,
+          fileUrl: response.data.url,
           fileName: file.name,
           mimeType: file.type,
           fileSizeBytes: file.size
@@ -1285,6 +1292,7 @@ function ClubDetailModal({ club, isAuthenticated, currentUserId, onClose, onJoin
       }
     } catch (err) {
       console.error('Error uploading document:', err);
+      toast.error('Failed to upload file. Please try again.');
     } finally {
       setUploadingDocument(false);
     }
