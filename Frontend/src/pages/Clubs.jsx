@@ -1041,6 +1041,7 @@ function ClubCard({ club, onViewDetails, showManageButton = false }) {
 }
 
 function ClubDetailModal({ club, isAuthenticated, currentUserId, onClose, onJoin, onUpdate, memberRoles }) {
+  const toast = useToast();
   const [activeTab, setActiveTab] = useState('about');
   const [members, setMembers] = useState([]);
   const [joinRequests, setJoinRequests] = useState([]);
