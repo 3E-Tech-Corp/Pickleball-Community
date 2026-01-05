@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { Users, Search, Filter, MapPin, Plus, Globe, Mail, Phone, ChevronLeft, ChevronRight, X, Copy, Check, Bell, UserPlus, Settings, Crown, Shield, Clock, DollarSign, Calendar, Upload, Image, Edit3, RefreshCw, Trash2, MessageCircle, List, Map, Loader2, Star, Heart, Award, Briefcase, ClipboardList, Flag, Key, Medal, Trophy, Wrench, Zap, Megaphone, UserCog, FileText, Download, File, Video, Table, Presentation, Eye, EyeOff, Lock, GripVertical, Building2, AlertCircle, Send, Network, ExternalLink } from 'lucide-react';
+import { Users, Search, Filter, MapPin, Plus, Globe, Mail, Phone, ChevronLeft, ChevronRight, ChevronDown, X, Copy, Check, Bell, UserPlus, Settings, Crown, Shield, Clock, DollarSign, Calendar, Upload, Image, Edit3, RefreshCw, Trash2, MessageCircle, List, Map, Loader2, Star, Heart, Award, Briefcase, ClipboardList, Flag, Key, Medal, Trophy, Wrench, Zap, Megaphone, UserCog, FileText, Download, File, Video, Table, Presentation, Eye, EyeOff, Lock, GripVertical, Building2, Building, AlertCircle, Send, Network, ExternalLink } from 'lucide-react';
 
 // Icon mapping for role icons
 const ROLE_ICON_MAP = {
@@ -1079,6 +1079,9 @@ function ClubDetailModal({ club, isAuthenticated, currentUserId, onClose, onJoin
   const [selectedLeagueId, setSelectedLeagueId] = useState('');
   const [leagueJoinMessage, setLeagueJoinMessage] = useState('');
   const [requestingLeague, setRequestingLeague] = useState(false);
+  const [leagueTree, setLeagueTree] = useState([]);
+  const [leagueTreeLoading, setLeagueTreeLoading] = useState(false);
+  const [expandedLeagueNodes, setExpandedLeagueNodes] = useState(new Set());
 
   const logoInputRef = useRef(null);
   const navigate = useNavigate();
@@ -1196,6 +1199,52 @@ function ClubDetailModal({ club, isAuthenticated, currentUserId, onClose, onJoin
     } finally {
       setRequestingLeague(false);
     }
+  };
+
+  // Load league tree for join modal
+  const loadLeagueTree = async () => {
+    setLeagueTreeLoading(true);
+    try {
+      const response = await leaguesApi.getTree();
+      if (response.success) {
+        setLeagueTree(response.data || []);
+        // Auto-expand top-level nodes
+        const rootIds = new Set((response.data || []).map(n => n.id));
+        setExpandedLeagueNodes(rootIds);
+      }
+    } catch (err) {
+      console.error('Error loading league tree:', err);
+    } finally {
+      setLeagueTreeLoading(false);
+    }
+  };
+
+  // Handle opening the join league modal
+  const handleOpenJoinLeagueModal = () => {
+    setShowJoinLeagueModal(true);
+    setSelectedLeagueId('');
+    setLeagueJoinMessage('');
+    if (leagueTree.length === 0) {
+      loadLeagueTree();
+    }
+  };
+
+  // Toggle tree node expansion
+  const toggleLeagueNode = (nodeId) => {
+    setExpandedLeagueNodes(prev => {
+      const next = new Set(prev);
+      if (next.has(nodeId)) {
+        next.delete(nodeId);
+      } else {
+        next.add(nodeId);
+      }
+      return next;
+    });
+  };
+
+  // Check if a league is already joined or pending
+  const isLeagueUnavailable = (leagueId) => {
+    return clubLeagues.some(cl => cl.leagueId === leagueId);
   };
 
   // Load league data when manage tab is opened
@@ -2799,7 +2848,7 @@ function ClubDetailModal({ club, isAuthenticated, currentUserId, onClose, onJoin
 
                       {/* Request to Join League Button */}
                       <button
-                        onClick={() => setShowJoinLeagueModal(true)}
+                        onClick={handleOpenJoinLeagueModal}
                         className="w-full py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 flex items-center justify-center gap-2"
                       >
                         <Plus className="w-4 h-4" />
@@ -2813,73 +2862,83 @@ function ClubDetailModal({ club, isAuthenticated, currentUserId, onClose, onJoin
           )}
         </div>
 
-        {/* Join League Modal */}
+        {/* Join League Modal - Tree View */}
         {showJoinLeagueModal && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-[60]">
-            <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
-              <div className="flex items-center justify-between mb-4">
+            <div className="bg-white rounded-xl shadow-xl max-w-lg w-full max-h-[80vh] flex flex-col">
+              <div className="flex items-center justify-between p-4 border-b">
                 <h3 className="text-lg font-semibold text-gray-900">Request to Join League</h3>
                 <button onClick={() => setShowJoinLeagueModal(false)} className="p-1 text-gray-400 hover:text-gray-600">
                   <X className="w-5 h-5" />
                 </button>
               </div>
 
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Select League</label>
-                  <select
-                    value={selectedLeagueId}
-                    onChange={(e) => setSelectedLeagueId(e.target.value)}
-                    className="w-full border border-gray-300 rounded-lg p-2 focus:ring-indigo-500 focus:border-indigo-500"
-                  >
-                    <option value="">Choose a league...</option>
-                    {availableLeagues
-                      .filter(league => !clubLeagues.some(cl => cl.leagueId === league.id))
-                      .map(league => (
-                        <option key={league.id} value={league.id}>
-                          {league.name} ({league.scope})
-                        </option>
-                      ))
-                    }
-                  </select>
-                </div>
+              <div className="flex-1 overflow-y-auto p-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Select a League</label>
 
-                <div>
+                {leagueTreeLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="w-6 h-6 animate-spin text-indigo-600" />
+                  </div>
+                ) : leagueTree.length === 0 ? (
+                  <div className="text-center py-8 text-gray-500">
+                    <Network className="w-12 h-12 mx-auto mb-2 text-gray-300" />
+                    <p>No leagues available</p>
+                  </div>
+                ) : (
+                  <div className="border rounded-lg overflow-hidden">
+                    {leagueTree.map(node => (
+                      <LeagueTreeSelectNode
+                        key={node.id}
+                        node={node}
+                        level={0}
+                        selectedId={selectedLeagueId}
+                        onSelect={setSelectedLeagueId}
+                        expandedNodes={expandedLeagueNodes}
+                        toggleNode={toggleLeagueNode}
+                        isUnavailable={isLeagueUnavailable}
+                      />
+                    ))}
+                  </div>
+                )}
+
+                {/* Message input */}
+                <div className="mt-4">
                   <label className="block text-sm font-medium text-gray-700 mb-1">Message (optional)</label>
                   <textarea
                     value={leagueJoinMessage}
                     onChange={(e) => setLeagueJoinMessage(e.target.value)}
-                    rows={3}
-                    className="w-full border border-gray-300 rounded-lg p-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    rows={2}
+                    className="w-full border border-gray-300 rounded-lg p-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
                     placeholder="Tell the league why you want to join..."
                   />
                 </div>
+              </div>
 
-                <div className="flex gap-2 pt-2">
-                  <button
-                    onClick={() => setShowJoinLeagueModal(false)}
-                    className="flex-1 py-2 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleRequestJoinLeague}
-                    disabled={!selectedLeagueId || requestingLeague}
-                    className="flex-1 py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 disabled:opacity-50 flex items-center justify-center gap-2"
-                  >
-                    {requestingLeague ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        Sending...
-                      </>
-                    ) : (
-                      <>
-                        <Send className="w-4 h-4" />
-                        Send Request
-                      </>
-                    )}
-                  </button>
-                </div>
+              <div className="p-4 border-t bg-gray-50 flex gap-2">
+                <button
+                  onClick={() => setShowJoinLeagueModal(false)}
+                  className="flex-1 py-2 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-100"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleRequestJoinLeague}
+                  disabled={!selectedLeagueId || requestingLeague}
+                  className="flex-1 py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {requestingLeague ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Sending...
+                    </>
+                  ) : (
+                    <>
+                      <Send className="w-4 h-4" />
+                      Send Request
+                    </>
+                  )}
+                </button>
               </div>
             </div>
           </div>
@@ -2959,6 +3018,105 @@ function ClubDetailModal({ club, isAuthenticated, currentUserId, onClose, onJoin
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+// Scope config for tree view styling
+const LEAGUE_SCOPE_CONFIG = {
+  National: { icon: Globe, color: 'text-purple-600', bg: 'bg-purple-100' },
+  Regional: { icon: Network, color: 'text-blue-600', bg: 'bg-blue-100' },
+  State: { icon: Building2, color: 'text-green-600', bg: 'bg-green-100' },
+  District: { icon: Building, color: 'text-orange-600', bg: 'bg-orange-100' },
+  Local: { icon: MapPin, color: 'text-gray-600', bg: 'bg-gray-100' }
+};
+
+// Tree node component for league selection
+function LeagueTreeSelectNode({ node, level, selectedId, onSelect, expandedNodes, toggleNode, isUnavailable }) {
+  const config = LEAGUE_SCOPE_CONFIG[node.scope] || LEAGUE_SCOPE_CONFIG.Local;
+  const ScopeIcon = config.icon;
+  const isExpanded = expandedNodes.has(node.id);
+  const hasChildren = node.children && node.children.length > 0;
+  const isSelected = selectedId === String(node.id);
+  const unavailable = isUnavailable(node.id);
+
+  const indentPx = level * 20;
+
+  return (
+    <div>
+      <div
+        className={`flex items-center gap-2 py-2.5 px-3 border-b border-gray-100 cursor-pointer transition-colors ${
+          isSelected ? 'bg-indigo-50' : unavailable ? 'bg-gray-50' : 'hover:bg-gray-50'
+        }`}
+        style={{ paddingLeft: `${12 + indentPx}px` }}
+        onClick={() => {
+          if (!unavailable) {
+            onSelect(String(node.id));
+          }
+        }}
+      >
+        {/* Expand/collapse toggle */}
+        {hasChildren ? (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleNode(node.id);
+            }}
+            className="w-5 h-5 flex items-center justify-center flex-shrink-0 text-gray-400 hover:text-gray-600"
+          >
+            {isExpanded ? (
+              <ChevronDown className="w-4 h-4" />
+            ) : (
+              <ChevronRight className="w-4 h-4" />
+            )}
+          </button>
+        ) : (
+          <div className="w-5 h-5 flex-shrink-0" />
+        )}
+
+        {/* Selection radio */}
+        <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
+          isSelected ? 'border-indigo-600 bg-indigo-600' : unavailable ? 'border-gray-300 bg-gray-100' : 'border-gray-300'
+        }`}>
+          {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+        </div>
+
+        {/* Scope icon */}
+        <div className={`p-1 rounded ${config.bg} flex-shrink-0`}>
+          <ScopeIcon className={`w-3.5 h-3.5 ${config.color}`} />
+        </div>
+
+        {/* League name */}
+        <div className="flex-1 min-w-0">
+          <span className={`text-sm font-medium ${unavailable ? 'text-gray-400' : 'text-gray-900'}`}>
+            {node.name}
+          </span>
+          <span className={`ml-2 text-xs ${config.color}`}>
+            {node.scope}
+          </span>
+          {unavailable && (
+            <span className="ml-2 text-xs text-gray-400">(already joined)</span>
+          )}
+        </div>
+      </div>
+
+      {/* Children */}
+      {isExpanded && hasChildren && (
+        <div>
+          {node.children.map(child => (
+            <LeagueTreeSelectNode
+              key={child.id}
+              node={child}
+              level={level + 1}
+              selectedId={selectedId}
+              onSelect={onSelect}
+              expandedNodes={expandedNodes}
+              toggleNode={toggleNode}
+              isUnavailable={isUnavailable}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
