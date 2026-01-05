@@ -629,6 +629,14 @@ export const venuesApi = {
     return api.get(`/venues/${id}?${params.toString()}`);
   },
 
+  // Alias for getVenue (courts are venues)
+  getCourt: (id, userLat, userLng) => {
+    const params = new URLSearchParams();
+    if (userLat) params.append('userLat', userLat);
+    if (userLng) params.append('userLng', userLng);
+    return api.get(`/venues/${id}?${params.toString()}`);
+  },
+
   // Submit venue confirmation/feedback
   submitConfirmation: (venueId, data) =>
     api.post(`/venues/${venueId}/confirmations`, data),
