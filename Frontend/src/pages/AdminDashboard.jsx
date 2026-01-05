@@ -21,6 +21,7 @@ import VenueTypesAdmin from './VenueTypesAdmin'
 import ClubMemberRolesAdmin from './ClubMemberRolesAdmin'
 import TeamUnitsAdmin from './TeamUnitsAdmin'
 import SkillLevelsAdmin from './SkillLevelsAdmin'
+import LeagueAdmin from './LeagueAdmin'
 
 const AdminDashboard = () => {
   const { user } = useAuth()
@@ -441,7 +442,7 @@ const AdminDashboard = () => {
     {
       title: 'Organization',
       items: [
-        { id: 'leagues', label: 'Leagues', icon: Network, href: '/admin/leagues' }
+        { id: 'leagues', label: 'Leagues', icon: Network }
       ]
     },
     {
@@ -584,6 +585,7 @@ const AdminDashboard = () => {
                     <table className="w-full">
                       <thead className="bg-gray-50 border-b">
                         <tr>
+                          <th className="px-4 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
                           <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
                           <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
                           <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Location</th>
@@ -595,6 +597,7 @@ const AdminDashboard = () => {
                       <tbody className="divide-y divide-gray-200">
                         {getPaginatedData(filteredUsers).map(u => (
                           <tr key={u.id} className="hover:bg-gray-50">
+                            <td className="px-4 py-4 text-sm font-mono text-gray-600">{u.id}</td>
                             <td className="px-6 py-4">
                               <div className="flex items-center">
                                 <div className="w-10 h-10 rounded-full bg-gray-200 overflow-hidden flex-shrink-0">
@@ -1549,6 +1552,9 @@ const AdminDashboard = () => {
 
           {/* Skill Levels Admin */}
           {activeTab === 'skillLevels' && <SkillLevelsAdmin embedded />}
+
+          {/* League Admin */}
+          {activeTab === 'leagues' && <LeagueAdmin embedded />}
         </div>
       </div>
 

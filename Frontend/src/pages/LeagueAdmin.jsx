@@ -21,7 +21,7 @@ const SCOPE_CONFIG = {
 
 const MANAGER_ROLES = ['Admin', 'President', 'Vice President', 'Director', 'Secretary', 'Treasurer', 'Moderator'];
 
-export default function LeagueAdmin() {
+export default function LeagueAdmin({ embedded = false }) {
   const { user } = useAuth();
   const navigate = useNavigate();
 
@@ -243,37 +243,27 @@ export default function LeagueAdmin() {
     !selectedLeague || (l.id !== selectedLeague.id)
   );
 
-  return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 py-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Link to="/admin/dashboard" className="p-2 hover:bg-gray-100 rounded-lg">
-                <ArrowLeft className="w-5 h-5 text-gray-600" />
-              </Link>
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-                  <Building2 className="w-7 h-7 text-indigo-600" />
-                  League Management
-                </h1>
-                <p className="text-gray-600 mt-1">Manage leagues, hierarchy, and club memberships</p>
-              </div>
-            </div>
-            <button
-              onClick={handleCreateNew}
-              className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
-            >
-              <Plus className="w-4 h-4" />
-              Create League
-            </button>
-          </div>
+  // Main content - used in both embedded and standalone modes
+  const content = (
+    <>
+      {/* Header for embedded mode */}
+      {embedded && (
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+            <Building2 className="w-7 h-7 text-indigo-600" />
+            League Management
+          </h2>
+          <button
+            onClick={handleCreateNew}
+            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+          >
+            <Plus className="w-4 h-4" />
+            Create League
+          </button>
         </div>
-      </div>
+      )}
 
-      <div className="max-w-7xl mx-auto px-4 py-6">
-        <div className="flex gap-6">
+      <div className="flex gap-6">
           {/* Left Panel - League List */}
           <div className="w-1/3">
             <div className="bg-white rounded-xl shadow-sm border border-gray-200">
@@ -692,6 +682,46 @@ export default function LeagueAdmin() {
           onClose={() => setProfileModalUserId(null)}
         />
       )}
+    </>
+  );
+
+  // Return embedded or standalone version
+  if (embedded) {
+    return content;
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* Header for standalone mode */}
+      <div className="bg-white border-b border-gray-200">
+        <div className="max-w-7xl mx-auto px-4 py-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <Link to="/admin/dashboard" className="p-2 hover:bg-gray-100 rounded-lg">
+                <ArrowLeft className="w-5 h-5 text-gray-600" />
+              </Link>
+              <div>
+                <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+                  <Building2 className="w-7 h-7 text-indigo-600" />
+                  League Management
+                </h1>
+                <p className="text-gray-600 mt-1">Manage leagues, hierarchy, and club memberships</p>
+              </div>
+            </div>
+            <button
+              onClick={handleCreateNew}
+              className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+            >
+              <Plus className="w-4 h-4" />
+              Create League
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="max-w-7xl mx-auto px-4 py-6">
+        {content}
+      </div>
     </div>
   );
 }
