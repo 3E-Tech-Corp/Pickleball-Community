@@ -12,12 +12,14 @@ const getRoleIcon = (iconName) => {
   return ROLE_ICON_MAP[iconName] || null;
 };
 import { useAuth } from '../contexts/AuthContext';
+import { useToast } from '../contexts/ToastContext';
 import { clubsApi, sharedAssetApi, clubMemberRolesApi, venuesApi, leaguesApi, getSharedAssetUrl, SHARED_AUTH_URL } from '../services/api';
 import PublicProfileModal from '../components/ui/PublicProfileModal';
 import VenueMap from '../components/ui/VenueMap';
 
 export default function Clubs() {
   const { user, isAuthenticated } = useAuth();
+  const toast = useToast();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const inviteCode = searchParams.get('invite');
@@ -1189,15 +1191,15 @@ function ClubDetailModal({ club, isAuthenticated, currentUserId, onClose, onJoin
         setSelectedLeagueId('');
         setLeagueJoinMessage('');
         loadLeagueData(); // Refresh
-        alert('Request to join league submitted successfully!');
+        toast.success('Request to join league submitted successfully!');
       } else {
-        alert(response.message || 'Failed to submit request');
+        toast.error(response.message || 'Failed to submit request');
       }
     } catch (err) {
       console.error('Error requesting to join league:', err);
       // API interceptor returns error.response.data directly, so err.message contains the API message
       const errorMessage = err?.message || 'Failed to submit request. Please try again.';
-      alert(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setRequestingLeague(false);
     }
@@ -1249,9 +1251,9 @@ function ClubDetailModal({ club, isAuthenticated, currentUserId, onClose, onJoin
     return clubLeagues.some(cl => cl.leagueId === leagueId);
   };
 
-  // Load league data when manage tab is opened
+  // Load league data when members or manage tab is opened
   useEffect(() => {
-    if (activeTab === 'manage' && canEdit) {
+    if (activeTab === 'members' || (activeTab === 'manage' && canEdit)) {
       loadLeagueData();
     }
   }, [activeTab, canEdit]);
@@ -1408,12 +1410,12 @@ function ClubDetailModal({ club, isAuthenticated, currentUserId, onClose, onJoin
     if (!file) return;
 
     if (!file.type.startsWith('image/')) {
-      alert('Please select an image file');
+      toast.error('Please select an image file');
       return;
     }
 
     if (file.size > 5 * 1024 * 1024) {
-      alert('Logo must be less than 5MB');
+      toast.error('Logo must be less than 5MB');
       return;
     }
 
@@ -1440,7 +1442,7 @@ function ClubDetailModal({ club, isAuthenticated, currentUserId, onClose, onJoin
       }
     } catch (err) {
       console.error('Error uploading logo:', err);
-      alert('Failed to upload logo');
+      toast.error('Failed to upload logo');
     } finally {
       setUploadingLogo(false);
       if (logoInputRef.current) logoInputRef.current.value = '';
@@ -1613,7 +1615,7 @@ function ClubDetailModal({ club, isAuthenticated, currentUserId, onClose, onJoin
       }
     } catch (err) {
       console.error('Error saving club info:', err);
-      alert('Failed to save club info');
+      toast.error('Failed to save club info');
     } finally {
       setSavingInfo(false);
     }
@@ -1997,6 +1999,73 @@ function ClubDetailModal({ club, isAuthenticated, currentUserId, onClose, onJoin
               ) : (
                 <p className="text-center text-gray-500 py-8">No members yet</p>
               )}
+
+              {/* League Affiliation Section */}
+              <div className="mt-8 pt-6 border-t">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="font-medium text-gray-900 flex items-center gap-2">
+                    <Building2 className="w-5 h-5 text-indigo-600" />
+                    League Affiliation
+                  </h3>
+                  <Link
+                    to="/leagues/structure"
+                    target="_blank"
+                    className="flex items-center gap-1 text-sm text-indigo-600 hover:text-indigo-800"
+                  >
+                    <Network className="w-4 h-4" />
+                    View Structure
+                    <ExternalLink className="w-3 h-3" />
+                  </Link>
+                </div>
+                <div className="bg-gray-50 rounded-lg p-4">
+                  {leaguesLoading ? (
+                    <div className="flex items-center justify-center py-4">
+                      <Loader2 className="w-5 h-5 animate-spin text-gray-400" />
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {/* Current Leagues */}
+                      {clubLeagues.length > 0 ? (
+                        <div>
+                          <p className="text-sm font-medium text-gray-700 mb-2">Member of:</p>
+                          <div className="space-y-2">
+                            {clubLeagues.map(league => (
+                              <div key={league.id} className="flex items-center justify-between bg-white p-3 rounded-lg border border-gray-200">
+                                <div>
+                                  <span className="font-medium text-gray-900">{league.leagueName}</span>
+                                  <span className={`ml-2 text-xs px-2 py-0.5 rounded-full ${
+                                    league.status === 'Active' ? 'bg-green-100 text-green-700' :
+                                    league.status === 'Pending' ? 'bg-yellow-100 text-yellow-700' :
+                                    'bg-gray-100 text-gray-600'
+                                  }`}>
+                                    {league.status}
+                                  </span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="text-center py-4">
+                          <Building2 className="w-8 h-8 mx-auto text-gray-300 mb-2" />
+                          <p className="text-sm text-gray-500">Not affiliated with any leagues yet</p>
+                        </div>
+                      )}
+
+                      {/* Request to Join League Button */}
+                      {canManage && (
+                        <button
+                          onClick={handleOpenJoinLeagueModal}
+                          className="w-full py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 flex items-center justify-center gap-2"
+                        >
+                          <Plus className="w-4 h-4" />
+                          Request to Join a League
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           )}
 
@@ -2792,71 +2861,6 @@ function ClubDetailModal({ club, isAuthenticated, currentUserId, onClose, onJoin
                     <p className="text-sm text-gray-500">Club chat is not enabled</p>
                   ) : (
                     <p className="text-sm text-gray-500">Join the club to access chat</p>
-                  )}
-                </div>
-              </div>
-
-              {/* League Affiliation Section */}
-              <div>
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="font-medium text-gray-900 flex items-center gap-2">
-                    <Building2 className="w-5 h-5 text-indigo-600" />
-                    League Affiliation
-                  </h3>
-                  <Link
-                    to="/leagues/structure"
-                    target="_blank"
-                    className="flex items-center gap-1 text-sm text-indigo-600 hover:text-indigo-800"
-                  >
-                    <Network className="w-4 h-4" />
-                    View Structure
-                    <ExternalLink className="w-3 h-3" />
-                  </Link>
-                </div>
-                <div className="bg-gray-50 rounded-lg p-4">
-                  {leaguesLoading ? (
-                    <div className="flex items-center justify-center py-4">
-                      <Loader2 className="w-5 h-5 animate-spin text-gray-400" />
-                    </div>
-                  ) : (
-                    <div className="space-y-3">
-                      {/* Current Leagues */}
-                      {clubLeagues.length > 0 ? (
-                        <div>
-                          <p className="text-sm font-medium text-gray-700 mb-2">Member of:</p>
-                          <div className="space-y-2">
-                            {clubLeagues.map(league => (
-                              <div key={league.id} className="flex items-center justify-between bg-white p-3 rounded-lg border border-gray-200">
-                                <div>
-                                  <span className="font-medium text-gray-900">{league.leagueName}</span>
-                                  <span className={`ml-2 text-xs px-2 py-0.5 rounded-full ${
-                                    league.status === 'Active' ? 'bg-green-100 text-green-700' :
-                                    league.status === 'Pending' ? 'bg-yellow-100 text-yellow-700' :
-                                    'bg-gray-100 text-gray-600'
-                                  }`}>
-                                    {league.status}
-                                  </span>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="text-center py-4">
-                          <Building2 className="w-8 h-8 mx-auto text-gray-300 mb-2" />
-                          <p className="text-sm text-gray-500">Not affiliated with any leagues yet</p>
-                        </div>
-                      )}
-
-                      {/* Request to Join League Button */}
-                      <button
-                        onClick={handleOpenJoinLeagueModal}
-                        className="w-full py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 flex items-center justify-center gap-2"
-                      >
-                        <Plus className="w-4 h-4" />
-                        Request to Join a League
-                      </button>
-                    </div>
                   )}
                 </div>
               </div>
