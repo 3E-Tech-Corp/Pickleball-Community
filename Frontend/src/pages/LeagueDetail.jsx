@@ -3,11 +3,19 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   Building2, ChevronRight, Users, MapPin, Globe, Mail, ExternalLink,
   Shield, Crown, Plus, Settings, Edit, Network, Loader2, ArrowLeft,
-  Check, X, UserPlus, Building, Clock, AlertCircle
+  Check, X, UserPlus, Building, Clock, AlertCircle, FileText, Download
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { leaguesApi, getSharedAssetUrl } from '../services/api';
 import PublicProfileModal from '../components/ui/PublicProfileModal';
+
+// Format file size helper
+const formatFileSize = (bytes) => {
+  if (!bytes) return '';
+  const sizes = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(1024));
+  return `${(bytes / Math.pow(1024, i)).toFixed(1)} ${sizes[i]}`;
+};
 
 // Scope icons and colors
 const SCOPE_CONFIG = {
@@ -346,7 +354,7 @@ export default function LeagueDetail() {
       <div className="bg-white border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4">
           <div className="flex gap-6 overflow-x-auto">
-            {['overview', 'sub-leagues', 'clubs', 'managers', ...(canManage && league.pendingRequests?.length > 0 ? ['requests'] : [])].map(tab => (
+            {['overview', 'sub-leagues', 'clubs', 'managers', ...(league.documents?.length > 0 ? ['documents'] : []), ...(canManage && league.pendingRequests?.length > 0 ? ['requests'] : [])].map(tab => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
@@ -623,6 +631,48 @@ export default function LeagueDetail() {
               <div className="p-8 text-center text-gray-500">
                 <Shield className="w-12 h-12 mx-auto mb-3 text-gray-300" />
                 <p>No managers assigned</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Documents Tab */}
+        {activeTab === 'documents' && (
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200">
+            <div className="p-4 border-b border-gray-200">
+              <h2 className="font-semibold text-gray-900">Documents</h2>
+            </div>
+            {league.documents && league.documents.length > 0 ? (
+              <div className="divide-y divide-gray-200">
+                {league.documents.map(doc => (
+                  <a
+                    key={doc.id}
+                    href={getSharedAssetUrl(doc.fileUrl)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-4 p-4 hover:bg-gray-50 transition-colors"
+                  >
+                    <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center flex-shrink-0">
+                      <FileText className="w-5 h-5 text-blue-600" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium text-gray-900">{doc.title}</div>
+                      {doc.description && (
+                        <div className="text-sm text-gray-500 truncate">{doc.description}</div>
+                      )}
+                      <div className="text-xs text-gray-400 mt-1">
+                        {doc.fileName && <span>{doc.fileName}</span>}
+                        {doc.fileSize && <span className="ml-2">({formatFileSize(doc.fileSize)})</span>}
+                      </div>
+                    </div>
+                    <Download className="w-5 h-5 text-gray-400" />
+                  </a>
+                ))}
+              </div>
+            ) : (
+              <div className="p-8 text-center text-gray-500">
+                <FileText className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+                <p>No documents available</p>
               </div>
             )}
           </div>
