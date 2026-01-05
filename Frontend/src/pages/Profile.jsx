@@ -804,48 +804,48 @@ const Profile = () => {
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                      <div className="flex gap-2">
-                        <input
-                          {...basicInfoForm.register('email')}
-                          type="email"
-                          disabled
-                          className="flex-1 px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-600"
-                        />
+                      <input
+                        {...basicInfoForm.register('email')}
+                        type="email"
+                        disabled
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-600"
+                      />
+                      <div className="flex items-center justify-between mt-1">
+                        <p className="text-xs text-gray-500">Managed by shared auth</p>
                         <button
                           type="button"
                           onClick={() => {
                             setCredentialModalType('email')
                             setCredentialModalOpen(true)
                           }}
-                          className="px-3 py-2 text-sm text-blue-600 hover:bg-blue-50 border border-blue-300 rounded-lg transition whitespace-nowrap"
+                          className="text-xs text-blue-600 hover:text-blue-800 font-medium"
                         >
                           Change
                         </button>
                       </div>
-                      <p className="text-xs text-gray-500 mt-1">Managed by shared auth</p>
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
-                      <div className="flex gap-2">
-                        <input
-                          {...basicInfoForm.register('phone')}
-                          type="tel"
-                          disabled
-                          className="flex-1 px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-600"
-                          placeholder="(123) 456-7890"
-                        />
+                      <input
+                        {...basicInfoForm.register('phone')}
+                        type="tel"
+                        disabled
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-600"
+                        placeholder="(123) 456-7890"
+                      />
+                      <div className="flex items-center justify-between mt-1">
+                        <p className="text-xs text-gray-500">Managed by shared auth</p>
                         <button
                           type="button"
                           onClick={() => {
                             setCredentialModalType('phone')
                             setCredentialModalOpen(true)
                           }}
-                          className="px-3 py-2 text-sm text-blue-600 hover:bg-blue-50 border border-blue-300 rounded-lg transition whitespace-nowrap"
+                          className="text-xs text-blue-600 hover:text-blue-800 font-medium"
                         >
                           Change
                         </button>
                       </div>
-                      <p className="text-xs text-gray-500 mt-1">Managed by shared auth</p>
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Gender</label>
