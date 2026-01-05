@@ -56,6 +56,13 @@ const ChangeCredentialModal = ({
           </button>
 
           <div className="px-6 py-8">
+            <div className="mb-4 p-3 bg-blue-50 rounded-lg">
+              <p className="text-sm text-blue-800">
+                {type === 'email'
+                  ? 'Changing your email requires OTP verification. The new email must not be associated with another account.'
+                  : 'Changing your phone requires OTP verification. The new phone number must not be associated with another account.'}
+              </p>
+            </div>
             <SharedChangeCredential
               authApiUrl={SHARED_AUTH_URL}
               type={type}
