@@ -1169,19 +1169,20 @@ function ClubDetailModal({ club, isAuthenticated, currentUserId, onClose, onJoin
 
   // Load leagues the club belongs to and available leagues to join
   const loadLeagueData = async () => {
-    if (!canEdit) return;
     setLeaguesLoading(true);
     try {
-      // Load club's current leagues
+      // Load club's current leagues (for all users - shown on About tab)
       const clubLeaguesRes = await leaguesApi.getClubLeagues(club.id);
       if (clubLeaguesRes.success) {
         setClubLeagues(clubLeaguesRes.data || []);
       }
 
-      // Load available leagues to join
-      const availableRes = await leaguesApi.search({ pageSize: 50 });
-      if (availableRes.success) {
-        setAvailableLeagues(availableRes.data?.items || []);
+      // Load available leagues to join (only for editors)
+      if (canEdit) {
+        const availableRes = await leaguesApi.search({ pageSize: 50 });
+        if (availableRes.success) {
+          setAvailableLeagues(availableRes.data?.items || []);
+        }
       }
     } catch (err) {
       console.error('Error loading league data:', err);
@@ -1262,10 +1263,10 @@ function ClubDetailModal({ club, isAuthenticated, currentUserId, onClose, onJoin
 
   // Load league data when about or manage tab is opened
   useEffect(() => {
-    if (activeTab === 'about' || (activeTab === 'manage' && canEdit)) {
+    if (activeTab === 'about' || activeTab === 'manage') {
       loadLeagueData();
     }
-  }, [activeTab, canEdit]);
+  }, [activeTab, club.id]);
 
   const handleDocumentUpload = async (e) => {
     const file = e.target.files?.[0];
@@ -1753,6 +1754,34 @@ function ClubDetailModal({ club, isAuthenticated, currentUserId, onClose, onJoin
           {/* About Tab */}
           {activeTab === 'about' && (
             <div className="space-y-6">
+              {/* League Affiliation - Top Right */}
+              {clubLeagues.filter(l => l.status === 'Active' || !l.status).length > 0 && (
+                <div className="flex justify-end">
+                  <Link
+                    to={`/leagues/${clubLeagues.find(l => l.status === 'Active' || !l.status)?.id}`}
+                    className="flex items-center gap-3 px-4 py-2 bg-indigo-50 hover:bg-indigo-100 rounded-lg transition-colors border border-indigo-100"
+                  >
+                    {clubLeagues.find(l => l.status === 'Active' || !l.status)?.avatarUrl ? (
+                      <img
+                        src={getSharedAssetUrl(clubLeagues.find(l => l.status === 'Active' || !l.status)?.avatarUrl)}
+                        alt=""
+                        className="w-10 h-10 rounded-lg object-cover"
+                      />
+                    ) : (
+                      <div className="w-10 h-10 rounded-lg bg-indigo-200 flex items-center justify-center">
+                        <Building2 className="w-5 h-5 text-indigo-600" />
+                      </div>
+                    )}
+                    <div className="text-left">
+                      <p className="text-xs text-indigo-600 font-medium">Member of</p>
+                      <p className="text-sm font-semibold text-indigo-900">
+                        {clubLeagues.find(l => l.status === 'Active' || !l.status)?.name}
+                      </p>
+                    </div>
+                  </Link>
+                </div>
+              )}
+
               {/* Join/Leave Button */}
               {!isMember && !club.hasPendingRequest && (
                 <button
