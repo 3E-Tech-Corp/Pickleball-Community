@@ -803,15 +803,8 @@ const Profile = () => {
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                      <input
-                        {...basicInfoForm.register('email')}
-                        type="email"
-                        disabled
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-600"
-                      />
-                      <div className="flex items-center justify-between mt-1">
-                        <p className="text-xs text-gray-500">Managed by shared auth</p>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-sm font-medium text-gray-700">Email</label>
                         <button
                           type="button"
                           onClick={() => {
@@ -823,18 +816,16 @@ const Profile = () => {
                           Change
                         </button>
                       </div>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
                       <input
-                        {...basicInfoForm.register('phone')}
-                        type="tel"
+                        {...basicInfoForm.register('email')}
+                        type="email"
                         disabled
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-600"
-                        placeholder="(123) 456-7890"
                       />
-                      <div className="flex items-center justify-between mt-1">
-                        <p className="text-xs text-gray-500">Managed by shared auth</p>
+                    </div>
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-sm font-medium text-gray-700">Phone</label>
                         <button
                           type="button"
                           onClick={() => {
@@ -846,6 +837,13 @@ const Profile = () => {
                           Change
                         </button>
                       </div>
+                      <input
+                        {...basicInfoForm.register('phone')}
+                        type="tel"
+                        disabled
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-600"
+                        placeholder="(123) 456-7890"
+                      />
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Gender</label>
