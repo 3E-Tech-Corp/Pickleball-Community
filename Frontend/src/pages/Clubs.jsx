@@ -1915,6 +1915,61 @@ function ClubDetailModal({ club, isAuthenticated, currentUserId, onClose, onJoin
           {/* Members Tab */}
           {activeTab === 'members' && (
             <div>
+              {/* Pending Join Requests - For Managers (at top) */}
+              {canManage && joinRequests.length > 0 && (
+                <div className="mb-6 pb-6 border-b">
+                  <h3 className="font-medium text-gray-900 flex items-center gap-2 mb-4">
+                    <UserPlus className="w-5 h-5 text-orange-600" />
+                    Pending Join Requests
+                    <span className="ml-1 px-2 py-0.5 bg-orange-100 text-orange-700 text-xs font-medium rounded-full">
+                      {joinRequests.length}
+                    </span>
+                  </h3>
+                  <div className="space-y-3">
+                    {joinRequests.map(request => (
+                      <div key={request.id} className="flex items-center justify-between p-3 bg-orange-50 rounded-lg border border-orange-100">
+                        <div
+                          className="flex items-center gap-3 cursor-pointer hover:opacity-80"
+                          onClick={() => setProfileModalUserId(request.userId)}
+                        >
+                          {request.userProfileImageUrl ? (
+                            <img src={getSharedAssetUrl(request.userProfileImageUrl)} alt="" className="w-10 h-10 rounded-full object-cover" />
+                          ) : (
+                            <div className="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center">
+                              <span className="text-orange-600 font-medium">
+                                {request.userName?.charAt(0) || '?'}
+                              </span>
+                            </div>
+                          )}
+                          <div>
+                            <span className="font-medium text-gray-900">{request.userName}</span>
+                            <p className="text-sm text-gray-500">{request.userLocation || request.userExperienceLevel}</p>
+                            {request.message && (
+                              <p className="text-sm text-gray-600 mt-1 italic">"{request.message}"</p>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => handleReviewRequest(request.id, true)}
+                            className="px-3 py-1.5 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700"
+                          >
+                            Approve
+                          </button>
+                          <button
+                            onClick={() => handleReviewRequest(request.id, false)}
+                            className="px-3 py-1.5 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700"
+                          >
+                            Reject
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Members List */}
               {loading ? (
                 <div className="flex justify-center py-8">
                   <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-purple-600"></div>
@@ -2009,60 +2064,6 @@ function ClubDetailModal({ club, isAuthenticated, currentUserId, onClose, onJoin
                 </div>
               ) : (
                 <p className="text-center text-gray-500 py-8">No members yet</p>
-              )}
-
-              {/* Pending Join Requests - For Managers */}
-              {canManage && joinRequests.length > 0 && (
-                <div className="mt-8 pt-6 border-t">
-                  <h3 className="font-medium text-gray-900 flex items-center gap-2 mb-4">
-                    <UserPlus className="w-5 h-5 text-orange-600" />
-                    Pending Join Requests
-                    <span className="ml-1 px-2 py-0.5 bg-orange-100 text-orange-700 text-xs font-medium rounded-full">
-                      {joinRequests.length}
-                    </span>
-                  </h3>
-                  <div className="space-y-3">
-                    {joinRequests.map(request => (
-                      <div key={request.id} className="flex items-center justify-between p-3 bg-orange-50 rounded-lg border border-orange-100">
-                        <div
-                          className="flex items-center gap-3 cursor-pointer hover:opacity-80"
-                          onClick={() => setProfileModalUserId(request.userId)}
-                        >
-                          {request.userProfileImageUrl ? (
-                            <img src={getSharedAssetUrl(request.userProfileImageUrl)} alt="" className="w-10 h-10 rounded-full object-cover" />
-                          ) : (
-                            <div className="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center">
-                              <span className="text-orange-600 font-medium">
-                                {request.userName?.charAt(0) || '?'}
-                              </span>
-                            </div>
-                          )}
-                          <div>
-                            <span className="font-medium text-gray-900">{request.userName}</span>
-                            <p className="text-sm text-gray-500">{request.userLocation || request.userExperienceLevel}</p>
-                            {request.message && (
-                              <p className="text-sm text-gray-600 mt-1 italic">"{request.message}"</p>
-                            )}
-                          </div>
-                        </div>
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => handleReviewRequest(request.id, true)}
-                            className="px-3 py-1.5 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700"
-                          >
-                            Approve
-                          </button>
-                          <button
-                            onClick={() => handleReviewRequest(request.id, false)}
-                            className="px-3 py-1.5 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700"
-                          >
-                            Reject
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
               )}
             </div>
           )}
