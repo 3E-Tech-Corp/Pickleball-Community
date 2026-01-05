@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../contexts/AuthContext'
+import { useToast } from '../contexts/ToastContext'
 import { useForm } from 'react-hook-form'
 import { userApi, assetApi, sharedUserApi, getAssetUrl, getSharedAssetUrl, SHARED_AUTH_URL } from '../services/api'
 import VideoUploadModal from '../components/ui/VideoUploadModal'
@@ -14,6 +15,7 @@ import {
 
 const Profile = () => {
   const { user, updateUser } = useAuth()
+  const toast = useToast()
   const [loading, setLoading] = useState(false)
   const [profileLoading, setProfileLoading] = useState(true)
   const [avatarPreview, setAvatarPreview] = useState(null)
@@ -161,7 +163,7 @@ const Profile = () => {
     const file = e.target.files[0]
     if (file) {
       if (file.size > 5 * 1024 * 1024) {
-        alert('Image size should be less than 5MB')
+        toast.error('Image size should be less than 5MB')
         return
       }
 
@@ -200,13 +202,14 @@ const Profile = () => {
 
           // Save relative path to local backend
           await userApi.updateProfile({ profileImageUrl: assetPath })
+          toast.success('Profile photo updated successfully')
         } else {
           console.error('Could not find asset URL in response:', JSON.stringify(response, null, 2))
           throw new Error('Upload failed - no asset URL returned. Check console for response format.')
         }
       } catch (error) {
         console.error('Avatar upload error:', error)
-        alert('Failed to upload avatar: ' + (error.response?.data?.message || error.message || 'Unknown error'))
+        toast.error('Failed to upload avatar: ' + (error.response?.data?.message || error.message || 'Unknown error'))
         // Revert preview on error
         setAvatarPreview(getSharedAssetUrl(user?.avatar || user?.profileImageUrl) || null)
       } finally {
@@ -221,8 +224,10 @@ const Profile = () => {
     try {
       await userApi.updateProfile({ handedness: value })
       updateUser({ ...user, handedness: value })
+      toast.success(`Dominant hand updated to ${value === 'left' ? 'Left' : 'Right'}`)
     } catch (error) {
       console.error('Handedness update error:', error)
+      toast.error('Failed to update dominant hand')
       setHandedness(user?.handedness || '')
     }
   }
@@ -234,9 +239,10 @@ const Profile = () => {
       await userApi.updateProfile({ bio: tempBio })
       updateUser({ ...user, bio: tempBio })
       setIsBioModalOpen(false)
+      toast.success('Bio updated successfully')
     } catch (error) {
       console.error('Bio update error:', error)
-      alert('Failed to update bio')
+      toast.error('Failed to update bio')
     } finally {
       setSavingBio(false)
     }
@@ -255,9 +261,10 @@ const Profile = () => {
       } else {
         setVideoPreview(getSharedAssetUrl(url)) // Uploaded file
       }
+      toast.success('Intro video updated successfully')
     } catch (error) {
       console.error('Video save error:', error)
-      alert('Failed to save video: ' + (error.message || 'Unknown error'))
+      toast.error('Failed to save video: ' + (error.message || 'Unknown error'))
     }
   }
 
@@ -293,8 +300,10 @@ const Profile = () => {
       // Update user profile
       await userApi.updateProfile({ introVideo: null })
       updateUser({ ...user, introVideo: null })
+      toast.success('Intro video removed')
     } catch (error) {
       console.error('Error removing video:', error)
+      toast.error('Failed to remove video')
     }
   }
 
@@ -318,8 +327,10 @@ const Profile = () => {
       updateUser({ ...user, ...updateData })
 
       setCredentialModalOpen(false)
+      toast.success(`${credentialModalType === 'email' ? 'Email' : 'Phone number'} updated successfully`)
     } catch (error) {
       console.error('Error syncing credential change:', error)
+      toast.error(`Failed to sync ${credentialModalType === 'email' ? 'email' : 'phone'} change`)
       // Still close the modal since shared auth was successful
       setCredentialModalOpen(false)
     }
@@ -335,12 +346,14 @@ const Profile = () => {
 
       if (setting === 'allowDirectMessages') {
         setAllowDirectMessages(value)
+        toast.success(`Direct messages ${value ? 'enabled' : 'disabled'}`)
       } else if (setting === 'allowClubMessages') {
         setAllowClubMessages(value)
+        toast.success(`Club chat auto-join ${value ? 'enabled' : 'disabled'}`)
       }
     } catch (error) {
       console.error('Error updating messaging settings:', error)
-      alert('Failed to update setting')
+      toast.error('Failed to update messaging setting')
       // Revert the toggle on error
       if (setting === 'allowDirectMessages') {
         setAllowDirectMessages(!value)
@@ -361,12 +374,44 @@ const Profile = () => {
         ...data,
         dateOfBirth: data.dateOfBirth || null
       }
+
+      // Identify what fields were changed
+      const fieldLabels = {
+        firstName: 'First Name',
+        lastName: 'Last Name',
+        gender: 'Gender',
+        dateOfBirth: 'Date of Birth',
+        address: 'Address',
+        city: 'City',
+        state: 'State',
+        zipCode: 'ZIP Code',
+        country: 'Country'
+      }
+
+      const changedFields = Object.keys(fieldLabels).filter(key => {
+        const oldValue = user?.[key] || ''
+        const newValue = profileData[key] || ''
+        return oldValue !== newValue
+      })
+
       await userApi.updateProfile(profileData)
       updateUser({ ...user, ...profileData })
       setIsEditingBasicInfo(false)
+
+      // Show toast with specific fields updated
+      if (changedFields.length === 0) {
+        toast.info('No changes detected')
+      } else if (changedFields.length === 1) {
+        toast.success(`${fieldLabels[changedFields[0]]} updated successfully`)
+      } else if (changedFields.length <= 3) {
+        const fieldNames = changedFields.map(f => fieldLabels[f]).join(', ')
+        toast.success(`Updated: ${fieldNames}`)
+      } else {
+        toast.success(`Basic information updated (${changedFields.length} fields)`)
+      }
     } catch (error) {
       console.error('Basic info update error:', error)
-      alert('Failed to update basic information')
+      toast.error('Failed to update basic information')
     } finally {
       setSavingBasicInfo(false)
     }
@@ -381,12 +426,42 @@ const Profile = () => {
         ...data,
         yearsPlaying: data.yearsPlaying ? parseInt(data.yearsPlaying, 10) : null
       }
+
+      // Identify what fields were changed
+      const fieldLabels = {
+        experienceLevel: 'Experience Level',
+        playingStyle: 'Playing Style',
+        paddleBrand: 'Paddle Brand',
+        paddleModel: 'Paddle Model',
+        yearsPlaying: 'Years Playing',
+        tournamentLevel: 'Tournament Level',
+        favoriteShot: 'Favorite Shot'
+      }
+
+      const changedFields = Object.keys(fieldLabels).filter(key => {
+        const oldValue = String(user?.[key] || '')
+        const newValue = String(profileData[key] || '')
+        return oldValue !== newValue
+      })
+
       await userApi.updateProfile(profileData)
       updateUser({ ...user, ...profileData })
       setIsEditingPickleballInfo(false)
+
+      // Show toast with specific fields updated
+      if (changedFields.length === 0) {
+        toast.info('No changes detected')
+      } else if (changedFields.length === 1) {
+        toast.success(`${fieldLabels[changedFields[0]]} updated successfully`)
+      } else if (changedFields.length <= 3) {
+        const fieldNames = changedFields.map(f => fieldLabels[f]).join(', ')
+        toast.success(`Updated: ${fieldNames}`)
+      } else {
+        toast.success(`Pickleball information updated (${changedFields.length} fields)`)
+      }
     } catch (error) {
       console.error('Pickleball info update error:', error)
-      alert('Failed to update pickleball information')
+      toast.error('Failed to update pickleball information')
     } finally {
       setSavingPickleballInfo(false)
     }
