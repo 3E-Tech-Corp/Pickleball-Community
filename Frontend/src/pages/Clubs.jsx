@@ -1771,30 +1771,24 @@ function ClubDetailModal({ club, isAuthenticated, currentUserId, onClose, onJoin
                 </div>
               )}
 
-              {/* Home Venue & Location */}
-              {(club.homeVenueName || club.address || club.city) && (
+              {/* Home Venue */}
+              {club.homeVenueName && (
                 <div>
                   <h3 className="font-medium text-gray-900 mb-2 flex items-center gap-2">
                     <MapPin className="w-5 h-5 text-purple-600" />
-                    {club.homeVenueName ? 'Home Venue' : 'Location'}
+                    Home Venue
                   </h3>
-                  <div className="bg-gray-50 rounded-lg p-4 text-sm">
-                    {club.homeVenueName && (
-                      club.homeVenueId ? (
-                        <Link
-                          to={`/venues?venueId=${club.homeVenueId}`}
-                          className="font-medium text-purple-600 hover:text-purple-700 hover:underline block mb-1"
-                        >
-                          {club.homeVenueName}
-                        </Link>
-                      ) : (
-                        <p className="font-medium text-purple-700 mb-1">{club.homeVenueName}</p>
-                      )
-                    )}
-                    {club.address && <p>{club.address}</p>}
-                    <p>{club.city}{club.state && `, ${club.state}`} {club.postalCode}</p>
-                    {club.country && <p>{club.country}</p>}
-                  </div>
+                  {club.homeVenueId ? (
+                    <Link
+                      to={`/venues?venueId=${club.homeVenueId}`}
+                      className="inline-flex items-center gap-2 px-3 py-2 bg-purple-50 text-purple-700 rounded-lg hover:bg-purple-100 transition-colors text-sm font-medium"
+                    >
+                      <Building2 className="w-4 h-4" />
+                      {club.homeVenueName}
+                    </Link>
+                  ) : (
+                    <span className="text-sm text-gray-600">{club.homeVenueName}</span>
+                  )}
                 </div>
               )}
 
@@ -1841,11 +1835,25 @@ function ClubDetailModal({ club, isAuthenticated, currentUserId, onClose, onJoin
                 </div>
               )}
 
-              {/* Contact */}
-              {(club.website || club.email || club.phone) && (
+              {/* Contact & Address */}
+              {(club.website || club.email || club.phone || club.address || club.city) && (
                 <div>
                   <h3 className="font-medium text-gray-900 mb-2">Contact</h3>
                   <div className="space-y-2 text-sm">
+                    {/* Address */}
+                    {(club.address || club.city) && (
+                      <div className="flex items-start gap-2">
+                        <MapPin className="w-4 h-4 text-gray-400 mt-0.5" />
+                        <div>
+                          {club.address && <p>{club.address}</p>}
+                          <p>
+                            {[club.city, club.state].filter(Boolean).join(', ')}
+                            {club.postalCode && ` ${club.postalCode}`}
+                          </p>
+                          {club.country && <p>{club.country}</p>}
+                        </div>
+                      </div>
+                    )}
                     {club.website && (
                       <div className="flex items-center gap-2">
                         <Globe className="w-4 h-4 text-gray-400" />
@@ -1916,56 +1924,62 @@ function ClubDetailModal({ club, isAuthenticated, currentUserId, onClose, onJoin
           {activeTab === 'members' && (
             <div>
               {/* Pending Join Requests - For Managers (at top) */}
-              {canManage && joinRequests.length > 0 && (
+              {canManage && (
                 <div className="mb-6 pb-6 border-b">
                   <h3 className="font-medium text-gray-900 flex items-center gap-2 mb-4">
                     <UserPlus className="w-5 h-5 text-orange-600" />
                     Pending Join Requests
-                    <span className="ml-1 px-2 py-0.5 bg-orange-100 text-orange-700 text-xs font-medium rounded-full">
-                      {joinRequests.length}
-                    </span>
+                    {joinRequests.length > 0 && (
+                      <span className="ml-1 px-2 py-0.5 bg-orange-100 text-orange-700 text-xs font-medium rounded-full">
+                        {joinRequests.length}
+                      </span>
+                    )}
                   </h3>
-                  <div className="space-y-3">
-                    {joinRequests.map(request => (
-                      <div key={request.id} className="flex items-center justify-between p-3 bg-orange-50 rounded-lg border border-orange-100">
-                        <div
-                          className="flex items-center gap-3 cursor-pointer hover:opacity-80"
-                          onClick={() => setProfileModalUserId(request.userId)}
-                        >
-                          {request.userProfileImageUrl ? (
-                            <img src={getSharedAssetUrl(request.userProfileImageUrl)} alt="" className="w-10 h-10 rounded-full object-cover" />
-                          ) : (
-                            <div className="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center">
-                              <span className="text-orange-600 font-medium">
-                                {request.userName?.charAt(0) || '?'}
-                              </span>
-                            </div>
-                          )}
-                          <div>
-                            <span className="font-medium text-gray-900">{request.userName}</span>
-                            <p className="text-sm text-gray-500">{request.userLocation || request.userExperienceLevel}</p>
-                            {request.message && (
-                              <p className="text-sm text-gray-600 mt-1 italic">"{request.message}"</p>
+                  {joinRequests.length > 0 ? (
+                    <div className="space-y-3">
+                      {joinRequests.map(request => (
+                        <div key={request.id} className="flex items-center justify-between p-3 bg-orange-50 rounded-lg border border-orange-100">
+                          <div
+                            className="flex items-center gap-3 cursor-pointer hover:opacity-80"
+                            onClick={() => setProfileModalUserId(request.userId)}
+                          >
+                            {request.userProfileImageUrl ? (
+                              <img src={getSharedAssetUrl(request.userProfileImageUrl)} alt="" className="w-10 h-10 rounded-full object-cover" />
+                            ) : (
+                              <div className="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center">
+                                <span className="text-orange-600 font-medium">
+                                  {request.userName?.charAt(0) || '?'}
+                                </span>
+                              </div>
                             )}
+                            <div>
+                              <span className="font-medium text-gray-900">{request.userName}</span>
+                              <p className="text-sm text-gray-500">{request.userLocation || request.userExperienceLevel}</p>
+                              {request.message && (
+                                <p className="text-sm text-gray-600 mt-1 italic">"{request.message}"</p>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => handleReviewRequest(request.id, true)}
+                              className="px-3 py-1.5 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700"
+                            >
+                              Approve
+                            </button>
+                            <button
+                              onClick={() => handleReviewRequest(request.id, false)}
+                              className="px-3 py-1.5 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700"
+                            >
+                              Reject
+                            </button>
                           </div>
                         </div>
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => handleReviewRequest(request.id, true)}
-                            className="px-3 py-1.5 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700"
-                          >
-                            Approve
-                          </button>
-                          <button
-                            onClick={() => handleReviewRequest(request.id, false)}
-                            className="px-3 py-1.5 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700"
-                          >
-                            Reject
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-500">No pending join requests</p>
+                  )}
                 </div>
               )}
 
@@ -2572,6 +2586,17 @@ function ClubDetailModal({ club, isAuthenticated, currentUserId, onClose, onJoin
                         </div>
                       )}
                       <p className="text-xs text-gray-500 mt-1">The club's home venue location will be used for the club address</p>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
+                      <input
+                        type="text"
+                        value={editFormData.address || ''}
+                        onChange={(e) => setEditFormData({ ...editFormData, address: e.target.value })}
+                        className="w-full border border-gray-300 rounded-lg p-2 focus:ring-purple-500 focus:border-purple-500"
+                        placeholder="Street address"
+                      />
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
