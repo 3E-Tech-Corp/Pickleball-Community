@@ -1637,15 +1637,15 @@ function ClubDetailModal({ club, isAuthenticated, currentUserId, onClose, onJoin
         {/* Header */}
         <div className="sticky top-0 bg-white px-6 py-4 border-b flex items-center justify-between z-10">
           <div className="flex items-center gap-4">
-            {club.logoUrl ? (
-              <img src={getSharedAssetUrl(club.logoUrl)} alt="" className="w-12 h-12 rounded-lg object-cover" />
+            {clubData.logoUrl ? (
+              <img src={getSharedAssetUrl(clubData.logoUrl)} alt="" className="w-12 h-12 rounded-lg object-cover" />
             ) : (
               <div className="w-12 h-12 rounded-lg bg-purple-100 flex items-center justify-center">
                 <Users className="w-6 h-6 text-purple-600" />
               </div>
             )}
             <div>
-              <h2 className="text-xl font-semibold text-gray-900">{club.name}</h2>
+              <h2 className="text-xl font-semibold text-gray-900">{clubData.name}</h2>
               <p className="text-sm text-gray-500">
                 {club.memberCount} member{club.memberCount !== 1 ? 's' : ''}
                 {club.city && ` • ${club.city}${club.state ? `, ${club.state}` : ''}`}
@@ -1761,6 +1761,43 @@ function ClubDetailModal({ club, isAuthenticated, currentUserId, onClose, onJoin
                 >
                   Leave Club
                 </button>
+              )}
+
+              {/* Invite Link - For Members */}
+              {isMember && (
+                <div className="bg-purple-50 rounded-lg p-4">
+                  <h3 className="font-medium text-gray-900 mb-2 flex items-center gap-2">
+                    <UserPlus className="w-5 h-5 text-purple-600" />
+                    Invite Others
+                  </h3>
+                  {inviteCode ? (
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        readOnly
+                        value={`${window.location.origin}/clubs?invite=${inviteCode}`}
+                        className="flex-1 border border-gray-300 rounded-lg p-2 bg-white text-sm"
+                      />
+                      <button
+                        onClick={copyInviteLink}
+                        className="px-3 py-2 bg-purple-600 text-white rounded-lg flex items-center gap-2 text-sm"
+                      >
+                        {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                        {copied ? 'Copied!' : 'Copy'}
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={handleGetInviteLink}
+                      className="px-4 py-2 bg-purple-600 text-white rounded-lg text-sm"
+                    >
+                      Generate Invite Link
+                    </button>
+                  )}
+                  <p className="text-xs text-gray-500 mt-2">
+                    Share this link to invite friends to join the club
+                  </p>
+                </div>
               )}
 
               {/* Description */}
