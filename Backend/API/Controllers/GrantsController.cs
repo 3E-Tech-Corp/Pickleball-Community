@@ -1,9 +1,9 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Pickleball.Community.Database;
 using Pickleball.Community.Models.DTOs;
 using Pickleball.Community.Models.Entities;
-using Pickleball.Community.Services;
 using System.Security.Claims;
 
 namespace Pickleball.Community.Controllers;
@@ -868,4 +868,16 @@ public class GrantsController : ControllerBase
             return StatusCode(500, new ApiResponse<List<object>> { Success = false, Message = "An error occurred" });
         }
     }
+}
+
+/// <summary>
+/// Paginated result wrapper for API responses
+/// </summary>
+public class PagedResult<T>
+{
+    public List<T> Items { get; set; } = new();
+    public int TotalCount { get; set; }
+    public int Page { get; set; }
+    public int PageSize { get; set; }
+    public int TotalPages => (int)Math.Ceiling((double)TotalCount / PageSize);
 }
