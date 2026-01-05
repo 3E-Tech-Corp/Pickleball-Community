@@ -606,10 +606,11 @@ export default function Clubs() {
             ) : clubs.length > 0 ? (
               <>
                 {viewMode === 'map' ? (
-                  /* Map View with Side List */
+                  /* Map View - Mobile responsive */
                   <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-                    <div className="flex h-[600px]">
-                      {/* Compact Club List */}
+                    {/* Desktop: Side-by-side layout */}
+                    <div className="hidden md:flex h-[600px]">
+                      {/* Compact Club List - Desktop */}
                       <div className="w-80 border-r border-gray-200 flex flex-col">
                         <div className="p-3 border-b bg-gray-50">
                           <p className="text-sm font-medium text-gray-700">
@@ -665,7 +666,7 @@ export default function Clubs() {
                           )}
                         </div>
                       </div>
-                      {/* Map */}
+                      {/* Map - Desktop */}
                       <div className="flex-1">
                         <VenueMap
                           venues={clubs.map(c => ({
@@ -681,6 +682,86 @@ export default function Clubs() {
                           selectedVenueId={hoveredClubId}
                           showNumbers={true}
                         />
+                      </div>
+                    </div>
+
+                    {/* Mobile: Stacked layout with horizontal scrollable list */}
+                    <div className="md:hidden flex flex-col">
+                      {/* Map - Mobile (takes most of the viewport) */}
+                      <div className="h-[50vh] min-h-[300px]">
+                        <VenueMap
+                          venues={clubs.map(c => ({
+                            ...c,
+                            id: c.id,
+                            name: c.name,
+                            latitude: c.latitude,
+                            longitude: c.longitude
+                          }))}
+                          userLocation={userLocation}
+                          onVenueClick={(club) => handleViewDetails(club)}
+                          onMarkerSelect={(club) => setHoveredClubId(club.id)}
+                          selectedVenueId={hoveredClubId}
+                          showNumbers={true}
+                        />
+                      </div>
+
+                      {/* Club count indicator */}
+                      <div className="px-3 py-2 bg-gray-50 border-t border-b border-gray-200">
+                        <p className="text-sm font-medium text-gray-700">
+                          {clubs.filter(c => c.latitude || c.gpsLat).length} clubs on map - scroll to browse
+                        </p>
+                      </div>
+
+                      {/* Horizontal scrollable club cards - Mobile */}
+                      <div className="overflow-x-auto">
+                        <div className="flex gap-3 p-3" style={{ minWidth: 'min-content' }}>
+                          {clubs.filter(c => c.latitude || c.gpsLat).map((club, index) => {
+                            const clubId = club.id;
+                            const isSelected = hoveredClubId === clubId;
+                            return (
+                              <div
+                                key={clubId}
+                                className={`flex-shrink-0 w-[200px] p-3 rounded-lg border cursor-pointer transition-colors ${
+                                  isSelected
+                                    ? 'bg-purple-50 border-purple-300 shadow-md'
+                                    : 'bg-white border-gray-200 hover:border-purple-200'
+                                }`}
+                                onClick={() => handleViewDetails(club)}
+                              >
+                                <div className="flex items-start gap-2">
+                                  <span className={`flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-semibold text-white ${
+                                    isSelected ? 'bg-purple-600' : 'bg-blue-600'
+                                  }`}>
+                                    {index + 1}
+                                  </span>
+                                  <div className="flex-1 min-w-0">
+                                    <h4 className="font-medium text-gray-900 text-sm line-clamp-2">
+                                      {club.name}
+                                    </h4>
+                                    <p className="text-xs text-gray-500 truncate mt-0.5">
+                                      {[club.city, club.state].filter(Boolean).join(', ')}
+                                    </p>
+                                    <div className="flex items-center gap-2 mt-1.5">
+                                      {club.distance && (
+                                        <span className="text-xs text-purple-600 font-medium">
+                                          {club.distance.toFixed(1)} mi
+                                        </span>
+                                      )}
+                                      <span className="text-xs text-gray-400">
+                                        {club.memberCount} members
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                          {clubs.filter(c => !(c.latitude || c.gpsLat)).length > 0 && (
+                            <div className="flex-shrink-0 w-[150px] p-3 flex items-center justify-center text-xs text-gray-400 text-center">
+                              +{clubs.filter(c => !(c.latitude || c.gpsLat)).length} clubs without location
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>

@@ -421,7 +421,7 @@ export default function Messages() {
             <>
               <button
                 onClick={handleBackToList}
-                className="p-2 -ml-2 rounded-lg hover:bg-white/10 md:hidden"
+                className="p-2.5 -ml-2 rounded-lg hover:bg-white/10 active:bg-white/20 md:hidden min-w-[44px] min-h-[44px] flex items-center justify-center touch-manipulation"
               >
                 <ChevronLeft className="w-6 h-6" />
               </button>
@@ -457,31 +457,31 @@ export default function Messages() {
               <div className="relative">
                 <button
                   onClick={() => setShowMenu(!showMenu)}
-                  className="p-2 rounded-lg hover:bg-white/10"
+                  className="p-2.5 rounded-lg hover:bg-white/10 active:bg-white/20 min-w-[44px] min-h-[44px] flex items-center justify-center touch-manipulation"
                 >
                   <MoreVertical className="w-5 h-5" />
                 </button>
                 {showMenu && (
-                  <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-lg shadow-lg border py-1 z-50">
+                  <div className="absolute right-0 top-full mt-2 w-52 bg-white rounded-lg shadow-lg border py-1 z-50">
                     <button
                       onClick={handleOpenAddFriends}
-                      className="w-full px-4 py-2 text-left text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                      className="w-full px-4 py-3 text-left text-gray-700 hover:bg-gray-50 active:bg-gray-100 flex items-center gap-3 min-h-[48px] touch-manipulation"
                     >
-                      <UserPlus className="w-4 h-4" />
+                      <UserPlus className="w-5 h-5" />
                       Add Friends
                     </button>
                     <button
                       onClick={handleMuteConversation}
-                      className="w-full px-4 py-2 text-left text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                      className="w-full px-4 py-3 text-left text-gray-700 hover:bg-gray-50 active:bg-gray-100 flex items-center gap-3 min-h-[48px] touch-manipulation"
                     >
                       {selectedConversation.isMuted ? (
                         <>
-                          <Bell className="w-4 h-4" />
+                          <Bell className="w-5 h-5" />
                           Unmute
                         </>
                       ) : (
                         <>
-                          <BellOff className="w-4 h-4" />
+                          <BellOff className="w-5 h-5" />
                           Mute
                         </>
                       )}
@@ -563,9 +563,9 @@ export default function Messages() {
                   key={conversation.id}
                   onClick={() => handleSelectConversation(conversation)}
                   className={`
-                    w-full hover:bg-gray-50 border-b transition-colors text-left
+                    w-full hover:bg-gray-50 active:bg-gray-100 border-b transition-colors text-left touch-manipulation
                     ${selectedConversation?.id === conversation.id ? 'bg-blue-50' : ''}
-                    ${sidebarCollapsed ? 'p-2 flex items-center justify-center' : 'p-4 flex items-start gap-3'}
+                    ${sidebarCollapsed ? 'p-2 flex items-center justify-center' : 'p-4 flex items-start gap-3 min-h-[72px]'}
                   `}
                   title={sidebarCollapsed ? (conversation.displayName || conversation.name || 'Conversation') : undefined}
                 >
@@ -802,12 +802,12 @@ export default function Messages() {
                   </div>
                 )}
 
-                {/* Message input */}
+                {/* Message input - Mobile optimized */}
                 <form
                   onSubmit={handleSendMessage}
-                  className="p-4 bg-white border-t flex items-end gap-2"
+                  className="p-3 md:p-4 bg-white border-t flex items-end gap-2 safe-area-inset-bottom"
                 >
-                  <div className="flex-1">
+                  <div className="flex-1 min-w-0">
                     <textarea
                       ref={inputRef}
                       value={newMessage}
@@ -821,14 +821,14 @@ export default function Messages() {
                       }}
                       placeholder="Type a message..."
                       rows={1}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-2xl resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      style={{ maxHeight: '120px' }}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-2xl resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base"
+                      style={{ maxHeight: '120px', fontSize: '16px' }}
                     />
                   </div>
                   <button
                     type="submit"
                     disabled={!newMessage.trim() || sendingMessage}
-                    className="p-3 bg-blue-600 text-white rounded-full hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
+                    className="p-3.5 md:p-3 bg-blue-600 text-white rounded-full hover:bg-blue-700 active:bg-blue-800 disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0 min-w-[48px] min-h-[48px] flex items-center justify-center touch-manipulation"
                   >
                     <Send className="w-5 h-5" />
                   </button>
@@ -930,6 +930,13 @@ function MessageBubble({ message, isOwn, showAvatar, isGroupChat, onReply }) {
     return name.length > 12 ? name.substring(0, 10) + '...' : name;
   };
 
+  // Toggle actions on tap (for mobile)
+  const handleTap = () => {
+    if (!message.isDeleted) {
+      setShowActions(!showActions);
+    }
+  };
+
   return (
     <div
       className={`flex gap-2 ${isOwn ? 'justify-end' : 'justify-start'}`}
@@ -989,8 +996,9 @@ function MessageBubble({ message, isOwn, showAvatar, isGroupChat, onReply }) {
 
         {/* Message bubble */}
         <div
+          onClick={handleTap}
           className={`
-            px-4 py-2.5 rounded-2xl relative group
+            px-4 py-2.5 rounded-2xl relative group cursor-pointer select-none touch-manipulation
             ${isOwn
               ? 'bg-blue-600 text-white rounded-tr-md'
               : 'bg-white text-gray-900 rounded-tl-md shadow-sm'
@@ -1028,18 +1036,22 @@ function MessageBubble({ message, isOwn, showAvatar, isGroupChat, onReply }) {
           </div>
         </div>
 
-        {/* Actions */}
+        {/* Actions - Touch-friendly */}
         {showActions && !message.isDeleted && (
           <div className={`
             flex items-center gap-1 mt-1
             ${isOwn ? 'justify-end' : 'justify-start'}
           `}>
             <button
-              onClick={onReply}
-              className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded"
-              title="Reply"
+              onClick={(e) => {
+                e.stopPropagation();
+                onReply();
+                setShowActions(false);
+              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-gray-600 bg-gray-100 hover:bg-gray-200 active:bg-gray-300 rounded-full text-sm font-medium touch-manipulation min-h-[36px]"
             >
               <Reply className="w-4 h-4" />
+              <span className="hidden sm:inline">Reply</span>
             </button>
           </div>
         )}
