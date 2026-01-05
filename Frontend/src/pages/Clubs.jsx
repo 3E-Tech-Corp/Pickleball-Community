@@ -1065,6 +1065,12 @@ function ClubDetailModal({ club, isAuthenticated, currentUserId, onClose, onJoin
   const [searchingVenues, setSearchingVenues] = useState(false);
   const [selectedVenue, setSelectedVenue] = useState(null);
 
+  // Sync clubData when club prop changes (important for logo/avatar display)
+  useEffect(() => {
+    setClubData(club);
+    setChatEnabled(club.chatEnabled || false);
+  }, [club]);
+
   // Documents state
   const [documents, setDocuments] = useState([]);
   const [documentsLoading, setDocumentsLoading] = useState(false);
