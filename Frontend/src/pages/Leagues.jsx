@@ -6,7 +6,7 @@ import {
   Building, Network, Loader2, ArrowLeft
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { leaguesApi, getAssetUrl } from '../services/api';
+import { leaguesApi, getSharedAssetUrl } from '../services/api';
 
 // Scope icons and colors
 const SCOPE_CONFIG = {
@@ -97,7 +97,7 @@ function LeagueCard({ league, onClick }) {
       <div className="flex items-start gap-3">
         {league.avatarUrl ? (
           <img
-            src={getAssetUrl(league.avatarUrl)}
+            src={getSharedAssetUrl(league.avatarUrl)}
             alt={league.name}
             className="w-12 h-12 rounded-lg object-cover"
           />
