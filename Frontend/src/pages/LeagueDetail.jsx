@@ -4,7 +4,8 @@ import {
   Building2, ChevronRight, Users, MapPin, Globe, Mail, ExternalLink,
   Shield, Crown, Plus, Settings, Edit, Network, Loader2, ArrowLeft,
   Check, X, UserPlus, Building, Clock, AlertCircle, FileText, Download,
-  Upload, DollarSign, TrendingUp, TrendingDown, RefreshCw, Eye, EyeOff, Trash2
+  Upload, DollarSign, TrendingUp, TrendingDown, RefreshCw, Eye, EyeOff, Trash2,
+  Paperclip, ChevronDown, ChevronUp, Image
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { leaguesApi, sharedAssetApi, grantsApi, getSharedAssetUrl } from '../services/api';
@@ -161,6 +162,11 @@ export default function LeagueDetail() {
   });
   const [savingTransaction, setSavingTransaction] = useState(false);
   const [grantPermissions, setGrantPermissions] = useState(null);
+
+  // Transaction attachments state
+  const [expandedTransactionId, setExpandedTransactionId] = useState(null);
+  const [uploadingAttachment, setUploadingAttachment] = useState(false);
+  const [attachmentDescription, setAttachmentDescription] = useState('');
 
   useEffect(() => {
     loadLeague();
@@ -425,6 +431,65 @@ export default function LeagueDetail() {
       console.error('Error voiding transaction:', err);
       alert('Failed to void transaction');
     }
+  };
+
+  // Attachment handlers
+  const handleAttachmentUpload = async (transactionId, e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadingAttachment(true);
+    try {
+      // Upload file to shared asset service
+      const assetType = sharedAssetApi.getAssetType(file);
+      const uploadRes = await sharedAssetApi.upload(file, assetType, 'grant-attachment');
+
+      if (uploadRes.data?.url) {
+        // Add attachment to transaction
+        const attachmentData = {
+          fileName: file.name,
+          fileUrl: uploadRes.data.url,
+          fileType: file.type,
+          fileSize: file.size,
+          description: attachmentDescription || null
+        };
+
+        const response = await grantsApi.addTransactionAttachment(transactionId, attachmentData);
+        if (response.success) {
+          setAttachmentDescription('');
+          loadGrantsData(); // Refresh to show new attachment
+        } else {
+          alert(response.message || 'Failed to add attachment');
+        }
+      }
+    } catch (err) {
+      console.error('Error uploading attachment:', err);
+      alert('Failed to upload attachment');
+    } finally {
+      setUploadingAttachment(false);
+      e.target.value = ''; // Reset file input
+    }
+  };
+
+  const handleDeleteAttachment = async (transactionId, attachmentId) => {
+    if (!confirm('Delete this attachment?')) return;
+
+    try {
+      const response = await grantsApi.deleteTransactionAttachment(transactionId, attachmentId);
+      if (response.success) {
+        loadGrantsData();
+      } else {
+        alert(response.message || 'Failed to delete attachment');
+      }
+    } catch (err) {
+      console.error('Error deleting attachment:', err);
+      alert('Failed to delete attachment');
+    }
+  };
+
+  const toggleTransactionExpand = (transactionId) => {
+    setExpandedTransactionId(prev => prev === transactionId ? null : transactionId);
+    setAttachmentDescription('');
   };
 
   // Load grants data when tab changes to grants
@@ -1127,10 +1192,14 @@ export default function LeagueDetail() {
                       <table className="w-full text-sm">
                         <thead>
                           <tr className="border-b bg-gray-50">
+                            <th className="w-8"></th>
                             <th className="text-left p-2 font-medium text-gray-700">Date</th>
                             <th className="text-left p-2 font-medium text-gray-700">Club</th>
                             <th className="text-left p-2 font-medium text-gray-700">Type</th>
                             <th className="text-left p-2 font-medium text-gray-700">Description</th>
+                            <th className="text-center p-2 font-medium text-gray-700">
+                              <Paperclip className="w-4 h-4 mx-auto" />
+                            </th>
                             <th className="text-right p-2 font-medium text-gray-700">Amount</th>
                             {grantPermissions?.canVoidTransactions && (
                               <th className="w-10"></th>
@@ -1139,43 +1208,161 @@ export default function LeagueDetail() {
                         </thead>
                         <tbody className="divide-y">
                           {grantTransactions.map(tx => (
-                            <tr key={tx.id} className={`hover:bg-gray-50 ${tx.isVoided ? 'opacity-50 bg-red-50' : ''}`}>
-                              <td className="p-2 text-gray-600 whitespace-nowrap">
-                                {new Date(tx.createdAt).toLocaleDateString()}
-                              </td>
-                              <td className="p-2 font-medium text-gray-900">{tx.clubName}</td>
-                              <td className="p-2">
-                                <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                                  tx.transactionType === 'Credit'
-                                    ? 'bg-green-100 text-green-800'
-                                    : 'bg-red-100 text-red-800'
-                                }`}>
-                                  {tx.category}
-                                </span>
-                              </td>
-                              <td className="p-2 text-gray-700 max-w-xs truncate">
-                                {tx.description || tx.grantPurpose || tx.feeReason || (tx.donorName ? `From ${tx.donorName}` : '-')}
-                              </td>
-                              <td className={`p-2 text-right font-medium whitespace-nowrap ${
-                                tx.transactionType === 'Credit' ? 'text-green-600' : 'text-red-600'
-                              }`}>
-                                {tx.transactionType === 'Credit' ? '+' : '-'}
-                                ${tx.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                              </td>
-                              {grantPermissions?.canVoidTransactions && (
+                            <>
+                              <tr key={tx.id} className={`hover:bg-gray-50 ${tx.isVoided ? 'opacity-50 bg-red-50' : ''}`}>
                                 <td className="p-2">
-                                  {!tx.isVoided && (
-                                    <button
-                                      onClick={() => handleVoidTransaction(tx.id)}
-                                      className="p-1 text-red-500 hover:bg-red-50 rounded"
-                                      title="Void Transaction"
-                                    >
-                                      <X className="w-4 h-4" />
-                                    </button>
+                                  <button
+                                    onClick={() => toggleTransactionExpand(tx.id)}
+                                    className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded"
+                                  >
+                                    {expandedTransactionId === tx.id ? (
+                                      <ChevronUp className="w-4 h-4" />
+                                    ) : (
+                                      <ChevronDown className="w-4 h-4" />
+                                    )}
+                                  </button>
+                                </td>
+                                <td className="p-2 text-gray-600 whitespace-nowrap">
+                                  {new Date(tx.createdAt).toLocaleDateString()}
+                                </td>
+                                <td className="p-2 font-medium text-gray-900">{tx.clubName}</td>
+                                <td className="p-2">
+                                  <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                                    tx.transactionType === 'Credit'
+                                      ? 'bg-green-100 text-green-800'
+                                      : 'bg-red-100 text-red-800'
+                                  }`}>
+                                    {tx.category}
+                                  </span>
+                                </td>
+                                <td className="p-2 text-gray-700 max-w-xs truncate">
+                                  {tx.description || tx.grantPurpose || tx.feeReason || (tx.donorName ? `From ${tx.donorName}` : '-')}
+                                </td>
+                                <td className="p-2 text-center">
+                                  {tx.attachments?.length > 0 && (
+                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs">
+                                      <Paperclip className="w-3 h-3" />
+                                      {tx.attachments.length}
+                                    </span>
                                   )}
                                 </td>
+                                <td className={`p-2 text-right font-medium whitespace-nowrap ${
+                                  tx.transactionType === 'Credit' ? 'text-green-600' : 'text-red-600'
+                                }`}>
+                                  {tx.transactionType === 'Credit' ? '+' : '-'}
+                                  ${tx.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </td>
+                                {grantPermissions?.canVoidTransactions && (
+                                  <td className="p-2">
+                                    {!tx.isVoided && (
+                                      <button
+                                        onClick={() => handleVoidTransaction(tx.id)}
+                                        className="p-1 text-red-500 hover:bg-red-50 rounded"
+                                        title="Void Transaction"
+                                      >
+                                        <X className="w-4 h-4" />
+                                      </button>
+                                    )}
+                                  </td>
+                                )}
+                              </tr>
+                              {/* Expanded row for attachments */}
+                              {expandedTransactionId === tx.id && (
+                                <tr key={`${tx.id}-attachments`}>
+                                  <td colSpan={grantPermissions?.canVoidTransactions ? 8 : 7} className="bg-gray-50 p-4">
+                                    <div className="space-y-3">
+                                      <h5 className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                                        <Paperclip className="w-4 h-4" />
+                                        Attachments
+                                      </h5>
+
+                                      {/* Existing attachments */}
+                                      {tx.attachments?.length > 0 ? (
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                          {tx.attachments.map(attachment => (
+                                            <div
+                                              key={attachment.id}
+                                              className="flex items-center gap-3 p-2 bg-white rounded-lg border border-gray-200"
+                                            >
+                                              <div className="w-10 h-10 rounded bg-blue-100 flex items-center justify-center flex-shrink-0">
+                                                {attachment.fileType?.startsWith('image/') ? (
+                                                  <Image className="w-5 h-5 text-blue-600" />
+                                                ) : (
+                                                  <FileText className="w-5 h-5 text-blue-600" />
+                                                )}
+                                              </div>
+                                              <div className="flex-1 min-w-0">
+                                                <p className="text-sm font-medium text-gray-900 truncate">
+                                                  {attachment.fileName}
+                                                </p>
+                                                <p className="text-xs text-gray-500">
+                                                  {attachment.fileSize && formatFileSize(attachment.fileSize)}
+                                                  {attachment.uploadedByName && ` • ${attachment.uploadedByName}`}
+                                                </p>
+                                                {attachment.description && (
+                                                  <p className="text-xs text-gray-600 truncate">{attachment.description}</p>
+                                                )}
+                                              </div>
+                                              <div className="flex items-center gap-1">
+                                                <a
+                                                  href={getSharedAssetUrl(attachment.fileUrl)}
+                                                  target="_blank"
+                                                  rel="noopener noreferrer"
+                                                  className="p-1.5 text-gray-500 hover:bg-gray-100 rounded"
+                                                  title="Download"
+                                                >
+                                                  <Download className="w-4 h-4" />
+                                                </a>
+                                                <button
+                                                  onClick={() => handleDeleteAttachment(tx.id, attachment.id)}
+                                                  className="p-1.5 text-red-500 hover:bg-red-50 rounded"
+                                                  title="Delete"
+                                                >
+                                                  <Trash2 className="w-4 h-4" />
+                                                </button>
+                                              </div>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      ) : (
+                                        <p className="text-sm text-gray-500">No attachments yet</p>
+                                      )}
+
+                                      {/* Add attachment section */}
+                                      {!tx.isVoided && (
+                                        <div className="pt-2 border-t border-gray-200">
+                                          <p className="text-xs font-medium text-gray-600 mb-2">Add Attachment</p>
+                                          <div className="flex items-center gap-2">
+                                            <input
+                                              type="text"
+                                              placeholder="Description (optional)"
+                                              value={attachmentDescription}
+                                              onChange={(e) => setAttachmentDescription(e.target.value)}
+                                              className="flex-1 text-sm border border-gray-300 rounded-lg px-3 py-1.5"
+                                            />
+                                            <label className={`inline-flex items-center gap-1 px-3 py-1.5 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 cursor-pointer ${uploadingAttachment ? 'opacity-50 cursor-wait' : ''}`}>
+                                              {uploadingAttachment ? (
+                                                <Loader2 className="w-4 h-4 animate-spin" />
+                                              ) : (
+                                                <Upload className="w-4 h-4" />
+                                              )}
+                                              {uploadingAttachment ? 'Uploading...' : 'Upload'}
+                                              <input
+                                                type="file"
+                                                onChange={(e) => handleAttachmentUpload(tx.id, e)}
+                                                className="hidden"
+                                                disabled={uploadingAttachment}
+                                                accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt"
+                                              />
+                                            </label>
+                                          </div>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </td>
+                                </tr>
                               )}
-                            </tr>
+                            </>
                           ))}
                         </tbody>
                       </table>

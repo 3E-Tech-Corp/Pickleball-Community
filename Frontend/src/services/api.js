@@ -1473,7 +1473,15 @@ export const grantsApi = {
   getClubs: (leagueId = null) => {
     const params = leagueId ? `?leagueId=${leagueId}` : '';
     return api.get(`/grants/clubs${params}`);
-  }
+  },
+
+  // Transaction Attachments
+  getTransactionAttachments: (transactionId) =>
+    api.get(`/grants/transactions/${transactionId}/attachments`),
+  addTransactionAttachment: (transactionId, data) =>
+    api.post(`/grants/transactions/${transactionId}/attachments`, data),
+  deleteTransactionAttachment: (transactionId, attachmentId) =>
+    api.delete(`/grants/transactions/${transactionId}/attachments/${attachmentId}`)
 }
 
 export default api

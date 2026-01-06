@@ -398,6 +398,8 @@ public class GrantsController : ControllerBase
                 .Include(t => t.ProcessedBy)
                 .Include(t => t.ApprovedBy)
                 .Include(t => t.VoidedBy)
+                .Include(t => t.Attachments)
+                    .ThenInclude(a => a.UploadedBy)
                 .ToListAsync();
 
             // Filter in memory
@@ -469,7 +471,20 @@ public class GrantsController : ControllerBase
                     VoidedAt = t.VoidedAt,
                     VoidReason = t.VoidReason,
                     CreatedAt = t.CreatedAt,
-                    UpdatedAt = t.UpdatedAt
+                    UpdatedAt = t.UpdatedAt,
+                    Attachments = t.Attachments.Select(a => new GrantTransactionAttachmentDto
+                    {
+                        Id = a.Id,
+                        TransactionId = a.TransactionId,
+                        FileName = a.FileName,
+                        FileUrl = a.FileUrl,
+                        FileType = a.FileType,
+                        FileSize = a.FileSize,
+                        Description = a.Description,
+                        UploadedByUserId = a.UploadedByUserId,
+                        UploadedByName = a.UploadedBy != null ? $"{a.UploadedBy.FirstName} {a.UploadedBy.LastName}".Trim() : "",
+                        CreatedAt = a.CreatedAt
+                    }).ToList()
                 })
                 .ToList();
 
@@ -693,6 +708,179 @@ public class GrantsController : ControllerBase
         {
             _logger.LogError(ex, "Error voiding transaction");
             return StatusCode(500, new ApiResponse<ClubGrantTransactionDto> { Success = false, Message = "An error occurred" });
+        }
+    }
+
+    // =============================================
+    // ATTACHMENT ENDPOINTS
+    // =============================================
+
+    // GET: /grants/transactions/{id}/attachments - Get attachments for a transaction
+    [HttpGet("transactions/{id}/attachments")]
+    public async Task<ActionResult<ApiResponse<List<GrantTransactionAttachmentDto>>>> GetTransactionAttachments(int id)
+    {
+        try
+        {
+            var userId = GetCurrentUserId();
+            if (!userId.HasValue)
+                return Unauthorized(new ApiResponse<List<GrantTransactionAttachmentDto>> { Success = false, Message = "User not authenticated" });
+
+            var permissions = await GetUserPermissionsAsync(userId.Value);
+            if (!permissions.IsGrantManager)
+                return Forbid();
+
+            var transaction = await _context.ClubGrantTransactions
+                .Include(t => t.Account)
+                .FirstOrDefaultAsync(t => t.Id == id);
+
+            if (transaction == null)
+                return NotFound(new ApiResponse<List<GrantTransactionAttachmentDto>> { Success = false, Message = "Transaction not found" });
+
+            // Check league access
+            if (!permissions.IsSiteAdmin && transaction.Account != null)
+            {
+                if (!permissions.AccessibleLeagueIds.Contains(transaction.Account.LeagueId))
+                    return Forbid();
+            }
+
+            var attachments = await _context.GrantTransactionAttachments
+                .Include(a => a.UploadedBy)
+                .Where(a => a.TransactionId == id)
+                .Select(a => new GrantTransactionAttachmentDto
+                {
+                    Id = a.Id,
+                    TransactionId = a.TransactionId,
+                    FileName = a.FileName,
+                    FileUrl = a.FileUrl,
+                    FileType = a.FileType,
+                    FileSize = a.FileSize,
+                    Description = a.Description,
+                    UploadedByUserId = a.UploadedByUserId,
+                    UploadedByName = a.UploadedBy != null ? $"{a.UploadedBy.FirstName} {a.UploadedBy.LastName}".Trim() : "",
+                    CreatedAt = a.CreatedAt
+                })
+                .OrderByDescending(a => a.CreatedAt)
+                .ToListAsync();
+
+            return Ok(new ApiResponse<List<GrantTransactionAttachmentDto>> { Success = true, Data = attachments });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error fetching transaction attachments");
+            return StatusCode(500, new ApiResponse<List<GrantTransactionAttachmentDto>> { Success = false, Message = "An error occurred" });
+        }
+    }
+
+    // POST: /grants/transactions/{id}/attachments - Add attachment to a transaction
+    [HttpPost("transactions/{id}/attachments")]
+    public async Task<ActionResult<ApiResponse<GrantTransactionAttachmentDto>>> AddTransactionAttachment(int id, [FromBody] CreateAttachmentDto dto)
+    {
+        try
+        {
+            var userId = GetCurrentUserId();
+            if (!userId.HasValue)
+                return Unauthorized(new ApiResponse<GrantTransactionAttachmentDto> { Success = false, Message = "User not authenticated" });
+
+            var permissions = await GetUserPermissionsAsync(userId.Value);
+            if (!permissions.IsGrantManager)
+                return Forbid();
+
+            var transaction = await _context.ClubGrantTransactions
+                .Include(t => t.Account)
+                .FirstOrDefaultAsync(t => t.Id == id);
+
+            if (transaction == null)
+                return NotFound(new ApiResponse<GrantTransactionAttachmentDto> { Success = false, Message = "Transaction not found" });
+
+            // Check league access
+            if (!permissions.IsSiteAdmin && transaction.Account != null)
+            {
+                if (!permissions.AccessibleLeagueIds.Contains(transaction.Account.LeagueId))
+                    return Forbid();
+            }
+
+            var attachment = new GrantTransactionAttachment
+            {
+                TransactionId = id,
+                FileName = dto.FileName,
+                FileUrl = dto.FileUrl,
+                FileType = dto.FileType,
+                FileSize = dto.FileSize,
+                Description = dto.Description,
+                UploadedByUserId = userId.Value,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            _context.GrantTransactionAttachments.Add(attachment);
+            await _context.SaveChangesAsync();
+
+            var user = await _context.Users.FindAsync(userId.Value);
+
+            var result = new GrantTransactionAttachmentDto
+            {
+                Id = attachment.Id,
+                TransactionId = attachment.TransactionId,
+                FileName = attachment.FileName,
+                FileUrl = attachment.FileUrl,
+                FileType = attachment.FileType,
+                FileSize = attachment.FileSize,
+                Description = attachment.Description,
+                UploadedByUserId = attachment.UploadedByUserId,
+                UploadedByName = user != null ? $"{user.FirstName} {user.LastName}".Trim() : "",
+                CreatedAt = attachment.CreatedAt
+            };
+
+            return Ok(new ApiResponse<GrantTransactionAttachmentDto> { Success = true, Data = result, Message = "Attachment added successfully" });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error adding transaction attachment");
+            return StatusCode(500, new ApiResponse<GrantTransactionAttachmentDto> { Success = false, Message = "An error occurred" });
+        }
+    }
+
+    // DELETE: /grants/transactions/{transactionId}/attachments/{attachmentId} - Delete attachment
+    [HttpDelete("transactions/{transactionId}/attachments/{attachmentId}")]
+    public async Task<ActionResult<ApiResponse<object>>> DeleteTransactionAttachment(int transactionId, int attachmentId)
+    {
+        try
+        {
+            var userId = GetCurrentUserId();
+            if (!userId.HasValue)
+                return Unauthorized(new ApiResponse<object> { Success = false, Message = "User not authenticated" });
+
+            var permissions = await GetUserPermissionsAsync(userId.Value);
+            if (!permissions.IsGrantManager)
+                return Forbid();
+
+            var attachment = await _context.GrantTransactionAttachments
+                .Include(a => a.Transaction)
+                    .ThenInclude(t => t!.Account)
+                .FirstOrDefaultAsync(a => a.Id == attachmentId && a.TransactionId == transactionId);
+
+            if (attachment == null)
+                return NotFound(new ApiResponse<object> { Success = false, Message = "Attachment not found" });
+
+            // Check league access
+            if (!permissions.IsSiteAdmin && attachment.Transaction?.Account != null)
+            {
+                if (!permissions.AccessibleLeagueIds.Contains(attachment.Transaction.Account.LeagueId))
+                    return Forbid();
+            }
+
+            // Only allow deletion by the uploader or site admin
+            if (!permissions.IsSiteAdmin && attachment.UploadedByUserId != userId.Value)
+                return Forbid();
+
+            _context.GrantTransactionAttachments.Remove(attachment);
+            await _context.SaveChangesAsync();
+
+            return Ok(new ApiResponse<object> { Success = true, Message = "Attachment deleted successfully" });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error deleting transaction attachment");
+            return StatusCode(500, new ApiResponse<object> { Success = false, Message = "An error occurred" });
         }
     }
 
