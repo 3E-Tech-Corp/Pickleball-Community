@@ -384,7 +384,22 @@ const AdminDashboard = () => {
   // Hero Video CRUD operations
   const handleAddHeroVideo = async ({ url, type }) => {
     try {
-      const videoType = type === 'youtube' ? 'youtube' : (url.startsWith('http') ? 'external' : 'upload')
+      if (!url) {
+        alert('No video URL provided')
+        return
+      }
+
+      // Determine video type based on URL content
+      let videoType = 'upload'
+      if (type === 'url' || url.startsWith('http')) {
+        // Check if it's a YouTube URL
+        if (url.includes('youtube.com') || url.includes('youtu.be')) {
+          videoType = 'youtube'
+        } else {
+          videoType = 'external'
+        }
+      }
+
       await themeApi.createHeroVideo({
         videoUrl: url,
         videoType,
@@ -395,7 +410,7 @@ const AdminDashboard = () => {
       setIsAddVideoModalOpen(false)
     } catch (error) {
       console.error('Error adding hero video:', error)
-      alert('Failed to add hero video')
+      alert('Failed to add hero video: ' + (error?.message || 'Unknown error'))
     }
   }
 
