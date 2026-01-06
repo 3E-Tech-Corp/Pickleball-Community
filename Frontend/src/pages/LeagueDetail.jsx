@@ -3,10 +3,11 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   Building2, ChevronRight, Users, MapPin, Globe, Mail, ExternalLink,
   Shield, Crown, Plus, Settings, Edit, Network, Loader2, ArrowLeft,
-  Check, X, UserPlus, Building, Clock, AlertCircle, FileText, Download
+  Check, X, UserPlus, Building, Clock, AlertCircle, FileText, Download,
+  Upload, DollarSign, TrendingUp, TrendingDown, RefreshCw, Eye, EyeOff, Trash2
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { leaguesApi, getSharedAssetUrl } from '../services/api';
+import { leaguesApi, sharedAssetApi, grantsApi, getSharedAssetUrl } from '../services/api';
 import PublicProfileModal from '../components/ui/PublicProfileModal';
 
 // Format file size helper
@@ -130,6 +131,37 @@ export default function LeagueDetail() {
   const [showAddManager, setShowAddManager] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
 
+  // Document management state
+  const [showDocumentModal, setShowDocumentModal] = useState(false);
+  const [editingDocument, setEditingDocument] = useState(null);
+  const [documentData, setDocumentData] = useState({
+    title: '', description: '', fileUrl: '', fileName: '', fileType: '', fileSize: 0, isPublic: true
+  });
+  const [savingDocument, setSavingDocument] = useState(false);
+  const [uploadingDocument, setUploadingDocument] = useState(false);
+
+  // Grants management state
+  const [grantAccounts, setGrantAccounts] = useState([]);
+  const [grantTransactions, setGrantTransactions] = useState([]);
+  const [grantsSummary, setGrantsSummary] = useState(null);
+  const [grantsLoading, setGrantsLoading] = useState(false);
+  const [grantsClubs, setGrantsClubs] = useState([]);
+  const [showTransactionModal, setShowTransactionModal] = useState(false);
+  const [transactionData, setTransactionData] = useState({
+    clubId: '',
+    transactionType: 'Credit',
+    category: 'Donation',
+    amount: '',
+    description: '',
+    donorName: '',
+    donorEmail: '',
+    grantPurpose: '',
+    feeReason: '',
+    notes: ''
+  });
+  const [savingTransaction, setSavingTransaction] = useState(false);
+  const [grantPermissions, setGrantPermissions] = useState(null);
+
   useEffect(() => {
     loadLeague();
   }, [id]);
@@ -205,6 +237,202 @@ export default function LeagueDetail() {
       setActionLoading(false);
     }
   };
+
+  // Document handlers
+  const openDocumentModal = (doc = null) => {
+    if (doc) {
+      setEditingDocument(doc);
+      setDocumentData({
+        title: doc.title || '',
+        description: doc.description || '',
+        fileUrl: doc.fileUrl || '',
+        fileName: doc.fileName || '',
+        fileType: doc.fileType || '',
+        fileSize: doc.fileSize || 0,
+        isPublic: doc.isPublic !== false
+      });
+    } else {
+      setEditingDocument(null);
+      setDocumentData({
+        title: '', description: '', fileUrl: '', fileName: '', fileType: '', fileSize: 0, isPublic: true
+      });
+    }
+    setShowDocumentModal(true);
+  };
+
+  const handleDocumentFileUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadingDocument(true);
+    try {
+      const response = await sharedAssetApi.upload(file, 'document', 'league-document');
+      if (response.data?.url) {
+        setDocumentData(prev => ({
+          ...prev,
+          fileUrl: response.data.url,
+          fileName: file.name,
+          fileType: file.type,
+          fileSize: file.size
+        }));
+      }
+    } catch (err) {
+      console.error('Error uploading document:', err);
+      alert('Failed to upload document');
+    } finally {
+      setUploadingDocument(false);
+    }
+  };
+
+  const handleSaveDocument = async () => {
+    if (!documentData.title.trim() || !documentData.fileUrl) {
+      alert('Title and file are required');
+      return;
+    }
+
+    setSavingDocument(true);
+    try {
+      let response;
+      if (editingDocument) {
+        response = await leaguesApi.updateDocument(id, editingDocument.id, documentData);
+      } else {
+        response = await leaguesApi.addDocument(id, documentData);
+      }
+
+      if (response.success) {
+        setShowDocumentModal(false);
+        loadLeague();
+      } else {
+        alert(response.message || 'Failed to save document');
+      }
+    } catch (err) {
+      console.error('Error saving document:', err);
+      alert('Failed to save document');
+    } finally {
+      setSavingDocument(false);
+    }
+  };
+
+  const handleDeleteDocument = async (docId) => {
+    if (!confirm('Delete this document?')) return;
+    try {
+      const response = await leaguesApi.deleteDocument(id, docId);
+      if (response.success) {
+        loadLeague();
+      }
+    } catch (err) {
+      console.error('Error deleting document:', err);
+    }
+  };
+
+  // Grants handlers
+  const loadGrantsData = async () => {
+    if (!league) return;
+    setGrantsLoading(true);
+    try {
+      const permRes = await grantsApi.getPermissions();
+      if (permRes.success) {
+        setGrantPermissions(permRes.data);
+      }
+
+      const [accountsRes, summaryRes, transactionsRes, clubsRes] = await Promise.all([
+        grantsApi.getAccounts({ leagueId: league.id }),
+        grantsApi.getAccountSummary(league.id),
+        grantsApi.getTransactions({ leagueId: league.id, pageSize: 20 }),
+        grantsApi.getClubs(league.id)
+      ]);
+
+      if (accountsRes.success) {
+        setGrantAccounts(accountsRes.data || []);
+      }
+      if (summaryRes.success) {
+        setGrantsSummary(summaryRes.data);
+      }
+      if (transactionsRes.success) {
+        setGrantTransactions(transactionsRes.data?.items || []);
+      }
+      if (clubsRes.success) {
+        setGrantsClubs(clubsRes.data || []);
+      }
+    } catch (err) {
+      console.error('Error loading grants data:', err);
+    } finally {
+      setGrantsLoading(false);
+    }
+  };
+
+  const handleCreateTransaction = async () => {
+    if (!transactionData.clubId || !transactionData.amount) {
+      alert('Club and amount are required');
+      return;
+    }
+
+    setSavingTransaction(true);
+    try {
+      const payload = {
+        clubId: parseInt(transactionData.clubId),
+        leagueId: league.id,
+        transactionType: transactionData.transactionType,
+        category: transactionData.category,
+        amount: parseFloat(transactionData.amount),
+        description: transactionData.description || null,
+        donorName: transactionData.donorName || null,
+        donorEmail: transactionData.donorEmail || null,
+        grantPurpose: transactionData.grantPurpose || null,
+        feeReason: transactionData.feeReason || null,
+        notes: transactionData.notes || null
+      };
+
+      const response = await grantsApi.createTransaction(payload);
+      if (response.success) {
+        setShowTransactionModal(false);
+        setTransactionData({
+          clubId: '',
+          transactionType: 'Credit',
+          category: 'Donation',
+          amount: '',
+          description: '',
+          donorName: '',
+          donorEmail: '',
+          grantPurpose: '',
+          feeReason: '',
+          notes: ''
+        });
+        loadGrantsData();
+      } else {
+        alert(response.message || 'Failed to create transaction');
+      }
+    } catch (err) {
+      console.error('Error creating transaction:', err);
+      alert('Failed to create transaction');
+    } finally {
+      setSavingTransaction(false);
+    }
+  };
+
+  const handleVoidTransaction = async (transactionId) => {
+    const reason = prompt('Enter reason for voiding this transaction:');
+    if (!reason) return;
+
+    try {
+      const response = await grantsApi.voidTransaction(transactionId, reason);
+      if (response.success) {
+        loadGrantsData();
+      } else {
+        alert(response.message || 'Failed to void transaction');
+      }
+    } catch (err) {
+      console.error('Error voiding transaction:', err);
+      alert('Failed to void transaction');
+    }
+  };
+
+  // Load grants data when tab changes to grants
+  useEffect(() => {
+    if (activeTab === 'grants' && league && league.canManage) {
+      loadGrantsData();
+    }
+  }, [activeTab, league?.id, league?.canManage]);
 
   if (loading) {
     return (
@@ -354,7 +582,7 @@ export default function LeagueDetail() {
       <div className="bg-white border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4">
           <div className="flex gap-6 overflow-x-auto">
-            {['overview', 'sub-leagues', 'clubs', 'managers', ...(league.documents?.length > 0 ? ['documents'] : []), ...(canManage && league.pendingRequests?.length > 0 ? ['requests'] : [])].map(tab => (
+            {['overview', 'sub-leagues', 'clubs', 'managers', 'documents', ...(canManage ? ['grants'] : []), ...(canManage && league.pendingRequests?.length > 0 ? ['requests'] : [])].map(tab => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
@@ -639,24 +867,46 @@ export default function LeagueDetail() {
         {/* Documents Tab */}
         {activeTab === 'documents' && (
           <div className="bg-white rounded-xl shadow-sm border border-gray-200">
-            <div className="p-4 border-b border-gray-200">
-              <h2 className="font-semibold text-gray-900">Documents</h2>
+            <div className="p-4 border-b border-gray-200 flex items-center justify-between">
+              <h2 className="font-semibold text-gray-900 flex items-center gap-2">
+                <FileText className="w-5 h-5 text-blue-600" />
+                Documents
+                {league.documents?.length > 0 && (
+                  <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs rounded-full">
+                    {league.documents.length}
+                  </span>
+                )}
+              </h2>
+              {canManage && (
+                <button
+                  onClick={() => openDocumentModal()}
+                  className="flex items-center gap-1 px-3 py-1.5 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                >
+                  <Plus className="w-4 h-4" />
+                  Add Document
+                </button>
+              )}
             </div>
             {league.documents && league.documents.length > 0 ? (
               <div className="divide-y divide-gray-200">
                 {league.documents.map(doc => (
-                  <a
+                  <div
                     key={doc.id}
-                    href={getSharedAssetUrl(doc.fileUrl)}
-                    target="_blank"
-                    rel="noopener noreferrer"
                     className="flex items-center gap-4 p-4 hover:bg-gray-50 transition-colors"
                   >
                     <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center flex-shrink-0">
                       <FileText className="w-5 h-5 text-blue-600" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="font-medium text-gray-900">{doc.title}</div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-gray-900">{doc.title}</span>
+                        {!doc.isPublic && (
+                          <span className="flex items-center gap-1 text-xs text-gray-500">
+                            <EyeOff className="w-3 h-3" />
+                            Private
+                          </span>
+                        )}
+                      </div>
                       {doc.description && (
                         <div className="text-sm text-gray-500 truncate">{doc.description}</div>
                       )}
@@ -665,14 +915,50 @@ export default function LeagueDetail() {
                         {doc.fileSize && <span className="ml-2">({formatFileSize(doc.fileSize)})</span>}
                       </div>
                     </div>
-                    <Download className="w-5 h-5 text-gray-400" />
-                  </a>
+                    <div className="flex items-center gap-1">
+                      <a
+                        href={getSharedAssetUrl(doc.fileUrl)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="p-2 text-gray-500 hover:bg-gray-200 rounded-lg"
+                        title="Download"
+                      >
+                        <Download className="w-4 h-4" />
+                      </a>
+                      {canManage && (
+                        <>
+                          <button
+                            onClick={() => openDocumentModal(doc)}
+                            className="p-2 text-gray-500 hover:bg-gray-200 rounded-lg"
+                            title="Edit"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteDocument(doc.id)}
+                            className="p-2 text-red-500 hover:bg-red-50 rounded-lg"
+                            title="Delete"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
                 ))}
               </div>
             ) : (
               <div className="p-8 text-center text-gray-500">
                 <FileText className="w-12 h-12 mx-auto mb-3 text-gray-300" />
                 <p>No documents available</p>
+                {canManage && (
+                  <button
+                    onClick={() => openDocumentModal()}
+                    className="mt-2 text-sm text-blue-600 hover:text-blue-800"
+                  >
+                    Add your first document
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -745,6 +1031,172 @@ export default function LeagueDetail() {
             )}
           </div>
         )}
+
+        {/* Grants Tab (managers only) */}
+        {activeTab === 'grants' && canManage && (
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+                <DollarSign className="w-5 h-5 text-green-600" />
+                Grant Management
+              </h3>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => loadGrantsData()}
+                  className="p-2 text-gray-500 hover:bg-gray-100 rounded-lg"
+                  title="Refresh"
+                >
+                  <RefreshCw className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => setShowTransactionModal(true)}
+                  className="flex items-center gap-1 px-3 py-1.5 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700"
+                >
+                  <Plus className="w-4 h-4" />
+                  New Transaction
+                </button>
+              </div>
+            </div>
+
+            {grantsLoading ? (
+              <div className="flex justify-center py-8">
+                <Loader2 className="w-8 h-8 animate-spin text-green-600" />
+              </div>
+            ) : (
+              <>
+                {/* Summary Cards */}
+                {grantsSummary && (
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+                    <div className="bg-green-50 rounded-lg p-4">
+                      <p className="text-sm text-green-700 font-medium">Total Balance</p>
+                      <p className="text-2xl font-bold text-green-800">
+                        ${(grantsSummary.totalBalance || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </p>
+                    </div>
+                    <div className="bg-blue-50 rounded-lg p-4">
+                      <p className="text-sm text-blue-700 font-medium flex items-center gap-1">
+                        <TrendingUp className="w-4 h-4" />
+                        Total Credits
+                      </p>
+                      <p className="text-2xl font-bold text-blue-800">
+                        ${(grantsSummary.totalCreditsAllTime || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </p>
+                    </div>
+                    <div className="bg-red-50 rounded-lg p-4">
+                      <p className="text-sm text-red-700 font-medium flex items-center gap-1">
+                        <TrendingDown className="w-4 h-4" />
+                        Total Debits
+                      </p>
+                      <p className="text-2xl font-bold text-red-800">
+                        ${(grantsSummary.totalDebitsAllTime || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Club Accounts */}
+                {grantAccounts.length > 0 && (
+                  <div className="mb-6">
+                    <h4 className="text-sm font-medium text-gray-700 mb-3">Club Accounts</h4>
+                    <div className="space-y-2 max-h-60 overflow-y-auto">
+                      {grantAccounts.map(account => (
+                        <div key={account.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
+                              <Building2 className="w-5 h-5 text-purple-600" />
+                            </div>
+                            <div>
+                              <p className="font-medium text-gray-900">{account.clubName}</p>
+                              <p className="text-xs text-gray-500">{account.leagueName} • {account.transactionCount || 0} transactions</p>
+                            </div>
+                          </div>
+                          <div className={`text-lg font-bold ${account.currentBalance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                            ${account.currentBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Recent Transactions */}
+                <div>
+                  <h4 className="text-sm font-medium text-gray-700 mb-3">Recent Transactions</h4>
+                  {grantTransactions.length > 0 ? (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b bg-gray-50">
+                            <th className="text-left p-2 font-medium text-gray-700">Date</th>
+                            <th className="text-left p-2 font-medium text-gray-700">Club</th>
+                            <th className="text-left p-2 font-medium text-gray-700">Type</th>
+                            <th className="text-left p-2 font-medium text-gray-700">Description</th>
+                            <th className="text-right p-2 font-medium text-gray-700">Amount</th>
+                            {grantPermissions?.canVoidTransactions && (
+                              <th className="w-10"></th>
+                            )}
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y">
+                          {grantTransactions.map(tx => (
+                            <tr key={tx.id} className={`hover:bg-gray-50 ${tx.isVoided ? 'opacity-50 bg-red-50' : ''}`}>
+                              <td className="p-2 text-gray-600 whitespace-nowrap">
+                                {new Date(tx.createdAt).toLocaleDateString()}
+                              </td>
+                              <td className="p-2 font-medium text-gray-900">{tx.clubName}</td>
+                              <td className="p-2">
+                                <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                                  tx.transactionType === 'Credit'
+                                    ? 'bg-green-100 text-green-800'
+                                    : 'bg-red-100 text-red-800'
+                                }`}>
+                                  {tx.category}
+                                </span>
+                              </td>
+                              <td className="p-2 text-gray-700 max-w-xs truncate">
+                                {tx.description || tx.grantPurpose || tx.feeReason || (tx.donorName ? `From ${tx.donorName}` : '-')}
+                              </td>
+                              <td className={`p-2 text-right font-medium whitespace-nowrap ${
+                                tx.transactionType === 'Credit' ? 'text-green-600' : 'text-red-600'
+                              }`}>
+                                {tx.transactionType === 'Credit' ? '+' : '-'}
+                                ${tx.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </td>
+                              {grantPermissions?.canVoidTransactions && (
+                                <td className="p-2">
+                                  {!tx.isVoided && (
+                                    <button
+                                      onClick={() => handleVoidTransaction(tx.id)}
+                                      className="p-1 text-red-500 hover:bg-red-50 rounded"
+                                      title="Void Transaction"
+                                    >
+                                      <X className="w-4 h-4" />
+                                    </button>
+                                  )}
+                                </td>
+                              )}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <div className="text-center py-6">
+                      <DollarSign className="w-10 h-10 mx-auto text-gray-300 mb-2" />
+                      <p className="text-sm text-gray-500">No transactions yet</p>
+                      <button
+                        onClick={() => setShowTransactionModal(true)}
+                        className="mt-2 text-sm text-green-600 hover:text-green-800"
+                      >
+                        Record your first transaction
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Modals */}
@@ -760,6 +1212,268 @@ export default function LeagueDetail() {
           userId={profileModalUserId}
           onClose={() => setProfileModalUserId(null)}
         />
+      )}
+
+      {/* Document Modal */}
+      {showDocumentModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl shadow-xl max-w-lg w-full p-6">
+            <h3 className="text-lg font-semibold mb-4">
+              {editingDocument ? 'Edit Document' : 'Add Document'}
+            </h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Title *</label>
+                <input
+                  type="text"
+                  value={documentData.title}
+                  onChange={(e) => setDocumentData({ ...documentData, title: e.target.value })}
+                  className="w-full border border-gray-300 rounded-lg p-2"
+                  placeholder="e.g., League Rules 2026"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                <textarea
+                  value={documentData.description}
+                  onChange={(e) => setDocumentData({ ...documentData, description: e.target.value })}
+                  rows={2}
+                  className="w-full border border-gray-300 rounded-lg p-2"
+                  placeholder="Brief description of this document..."
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">File *</label>
+                {documentData.fileUrl ? (
+                  <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                    <FileText className="w-8 h-8 text-blue-600" />
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-gray-900 truncate">{documentData.fileName || 'Uploaded file'}</p>
+                      {documentData.fileSize > 0 && (
+                        <p className="text-xs text-gray-500">
+                          {(documentData.fileSize / 1024).toFixed(1)} KB
+                        </p>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => setDocumentData(prev => ({ ...prev, fileUrl: '', fileName: '', fileType: '', fileSize: 0 }))}
+                      className="p-1.5 text-gray-500 hover:bg-gray-200 rounded"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <label className="flex flex-col items-center justify-center w-full h-24 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100">
+                    {uploadingDocument ? (
+                      <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
+                    ) : (
+                      <>
+                        <Upload className="w-6 h-6 text-gray-400 mb-1" />
+                        <span className="text-sm text-gray-500">Click to upload</span>
+                      </>
+                    )}
+                    <input
+                      type="file"
+                      onChange={handleDocumentFileUpload}
+                      className="hidden"
+                      disabled={uploadingDocument}
+                    />
+                  </label>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="isPublic"
+                  checked={documentData.isPublic}
+                  onChange={(e) => setDocumentData({ ...documentData, isPublic: e.target.checked })}
+                  className="w-4 h-4 text-blue-600 rounded"
+                />
+                <label htmlFor="isPublic" className="text-sm text-gray-700 flex items-center gap-1">
+                  <Eye className="w-4 h-4" />
+                  Publicly visible
+                </label>
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button
+                  onClick={() => setShowDocumentModal(false)}
+                  className="flex-1 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveDocument}
+                  disabled={!documentData.title || !documentData.fileUrl || savingDocument}
+                  className="flex-1 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {savingDocument ? 'Saving...' : (editingDocument ? 'Update' : 'Add Document')}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* New Transaction Modal */}
+      {showTransactionModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl shadow-xl max-w-lg w-full p-6 max-h-[90vh] overflow-y-auto">
+            <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+              <DollarSign className="w-5 h-5 text-green-600" />
+              New Transaction
+            </h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Club *</label>
+                <select
+                  value={transactionData.clubId}
+                  onChange={(e) => setTransactionData({ ...transactionData, clubId: e.target.value })}
+                  className="w-full border border-gray-300 rounded-lg p-2"
+                >
+                  <option value="">Select a club</option>
+                  {grantsClubs.map(club => (
+                    <option key={`${club.clubId}-${club.leagueId}`} value={club.clubId}>
+                      {club.clubName} ({club.leagueName})
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Type *</label>
+                  <select
+                    value={transactionData.transactionType}
+                    onChange={(e) => setTransactionData({ ...transactionData, transactionType: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg p-2"
+                  >
+                    <option value="Credit">Credit (Add funds)</option>
+                    <option value="Debit">Debit (Remove funds)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Category *</label>
+                  <select
+                    value={transactionData.category}
+                    onChange={(e) => setTransactionData({ ...transactionData, category: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg p-2"
+                  >
+                    <option value="Donation">Donation</option>
+                    <option value="Grant">Grant</option>
+                    <option value="Fee">Fee</option>
+                    <option value="Adjustment">Adjustment</option>
+                    <option value="Refund">Refund</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Amount *</label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0.01"
+                    value={transactionData.amount}
+                    onChange={(e) => setTransactionData({ ...transactionData, amount: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg p-2 pl-7"
+                    placeholder="0.00"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                <input
+                  type="text"
+                  value={transactionData.description}
+                  onChange={(e) => setTransactionData({ ...transactionData, description: e.target.value })}
+                  className="w-full border border-gray-300 rounded-lg p-2"
+                  placeholder="Brief description of this transaction"
+                />
+              </div>
+
+              {/* Conditional fields based on category */}
+              {transactionData.category === 'Donation' && (
+                <div className="bg-blue-50 rounded-lg p-4 space-y-3">
+                  <h4 className="text-sm font-medium text-blue-900">Donor Information</h4>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-blue-700 mb-1">Donor Name</label>
+                      <input
+                        type="text"
+                        value={transactionData.donorName}
+                        onChange={(e) => setTransactionData({ ...transactionData, donorName: e.target.value })}
+                        className="w-full border border-blue-200 rounded-lg p-2 text-sm"
+                        placeholder="John Doe"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-blue-700 mb-1">Donor Email</label>
+                      <input
+                        type="email"
+                        value={transactionData.donorEmail}
+                        onChange={(e) => setTransactionData({ ...transactionData, donorEmail: e.target.value })}
+                        className="w-full border border-blue-200 rounded-lg p-2 text-sm"
+                        placeholder="john@example.com"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {transactionData.category === 'Grant' && (
+                <div className="bg-green-50 rounded-lg p-4">
+                  <label className="block text-xs font-medium text-green-700 mb-1">Grant Purpose</label>
+                  <input
+                    type="text"
+                    value={transactionData.grantPurpose}
+                    onChange={(e) => setTransactionData({ ...transactionData, grantPurpose: e.target.value })}
+                    className="w-full border border-green-200 rounded-lg p-2 text-sm"
+                    placeholder="What is this grant for?"
+                  />
+                </div>
+              )}
+
+              {transactionData.category === 'Fee' && (
+                <div className="bg-red-50 rounded-lg p-4">
+                  <label className="block text-xs font-medium text-red-700 mb-1">Fee Reason</label>
+                  <input
+                    type="text"
+                    value={transactionData.feeReason}
+                    onChange={(e) => setTransactionData({ ...transactionData, feeReason: e.target.value })}
+                    className="w-full border border-red-200 rounded-lg p-2 text-sm"
+                    placeholder="Reason for this fee"
+                  />
+                </div>
+              )}
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Notes (internal)</label>
+                <textarea
+                  value={transactionData.notes}
+                  onChange={(e) => setTransactionData({ ...transactionData, notes: e.target.value })}
+                  className="w-full border border-gray-300 rounded-lg p-2 h-20"
+                  placeholder="Any additional notes..."
+                />
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  onClick={() => setShowTransactionModal(false)}
+                  className="flex-1 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleCreateTransaction}
+                  disabled={!transactionData.clubId || !transactionData.amount || savingTransaction}
+                  className="flex-1 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
+                >
+                  {savingTransaction ? 'Creating...' : 'Create Transaction'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
