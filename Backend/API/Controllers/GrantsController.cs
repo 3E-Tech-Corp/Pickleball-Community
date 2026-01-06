@@ -161,7 +161,7 @@ public class GrantsController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error fetching grant accounts");
-            return StatusCode(500, new ApiResponse<List<ClubGrantAccountDto>> { Success = false, Message = "An error occurred" });
+            return StatusCode(500, new ApiResponse<List<ClubGrantAccountDto>> { Success = false, Message = $"Error: {ex.Message}" });
         }
     }
 
@@ -207,7 +207,7 @@ public class GrantsController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error fetching accounts summary");
-            return StatusCode(500, new ApiResponse<ClubGrantAccountSummaryDto> { Success = false, Message = "An error occurred" });
+            return StatusCode(500, new ApiResponse<ClubGrantAccountSummaryDto> { Success = false, Message = $"Error: {ex.Message}" });
         }
     }
 
@@ -377,7 +377,7 @@ public class GrantsController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error fetching transactions");
-            return StatusCode(500, new ApiResponse<PagedResult<ClubGrantTransactionDto>> { Success = false, Message = "An error occurred" });
+            return StatusCode(500, new ApiResponse<PagedResult<ClubGrantTransactionDto>> { Success = false, Message = $"Error: {ex.Message}" });
         }
     }
 
@@ -1085,7 +1085,7 @@ public class GrantsController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error fetching clubs");
-            return StatusCode(500, new ApiResponse<List<object>> { Success = false, Message = "An error occurred" });
+            return StatusCode(500, new ApiResponse<List<object>> { Success = false, Message = $"Error: {ex.Message}" });
         }
     }
 
