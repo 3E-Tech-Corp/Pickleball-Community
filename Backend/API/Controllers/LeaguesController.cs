@@ -817,6 +817,15 @@ public class LeaguesController : ControllerBase
             if (existingRequest != null)
                 return BadRequest(new ApiResponse<LeagueClubRequestDto> { Success = false, Message = "A request is already pending" });
 
+            // Check if club is already a member of any league in the same hierarchy
+            var (isAlreadyMember, existingLeagueName) = await IsClubMemberOfSameHierarchyAsync(clubId, leagueId);
+            if (isAlreadyMember)
+                return BadRequest(new ApiResponse<LeagueClubRequestDto>
+                {
+                    Success = false,
+                    Message = $"Club is already a member of '{existingLeagueName}' in the same league hierarchy. A club can only belong to one league under the same root."
+                });
+
             var clubRequest = new LeagueClubRequest
             {
                 LeagueId = leagueId,
@@ -883,6 +892,23 @@ public class LeaguesController : ControllerBase
 
             if (request.Approve)
             {
+                // Check if club is already a member of any league in the same hierarchy
+                // (in case they joined another league while the request was pending)
+                var (isAlreadyMember, existingLeagueName) = await IsClubMemberOfSameHierarchyAsync(clubRequest.ClubId, id);
+                if (isAlreadyMember)
+                {
+                    // Auto-reject the request since they can't join
+                    clubRequest.Status = "Rejected";
+                    clubRequest.ResponseMessage = $"Club is already a member of '{existingLeagueName}' in the same league hierarchy. A club can only belong to one league under the same root.";
+                    await _context.SaveChangesAsync();
+
+                    return BadRequest(new ApiResponse<LeagueClubDto>
+                    {
+                        Success = false,
+                        Message = clubRequest.ResponseMessage
+                    });
+                }
+
                 // Add club to league
                 var leagueClub = new LeagueClub
                 {
@@ -1121,6 +1147,91 @@ public class LeaguesController : ControllerBase
         }
 
         return false;
+    }
+
+    // Helper to get the root league ID (returns the league itself if it's the root)
+    private async Task<int> GetRootLeagueIdAsync(int leagueId)
+    {
+        var currentId = leagueId;
+        var maxIterations = 100; // Prevent infinite loops
+        var iterations = 0;
+
+        while (iterations < maxIterations)
+        {
+            iterations++;
+            var parentId = await _context.Leagues
+                .Where(l => l.Id == currentId)
+                .Select(l => l.ParentLeagueId)
+                .FirstOrDefaultAsync();
+
+            if (!parentId.HasValue)
+                return currentId; // This is the root
+
+            currentId = parentId.Value;
+        }
+
+        return currentId;
+    }
+
+    // Helper to get all league IDs under a root (including the root itself)
+    private async Task<HashSet<int>> GetAllLeaguesUnderRootAsync(int rootLeagueId)
+    {
+        var result = new HashSet<int>();
+        var toProcess = new Queue<int>();
+        toProcess.Enqueue(rootLeagueId);
+
+        var maxIterations = 1000;
+        var iterations = 0;
+
+        while (toProcess.Count > 0 && iterations < maxIterations)
+        {
+            iterations++;
+            var currentId = toProcess.Dequeue();
+
+            if (result.Contains(currentId))
+                continue;
+
+            result.Add(currentId);
+
+            var childIds = await _context.Leagues
+                .Where(l => l.ParentLeagueId == currentId && l.IsActive)
+                .Select(l => l.Id)
+                .ToListAsync();
+
+            foreach (var childId in childIds)
+            {
+                if (!result.Contains(childId))
+                    toProcess.Enqueue(childId);
+            }
+        }
+
+        return result;
+    }
+
+    // Helper to check if a club is already a member of any league in the same hierarchy
+    private async Task<(bool IsMember, string? ExistingLeagueName)> IsClubMemberOfSameHierarchyAsync(int clubId, int leagueId)
+    {
+        // Get the root league for the target league
+        var rootLeagueId = await GetRootLeagueIdAsync(leagueId);
+
+        // Get all leagues under this root
+        var allLeaguesInHierarchy = await GetAllLeaguesUnderRootAsync(rootLeagueId);
+
+        // Check if the club is already a member of any of these leagues
+        var existingMembership = await _context.LeagueClubs
+            .Include(lc => lc.League)
+            .Where(lc => lc.ClubId == clubId && lc.Status == "Active")
+            .ToListAsync();
+
+        var conflictingMembership = existingMembership
+            .FirstOrDefault(lc => allLeaguesInHierarchy.Contains(lc.LeagueId));
+
+        if (conflictingMembership != null)
+        {
+            return (true, conflictingMembership.League?.Name ?? "Unknown League");
+        }
+
+        return (false, null);
     }
 
     // =====================
