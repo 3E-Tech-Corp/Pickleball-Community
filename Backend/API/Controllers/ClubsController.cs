@@ -27,6 +27,48 @@ public class ClubsController : ControllerBase
         return int.TryParse(userIdClaim, out var userId) ? userId : null;
     }
 
+    // GET: /clubs/recent - Get recently created clubs (public, for home page marquee)
+    [HttpGet("recent")]
+    public async Task<ActionResult<ApiResponse<List<RecentClubDto>>>> GetRecentClubs([FromQuery] int count = 20)
+    {
+        try
+        {
+            // Limit to reasonable range
+            count = Math.Clamp(count, 5, 50);
+
+            var recentClubs = await _context.Clubs
+                .Where(c => c.IsActive && c.IsPublic)
+                .OrderByDescending(c => c.CreatedAt)
+                .Take(count)
+                .Select(c => new RecentClubDto
+                {
+                    Id = c.Id,
+                    Name = c.Name,
+                    LogoUrl = c.LogoUrl,
+                    City = c.City,
+                    State = c.State,
+                    MemberCount = c.Members.Count(m => m.IsActive),
+                    CreatedAt = c.CreatedAt
+                })
+                .ToListAsync();
+
+            return Ok(new ApiResponse<List<RecentClubDto>>
+            {
+                Success = true,
+                Data = recentClubs
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error fetching recent clubs");
+            return StatusCode(500, new ApiResponse<List<RecentClubDto>>
+            {
+                Success = false,
+                Message = "An error occurred while fetching recent clubs"
+            });
+        }
+    }
+
     // GET: /clubs/search - Search for clubs
     [HttpGet("search")]
     public async Task<ActionResult<ApiResponse<PagedResult<ClubDto>>>> SearchClubs([FromQuery] ClubSearchRequest request)

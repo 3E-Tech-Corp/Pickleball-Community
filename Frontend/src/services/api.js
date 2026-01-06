@@ -843,6 +843,9 @@ export const clubsApi = {
     return api.get(`/clubs/search?${queryParams.toString()}`);
   },
 
+  // Get recently created clubs (public, for marquee)
+  getRecentClubs: (count = 20) => api.get(`/clubs/recent?count=${count}`),
+
   // Location dropdowns
   getCountries: () => api.get('/clubs/countries'),
   getStatesByCountry: (country) => api.get(`/clubs/countries/${encodeURIComponent(country)}/states`),

@@ -1,51 +1,74 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { userApi, getSharedAssetUrl } from '../../services/api';
-import { Users, MapPin } from 'lucide-react';
+import { userApi, clubsApi, getSharedAssetUrl } from '../../services/api';
+import { Users, MapPin, Building2, Sparkles } from 'lucide-react';
 
 const RecentPlayers = () => {
-  const [players, setPlayers] = useState([]);
+  const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const scrollRef = useRef(null);
   const [isPaused, setIsPaused] = useState(false);
 
-  // Fetch recent players
-  const fetchPlayers = async () => {
+  // Fetch recent players and clubs
+  const fetchData = async () => {
     try {
-      const response = await userApi.getRecentPlayers(30);
-      if (response.data?.success && response.data.data) {
-        setPlayers(response.data.data);
+      const [playersRes, clubsRes] = await Promise.all([
+        userApi.getRecentPlayers(20),
+        clubsApi.getRecentClubs(15)
+      ]);
+
+      const players = (playersRes.data?.success && playersRes.data.data)
+        ? playersRes.data.data.map(p => ({ ...p, type: 'player' }))
+        : [];
+
+      const clubs = (clubsRes.data?.success && clubsRes.data.data)
+        ? clubsRes.data.data.map(c => ({ ...c, type: 'club' }))
+        : [];
+
+      // Interleave players and clubs for variety
+      const mixed = [];
+      const maxLen = Math.max(players.length, clubs.length);
+      for (let i = 0; i < maxLen; i++) {
+        if (i < players.length) mixed.push(players[i]);
+        if (i < clubs.length) mixed.push(clubs[i]);
+        // Add another player if available for 2:1 ratio
+        if (i + players.length < players.length * 2 && players.length > clubs.length) {
+          const extraIdx = i + Math.floor(players.length / 2);
+          if (extraIdx < players.length) mixed.push(players[extraIdx]);
+        }
       }
+
+      setItems(mixed.length > 0 ? mixed : players);
     } catch (err) {
-      console.error('Error fetching recent players:', err);
+      console.error('Error fetching recent data:', err);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchPlayers();
+    fetchData();
 
     // Auto-refresh every 60 seconds
-    const interval = setInterval(fetchPlayers, 60000);
+    const interval = setInterval(fetchData, 60000);
     return () => clearInterval(interval);
   }, []);
 
-  // Don't render if no players
-  if (loading || players.length === 0) {
+  // Don't render if no items
+  if (loading || items.length === 0) {
     return null;
   }
 
-  // Duplicate players array for seamless infinite scroll
-  const duplicatedPlayers = [...players, ...players];
+  // Duplicate items array for seamless infinite scroll
+  const duplicatedItems = [...items, ...items];
 
   return (
     <section className="bg-gradient-to-r from-emerald-900 via-emerald-800 to-emerald-900 py-4 overflow-hidden">
       <div className="container mx-auto px-4">
         <div className="flex items-center gap-3 mb-3">
-          <Users className="w-5 h-5 text-emerald-400" />
+          <Sparkles className="w-5 h-5 text-emerald-400" />
           <h3 className="text-white font-semibold text-sm uppercase tracking-wide">
-            Recently Joined Players
+            New to Our Community
           </h3>
         </div>
       </div>
@@ -58,13 +81,15 @@ const RecentPlayers = () => {
       >
         <div
           ref={scrollRef}
-          className={`flex gap-4 ${isPaused ? 'animate-marquee-paused' : 'animate-marquee'}`}
+          className={`flex gap-4 px-4 ${isPaused ? 'animate-marquee-paused' : 'animate-marquee'}`}
           style={{
             width: 'fit-content'
           }}
         >
-          {duplicatedPlayers.map((player, index) => (
-            <PlayerCard key={`${player.id}-${index}`} player={player} />
+          {duplicatedItems.map((item, index) => (
+            item.type === 'club'
+              ? <ClubCard key={`club-${item.id}-${index}`} club={item} />
+              : <PlayerCard key={`player-${item.id}-${index}`} player={item} />
           ))}
         </div>
       </div>
@@ -81,11 +106,11 @@ const RecentPlayers = () => {
         }
 
         .animate-marquee {
-          animation: marquee 30s linear infinite;
+          animation: marquee 40s linear infinite;
         }
 
         .animate-marquee-paused {
-          animation: marquee 30s linear infinite;
+          animation: marquee 40s linear infinite;
           animation-play-state: paused;
         }
       `}</style>
@@ -117,8 +142,10 @@ const PlayerCard = ({ player }) => {
             </span>
           </div>
         )}
-        {/* Online indicator */}
-        <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-green-400 rounded-full border-2 border-emerald-900" />
+        {/* Player badge */}
+        <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-emerald-500 rounded-full border-2 border-emerald-900 flex items-center justify-center">
+          <Users className="w-2.5 h-2.5 text-white" />
+        </div>
       </div>
 
       {/* Info */}
@@ -132,6 +159,57 @@ const PlayerCard = ({ player }) => {
             <span className="truncate">{location}</span>
           </div>
         )}
+      </div>
+    </Link>
+  );
+};
+
+const ClubCard = ({ club }) => {
+  const location = [club.city, club.state].filter(Boolean).join(', ');
+
+  return (
+    <Link
+      to={`/clubs/${club.id}`}
+      className="flex-shrink-0 flex items-center gap-3 bg-amber-500/20 backdrop-blur-sm rounded-xl px-4 py-3 border border-amber-400/30 hover:bg-amber-500/30 transition-all group min-w-[200px]"
+    >
+      {/* Logo */}
+      <div className="relative flex-shrink-0">
+        {club.logoUrl ? (
+          <img
+            src={getSharedAssetUrl(club.logoUrl)}
+            alt={club.name}
+            className="w-12 h-12 rounded-lg object-cover border-2 border-amber-400/50 group-hover:border-amber-400 transition-colors"
+          />
+        ) : (
+          <div className="w-12 h-12 rounded-lg bg-amber-600 flex items-center justify-center border-2 border-amber-400/50 group-hover:border-amber-400 transition-colors">
+            <Building2 className="w-6 h-6 text-white" />
+          </div>
+        )}
+        {/* Club badge */}
+        <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-amber-500 rounded-full border-2 border-emerald-900 flex items-center justify-center">
+          <Building2 className="w-2.5 h-2.5 text-white" />
+        </div>
+      </div>
+
+      {/* Info */}
+      <div className="min-w-0">
+        <div className="text-white font-medium truncate group-hover:text-amber-300 transition-colors">
+          {club.name}
+        </div>
+        <div className="flex items-center gap-2 text-amber-300/80 text-sm">
+          {location && (
+            <span className="flex items-center gap-1 truncate">
+              <MapPin className="w-3 h-3 flex-shrink-0" />
+              <span className="truncate">{location}</span>
+            </span>
+          )}
+          {club.memberCount > 0 && (
+            <span className="flex items-center gap-1">
+              <Users className="w-3 h-3" />
+              {club.memberCount}
+            </span>
+          )}
+        </div>
       </div>
     </Link>
   );
