@@ -1203,12 +1203,12 @@ function ClubDetailModal({ club, isAuthenticated, currentUserId, onClose, onJoin
         loadLeagueData(); // Refresh
         toast.success('Request to join league submitted successfully!');
       } else {
-        toast.error(response.message || 'Failed to submit request');
+        toast.error(response.message || response.Message || 'Failed to submit request');
       }
     } catch (err) {
       console.error('Error requesting to join league:', err);
-      // API interceptor returns error.response.data directly, so err.message contains the API message
-      const errorMessage = err?.message || 'Failed to submit request. Please try again.';
+      // API interceptor returns error.response.data directly, check both cases for message
+      const errorMessage = err?.message || err?.Message || 'Failed to submit request. Please try again.';
       toast.error(errorMessage);
     } finally {
       setRequestingLeague(false);
