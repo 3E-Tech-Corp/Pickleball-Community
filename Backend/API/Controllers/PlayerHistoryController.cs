@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Pickleball.Community.Models.DTOs;
 using Pickleball.Community.Models.Entities;
-using Pickleball.Community.Services;
+using Pickleball.Community.Database;
 using System.Security.Claims;
 
 namespace Pickleball.Community.Controllers;
