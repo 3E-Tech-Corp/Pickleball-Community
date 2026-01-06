@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Pickleball.Community.Database;
 using Pickleball.Community.Models.Entities;
+using Pickleball.Community.Services;
 using System.Security.Claims;
 
 namespace Pickleball.Community.Controllers;
@@ -13,11 +14,16 @@ namespace Pickleball.Community.Controllers;
 public class NotificationsController : ControllerBase
 {
     private readonly ApplicationDbContext _context;
+    private readonly INotificationService _notificationService;
     private readonly ILogger<NotificationsController> _logger;
 
-    public NotificationsController(ApplicationDbContext context, ILogger<NotificationsController> logger)
+    public NotificationsController(
+        ApplicationDbContext context,
+        INotificationService notificationService,
+        ILogger<NotificationsController> logger)
     {
         _context = context;
+        _notificationService = notificationService;
         _logger = logger;
     }
 
@@ -322,21 +328,16 @@ public class NotificationsController : ControllerBase
                 return BadRequest(new { success = false, message = "User not found" });
             }
 
-            var notification = new Notification
-            {
-                UserId = dto.UserId,
-                Type = dto.Type ?? "General",
-                Title = dto.Title,
-                Message = dto.Message,
-                ActionUrl = dto.ActionUrl,
-                ReferenceType = dto.ReferenceType,
-                ReferenceId = dto.ReferenceId,
-                IsRead = false,
-                CreatedAt = DateTime.UtcNow
-            };
-
-            _context.Notifications.Add(notification);
-            await _context.SaveChangesAsync();
+            // Use notification service to create and push via SignalR
+            var notification = await _notificationService.CreateAndSendAsync(
+                dto.UserId,
+                dto.Type ?? "General",
+                dto.Title,
+                dto.Message,
+                dto.ActionUrl,
+                dto.ReferenceType,
+                dto.ReferenceId
+            );
 
             return Ok(new { success = true, data = notification.Id });
         }
@@ -356,19 +357,37 @@ public class NotificationsController : ControllerBase
     {
         try
         {
-            var notifications = dto.UserIds.Select(userId => new Notification
+            var notifications = new List<Notification>();
+            var now = DateTime.UtcNow;
+
+            foreach (var userId in dto.UserIds)
             {
-                UserId = userId,
+                var notification = new Notification
+                {
+                    UserId = userId,
+                    Type = dto.Type ?? "System",
+                    Title = dto.Title,
+                    Message = dto.Message,
+                    ActionUrl = dto.ActionUrl,
+                    IsRead = false,
+                    CreatedAt = now
+                };
+                notifications.Add(notification);
+            }
+
+            _context.Notifications.AddRange(notifications);
+            await _context.SaveChangesAsync();
+
+            // Push to all users via SignalR
+            var payload = new NotificationPayload
+            {
                 Type = dto.Type ?? "System",
                 Title = dto.Title,
                 Message = dto.Message,
                 ActionUrl = dto.ActionUrl,
-                IsRead = false,
-                CreatedAt = DateTime.UtcNow
-            }).ToList();
-
-            _context.Notifications.AddRange(notifications);
-            await _context.SaveChangesAsync();
+                CreatedAt = now
+            };
+            await _notificationService.SendToUsersAsync(dto.UserIds, payload);
 
             return Ok(new { success = true, count = notifications.Count });
         }
