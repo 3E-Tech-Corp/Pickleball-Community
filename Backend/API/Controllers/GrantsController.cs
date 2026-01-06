@@ -988,19 +988,36 @@ public class GrantsController : ControllerBase
     // =============================================
 
     /// <summary>
-    /// Get all descendant league IDs (including the starting league) recursively
+    /// Get all descendant league IDs (including the starting league) using iterative approach
     /// </summary>
     private async Task<List<int>> GetDescendantLeagueIdsAsync(int leagueId)
     {
-        var result = new List<int> { leagueId };
-        var childLeagues = await _context.Leagues
-            .Where(l => l.ParentLeagueId == leagueId && l.IsActive)
-            .Select(l => l.Id)
-            .ToListAsync();
+        var result = new List<int>();
+        var toProcess = new Queue<int>();
+        toProcess.Enqueue(leagueId);
+        var maxIterations = 1000; // Safety limit to prevent infinite loops
+        var iterations = 0;
 
-        foreach (var childId in childLeagues)
+        while (toProcess.Count > 0 && iterations < maxIterations)
         {
-            result.AddRange(await GetDescendantLeagueIdsAsync(childId));
+            iterations++;
+            var currentId = toProcess.Dequeue();
+
+            if (result.Contains(currentId))
+                continue; // Skip if already processed (prevents circular references)
+
+            result.Add(currentId);
+
+            var childIds = await _context.Leagues
+                .Where(l => l.ParentLeagueId == currentId && l.IsActive)
+                .Select(l => l.Id)
+                .ToListAsync();
+
+            foreach (var childId in childIds)
+            {
+                if (!result.Contains(childId))
+                    toProcess.Enqueue(childId);
+            }
         }
 
         return result;
