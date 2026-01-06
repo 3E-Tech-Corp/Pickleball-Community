@@ -2928,16 +2928,16 @@ function ClubDetailModal({ club, isAuthenticated, currentUserId, onClose, onJoin
                           <p className="text-sm font-medium text-gray-700 mb-2">Member of:</p>
                           <div className="space-y-2">
                             {clubLeagues.map(league => (
-                              <div key={league.id} className="flex items-center justify-between bg-white p-3 rounded-lg border border-gray-200">
-                                <div>
-                                  <span className="font-medium text-gray-900">{league.leagueName}</span>
-                                  <span className={`ml-2 text-xs px-2 py-0.5 rounded-full ${
-                                    league.status === 'Active' ? 'bg-green-100 text-green-700' :
-                                    league.status === 'Pending' ? 'bg-yellow-100 text-yellow-700' :
-                                    'bg-gray-100 text-gray-600'
-                                  }`}>
-                                    {league.status}
-                                  </span>
+                              <div key={league.id} className="flex items-center bg-white p-3 rounded-lg border border-gray-200">
+                                <div className="flex items-center gap-2">
+                                  {(league.rootLeagueAvatarUrl || league.avatarUrl) && (
+                                    <img
+                                      src={getSharedAssetUrl(league.rootLeagueAvatarUrl || league.avatarUrl)}
+                                      alt=""
+                                      className="w-6 h-6 rounded object-cover"
+                                    />
+                                  )}
+                                  <span className="font-medium text-gray-900">{league.name || league.leagueName}</span>
                                 </div>
                               </div>
                             ))}
