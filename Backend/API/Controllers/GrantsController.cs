@@ -987,7 +987,26 @@ public class GrantsController : ControllerBase
     // GRANT MANAGER ENDPOINTS (full access)
     // =============================================
 
-    // GET: /grants/clubs - Get clubs for dropdown (with league filter)
+    /// <summary>
+    /// Get all descendant league IDs (including the starting league) recursively
+    /// </summary>
+    private async Task<List<int>> GetDescendantLeagueIdsAsync(int leagueId)
+    {
+        var result = new List<int> { leagueId };
+        var childLeagues = await _context.Leagues
+            .Where(l => l.ParentLeagueId == leagueId && l.IsActive)
+            .Select(l => l.Id)
+            .ToListAsync();
+
+        foreach (var childId in childLeagues)
+        {
+            result.AddRange(await GetDescendantLeagueIdsAsync(childId));
+        }
+
+        return result;
+    }
+
+    // GET: /grants/clubs - Get clubs for dropdown (with league filter, includes child leagues)
     [HttpGet("clubs")]
     public async Task<ActionResult<ApiResponse<List<object>>>> GetClubs([FromQuery] int? leagueId)
     {
@@ -1006,13 +1025,22 @@ public class GrantsController : ControllerBase
                 .Include(lc => lc.League)
                 .Where(lc => lc.Status == "Active" && lc.Club!.IsActive && lc.League!.IsActive);
 
+            // If a specific league is specified, get clubs from that league and all its descendants
             if (leagueId.HasValue)
             {
-                query = query.Where(lc => lc.LeagueId == leagueId.Value);
+                var descendantLeagueIds = await GetDescendantLeagueIdsAsync(leagueId.Value);
+                query = query.Where(lc => descendantLeagueIds.Contains(lc.LeagueId));
             }
             else if (!permissions.IsSiteAdmin && permissions.AccessibleLeagueIds.Any())
             {
-                query = query.Where(lc => permissions.AccessibleLeagueIds.Contains(lc.LeagueId));
+                // For non-site-admins, also include descendants of their accessible leagues
+                var allAccessibleLeagueIds = new List<int>();
+                foreach (var accessibleLeagueId in permissions.AccessibleLeagueIds)
+                {
+                    allAccessibleLeagueIds.AddRange(await GetDescendantLeagueIdsAsync(accessibleLeagueId));
+                }
+                var distinctLeagueIds = allAccessibleLeagueIds.Distinct().ToList();
+                query = query.Where(lc => distinctLeagueIds.Contains(lc.LeagueId));
             }
 
             var clubs = await query
@@ -1024,7 +1052,8 @@ public class GrantsController : ControllerBase
                     LeagueName = lc.League!.Name
                 })
                 .Distinct()
-                .OrderBy(c => c.ClubName)
+                .OrderBy(c => c.LeagueName)
+                .ThenBy(c => c.ClubName)
                 .ToListAsync();
 
             return Ok(new ApiResponse<List<object>> { Success = true, Data = clubs.Cast<object>().ToList() });

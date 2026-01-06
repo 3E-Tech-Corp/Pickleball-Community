@@ -1369,7 +1369,7 @@ export default function LeagueAdmin({ embedded = false }) {
                   <option value="">Select a club</option>
                   {grantsClubs.map(club => (
                     <option key={`${club.clubId}-${club.leagueId}`} value={club.clubId}>
-                      {club.clubName}
+                      {club.clubName} ({club.leagueName})
                     </option>
                   ))}
                 </select>
