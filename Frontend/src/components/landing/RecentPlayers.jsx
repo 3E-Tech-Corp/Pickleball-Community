@@ -54,8 +54,22 @@ const RecentPlayers = () => {
     return () => clearInterval(interval);
   }, []);
 
+  // Show loading state or empty state for debugging
+  if (loading) {
+    return (
+      <section className="bg-gradient-to-r from-emerald-900 via-emerald-800 to-emerald-900 py-4">
+        <div className="container mx-auto px-4">
+          <div className="flex items-center gap-3">
+            <Sparkles className="w-5 h-5 text-emerald-400 animate-pulse" />
+            <span className="text-white/70 text-sm">Loading community...</span>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
   // Don't render if no items
-  if (loading || items.length === 0) {
+  if (items.length === 0) {
     return null;
   }
 
