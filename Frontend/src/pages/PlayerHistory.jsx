@@ -266,24 +266,33 @@ export default function PlayerHistory() {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-600"></div>
       </div>
     )
   }
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-6xl mx-auto px-4 py-6">
-        {/* Header */}
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold text-gray-900">Player History</h1>
-          <p className="text-gray-600">View your game history, awards, and ratings over time</p>
+      {/* Header */}
+      <div className="bg-gradient-to-r from-yellow-500 to-amber-600 text-white py-12">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center gap-4">
+            <Trophy className="w-12 h-12" />
+            <div>
+              <h1 className="text-3xl font-bold">Player History</h1>
+              <p className="text-yellow-100 mt-1">
+                View your game history, awards, and ratings over time
+              </p>
+            </div>
+          </div>
         </div>
+      </div>
 
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Summary Cards */}
         {summary && (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-            <div className="bg-white rounded-lg shadow p-4">
+            <div className="bg-white rounded-xl shadow-sm p-4">
               <div className="flex items-center gap-2 text-gray-600 mb-1">
                 <Gamepad2 className="w-4 h-4" />
                 <span className="text-sm">Games Played</span>
@@ -293,7 +302,7 @@ export default function PlayerHistory() {
                 {summary.totalWins}W - {summary.totalLosses}L ({summary.winPercentage}%)
               </div>
             </div>
-            <div className="bg-white rounded-lg shadow p-4">
+            <div className="bg-white rounded-xl shadow-sm p-4">
               <div className="flex items-center gap-2 text-gray-600 mb-1">
                 <Trophy className="w-4 h-4" />
                 <span className="text-sm">Awards</span>
@@ -303,7 +312,7 @@ export default function PlayerHistory() {
                 {summary.totalBadges} badges, {summary.notableFinishes} finishes
               </div>
             </div>
-            <div className="bg-white rounded-lg shadow p-4">
+            <div className="bg-white rounded-xl shadow-sm p-4">
               <div className="flex items-center gap-2 text-gray-600 mb-1">
                 <Star className="w-4 h-4" />
                 <span className="text-sm">League Points</span>
@@ -311,7 +320,7 @@ export default function PlayerHistory() {
               <div className="text-2xl font-bold text-gray-900">{summary.totalLeaguePoints}</div>
               <div className="text-sm text-gray-500">Total accumulated</div>
             </div>
-            <div className="bg-white rounded-lg shadow p-4">
+            <div className="bg-white rounded-xl shadow-sm p-4">
               <div className="flex items-center gap-2 text-gray-600 mb-1">
                 <TrendingUp className="w-4 h-4" />
                 <span className="text-sm">Current Rating</span>
@@ -327,73 +336,82 @@ export default function PlayerHistory() {
         )}
 
         {/* Tabs */}
-        <div className="bg-white rounded-lg shadow mb-6">
-          <div className="border-b border-gray-200">
-            <nav className="flex -mb-px">
-              <button
-                onClick={() => setActiveTab('games')}
-                className={`px-6 py-3 text-sm font-medium border-b-2 ${
-                  activeTab === 'games'
-                    ? 'border-emerald-600 text-emerald-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700'
-                }`}
-              >
-                <Gamepad2 className="w-4 h-4 inline mr-2" />
-                Games
-              </button>
-              <button
-                onClick={() => setActiveTab('awards')}
-                className={`px-6 py-3 text-sm font-medium border-b-2 ${
-                  activeTab === 'awards'
-                    ? 'border-emerald-600 text-emerald-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700'
-                }`}
-              >
-                <Trophy className="w-4 h-4 inline mr-2" />
-                Awards
-              </button>
-              <button
-                onClick={() => setActiveTab('ratings')}
-                className={`px-6 py-3 text-sm font-medium border-b-2 ${
-                  activeTab === 'ratings'
-                    ? 'border-emerald-600 text-emerald-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700'
-                }`}
-              >
-                <TrendingUp className="w-4 h-4 inline mr-2" />
-                Ratings
-              </button>
-            </nav>
-          </div>
+        <div className="flex gap-2 mb-6 flex-wrap">
+          <button
+            onClick={() => setActiveTab('games')}
+            className={`px-4 py-2 rounded-lg font-medium flex items-center gap-2 ${
+              activeTab === 'games'
+                ? 'bg-amber-600 text-white'
+                : 'bg-white text-gray-700 hover:bg-gray-50 shadow-sm'
+            }`}
+          >
+            <Gamepad2 className="w-5 h-5" />
+            Games
+            {gamesStats.totalGames > 0 && (
+              <span className={`px-2 py-0.5 rounded-full text-xs ${
+                activeTab === 'games' ? 'bg-amber-500' : 'bg-gray-200'
+              }`}>
+                {gamesStats.totalGames}
+              </span>
+            )}
+          </button>
+          <button
+            onClick={() => setActiveTab('awards')}
+            className={`px-4 py-2 rounded-lg font-medium flex items-center gap-2 ${
+              activeTab === 'awards'
+                ? 'bg-amber-600 text-white'
+                : 'bg-white text-gray-700 hover:bg-gray-50 shadow-sm'
+            }`}
+          >
+            <Trophy className="w-5 h-5" />
+            Awards
+            {awardsStats.totalBadges > 0 && (
+              <span className={`px-2 py-0.5 rounded-full text-xs ${
+                activeTab === 'awards' ? 'bg-amber-500' : 'bg-gray-200'
+              }`}>
+                {awards.length}
+              </span>
+            )}
+          </button>
+          <button
+            onClick={() => setActiveTab('ratings')}
+            className={`px-4 py-2 rounded-lg font-medium flex items-center gap-2 ${
+              activeTab === 'ratings'
+                ? 'bg-amber-600 text-white'
+                : 'bg-white text-gray-700 hover:bg-gray-50 shadow-sm'
+            }`}
+          >
+            <TrendingUp className="w-5 h-5" />
+            Ratings
+          </button>
+        </div>
 
-          {/* Tab Content */}
-          <div className="p-4">
-            {/* Game History Tab */}
-            {activeTab === 'games' && (
+        {/* Tab Content */}
+        {/* Game History Tab */}
+        {activeTab === 'games' && (
+          <div className="bg-white rounded-xl shadow-sm">
+            <div className="p-6 border-b flex justify-between items-center">
               <div>
-                {/* Filter Toggle */}
-                <div className="flex justify-between items-center mb-4">
-                  <div className="text-sm text-gray-600">
-                    {gamesStats.totalGames || 0} games found
-                    {gamesStats.totalGames > 0 && (
-                      <span className="ml-2">
-                        ({gamesStats.winPercentage}% win rate)
-                      </span>
-                    )}
-                  </div>
-                  <button
-                    onClick={() => setShowGameFilters(!showGameFilters)}
-                    className="flex items-center gap-2 px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg"
-                  >
-                    <Filter className="w-4 h-4" />
-                    Filters
-                    {showGameFilters ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                  </button>
-                </div>
+                <h2 className="text-xl font-semibold text-gray-900">Game History</h2>
+                <p className="text-gray-500 text-sm mt-1">
+                  {gamesStats.totalGames || 0} games found
+                  {gamesStats.totalGames > 0 && ` (${gamesStats.winPercentage}% win rate)`}
+                </p>
+              </div>
+              <button
+                onClick={() => setShowGameFilters(!showGameFilters)}
+                className="flex items-center gap-2 px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg"
+              >
+                <Filter className="w-4 h-4" />
+                Filters
+                {showGameFilters ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+              </button>
+            </div>
 
-                {/* Game Filters */}
-                {showGameFilters && (
-                  <div className="bg-gray-50 rounded-lg p-4 mb-4">
+            <div className="p-6">
+              {/* Game Filters */}
+              {showGameFilters && (
+                <div className="bg-gray-50 rounded-lg p-4 mb-4">
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Partner Name</label>
@@ -571,30 +589,33 @@ export default function PlayerHistory() {
                     ))}
                   </div>
                 )}
-              </div>
-            )}
+            </div>
+          </div>
+        )}
 
-            {/* Awards Tab */}
-            {activeTab === 'awards' && (
+        {/* Awards Tab */}
+        {activeTab === 'awards' && (
+          <div className="bg-white rounded-xl shadow-sm">
+            {/* Header */}
+            <div className="p-6 border-b flex justify-between items-center">
               <div>
-                {/* Filter Toggle */}
-                <div className="flex justify-between items-center mb-4">
-                  <div className="text-sm text-gray-600">
-                    {awards.length} awards
-                    {awardsStats.totalLeaguePoints > 0 && (
-                      <span className="ml-2">({awardsStats.totalLeaguePoints} league points)</span>
-                    )}
-                  </div>
-                  <button
-                    onClick={() => setShowAwardFilters(!showAwardFilters)}
-                    className="flex items-center gap-2 px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg"
-                  >
-                    <Filter className="w-4 h-4" />
-                    Filters
-                    {showAwardFilters ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                  </button>
-                </div>
+                <h2 className="text-xl font-semibold text-gray-900">Awards & Achievements</h2>
+                <p className="text-gray-500 text-sm mt-1">
+                  {awards.length} awards
+                  {awardsStats.totalLeaguePoints > 0 && ` (${awardsStats.totalLeaguePoints} league points)`}
+                </p>
+              </div>
+              <button
+                onClick={() => setShowAwardFilters(!showAwardFilters)}
+                className="flex items-center gap-2 px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg"
+              >
+                <Filter className="w-4 h-4" />
+                Filters
+                {showAwardFilters ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+              </button>
+            </div>
 
+            <div className="p-6">
                 {/* Award Filters */}
                 {showAwardFilters && (
                   <div className="bg-gray-50 rounded-lg p-4 mb-4">
@@ -716,13 +737,21 @@ export default function PlayerHistory() {
                     ))}
                   </div>
                 )}
-              </div>
-            )}
+            </div>
+          </div>
+        )}
 
-            {/* Ratings Tab */}
-            {activeTab === 'ratings' && (
-              <div>
-                {/* Rating Stats */}
+        {/* Ratings Tab */}
+        {activeTab === 'ratings' && (
+          <div className="bg-white rounded-xl shadow-sm">
+            {/* Header */}
+            <div className="p-6 border-b">
+              <h2 className="text-xl font-semibold text-gray-900">Rating History</h2>
+              <p className="text-gray-500 text-sm mt-1">Track your skill rating changes over time</p>
+            </div>
+
+            <div className="p-6">
+              {/* Rating Stats */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
                   <div className="bg-gray-50 rounded-lg p-3 text-center">
                     <div className="text-sm text-gray-600">Current</div>
@@ -866,10 +895,9 @@ export default function PlayerHistory() {
                     </table>
                   </div>
                 )}
-              </div>
-            )}
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   )
