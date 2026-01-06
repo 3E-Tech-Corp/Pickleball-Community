@@ -29,6 +29,7 @@ public class ClubsController : ControllerBase
 
     // GET: /clubs/recent - Get recently created clubs (public, for home page marquee)
     [HttpGet("recent")]
+    [AllowAnonymous]
     public async Task<ActionResult<ApiResponse<List<RecentClubDto>>>> GetRecentClubs([FromQuery] int count = 20)
     {
         try
