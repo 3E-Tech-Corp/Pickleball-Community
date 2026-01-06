@@ -414,7 +414,7 @@ export const themeApi = {
   deleteHeroVideo: (id) => api.delete(`/theme/hero-videos/${id}`),
   activateHeroVideo: (id) => api.put(`/theme/hero-videos/${id}/activate`),
   deactivateHeroVideo: (id) => api.put(`/theme/hero-videos/${id}/deactivate`),
-  reorderHeroVideos: (videoIds) => api.put('/theme/hero-videos/reorder', { videoIds })
+  reorderHeroVideos: (videoIds) => api.put('/theme/hero-videos/reorder', { VideoIds: videoIds })
 }
 
 // User Profile API

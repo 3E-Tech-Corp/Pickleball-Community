@@ -1,11 +1,14 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { useTheme } from '../../contexts/ThemeContext';
 import { getSharedAssetUrl, themeApi } from '../../services/api';
-import { Play, Pause, Volume2, VolumeX, MapPin, Users, Award, Calendar } from 'lucide-react';
+import { Play, Pause, Volume2, VolumeX, MapPin, Users, Award, Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
 
 const SHARED_AUTH_URL = import.meta.env.VITE_SHARED_AUTH_URL || 'https://shared.funtimepb.com/api';
 const SITE_KEY = 'community';
+
+// Video rotation interval in milliseconds (15 seconds)
+const VIDEO_ROTATION_INTERVAL = 15000;
 
 // Check if URL is from external platform
 const isExternalVideoUrl = (url) => {
@@ -33,12 +36,15 @@ const Header = () => {
   const [isPlaying, setIsPlaying] = useState(true);
   const [isMuted, setIsMuted] = useState(true);
   const [logoHtml, setLogoHtml] = useState(null);
-  const [activeHeroVideo, setActiveHeroVideo] = useState(null);
+  const [activeVideos, setActiveVideos] = useState([]);
+  const [currentVideoIndex, setCurrentVideoIndex] = useState(0);
+  const [isTransitioning, setIsTransitioning] = useState(false);
   const videoRef = useRef(null);
+  const rotationTimerRef = useRef(null);
 
-  // Fetch active hero videos from the HeroVideos table
+  // Fetch ALL active hero videos from the HeroVideos table
   useEffect(() => {
-    const fetchActiveVideo = async () => {
+    const fetchActiveVideos = async () => {
       try {
         const response = await themeApi.getHeroVideos();
         let videos = [];
@@ -47,21 +53,56 @@ const Header = () => {
         } else if (Array.isArray(response)) {
           videos = response;
         }
-        // Find the first active video by sort order
-        const activeVideo = videos.find(v => v.isActive);
-        if (activeVideo) {
-          setActiveHeroVideo(activeVideo);
-        }
+        // Get ALL active videos sorted by sortOrder
+        const activeVids = videos
+          .filter(v => v.isActive)
+          .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
+        setActiveVideos(activeVids);
       } catch (error) {
         console.error('Error fetching hero videos:', error);
       }
     };
-    fetchActiveVideo();
+    fetchActiveVideos();
   }, []);
 
+  // Navigate to next video
+  const goToNextVideo = useCallback(() => {
+    if (activeVideos.length <= 1) return;
+    setIsTransitioning(true);
+    setTimeout(() => {
+      setCurrentVideoIndex(prev => (prev + 1) % activeVideos.length);
+      setIsTransitioning(false);
+    }, 300);
+  }, [activeVideos.length]);
+
+  // Navigate to previous video
+  const goToPrevVideo = useCallback(() => {
+    if (activeVideos.length <= 1) return;
+    setIsTransitioning(true);
+    setTimeout(() => {
+      setCurrentVideoIndex(prev => (prev - 1 + activeVideos.length) % activeVideos.length);
+      setIsTransitioning(false);
+    }, 300);
+  }, [activeVideos.length]);
+
+  // Auto-rotate videos every 15 seconds when there are multiple
+  useEffect(() => {
+    if (activeVideos.length > 1) {
+      rotationTimerRef.current = setInterval(goToNextVideo, VIDEO_ROTATION_INTERVAL);
+      return () => {
+        if (rotationTimerRef.current) {
+          clearInterval(rotationTimerRef.current);
+        }
+      };
+    }
+  }, [activeVideos.length, goToNextVideo]);
+
+  // Get current active video
+  const currentVideo = activeVideos[currentVideoIndex] || null;
+
   // Use active video from HeroVideos table, fallback to legacy heroVideoUrl from theme
-  const heroVideoUrl = activeHeroVideo?.videoUrl || theme?.heroVideoUrl;
-  const heroThumbnailUrl = activeHeroVideo?.thumbnailUrl || theme?.heroVideoThumbnailUrl;
+  const heroVideoUrl = currentVideo?.videoUrl || theme?.heroVideoUrl;
+  const heroThumbnailUrl = currentVideo?.thumbnailUrl || theme?.heroVideoThumbnailUrl;
   const isExternalVideo = isExternalVideoUrl(heroVideoUrl);
   const youtubeEmbedUrl = getYouTubeEmbedUrl(heroVideoUrl);
   const hasVideo = heroVideoUrl && (isExternalVideo || heroVideoUrl);
@@ -109,34 +150,82 @@ const Header = () => {
       {/* Background Video or Image */}
       {hasVideo ? (
         <>
-          {youtubeEmbedUrl ? (
-            /* YouTube embed */
-            <div className="absolute inset-0 w-full h-full overflow-hidden">
-              <iframe
-                src={youtubeEmbedUrl}
-                className="absolute top-1/2 left-1/2 w-[200%] h-[200%] -translate-x-1/2 -translate-y-1/2 pointer-events-none"
-                allow="autoplay; encrypted-media"
-                allowFullScreen
-                title="Hero video"
-              />
-            </div>
-          ) : isExternalVideo ? (
-            /* Other external video - just show image fallback or gradient */
-            <div className="absolute inset-0 bg-gradient-to-br from-green-600 via-green-700 to-emerald-800" />
-          ) : (
-            /* Uploaded/local video file */
-            <video
-              ref={videoRef}
-              className="absolute inset-0 w-full h-full object-cover"
-              autoPlay
-              loop
-              muted={isMuted}
-              playsInline
-              poster={heroThumbnailUrl ? getSharedAssetUrl(heroThumbnailUrl) : undefined}
-            >
-              <source src={getSharedAssetUrl(heroVideoUrl)} type="video/mp4" />
-            </video>
+          <div className={`absolute inset-0 transition-opacity duration-300 ${isTransitioning ? 'opacity-0' : 'opacity-100'}`}>
+            {youtubeEmbedUrl ? (
+              /* YouTube embed */
+              <div className="absolute inset-0 w-full h-full overflow-hidden">
+                <iframe
+                  key={currentVideo?.id || 'youtube'}
+                  src={youtubeEmbedUrl}
+                  className="absolute top-1/2 left-1/2 w-[200%] h-[200%] -translate-x-1/2 -translate-y-1/2 pointer-events-none"
+                  allow="autoplay; encrypted-media"
+                  allowFullScreen
+                  title="Hero video"
+                />
+              </div>
+            ) : isExternalVideo ? (
+              /* Other external video - just show image fallback or gradient */
+              <div className="absolute inset-0 bg-gradient-to-br from-green-600 via-green-700 to-emerald-800" />
+            ) : (
+              /* Uploaded/local video file */
+              <video
+                key={currentVideo?.id || 'video'}
+                ref={videoRef}
+                className="absolute inset-0 w-full h-full object-cover"
+                autoPlay
+                loop
+                muted={isMuted}
+                playsInline
+                poster={heroThumbnailUrl ? getSharedAssetUrl(heroThumbnailUrl) : undefined}
+              >
+                <source src={getSharedAssetUrl(heroVideoUrl)} type="video/mp4" />
+              </video>
+            )}
+          </div>
+
+          {/* Video Navigation Controls - show when multiple videos */}
+          {activeVideos.length > 1 && (
+            <>
+              {/* Previous/Next Buttons */}
+              <button
+                onClick={goToPrevVideo}
+                className="absolute left-4 top-1/2 -translate-y-1/2 z-20 p-2 bg-black/40 hover:bg-black/60 rounded-full text-white/80 hover:text-white transition-all"
+                aria-label="Previous video"
+              >
+                <ChevronLeft className="w-6 h-6" />
+              </button>
+              <button
+                onClick={goToNextVideo}
+                className="absolute right-4 top-1/2 -translate-y-1/2 z-20 p-2 bg-black/40 hover:bg-black/60 rounded-full text-white/80 hover:text-white transition-all"
+                aria-label="Next video"
+              >
+                <ChevronRight className="w-6 h-6" />
+              </button>
+
+              {/* Dot Indicators */}
+              <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-20 flex gap-2">
+                {activeVideos.map((_, index) => (
+                  <button
+                    key={index}
+                    onClick={() => {
+                      setIsTransitioning(true);
+                      setTimeout(() => {
+                        setCurrentVideoIndex(index);
+                        setIsTransitioning(false);
+                      }, 300);
+                    }}
+                    className={`w-2.5 h-2.5 rounded-full transition-all ${
+                      index === currentVideoIndex
+                        ? 'bg-white w-6'
+                        : 'bg-white/50 hover:bg-white/70'
+                    }`}
+                    aria-label={`Go to video ${index + 1}`}
+                  />
+                ))}
+              </div>
+            </>
           )}
+
           {/* Video Controls - only for local videos */}
           {!isExternalVideo && (
             <div className="absolute bottom-4 right-4 flex gap-2 z-20">
