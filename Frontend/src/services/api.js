@@ -1520,4 +1520,63 @@ export const clubFinanceApi = {
   getMembers: (clubId) => api.get(`/clubs/${clubId}/finance/members`)
 }
 
+// Player History API
+export const playerHistoryApi = {
+  // Summary
+  getSummary: (userId) => api.get(`/api/player-history/${userId}/summary`),
+
+  // Game History
+  getGames: (userId, params = {}) => {
+    const queryParams = new URLSearchParams();
+    if (params.partnerUserId) queryParams.append('partnerUserId', params.partnerUserId);
+    if (params.opponentUserId) queryParams.append('opponentUserId', params.opponentUserId);
+    if (params.partnerName) queryParams.append('partnerName', params.partnerName);
+    if (params.opponentName) queryParams.append('opponentName', params.opponentName);
+    if (params.dateFrom) queryParams.append('dateFrom', params.dateFrom);
+    if (params.dateTo) queryParams.append('dateTo', params.dateTo);
+    if (params.eventType) queryParams.append('eventType', params.eventType);
+    if (params.eventId) queryParams.append('eventId', params.eventId);
+    if (params.winsOnly !== undefined) queryParams.append('winsOnly', params.winsOnly);
+    if (params.page) queryParams.append('page', params.page);
+    if (params.pageSize) queryParams.append('pageSize', params.pageSize);
+    const queryString = queryParams.toString();
+    return api.get(`/api/player-history/${userId}/games${queryString ? `?${queryString}` : ''}`);
+  },
+
+  // Awards
+  getAwards: (userId, params = {}) => {
+    const queryParams = new URLSearchParams();
+    if (params.awardType) queryParams.append('awardType', params.awardType);
+    if (params.eventId) queryParams.append('eventId', params.eventId);
+    if (params.leagueId) queryParams.append('leagueId', params.leagueId);
+    if (params.clubId) queryParams.append('clubId', params.clubId);
+    if (params.dateFrom) queryParams.append('dateFrom', params.dateFrom);
+    if (params.dateTo) queryParams.append('dateTo', params.dateTo);
+    if (params.activeOnly !== undefined) queryParams.append('activeOnly', params.activeOnly);
+    if (params.page) queryParams.append('page', params.page);
+    if (params.pageSize) queryParams.append('pageSize', params.pageSize);
+    const queryString = queryParams.toString();
+    return api.get(`/api/player-history/${userId}/awards${queryString ? `?${queryString}` : ''}`);
+  },
+  createAward: (data) => api.post('/api/player-history/awards', data),
+
+  // Ratings
+  getRatings: (userId, params = {}) => {
+    const queryParams = new URLSearchParams();
+    if (params.ratingType) queryParams.append('ratingType', params.ratingType);
+    if (params.dateFrom) queryParams.append('dateFrom', params.dateFrom);
+    if (params.dateTo) queryParams.append('dateTo', params.dateTo);
+    if (params.page) queryParams.append('page', params.page);
+    if (params.pageSize) queryParams.append('pageSize', params.pageSize);
+    const queryString = queryParams.toString();
+    return api.get(`/api/player-history/${userId}/ratings${queryString ? `?${queryString}` : ''}`);
+  },
+  createRating: (data) => api.post('/api/player-history/ratings', data),
+
+  // Helpers
+  getEventTypes: () => api.get('/api/player-history/event-types'),
+  getAwardTypes: () => api.get('/api/player-history/award-types'),
+  getRatingTypes: () => api.get('/api/player-history/rating-types')
+}
+
 export default api

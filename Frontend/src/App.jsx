@@ -35,6 +35,7 @@ import MyBlog from './pages/MyBlog'
 import Friends from './pages/Friends'
 import Messages from './pages/Messages'
 import PublicProfile from './pages/PublicProfile'
+import PlayerHistory from './pages/PlayerHistory'
 import ProtectedRoute from './components/ProtectedRoute'
 
 import ForgotPassword from './pages/ForgotPassword'
@@ -121,6 +122,13 @@ function App() {
       <Route path="/users/:userId" element={
         <ProtectedRoute>
           <PublicProfile />
+        </ProtectedRoute>
+      } />
+
+      {/* Player History - Awards, Games, Ratings */}
+      <Route path="/history" element={
+        <ProtectedRoute>
+          <PlayerHistory />
         </ProtectedRoute>
       } />
 

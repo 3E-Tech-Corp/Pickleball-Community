@@ -122,6 +122,10 @@ public class ApplicationDbContext : DbContext
     public DbSet<ClubFinanceTransaction> ClubFinanceTransactions { get; set; }
     public DbSet<ClubFinanceTransactionAttachment> ClubFinanceTransactionAttachments { get; set; }
 
+    // Player History
+    public DbSet<PlayerAward> PlayerAwards { get; set; }
+    public DbSet<PlayerRatingHistory> PlayerRatingHistories { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<User>(entity =>
@@ -1135,6 +1139,78 @@ public class ApplicationDbContext : DbContext
             entity.HasOne(a => a.UploadedBy)
                   .WithMany()
                   .HasForeignKey(a => a.UploadedByUserId)
+                  .OnDelete(DeleteBehavior.NoAction);
+        });
+
+        // Player Award configuration
+        modelBuilder.Entity<PlayerAward>(entity =>
+        {
+            entity.Property(a => a.AwardType).IsRequired().HasMaxLength(50);
+            entity.Property(a => a.Title).IsRequired().HasMaxLength(200);
+            entity.HasIndex(a => a.UserId);
+            entity.HasIndex(a => a.AwardType);
+            entity.HasIndex(a => a.AwardedAt);
+            entity.HasIndex(a => a.EventId);
+            entity.HasIndex(a => a.LeagueId);
+
+            entity.HasOne(a => a.User)
+                  .WithMany()
+                  .HasForeignKey(a => a.UserId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(a => a.Event)
+                  .WithMany()
+                  .HasForeignKey(a => a.EventId)
+                  .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasOne(a => a.Division)
+                  .WithMany()
+                  .HasForeignKey(a => a.DivisionId)
+                  .OnDelete(DeleteBehavior.NoAction);
+
+            entity.HasOne(a => a.League)
+                  .WithMany()
+                  .HasForeignKey(a => a.LeagueId)
+                  .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasOne(a => a.Club)
+                  .WithMany()
+                  .HasForeignKey(a => a.ClubId)
+                  .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasOne(a => a.AwardedBy)
+                  .WithMany()
+                  .HasForeignKey(a => a.AwardedByUserId)
+                  .OnDelete(DeleteBehavior.NoAction);
+        });
+
+        // Player Rating History configuration
+        modelBuilder.Entity<PlayerRatingHistory>(entity =>
+        {
+            entity.Property(r => r.RatingType).IsRequired().HasMaxLength(50);
+            entity.HasIndex(r => r.UserId);
+            entity.HasIndex(r => r.RatingType);
+            entity.HasIndex(r => r.EffectiveDate);
+            entity.HasIndex(r => new { r.UserId, r.EffectiveDate });
+
+            entity.HasOne(r => r.User)
+                  .WithMany()
+                  .HasForeignKey(r => r.UserId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(r => r.Event)
+                  .WithMany()
+                  .HasForeignKey(r => r.EventId)
+                  .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasOne(r => r.Game)
+                  .WithMany()
+                  .HasForeignKey(r => r.GameId)
+                  .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasOne(r => r.UpdatedBy)
+                  .WithMany()
+                  .HasForeignKey(r => r.UpdatedByUserId)
                   .OnDelete(DeleteBehavior.NoAction);
         });
     }

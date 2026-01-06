@@ -149,10 +149,10 @@ const MemberDashboard = () => {
     },
     {
       title: 'History',
-      description: 'View your achievements and badges',
+      description: 'Games, awards, and rating history',
       icon: Trophy,
       color: 'yellow',
-      link: '/awards'
+      link: '/history'
     }
   ]
 
