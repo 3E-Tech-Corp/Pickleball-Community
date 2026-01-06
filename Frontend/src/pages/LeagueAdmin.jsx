@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   Building2, Plus, Search, Edit, Trash2, ChevronRight, ChevronDown,
-  Users, MapPin, Globe, Network, Shield, Loader2,
+  Users, MapPin, Globe, Network, Shield, Loader2, X,
   AlertCircle, Building, Save, ArrowLeft, ExternalLink, Image
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
