@@ -17,6 +17,9 @@ const RecentPlayers = () => {
         clubsApi.getRecentClubs(15)
       ]);
 
+      console.log('Players API response:', playersRes.data);
+      console.log('Clubs API response:', clubsRes.data);
+
       const players = (playersRes.data?.success && playersRes.data.data)
         ? playersRes.data.data.map(p => ({ ...p, type: 'player' }))
         : [];
@@ -24,6 +27,8 @@ const RecentPlayers = () => {
       const clubs = (clubsRes.data?.success && clubsRes.data.data)
         ? clubsRes.data.data.map(c => ({ ...c, type: 'club' }))
         : [];
+
+      console.log('Parsed players:', players.length, 'clubs:', clubs.length);
 
       // Interleave players and clubs for variety
       const mixed = [];
@@ -38,6 +43,7 @@ const RecentPlayers = () => {
         }
       }
 
+      console.log('Mixed items:', mixed.length);
       setItems(mixed.length > 0 ? mixed : players);
     } catch (err) {
       console.error('Error fetching recent data:', err);
