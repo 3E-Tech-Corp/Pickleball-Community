@@ -113,42 +113,42 @@ const MemberDashboard = () => {
 
   const dashboardCards = [
     {
-      title: 'Edit Profile',
+      title: 'Profile',
       description: 'Update your information and preferences',
       icon: Settings,
       color: 'blue',
       link: '/profile'
     },
     {
-      title: 'My Friends',
+      title: 'Friends',
       description: 'Connect with other pickleball players',
       icon: Users,
       color: 'green',
       link: '/friends'
     },
     {
-      title: 'My Clubs',
+      title: 'Clubs',
       description: 'View and manage your club memberships',
       icon: Building2,
       color: 'purple',
       link: '/clubs?view=my'
     },
     {
-      title: 'My Events',
+      title: 'Events',
       description: 'See upcoming events you\'re registered for',
       icon: Calendar,
       color: 'orange',
       link: '/events?view=my'
     },
     {
-      title: 'Peer Review',
+      title: 'Reviews',
       description: 'Get certified through peer skill ratings',
       icon: UserPlus,
       color: 'teal',
       link: '/my-certificate'
     },
     {
-      title: 'Awards History',
+      title: 'History',
       description: 'View your achievements and badges',
       icon: Trophy,
       color: 'yellow',
