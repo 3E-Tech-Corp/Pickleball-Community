@@ -443,12 +443,15 @@ const AdminDashboard = () => {
     if (index <= 0) return
     const newOrder = [...heroVideos]
     ;[newOrder[index - 1], newOrder[index]] = [newOrder[index], newOrder[index - 1]]
+    // Optimistic update - show change immediately
+    setHeroVideos(newOrder)
     const videoIds = newOrder.map(v => v.id)
     try {
       await themeApi.reorderHeroVideos(videoIds)
-      await fetchHeroVideos()
     } catch (error) {
       console.error('Error reordering videos:', error)
+      // Revert on error
+      await fetchHeroVideos()
     }
   }
 
@@ -456,12 +459,15 @@ const AdminDashboard = () => {
     if (index >= heroVideos.length - 1) return
     const newOrder = [...heroVideos]
     ;[newOrder[index], newOrder[index + 1]] = [newOrder[index + 1], newOrder[index]]
+    // Optimistic update - show change immediately
+    setHeroVideos(newOrder)
     const videoIds = newOrder.map(v => v.id)
     try {
       await themeApi.reorderHeroVideos(videoIds)
-      await fetchHeroVideos()
     } catch (error) {
       console.error('Error reordering videos:', error)
+      // Revert on error
+      await fetchHeroVideos()
     }
   }
 
