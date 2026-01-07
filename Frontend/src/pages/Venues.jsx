@@ -1225,7 +1225,7 @@ function CourtDetailModal({ court, isAuthenticated, onClose, onConfirmationSubmi
                   : 'border-transparent text-gray-500 hover:text-gray-700'
               }`}
             >
-              {court.myConfirmation ? 'Update My Info' : 'Confirm Info'}
+              {court.myConfirmation ? 'Verify Venue Info' : 'Confirm Info'}
             </button>
             <button
               onClick={() => setActiveTab('confirmations')}
@@ -1686,7 +1686,7 @@ function CourtDetailModal({ court, isAuthenticated, onClose, onConfirmationSubmi
                     disabled={submitting}
                     className="w-full py-3 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors disabled:opacity-50"
                   >
-                    {submitting ? 'Submitting...' : court.myConfirmation ? 'Update My Info' : 'Submit Confirmation'}
+                    {submitting ? 'Submitting...' : court.myConfirmation ? 'Update Verification' : 'Submit Confirmation'}
                   </button>
                 </form>
               )}
