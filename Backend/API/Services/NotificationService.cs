@@ -140,21 +140,8 @@ public class NotificationService : INotificationService
             CreatedAt = notification.CreatedAt
         };
 
+        // SendToUserAsync now handles both SignalR and Web Push
         await SendToUserAsync(userId, payload);
-
-        // Also send Web Push notification for offline users
-        var pushService = GetPushService();
-        if (pushService != null)
-        {
-            try
-            {
-                await pushService.SendToUserAsync(userId, title, message ?? "", actionUrl);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Failed to send push notification to user {UserId}", userId);
-            }
-        }
 
         _logger.LogInformation("Notification {Id} created and sent to user {UserId}: {Title}",
             notification.Id, userId, title);
@@ -167,8 +154,23 @@ public class NotificationService : INotificationService
     {
         try
         {
+            // Send via SignalR
             await _hubContext.Clients.Group($"user_{userId}")
                 .SendAsync("ReceiveNotification", notification);
+
+            // Also send Web Push for offline users
+            var pushService = GetPushService();
+            if (pushService != null)
+            {
+                try
+                {
+                    await pushService.SendToUserAsync(userId, notification.Title, notification.Message ?? "", notification.ActionUrl);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to send push notification to user {UserId}", userId);
+                }
+            }
 
             _logger.LogDebug("Notification sent to user {UserId}: {Title}", userId, notification.Title);
         }
@@ -181,19 +183,50 @@ public class NotificationService : INotificationService
     /// <inheritdoc />
     public async Task SendToUsersAsync(IEnumerable<int> userIds, NotificationPayload notification)
     {
-        var tasks = userIds.Select(userId =>
+        var userIdList = userIds.ToList();
+
+        // Send via SignalR
+        var tasks = userIdList.Select(userId =>
             _hubContext.Clients.Group($"user_{userId}")
                 .SendAsync("ReceiveNotification", notification));
-
         await Task.WhenAll(tasks);
 
-        _logger.LogDebug("Notification sent to {Count} users: {Title}", userIds.Count(), notification.Title);
+        // Also send Web Push for offline users
+        var pushService = GetPushService();
+        if (pushService != null)
+        {
+            try
+            {
+                await pushService.SendToUsersAsync(userIdList, notification.Title, notification.Message ?? "", notification.ActionUrl);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to send push notifications to {Count} users", userIdList.Count);
+            }
+        }
+
+        _logger.LogDebug("Notification sent to {Count} users: {Title}", userIdList.Count, notification.Title);
     }
 
     /// <inheritdoc />
     public async Task BroadcastAsync(NotificationPayload notification)
     {
+        // Send via SignalR
         await _hubContext.Clients.All.SendAsync("ReceiveNotification", notification);
+
+        // Also send Web Push to all subscribed users
+        var pushService = GetPushService();
+        if (pushService != null)
+        {
+            try
+            {
+                await pushService.BroadcastAsync(notification.Title, notification.Message ?? "", notification.ActionUrl);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to broadcast push notification");
+            }
+        }
 
         _logger.LogDebug("Notification broadcast to all users: {Title}", notification.Title);
     }
@@ -201,24 +234,96 @@ public class NotificationService : INotificationService
     /// <inheritdoc />
     public async Task SendToGameAsync(int gameId, NotificationPayload notification)
     {
+        // Send via SignalR to game group
         var groupName = $"game_{gameId}";
         await _hubContext.Clients.Group(groupName).SendAsync("ReceiveNotification", notification);
+
+        // Get game participants for Web Push
+        var pushService = GetPushService();
+        if (pushService != null)
+        {
+            try
+            {
+                var userIds = await _context.GameParticipants
+                    .Where(gp => gp.GameId == gameId)
+                    .Select(gp => gp.UserId)
+                    .ToListAsync();
+
+                if (userIds.Count > 0)
+                {
+                    await pushService.SendToUsersAsync(userIds, notification.Title, notification.Message ?? "", notification.ActionUrl);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to send push notifications to game {GameId}", gameId);
+            }
+        }
+
         _logger.LogDebug("Notification sent to game {GameId}: {Title}", gameId, notification.Title);
     }
 
     /// <inheritdoc />
     public async Task SendToEventAsync(int eventId, NotificationPayload notification)
     {
+        // Send via SignalR to event group
         var groupName = $"event_{eventId}";
         await _hubContext.Clients.Group(groupName).SendAsync("ReceiveNotification", notification);
+
+        // Get event participants for Web Push
+        var pushService = GetPushService();
+        if (pushService != null)
+        {
+            try
+            {
+                var userIds = await _context.EventParticipants
+                    .Where(ep => ep.EventId == eventId && ep.IsActive)
+                    .Select(ep => ep.UserId)
+                    .ToListAsync();
+
+                if (userIds.Count > 0)
+                {
+                    await pushService.SendToUsersAsync(userIds, notification.Title, notification.Message ?? "", notification.ActionUrl);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to send push notifications to event {EventId}", eventId);
+            }
+        }
+
         _logger.LogDebug("Notification sent to event {EventId}: {Title}", eventId, notification.Title);
     }
 
     /// <inheritdoc />
     public async Task SendToClubAsync(int clubId, NotificationPayload notification)
     {
+        // Send via SignalR to club group
         var groupName = $"club_{clubId}";
         await _hubContext.Clients.Group(groupName).SendAsync("ReceiveNotification", notification);
+
+        // Get club members for Web Push
+        var pushService = GetPushService();
+        if (pushService != null)
+        {
+            try
+            {
+                var userIds = await _context.ClubMembers
+                    .Where(cm => cm.ClubId == clubId && cm.IsActive)
+                    .Select(cm => cm.UserId)
+                    .ToListAsync();
+
+                if (userIds.Count > 0)
+                {
+                    await pushService.SendToUsersAsync(userIds, notification.Title, notification.Message ?? "", notification.ActionUrl);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to send push notifications to club {ClubId}", clubId);
+            }
+        }
+
         _logger.LogDebug("Notification sent to club {ClubId}: {Title}", clubId, notification.Title);
     }
 
@@ -255,21 +360,8 @@ public class NotificationService : INotificationService
             CreatedAt = now
         };
 
+        // SendToUsersAsync now handles both SignalR and Web Push
         await SendToUsersAsync(userIds, payload);
-
-        // Also send Web Push notifications for offline users
-        var pushService = GetPushService();
-        if (pushService != null)
-        {
-            try
-            {
-                await pushService.SendToUsersAsync(userIds, title, message ?? "", actionUrl);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Failed to send push notifications to {Count} users", userIds.Count());
-            }
-        }
 
         _logger.LogInformation("Notification sent to {Count} users: {Title}", notifications.Count, title);
 
