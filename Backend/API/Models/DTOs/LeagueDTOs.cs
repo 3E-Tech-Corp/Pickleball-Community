@@ -23,6 +23,18 @@ public class LeagueDto
     public DateTime CreatedAt { get; set; }
 }
 
+// Managed league info for user menu
+public class ManagedLeagueDto
+{
+    public int LeagueId { get; set; }
+    public string LeagueName { get; set; } = string.Empty;
+    public string LeagueScope { get; set; } = "Local";
+    public string? LeagueAvatarUrl { get; set; }
+    public int RootLeagueId { get; set; }
+    public string RootLeagueName { get; set; } = string.Empty;
+    public string? RootLeagueAvatarUrl { get; set; }
+}
+
 // League detail view
 public class LeagueDetailDto : LeagueDto
 {

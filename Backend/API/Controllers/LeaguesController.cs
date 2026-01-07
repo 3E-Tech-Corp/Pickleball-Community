@@ -150,6 +150,57 @@ public class LeaguesController : ControllerBase
         }
     }
 
+    // GET: /leagues/my-managed - Get leagues where current user is a manager
+    [HttpGet("my-managed")]
+    [Authorize]
+    public async Task<ActionResult<ApiResponse<List<ManagedLeagueDto>>>> GetMyManagedLeagues()
+    {
+        try
+        {
+            var userId = GetCurrentUserId();
+            if (!userId.HasValue)
+                return Unauthorized(new ApiResponse<List<ManagedLeagueDto>> { Success = false, Message = "Not authenticated" });
+
+            // Get all leagues where user is an active manager
+            var managedLeagues = await _context.LeagueManagers
+                .Include(m => m.League)
+                .Where(m => m.UserId == userId.Value && m.IsActive && m.League.IsActive)
+                .Select(m => m.League)
+                .ToListAsync();
+
+            var result = new List<ManagedLeagueDto>();
+
+            foreach (var league in managedLeagues)
+            {
+                // Find root league by traversing up the hierarchy
+                var rootLeague = league;
+                while (rootLeague.ParentLeagueId.HasValue)
+                {
+                    rootLeague = await _context.Leagues.FindAsync(rootLeague.ParentLeagueId.Value);
+                    if (rootLeague == null) break;
+                }
+
+                result.Add(new ManagedLeagueDto
+                {
+                    LeagueId = league.Id,
+                    LeagueName = league.Name,
+                    LeagueScope = league.Scope,
+                    LeagueAvatarUrl = league.AvatarUrl,
+                    RootLeagueId = rootLeague?.Id ?? league.Id,
+                    RootLeagueName = rootLeague?.Name ?? league.Name,
+                    RootLeagueAvatarUrl = rootLeague?.AvatarUrl ?? league.AvatarUrl
+                });
+            }
+
+            return Ok(new ApiResponse<List<ManagedLeagueDto>> { Success = true, Data = result });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting managed leagues");
+            return StatusCode(500, new ApiResponse<List<ManagedLeagueDto>> { Success = false, Message = "An error occurred" });
+        }
+    }
+
     // GET: /leagues/{id} - Get league details
     [HttpGet("{id}")]
     public async Task<ActionResult<ApiResponse<LeagueDetailDto>>> GetLeague(int id)

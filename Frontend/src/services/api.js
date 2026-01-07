@@ -1320,6 +1320,9 @@ export const leaguesApi = {
   // Get league details with managers, clubs, and child leagues
   getLeague: (id) => api.get(`/leagues/${id}`),
 
+  // Get leagues where current user is a manager
+  getMyManagedLeagues: () => api.get('/leagues/my-managed'),
+
   // Get hierarchy tree for navigation
   getTree: (scope = null) => {
     const params = scope ? `?scope=${scope}` : '';

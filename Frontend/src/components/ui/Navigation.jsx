@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Menu, X, LogOut, HomeIcon, School2Icon, User, Bell, FileText, Calendar, MapPin, Users, MessageCircle, HelpCircle, MessageSquarePlus } from 'lucide-react';
+import { Menu, X, LogOut, HomeIcon, School2Icon, User, Bell, FileText, Calendar, MapPin, Users, MessageCircle, HelpCircle, MessageSquarePlus, Network } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
-import { getAssetUrl, getSharedAssetUrl, notificationsApi } from '../../services/api';
+import { getAssetUrl, getSharedAssetUrl, notificationsApi, leaguesApi } from '../../services/api';
 import { useSharedAuth } from '../../hooks/useSharedAuth';
 import { useNotifications } from '../../hooks/useNotifications';
 
@@ -16,6 +16,7 @@ const Navigation = () => {
   const [authKey, setAuthKey] = useState(0); // Add this
   const [logoHtml, setLogoHtml] = useState(null);
   const [newNotification, setNewNotification] = useState(null);
+  const [managedLeagues, setManagedLeagues] = useState([]);
   const location = useLocation();
 
   const { user, logout, isAuthenticated } = useAuth();
@@ -42,6 +43,21 @@ const Navigation = () => {
         .catch(err => console.error('Failed to get unread count:', err));
     } else {
       disconnectNotifications();
+    }
+  }, [isAuthenticated, user]);
+
+  // Fetch managed leagues for non-admin league managers
+  useEffect(() => {
+    if (isAuthenticated && user && user.role?.toLowerCase() !== 'admin') {
+      leaguesApi.getMyManagedLeagues()
+        .then(res => {
+          if (res?.success && res?.data) {
+            setManagedLeagues(res.data);
+          }
+        })
+        .catch(err => console.error('Failed to get managed leagues:', err));
+    } else {
+      setManagedLeagues([]);
     }
   }, [isAuthenticated, user]);
 
@@ -145,6 +161,13 @@ const Navigation = () => {
       icon: School2Icon,
       isAdmin: true
     }] : []),
+    // League Admin links - only shown for non-admin league managers
+    ...(!isAdmin && managedLeagues.length > 0 ? managedLeagues.map(league => ({
+      name: `${league.rootLeagueName} Admin`,
+      href: `/leagues/${league.leagueId}`,
+      icon: Network,
+      isLeagueAdmin: true
+    })) : []),
     {
       name: 'Dashboard',
       href: getDashboardPath(),
@@ -500,6 +523,23 @@ const Navigation = () => {
                     <School2Icon className="w-4 h-4" />
                     <span>Admin Dashboard</span>
                   </Link>
+                )}
+
+                {/* League Admin links for non-admin league managers */}
+                {!isAdmin && managedLeagues.length > 0 && (
+                  <div className="space-y-2 mb-3">
+                    {managedLeagues.map(league => (
+                      <Link
+                        key={league.leagueId}
+                        to={`/leagues/${league.leagueId}`}
+                        className="flex items-center space-x-2 px-3 py-2 text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded-lg transition-colors font-medium text-sm"
+                        onClick={() => setIsOpen(false)}
+                      >
+                        <Network className="w-4 h-4" />
+                        <span>{league.rootLeagueName} Admin</span>
+                      </Link>
+                    ))}
+                  </div>
                 )}
               </>
             ) : (
