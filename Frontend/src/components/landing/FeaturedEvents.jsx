@@ -333,7 +333,7 @@ function EventCard({ event, formatDate, formatTime }) {
         <div className="space-y-1.5 text-sm text-gray-600">
           <div className="flex items-center gap-2">
             <Clock className="w-4 h-4 text-gray-400 flex-shrink-0" />
-            <span>{formatTime(event.startDate)}</span>
+            <span>{formatDate(event.startDate)} at {formatTime(event.startDate)}</span>
           </div>
           <div className="flex items-center gap-2">
             <MapPin className="w-4 h-4 text-gray-400 flex-shrink-0" />
