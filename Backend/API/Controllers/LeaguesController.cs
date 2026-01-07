@@ -5,7 +5,7 @@ using System.Security.Claims;
 using Pickleball.Community.Database;
 using Pickleball.Community.Models.Entities;
 using Pickleball.Community.Models.DTOs;
-using Pickleball.Community.API.Services;
+using Pickleball.Community.Services;
 
 namespace Pickleball.Community.API.Controllers;
 
