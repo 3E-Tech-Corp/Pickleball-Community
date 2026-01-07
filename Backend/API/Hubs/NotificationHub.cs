@@ -114,4 +114,82 @@ public class NotificationHub : Hub
             return _userConnections.Count;
         }
     }
+
+    /// <summary>
+    /// Join a game group to receive real-time score updates
+    /// </summary>
+    public async Task JoinGameGroup(int gameId)
+    {
+        var userId = GetCurrentUserId();
+        if (!userId.HasValue) return;
+
+        var groupName = $"game_{gameId}";
+        await Groups.AddToGroupAsync(Context.ConnectionId, groupName);
+        _logger.LogInformation("User {UserId} joined game group {GroupName}", userId.Value, groupName);
+    }
+
+    /// <summary>
+    /// Leave a game group
+    /// </summary>
+    public async Task LeaveGameGroup(int gameId)
+    {
+        var userId = GetCurrentUserId();
+        if (!userId.HasValue) return;
+
+        var groupName = $"game_{gameId}";
+        await Groups.RemoveFromGroupAsync(Context.ConnectionId, groupName);
+        _logger.LogInformation("User {UserId} left game group {GroupName}", userId.Value, groupName);
+    }
+
+    /// <summary>
+    /// Join an event group to receive event updates
+    /// </summary>
+    public async Task JoinEventGroup(int eventId)
+    {
+        var userId = GetCurrentUserId();
+        if (!userId.HasValue) return;
+
+        var groupName = $"event_{eventId}";
+        await Groups.AddToGroupAsync(Context.ConnectionId, groupName);
+        _logger.LogInformation("User {UserId} joined event group {GroupName}", userId.Value, groupName);
+    }
+
+    /// <summary>
+    /// Leave an event group
+    /// </summary>
+    public async Task LeaveEventGroup(int eventId)
+    {
+        var userId = GetCurrentUserId();
+        if (!userId.HasValue) return;
+
+        var groupName = $"event_{eventId}";
+        await Groups.RemoveFromGroupAsync(Context.ConnectionId, groupName);
+        _logger.LogInformation("User {UserId} left event group {GroupName}", userId.Value, groupName);
+    }
+
+    /// <summary>
+    /// Join a club group to receive club updates
+    /// </summary>
+    public async Task JoinClubGroup(int clubId)
+    {
+        var userId = GetCurrentUserId();
+        if (!userId.HasValue) return;
+
+        var groupName = $"club_{clubId}";
+        await Groups.AddToGroupAsync(Context.ConnectionId, groupName);
+        _logger.LogInformation("User {UserId} joined club group {GroupName}", userId.Value, groupName);
+    }
+
+    /// <summary>
+    /// Leave a club group
+    /// </summary>
+    public async Task LeaveClubGroup(int clubId)
+    {
+        var userId = GetCurrentUserId();
+        if (!userId.HasValue) return;
+
+        var groupName = $"club_{clubId}";
+        await Groups.RemoveFromGroupAsync(Context.ConnectionId, groupName);
+        _logger.LogInformation("User {UserId} left club group {GroupName}", userId.Value, groupName);
+    }
 }

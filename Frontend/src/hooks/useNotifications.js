@@ -179,6 +179,78 @@ export function useNotifications() {
     };
   }, []);
 
+  // Join a game group to receive score updates
+  const joinGame = useCallback(async (gameId) => {
+    if (connectionRef.current?.state === signalR.HubConnectionState.Connected) {
+      try {
+        await connectionRef.current.invoke('JoinGameGroup', gameId);
+        console.log(`Joined game group: ${gameId}`);
+      } catch (err) {
+        console.error('Error joining game group:', err);
+      }
+    }
+  }, []);
+
+  // Leave a game group
+  const leaveGame = useCallback(async (gameId) => {
+    if (connectionRef.current?.state === signalR.HubConnectionState.Connected) {
+      try {
+        await connectionRef.current.invoke('LeaveGameGroup', gameId);
+        console.log(`Left game group: ${gameId}`);
+      } catch (err) {
+        console.error('Error leaving game group:', err);
+      }
+    }
+  }, []);
+
+  // Join an event group
+  const joinEvent = useCallback(async (eventId) => {
+    if (connectionRef.current?.state === signalR.HubConnectionState.Connected) {
+      try {
+        await connectionRef.current.invoke('JoinEventGroup', eventId);
+        console.log(`Joined event group: ${eventId}`);
+      } catch (err) {
+        console.error('Error joining event group:', err);
+      }
+    }
+  }, []);
+
+  // Leave an event group
+  const leaveEvent = useCallback(async (eventId) => {
+    if (connectionRef.current?.state === signalR.HubConnectionState.Connected) {
+      try {
+        await connectionRef.current.invoke('LeaveEventGroup', eventId);
+        console.log(`Left event group: ${eventId}`);
+      } catch (err) {
+        console.error('Error leaving event group:', err);
+      }
+    }
+  }, []);
+
+  // Join a club group
+  const joinClub = useCallback(async (clubId) => {
+    if (connectionRef.current?.state === signalR.HubConnectionState.Connected) {
+      try {
+        await connectionRef.current.invoke('JoinClubGroup', clubId);
+        console.log(`Joined club group: ${clubId}`);
+      } catch (err) {
+        console.error('Error joining club group:', err);
+      }
+    }
+  }, []);
+
+  // Leave a club group
+  const leaveClub = useCallback(async (clubId) => {
+    if (connectionRef.current?.state === signalR.HubConnectionState.Connected) {
+      try {
+        await connectionRef.current.invoke('LeaveClubGroup', clubId);
+        console.log(`Left club group: ${clubId}`);
+      } catch (err) {
+        console.error('Error leaving club group:', err);
+      }
+    }
+  }, []);
+
   return {
     connection,
     connectionState,
@@ -191,7 +263,14 @@ export function useNotifications() {
     clearAll,
     markAsRead,
     setInitialUnreadCount,
-    isConnected: connectionState === 'connected'
+    isConnected: connectionState === 'connected',
+    // Group methods
+    joinGame,
+    leaveGame,
+    joinEvent,
+    leaveEvent,
+    joinClub,
+    leaveClub
   };
 }
 

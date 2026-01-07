@@ -31,6 +31,27 @@ public interface INotificationService
     /// Broadcast a notification to all connected users
     /// </summary>
     Task BroadcastAsync(NotificationPayload notification);
+
+    /// <summary>
+    /// Send notification to all users watching a specific game
+    /// </summary>
+    Task SendToGameAsync(int gameId, NotificationPayload notification);
+
+    /// <summary>
+    /// Send notification to all users in an event group
+    /// </summary>
+    Task SendToEventAsync(int eventId, NotificationPayload notification);
+
+    /// <summary>
+    /// Send notification to all users in a club group
+    /// </summary>
+    Task SendToClubAsync(int clubId, NotificationPayload notification);
+
+    /// <summary>
+    /// Create and send notifications to multiple users (saves to DB and pushes via SignalR)
+    /// </summary>
+    Task<List<Notification>> CreateAndSendToUsersAsync(IEnumerable<int> userIds, string type, string title,
+        string? message = null, string? actionUrl = null, string? referenceType = null, int? referenceId = null);
 }
 
 /// <summary>
@@ -143,5 +164,69 @@ public class NotificationService : INotificationService
         await _hubContext.Clients.All.SendAsync("ReceiveNotification", notification);
 
         _logger.LogDebug("Notification broadcast to all users: {Title}", notification.Title);
+    }
+
+    /// <inheritdoc />
+    public async Task SendToGameAsync(int gameId, NotificationPayload notification)
+    {
+        var groupName = $"game_{gameId}";
+        await _hubContext.Clients.Group(groupName).SendAsync("ReceiveNotification", notification);
+        _logger.LogDebug("Notification sent to game {GameId}: {Title}", gameId, notification.Title);
+    }
+
+    /// <inheritdoc />
+    public async Task SendToEventAsync(int eventId, NotificationPayload notification)
+    {
+        var groupName = $"event_{eventId}";
+        await _hubContext.Clients.Group(groupName).SendAsync("ReceiveNotification", notification);
+        _logger.LogDebug("Notification sent to event {EventId}: {Title}", eventId, notification.Title);
+    }
+
+    /// <inheritdoc />
+    public async Task SendToClubAsync(int clubId, NotificationPayload notification)
+    {
+        var groupName = $"club_{clubId}";
+        await _hubContext.Clients.Group(groupName).SendAsync("ReceiveNotification", notification);
+        _logger.LogDebug("Notification sent to club {ClubId}: {Title}", clubId, notification.Title);
+    }
+
+    /// <inheritdoc />
+    public async Task<List<Notification>> CreateAndSendToUsersAsync(IEnumerable<int> userIds, string type, string title,
+        string? message = null, string? actionUrl = null, string? referenceType = null, int? referenceId = null)
+    {
+        var now = DateTime.UtcNow;
+        var notifications = userIds.Select(userId => new Notification
+        {
+            UserId = userId,
+            Type = type,
+            Title = title,
+            Message = message,
+            ActionUrl = actionUrl,
+            ReferenceType = referenceType,
+            ReferenceId = referenceId,
+            IsRead = false,
+            CreatedAt = now
+        }).ToList();
+
+        _context.Notifications.AddRange(notifications);
+        await _context.SaveChangesAsync();
+
+        // Push to all users via SignalR
+        var payload = new NotificationPayload
+        {
+            Type = type,
+            Title = title,
+            Message = message,
+            ActionUrl = actionUrl,
+            ReferenceType = referenceType,
+            ReferenceId = referenceId,
+            CreatedAt = now
+        };
+
+        await SendToUsersAsync(userIds, payload);
+
+        _logger.LogInformation("Notification sent to {Count} users: {Title}", notifications.Count, title);
+
+        return notifications;
     }
 }
