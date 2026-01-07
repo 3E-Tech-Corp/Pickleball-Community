@@ -177,16 +177,52 @@ public class LeaguesController : ControllerBase
             var userId = GetCurrentUserId();
             var canManage = await CanManageLeagueAsync(id);
 
-            // Build breadcrumb path
+            // Build breadcrumb path (includes current league at the end)
             var breadcrumbs = await BuildBreadcrumbsAsync(league);
 
-            // Get documents from this league and all parent leagues
-            var parentLeagueIds = breadcrumbs.Select(b => b.Id).ToList();
+            // Get parent league IDs (exclude current league) in root-first order
+            var parentLeagueIds = breadcrumbs.Where(b => b.Id != league.Id).Select(b => b.Id).ToList();
             var allDocuments = new List<LeagueDocumentDto>();
 
-            // Add current league's documents
+            // Add parent leagues' documents first (public only, in root-to-parent order)
+            if (parentLeagueIds.Any())
+            {
+                var parentDocuments = await _context.LeagueDocuments
+                    .Include(d => d.League)
+                    .Include(d => d.UploadedBy)
+                    .Where(d => parentLeagueIds.Contains(d.LeagueId) && d.IsActive && d.IsPublic)
+                    .ToListAsync();
+
+                // Sort by hierarchy (root first) then by sort order within each league
+                var sortedParentDocs = parentDocuments
+                    .OrderBy(d => parentLeagueIds.IndexOf(d.LeagueId))
+                    .ThenBy(d => d.SortOrder)
+                    .Select(d => new LeagueDocumentDto
+                    {
+                        Id = d.Id,
+                        LeagueId = d.LeagueId,
+                        LeagueName = d.League?.Name,
+                        Title = d.Title,
+                        Description = d.Description,
+                        FileUrl = d.FileUrl,
+                        FileName = d.FileName,
+                        FileType = d.FileType,
+                        FileSize = d.FileSize,
+                        SortOrder = d.SortOrder,
+                        IsPublic = d.IsPublic,
+                        IsActive = d.IsActive,
+                        CreatedAt = d.CreatedAt,
+                        UploadedByUserId = d.UploadedByUserId,
+                        UploadedByName = d.UploadedBy != null ? $"{d.UploadedBy.FirstName} {d.UploadedBy.LastName}".Trim() : null
+                    });
+
+                allDocuments.AddRange(sortedParentDocs);
+            }
+
+            // Add current league's documents last
             allDocuments.AddRange(league.Documents
                 .Where(d => d.IsActive && (d.IsPublic || canManage))
+                .OrderBy(d => d.SortOrder)
                 .Select(d => new LeagueDocumentDto
                 {
                     Id = d.Id,
@@ -206,41 +242,8 @@ public class LeaguesController : ControllerBase
                     UploadedByName = d.UploadedBy != null ? $"{d.UploadedBy.FirstName} {d.UploadedBy.LastName}".Trim() : null
                 }));
 
-            // Add parent leagues' documents (public only for non-managers of those leagues)
-            if (parentLeagueIds.Any())
-            {
-                var parentDocuments = await _context.LeagueDocuments
-                    .Include(d => d.League)
-                    .Include(d => d.UploadedBy)
-                    .Where(d => parentLeagueIds.Contains(d.LeagueId) && d.IsActive && d.IsPublic)
-                    .ToListAsync();
-
-                allDocuments.AddRange(parentDocuments.Select(d => new LeagueDocumentDto
-                {
-                    Id = d.Id,
-                    LeagueId = d.LeagueId,
-                    LeagueName = d.League?.Name,
-                    Title = d.Title,
-                    Description = d.Description,
-                    FileUrl = d.FileUrl,
-                    FileName = d.FileName,
-                    FileType = d.FileType,
-                    FileSize = d.FileSize,
-                    SortOrder = d.SortOrder,
-                    IsPublic = d.IsPublic,
-                    IsActive = d.IsActive,
-                    CreatedAt = d.CreatedAt,
-                    UploadedByUserId = d.UploadedByUserId,
-                    UploadedByName = d.UploadedBy != null ? $"{d.UploadedBy.FirstName} {d.UploadedBy.LastName}".Trim() : null
-                }));
-            }
-
-            // Sort: current league docs first (by sort order), then parent docs (by league hierarchy, then sort order)
-            var sortedDocuments = allDocuments
-                .OrderBy(d => d.LeagueId == league.Id ? 0 : 1)
-                .ThenBy(d => parentLeagueIds.IndexOf(d.LeagueId))
-                .ThenBy(d => d.SortOrder)
-                .ToList();
+            // Documents are already in correct order: parent docs (root first) then current league docs
+            var sortedDocuments = allDocuments;
 
             var dto = new LeagueDetailDto
             {
