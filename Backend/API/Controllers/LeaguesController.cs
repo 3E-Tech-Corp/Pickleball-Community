@@ -341,7 +341,10 @@ public class LeaguesController : ControllerBase
                     ParentLeagueId = c.ParentLeagueId,
                     CreatedAt = c.CreatedAt
                 }).ToList(),
-                Managers = league.Managers.Select(m => new LeagueManagerDto
+                Managers = league.Managers
+                    .OrderBy(m => GetRoleSortOrder(m.Role))
+                    .ThenBy(m => $"{m.User?.FirstName} {m.User?.LastName}".Trim())
+                    .Select(m => new LeagueManagerDto
                 {
                     Id = m.Id,
                     LeagueId = m.LeagueId,
@@ -1273,6 +1276,22 @@ public class LeaguesController : ControllerBase
         }
         // Return null if this league itself is the root (no hierarchy display needed)
         return current?.Id != league.Id ? current : null;
+    }
+
+    // Helper to get sort order for manager roles (lower = higher priority)
+    private static int GetRoleSortOrder(string role)
+    {
+        return role?.ToLower() switch
+        {
+            "president" => 1,
+            "vice president" => 2,
+            "director" => 3,
+            "secretary" => 4,
+            "treasurer" => 5,
+            "admin" => 6,
+            "moderator" => 7,
+            _ => 99 // Unknown roles at the end
+        };
     }
 
     // Helper method to build breadcrumbs
