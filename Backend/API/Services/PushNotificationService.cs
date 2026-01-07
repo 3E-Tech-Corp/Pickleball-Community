@@ -18,7 +18,7 @@ public interface IPushNotificationService
     /// <summary>
     /// Subscribe a user's device to push notifications
     /// </summary>
-    Task<PushSubscription> SubscribeAsync(int userId, string endpoint, string p256dh, string auth, string? userAgent = null, string? deviceName = null);
+    Task<UserPushSubscription> SubscribeAsync(int userId, string endpoint, string p256dh, string auth, string? userAgent = null, string? deviceName = null);
 
     /// <summary>
     /// Unsubscribe a device from push notifications
@@ -33,7 +33,7 @@ public interface IPushNotificationService
     /// <summary>
     /// Get all active subscriptions for a user
     /// </summary>
-    Task<List<PushSubscription>> GetSubscriptionsAsync(int userId);
+    Task<List<UserPushSubscription>> GetSubscriptionsAsync(int userId);
 
     /// <summary>
     /// Send push notification to a specific user (all their devices)
@@ -89,7 +89,7 @@ public class PushNotificationService : IPushNotificationService
     }
 
     /// <inheritdoc />
-    public async Task<PushSubscription> SubscribeAsync(int userId, string endpoint, string p256dh, string auth, string? userAgent = null, string? deviceName = null)
+    public async Task<UserPushSubscription> SubscribeAsync(int userId, string endpoint, string p256dh, string auth, string? userAgent = null, string? deviceName = null)
     {
         // Check if subscription already exists
         var existing = await _context.PushSubscriptions
@@ -109,7 +109,7 @@ public class PushNotificationService : IPushNotificationService
         else
         {
             // Create new subscription
-            existing = new PushSubscription
+            existing = new UserPushSubscription
             {
                 UserId = userId,
                 Endpoint = endpoint,
@@ -160,7 +160,7 @@ public class PushNotificationService : IPushNotificationService
     }
 
     /// <inheritdoc />
-    public async Task<List<PushSubscription>> GetSubscriptionsAsync(int userId)
+    public async Task<List<UserPushSubscription>> GetSubscriptionsAsync(int userId)
     {
         return await _context.PushSubscriptions
             .Where(s => s.UserId == userId && s.IsActive)
@@ -202,7 +202,7 @@ public class PushNotificationService : IPushNotificationService
     /// <summary>
     /// Send push notification to a list of subscriptions
     /// </summary>
-    private async Task<int> SendToSubscriptionsAsync(List<PushSubscription> subscriptions, string title, string body, string? url, string? icon)
+    private async Task<int> SendToSubscriptionsAsync(List<UserPushSubscription> subscriptions, string title, string body, string? url, string? icon)
     {
         if (subscriptions.Count == 0)
             return 0;
@@ -218,7 +218,7 @@ public class PushNotificationService : IPushNotificationService
         });
 
         var successCount = 0;
-        var failedSubscriptions = new List<PushSubscription>();
+        var failedSubscriptions = new List<UserPushSubscription>();
 
         foreach (var subscription in subscriptions)
         {

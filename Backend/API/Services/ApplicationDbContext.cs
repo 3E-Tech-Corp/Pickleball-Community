@@ -128,7 +128,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<PlayerRatingHistory> PlayerRatingHistories { get; set; }
 
     // Push Notifications
-    public DbSet<PushSubscription> PushSubscriptions { get; set; }
+    public DbSet<UserPushSubscription> PushSubscriptions { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

@@ -7,7 +7,7 @@ namespace Pickleball.Community.Models.Entities;
 /// Stores Web Push notification subscriptions for users.
 /// Each user can have multiple subscriptions (one per device/browser).
 /// </summary>
-public class PushSubscription
+public class UserPushSubscription
 {
     public int Id { get; set; }
 
