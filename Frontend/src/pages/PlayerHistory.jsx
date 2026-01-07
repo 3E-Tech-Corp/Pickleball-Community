@@ -86,10 +86,10 @@ export default function PlayerHistory() {
         playerHistoryApi.getRatingTypes()
       ])
 
-      if (summaryRes.data?.success) setSummary(summaryRes.data.data)
-      if (eventTypesRes.data?.success) setEventTypes(eventTypesRes.data.data || [])
-      if (awardTypesRes.data?.success) setAwardTypes(awardTypesRes.data.data || [])
-      if (ratingTypesRes.data?.success) setRatingTypes(ratingTypesRes.data.data || [])
+      if (summaryRes?.success) setSummary(summaryRes.data)
+      if (eventTypesRes?.success) setEventTypes(eventTypesRes.data || [])
+      if (awardTypesRes?.success) setAwardTypes(awardTypesRes.data || [])
+      if (ratingTypesRes?.success) setRatingTypes(ratingTypesRes.data || [])
 
       // Load initial tab data
       loadGames()
@@ -114,13 +114,13 @@ export default function PlayerHistory() {
       })
 
       const response = await playerHistoryApi.getGames(user.id, params)
-      if (response.data?.success) {
-        setGames(response.data.data.games || [])
+      if (response?.success) {
+        setGames(response.data?.games || [])
         setGamesStats({
-          totalGames: response.data.data.totalGames,
-          totalWins: response.data.data.totalWins,
-          totalLosses: response.data.data.totalLosses,
-          winPercentage: response.data.data.winPercentage
+          totalGames: response.data?.totalGames || 0,
+          totalWins: response.data?.totalWins || 0,
+          totalLosses: response.data?.totalLosses || 0,
+          winPercentage: response.data?.winPercentage || 0
         })
       }
     } catch (err) {
@@ -140,12 +140,12 @@ export default function PlayerHistory() {
       })
 
       const response = await playerHistoryApi.getAwards(user.id, params)
-      if (response.data?.success) {
-        setAwards(response.data.data.awards || [])
+      if (response?.success) {
+        setAwards(response.data?.awards || [])
         setAwardsStats({
-          totalBadges: response.data.data.totalBadges,
-          totalLeaguePoints: response.data.data.totalLeaguePoints,
-          notableFinishes: response.data.data.notableFinishes
+          totalBadges: response.data?.totalBadges || 0,
+          totalLeaguePoints: response.data?.totalLeaguePoints || 0,
+          notableFinishes: response.data?.notableFinishes || 0
         })
       }
     } catch (err) {
@@ -165,13 +165,13 @@ export default function PlayerHistory() {
       })
 
       const response = await playerHistoryApi.getRatings(user.id, params)
-      if (response.data?.success) {
-        setRatings(response.data.data.ratings || [])
+      if (response?.success) {
+        setRatings(response.data?.ratings || [])
         setRatingsStats({
-          currentRating: response.data.data.currentRating,
-          highestRating: response.data.data.highestRating,
-          lowestRating: response.data.data.lowestRating,
-          ratingTrend: response.data.data.ratingTrend
+          currentRating: response.data?.currentRating,
+          highestRating: response.data?.highestRating,
+          lowestRating: response.data?.lowestRating,
+          ratingTrend: response.data?.ratingTrend
         })
       }
     } catch (err) {
