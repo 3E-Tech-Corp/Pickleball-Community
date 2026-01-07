@@ -124,17 +124,34 @@ export default function VenueMap({
       maxZoom: 19
     }).addTo(map);
 
+    // Handle clicks on "View Details" button in popups
+    const handlePopupClick = (e) => {
+      const btn = e.target.closest('.venue-detail-btn');
+      if (btn) {
+        const venueId = parseInt(btn.dataset.venueId, 10);
+        const venue = items.find(v => (v.id || v.courtId) === venueId);
+        if (venue) {
+          if (onMarkerSelect) onMarkerSelect(venue);
+          if (handleItemClick) handleItemClick(venue);
+        }
+      }
+    };
+    mapRef.current.addEventListener('click', handlePopupClick);
+
     // Mark map as ready so markers can be added
     setMapReady(true);
 
     return () => {
+      if (mapRef.current) {
+        mapRef.current.removeEventListener('click', handlePopupClick);
+      }
       if (mapInstanceRef.current) {
         mapInstanceRef.current.remove();
         mapInstanceRef.current = null;
         setMapReady(false);
       }
     };
-  }, [isClient, inChina]);
+  }, [isClient, inChina, items, onMarkerSelect, handleItemClick]);
 
   // Create numbered marker icon
   const createNumberedIcon = (number, isSelected) => {
@@ -287,6 +304,8 @@ export default function VenueMap({
 
     // Use region-appropriate map service for directions (Amap for China, Google Maps elsewhere)
     const directionsUrl = getDirectionsUrl(court.lat, court.lng, inChina);
+    const venueId = court.id || court.courtId;
+
     let actions = `<a href="${directionsUrl}" target="_blank" rel="noopener" style="color: #2563eb; font-size: 11px; text-decoration: none; margin-right: 8px;">📍 Directions</a>`;
     if (court.phone) {
       actions += `<a href="tel:${court.phone}" style="color: #16a34a; font-size: 11px; text-decoration: none; margin-right: 8px;">📞 Call</a>`;
@@ -304,9 +323,16 @@ export default function VenueMap({
         <p style="margin: 0 0 8px 0; font-size: 12px; color: #666;">${address}</p>
         ${courtTypes ? `<div style="margin-bottom: 8px;">${courtTypes}</div>` : ''}
         ${lights}
-        <div style="padding-top: 8px; border-top: 1px solid #eee;">
+        <div style="padding-top: 8px; border-top: 1px solid #eee; display: flex; flex-wrap: wrap; gap: 4px;">
           ${actions}
         </div>
+        <button
+          data-venue-id="${venueId}"
+          class="venue-detail-btn"
+          style="width: 100%; margin-top: 8px; padding: 8px 12px; background: #16a34a; color: white; border: none; border-radius: 6px; font-size: 12px; font-weight: 500; cursor: pointer;"
+        >
+          View Details
+        </button>
       </div>
     `;
   };
