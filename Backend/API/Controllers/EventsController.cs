@@ -16,15 +16,18 @@ public class EventsController : ControllerBase
     private readonly ApplicationDbContext _context;
     private readonly ILogger<EventsController> _logger;
     private readonly INotificationService _notificationService;
+    private readonly IActivityAwardService _activityAwardService;
 
     public EventsController(
         ApplicationDbContext context,
         ILogger<EventsController> logger,
-        INotificationService notificationService)
+        INotificationService notificationService,
+        IActivityAwardService activityAwardService)
     {
         _context = context;
         _logger = logger;
         _notificationService = notificationService;
+        _activityAwardService = activityAwardService;
     }
 
     private int? GetCurrentUserId()
@@ -535,6 +538,9 @@ public class EventsController : ControllerBase
             }
             await _context.SaveChangesAsync();
 
+            // Grant "Event Organizer" award
+            await _activityAwardService.GrantCreatedEventAwardAsync(userId.Value, evt.Id, evt.Name);
+
             return await GetEvent(evt.Id);
         }
         catch (Exception ex)
@@ -808,6 +814,9 @@ public class EventsController : ControllerBase
                     registration.Id
                 );
             }
+
+            // Grant "Event Participant" award
+            await _activityAwardService.GrantJoinedEventAwardAsync(userId.Value, id, evt.Name);
 
             return Ok(new ApiResponse<EventRegistrationDto>
             {

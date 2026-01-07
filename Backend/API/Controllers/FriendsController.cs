@@ -19,15 +19,18 @@ public class FriendsController : ControllerBase
     private readonly ApplicationDbContext _context;
     private readonly ILogger<FriendsController> _logger;
     private readonly INotificationService _notificationService;
+    private readonly IActivityAwardService _activityAwardService;
 
     public FriendsController(
         ApplicationDbContext context,
         ILogger<FriendsController> logger,
-        INotificationService notificationService)
+        INotificationService notificationService,
+        IActivityAwardService activityAwardService)
     {
         _context = context;
         _logger = logger;
         _notificationService = notificationService;
+        _activityAwardService = activityAwardService;
     }
 
     private int? GetCurrentUserId()
@@ -556,6 +559,13 @@ public class FriendsController : ControllerBase
                 "User",
                 userId.Value
             );
+
+            // Grant activity awards for adding a friend (to both users)
+            await _activityAwardService.GrantAddedFriendAwardAsync(request.SenderId, request.RecipientId);
+
+            // Check friend milestones for both users
+            await _activityAwardService.CheckFriendMilestonesAsync(request.SenderId);
+            await _activityAwardService.CheckFriendMilestonesAsync(request.RecipientId);
 
             return Ok(new ApiResponse<object> { Success = true, Message = "Friend request accepted" });
         }

@@ -16,15 +16,18 @@ public class ClubsController : ControllerBase
     private readonly ApplicationDbContext _context;
     private readonly ILogger<ClubsController> _logger;
     private readonly INotificationService _notificationService;
+    private readonly IActivityAwardService _activityAwardService;
 
     public ClubsController(
         ApplicationDbContext context,
         ILogger<ClubsController> logger,
-        INotificationService notificationService)
+        INotificationService notificationService,
+        IActivityAwardService activityAwardService)
     {
         _context = context;
         _logger = logger;
         _notificationService = notificationService;
+        _activityAwardService = activityAwardService;
     }
 
     private int? GetCurrentUserId()
@@ -468,6 +471,9 @@ public class ClubsController : ControllerBase
             _context.ClubMembers.Add(membership);
             await _context.SaveChangesAsync();
 
+            // Grant "Club Founder" award
+            await _activityAwardService.GrantCreatedClubAwardAsync(userId.Value, club.Id, club.Name);
+
             // Return the created club
             return await GetClub(club.Id);
         }
@@ -628,6 +634,9 @@ public class ClubsController : ControllerBase
 
                 // Add to club chat if enabled and user allows club messages
                 await AddUserToClubChatIfEligible(club, userId.Value);
+
+                // Grant "Club Member" award
+                await _activityAwardService.GrantJoinedClubAwardAsync(userId.Value, id, club.Name);
 
                 return Ok(new ApiResponse<bool> { Success = true, Data = true, Message = "Joined club successfully" });
             }
@@ -1073,6 +1082,9 @@ public class ClubsController : ControllerBase
                     "Club",
                     id
                 );
+
+                // Grant "Club Member" award
+                await _activityAwardService.GrantJoinedClubAwardAsync(request.UserId, id, clubName);
             }
             else
             {
