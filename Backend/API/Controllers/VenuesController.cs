@@ -439,8 +439,9 @@ public class VenuesController : ControllerBase
             if (venue == null)
                 return NotFound(new ApiResponse<VenueConfirmationDto> { Success = false, Message = "Venue not found" });
 
-            // If venue name is "Unnamed Venue" and a new name is suggested, update it immediately
-            if (venue.Name == "Unnamed Venue" && !string.IsNullOrWhiteSpace(dto.SuggestedName))
+            // If venue has no name (or placeholder name) and a new name is suggested, update it immediately
+            var hasNoName = string.IsNullOrWhiteSpace(venue.Name) || venue.Name == "Unnamed Venue" || venue.Name == "Unnamed";
+            if (hasNoName && !string.IsNullOrWhiteSpace(dto.SuggestedName))
             {
                 venue.Name = dto.SuggestedName;
                 // Clear the suggested name since it's being applied directly
