@@ -91,6 +91,8 @@ public class PushNotificationService : IPushNotificationService
     /// <inheritdoc />
     public async Task<UserPushSubscription> SubscribeAsync(int userId, string endpoint, string p256dh, string auth, string? userAgent = null, string? deviceName = null)
     {
+        _logger.LogInformation("SubscribeAsync: Creating subscription for userId={UserId}, endpoint={Endpoint}", userId, endpoint?.Substring(0, Math.Min(50, endpoint?.Length ?? 0)));
+
         // Check if subscription already exists
         var existing = await _context.PushSubscriptions
             .FirstOrDefaultAsync(s => s.Endpoint == endpoint);
@@ -125,7 +127,8 @@ public class PushNotificationService : IPushNotificationService
 
         await _context.SaveChangesAsync();
 
-        _logger.LogInformation("Push subscription created/updated for user {UserId}", userId);
+        _logger.LogInformation("Push subscription created/updated for user {UserId}, subscriptionId={SubscriptionId}, IsActive={IsActive}",
+            userId, existing.Id, existing.IsActive);
         return existing;
     }
 
@@ -171,9 +174,13 @@ public class PushNotificationService : IPushNotificationService
     /// <inheritdoc />
     public async Task<int> SendToUserAsync(int userId, string title, string body, string? url = null, string? icon = null)
     {
+        _logger.LogInformation("SendToUserAsync: Looking for subscriptions for userId={UserId}", userId);
+
         var subscriptions = await _context.PushSubscriptions
             .Where(s => s.UserId == userId && s.IsActive)
             .ToListAsync();
+
+        _logger.LogInformation("SendToUserAsync: Found {Count} active subscriptions for userId={UserId}", subscriptions.Count, userId);
 
         return await SendToSubscriptionsAsync(subscriptions, title, body, url, icon);
     }

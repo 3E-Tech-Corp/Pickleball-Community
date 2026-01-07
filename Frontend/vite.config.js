@@ -13,9 +13,10 @@ export default defineConfig({
       strategies: 'injectManifest',
       srcDir: 'src',
       filename: 'sw.js',
-      // Disable service worker in development
+      // Enable service worker in development for push notification testing
       devOptions: {
-        enabled: false
+        enabled: true,
+        type: 'module'
       },
       manifest: {
         name: 'Pickleball Community',
