@@ -144,14 +144,23 @@ export function usePushNotifications() {
   }, [subscription]);
 
   // Send test notification
+  // Returns the number of notifications sent, or -1 on error
   const sendTest = useCallback(async () => {
     try {
-      await pushApi.test();
-      return true;
+      setError(null);
+      const response = await pushApi.test();
+      const sentTo = response?.sentTo ?? response?.data?.sentTo ?? 0;
+
+      if (sentTo === 0) {
+        setError('No push subscriptions found. Try disabling and re-enabling push notifications.');
+        return 0;
+      }
+
+      return sentTo;
     } catch (err) {
       console.error('Error sending test notification:', err);
-      setError(err.message);
-      return false;
+      setError(err.message || 'Failed to send test notification');
+      return -1;
     }
   }, []);
 

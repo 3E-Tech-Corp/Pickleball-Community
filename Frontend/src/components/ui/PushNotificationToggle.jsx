@@ -36,11 +36,13 @@ export function PushNotificationToggle({ className = '' }) {
 
   // Test Web Push only (doesn't save to DB)
   const handleTestPush = async () => {
-    const success = await sendTest();
-    if (success) {
+    const sentCount = await sendTest();
+    // sentCount > 0 means notifications were sent, 0 means no subscriptions, -1 means error
+    if (sentCount > 0) {
       setTestPushSent(true);
       setTimeout(() => setTestPushSent(false), 3000);
     }
+    // Error is already set in the hook if sentCount <= 0
   };
 
   // Test both SignalR and Web Push (creates a real notification in DB)
