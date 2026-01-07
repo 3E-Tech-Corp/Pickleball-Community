@@ -361,36 +361,77 @@ public class NotificationsController : ControllerBase
                     return Ok(new { success = true, data = notification.Id, message = "Notification sent to user" });
 
                 case "game":
+                    // Game notifications are real-time only (for live score updates) - no DB save
                     if (!dto.TargetId.HasValue)
                     {
                         return BadRequest(new { success = false, message = "TargetId (GameId) is required for game notifications" });
                     }
                     await _notificationService.SendToGameAsync(dto.TargetId.Value, payload);
-                    _logger.LogInformation("Notification sent to game group {GameId}: {Title}", dto.TargetId.Value, dto.Title);
-                    return Ok(new { success = true, message = $"Notification sent to game group {dto.TargetId.Value}" });
+                    _logger.LogInformation("Game score update sent to game group {GameId}: {Title}", dto.TargetId.Value, dto.Title);
+                    return Ok(new { success = true, message = $"Game update sent to game group {dto.TargetId.Value} (real-time only)" });
 
                 case "event":
+                    // Event notifications: Save to DB for all registered users + real-time push
                     if (!dto.TargetId.HasValue)
                     {
                         return BadRequest(new { success = false, message = "TargetId (EventId) is required for event notifications" });
                     }
+                    var eventUserIds = await _context.EventRegistrations
+                        .Where(r => r.EventId == dto.TargetId.Value)
+                        .Select(r => r.UserId)
+                        .Distinct()
+                        .ToListAsync();
+                    if (eventUserIds.Count > 0)
+                    {
+                        await _notificationService.CreateAndSendToUsersAsync(
+                            eventUserIds, dto.Type ?? "Event", dto.Title, dto.Message,
+                            dto.ActionUrl, "Event", dto.TargetId.Value);
+                    }
+                    // Also send via SignalR group for any connected watchers
                     await _notificationService.SendToEventAsync(dto.TargetId.Value, payload);
-                    _logger.LogInformation("Notification sent to event group {EventId}: {Title}", dto.TargetId.Value, dto.Title);
-                    return Ok(new { success = true, message = $"Notification sent to event group {dto.TargetId.Value}" });
+                    _logger.LogInformation("Notification sent to event {EventId} ({Count} registered users): {Title}",
+                        dto.TargetId.Value, eventUserIds.Count, dto.Title);
+                    return Ok(new { success = true, message = $"Notification sent to {eventUserIds.Count} event registrants" });
 
                 case "club":
+                    // Club notifications: Save to DB for all club members + real-time push
                     if (!dto.TargetId.HasValue)
                     {
                         return BadRequest(new { success = false, message = "TargetId (ClubId) is required for club notifications" });
                     }
+                    var clubUserIds = await _context.ClubMembers
+                        .Where(m => m.ClubId == dto.TargetId.Value)
+                        .Select(m => m.UserId)
+                        .Distinct()
+                        .ToListAsync();
+                    if (clubUserIds.Count > 0)
+                    {
+                        await _notificationService.CreateAndSendToUsersAsync(
+                            clubUserIds, dto.Type ?? "Club", dto.Title, dto.Message,
+                            dto.ActionUrl, "Club", dto.TargetId.Value);
+                    }
+                    // Also send via SignalR group for any connected watchers
                     await _notificationService.SendToClubAsync(dto.TargetId.Value, payload);
-                    _logger.LogInformation("Notification sent to club group {ClubId}: {Title}", dto.TargetId.Value, dto.Title);
-                    return Ok(new { success = true, message = $"Notification sent to club group {dto.TargetId.Value}" });
+                    _logger.LogInformation("Notification sent to club {ClubId} ({Count} members): {Title}",
+                        dto.TargetId.Value, clubUserIds.Count, dto.Title);
+                    return Ok(new { success = true, message = $"Notification sent to {clubUserIds.Count} club members" });
 
                 case "broadcast":
+                    // Broadcast: Save to DB for all active users + real-time push
+                    var allUserIds = await _context.Users
+                        .Where(u => u.IsActive)
+                        .Select(u => u.Id)
+                        .ToListAsync();
+                    if (allUserIds.Count > 0)
+                    {
+                        await _notificationService.CreateAndSendToUsersAsync(
+                            allUserIds, dto.Type ?? "Announcement", dto.Title, dto.Message,
+                            dto.ActionUrl, null, null);
+                    }
+                    // Also broadcast via SignalR for immediate delivery
                     await _notificationService.BroadcastAsync(payload);
-                    _logger.LogInformation("Notification broadcast to all users: {Title}", dto.Title);
-                    return Ok(new { success = true, message = "Notification broadcast to all connected users" });
+                    _logger.LogInformation("Notification broadcast to all {Count} users: {Title}", allUserIds.Count, dto.Title);
+                    return Ok(new { success = true, message = $"Notification broadcast to {allUserIds.Count} users" });
 
                 default:
                     return BadRequest(new { success = false, message = $"Invalid target type: {targetType}" });

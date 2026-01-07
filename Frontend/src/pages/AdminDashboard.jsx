@@ -2178,13 +2178,13 @@ const AdminDashboard = () => {
 
                 {/* Info Box */}
                 <div className="mt-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
-                  <h4 className="text-sm font-medium text-gray-900 mb-2">How Group Notifications Work</h4>
+                  <h4 className="text-sm font-medium text-gray-900 mb-2">How Notifications Work</h4>
                   <ul className="text-xs text-gray-600 space-y-1">
-                    <li>• <strong>User:</strong> Sends directly to a specific user (saved to DB + real-time push)</li>
-                    <li>• <strong>Game:</strong> Sends to all users watching a specific game (real-time only)</li>
-                    <li>• <strong>Event:</strong> Sends to all users subscribed to an event (real-time only)</li>
-                    <li>• <strong>Club:</strong> Sends to all users in a club group (real-time only)</li>
-                    <li>• <strong>Broadcast:</strong> Sends to ALL connected users (real-time only)</li>
+                    <li>• <strong>User:</strong> Sends to a specific user (saved to DB + real-time push)</li>
+                    <li>• <strong>Game:</strong> Real-time score updates only - NOT saved to DB (for live game displays)</li>
+                    <li>• <strong>Event:</strong> Sends to all registered event participants (saved to DB + real-time)</li>
+                    <li>• <strong>Club:</strong> Sends to all club members (saved to DB + real-time)</li>
+                    <li>• <strong>Broadcast:</strong> Sends to ALL active users (saved to DB + real-time)</li>
                   </ul>
                 </div>
               </div>

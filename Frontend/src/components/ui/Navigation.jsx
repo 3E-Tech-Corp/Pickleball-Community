@@ -266,7 +266,19 @@ const Navigation = () => {
           <div className="hidden md:flex items-center space-x-4 user-dropdown-container">
             {isAuthenticated && user ? (
               <>
-
+                {/* Notification Bell Icon */}
+                <Link
+                  to="/notifications"
+                  className="relative p-2 text-gray-600 hover:text-blue-600 hover:bg-gray-100 rounded-lg transition-colors"
+                  title="Notifications"
+                >
+                  <Bell className="w-5 h-5" />
+                  {unreadCount > 0 && (
+                    <span className="absolute top-0.5 right-0.5 bg-red-500 text-white text-xs rounded-full min-w-[18px] h-[18px] flex items-center justify-center font-medium px-1">
+                      {unreadCount > 99 ? '99+' : unreadCount}
+                    </span>
+                  )}
+                </Link>
 
                 {/* User Avatar with Dropdown */}
                 <div className="relative">
