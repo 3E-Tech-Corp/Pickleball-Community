@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Bell, Check, CheckCheck, Trash2, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
 import { notificationsApi } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
+import PushNotificationToggle from '../components/ui/PushNotificationToggle';
 
 const NotificationTypeIcon = ({ type }) => {
   switch (type) {
@@ -242,6 +243,9 @@ const Notifications = () => {
             <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
           </button>
         </div>
+
+        {/* Push Notification Settings */}
+        <PushNotificationToggle className="mb-4" />
 
         {/* Actions Bar */}
         <div className="bg-white rounded-t-xl border border-b-0 border-gray-200 p-3 flex items-center justify-between">

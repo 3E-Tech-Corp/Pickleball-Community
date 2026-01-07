@@ -127,6 +127,9 @@ public class ApplicationDbContext : DbContext
     public DbSet<PlayerAward> PlayerAwards { get; set; }
     public DbSet<PlayerRatingHistory> PlayerRatingHistories { get; set; }
 
+    // Push Notifications
+    public DbSet<PushSubscription> PushSubscriptions { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<User>(entity =>

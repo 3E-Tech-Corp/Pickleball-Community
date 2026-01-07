@@ -1411,6 +1411,35 @@ export const notificationsApi = {
   deleteAll: () => api.delete('/notifications/all')
 }
 
+// Push Notifications API (Web Push)
+export const pushApi = {
+  // Get VAPID public key for subscribing
+  getVapidPublicKey: () => api.get('/push/vapid-public-key'),
+
+  // Subscribe to push notifications
+  subscribe: (subscription, deviceName = null) => api.post('/push/subscribe', {
+    endpoint: subscription.endpoint,
+    keys: {
+      p256dh: subscription.toJSON().keys.p256dh,
+      auth: subscription.toJSON().keys.auth
+    },
+    userAgent: navigator.userAgent,
+    deviceName
+  }),
+
+  // Unsubscribe from push notifications
+  unsubscribe: (endpoint) => api.post('/push/unsubscribe', { endpoint }),
+
+  // Unsubscribe all devices
+  unsubscribeAll: () => api.delete('/push/subscriptions'),
+
+  // Get all subscriptions for current user
+  getSubscriptions: () => api.get('/push/subscriptions'),
+
+  // Send test push notification
+  test: () => api.post('/push/test')
+}
+
 // Grants API (club grant account management)
 export const grantsApi = {
   // Get current user's grant permissions

@@ -77,15 +77,33 @@ public class NotificationService : INotificationService
     private readonly IHubContext<NotificationHub> _hubContext;
     private readonly ApplicationDbContext _context;
     private readonly ILogger<NotificationService> _logger;
+    private readonly IServiceProvider _serviceProvider;
 
     public NotificationService(
         IHubContext<NotificationHub> hubContext,
         ApplicationDbContext context,
-        ILogger<NotificationService> logger)
+        ILogger<NotificationService> logger,
+        IServiceProvider serviceProvider)
     {
         _hubContext = hubContext;
         _context = context;
         _logger = logger;
+        _serviceProvider = serviceProvider;
+    }
+
+    /// <summary>
+    /// Get push service (lazy loaded to avoid circular dependency)
+    /// </summary>
+    private IPushNotificationService? GetPushService()
+    {
+        try
+        {
+            return _serviceProvider.GetService<IPushNotificationService>();
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     /// <inheritdoc />
@@ -123,6 +141,20 @@ public class NotificationService : INotificationService
         };
 
         await SendToUserAsync(userId, payload);
+
+        // Also send Web Push notification for offline users
+        var pushService = GetPushService();
+        if (pushService != null)
+        {
+            try
+            {
+                await pushService.SendToUserAsync(userId, title, message ?? "", actionUrl);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to send push notification to user {UserId}", userId);
+            }
+        }
 
         _logger.LogInformation("Notification {Id} created and sent to user {UserId}: {Title}",
             notification.Id, userId, title);
@@ -224,6 +256,20 @@ public class NotificationService : INotificationService
         };
 
         await SendToUsersAsync(userIds, payload);
+
+        // Also send Web Push notifications for offline users
+        var pushService = GetPushService();
+        if (pushService != null)
+        {
+            try
+            {
+                await pushService.SendToUsersAsync(userIds, title, message ?? "", actionUrl);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to send push notifications to {Count} users", userIds.Count());
+            }
+        }
 
         _logger.LogInformation("Notification sent to {Count} users: {Title}", notifications.Count, title);
 
