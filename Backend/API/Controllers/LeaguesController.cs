@@ -5,6 +5,7 @@ using System.Security.Claims;
 using Pickleball.Community.Database;
 using Pickleball.Community.Models.Entities;
 using Pickleball.Community.Models.DTOs;
+using Pickleball.Community.API.Services;
 
 namespace Pickleball.Community.API.Controllers;
 
@@ -14,11 +15,13 @@ public class LeaguesController : ControllerBase
 {
     private readonly ApplicationDbContext _context;
     private readonly ILogger<LeaguesController> _logger;
+    private readonly INotificationService _notificationService;
 
-    public LeaguesController(ApplicationDbContext context, ILogger<LeaguesController> logger)
+    public LeaguesController(ApplicationDbContext context, ILogger<LeaguesController> logger, INotificationService notificationService)
     {
         _context = context;
         _logger = logger;
+        _notificationService = notificationService;
     }
 
     private int? GetCurrentUserId()
@@ -236,13 +239,19 @@ public class LeaguesController : ControllerBase
             var allDocuments = new List<LeagueDocumentDto>();
 
             // Add parent leagues' documents first (public only, in root-to-parent order)
+            // Note: Query each parent individually to avoid OPENJSON compatibility issues with older SQL Server
             if (parentLeagueIds.Any())
             {
-                var parentDocuments = await _context.LeagueDocuments
-                    .Include(d => d.League)
-                    .Include(d => d.UploadedBy)
-                    .Where(d => parentLeagueIds.Contains(d.LeagueId) && d.IsActive && d.IsPublic)
-                    .ToListAsync();
+                var parentDocuments = new List<LeagueDocument>();
+                foreach (var parentId in parentLeagueIds)
+                {
+                    var docs = await _context.LeagueDocuments
+                        .Include(d => d.League)
+                        .Include(d => d.UploadedBy)
+                        .Where(d => d.LeagueId == parentId && d.IsActive && d.IsPublic)
+                        .ToListAsync();
+                    parentDocuments.AddRange(docs);
+                }
 
                 // Sort by hierarchy (root first) then by sort order within each league
                 var sortedParentDocs = parentDocuments
@@ -947,6 +956,26 @@ public class LeaguesController : ControllerBase
             _context.LeagueClubRequests.Add(clubRequest);
             await _context.SaveChangesAsync();
 
+            // Notify league managers about the join request
+            var leagueManagerIds = await _context.LeagueManagers
+                .Where(m => m.LeagueId == leagueId && m.IsActive)
+                .Select(m => m.UserId)
+                .ToListAsync();
+
+            if (leagueManagerIds.Any())
+            {
+                var clubName = clubMember.Club?.Name ?? "A club";
+                await _notificationService.CreateAndSendToUsersAsync(
+                    leagueManagerIds,
+                    "LeagueJoinRequest",
+                    "New League Join Request",
+                    $"{clubName} wants to join {league.Name}",
+                    $"/leagues?id={leagueId}&tab=requests",
+                    "LeagueClubRequest",
+                    clubRequest.Id
+                );
+            }
+
             var dto = new LeagueClubRequestDto
             {
                 Id = clubRequest.Id,
@@ -1047,6 +1076,48 @@ public class LeaguesController : ControllerBase
             else
             {
                 await _context.SaveChangesAsync();
+            }
+
+            // Notify the club admins about the decision
+            var clubAdminIds = await _context.ClubMembers
+                .Where(m => m.ClubId == clubRequest.ClubId && m.IsActive && m.Role == "Admin")
+                .Select(m => m.UserId)
+                .ToListAsync();
+
+            // Get league name for notification
+            var leagueName = await _context.Leagues
+                .Where(l => l.Id == id)
+                .Select(l => l.Name)
+                .FirstOrDefaultAsync() ?? "the league";
+
+            var clubName = clubRequest.Club?.Name ?? "Your club";
+
+            if (clubAdminIds.Any())
+            {
+                if (request.Approve)
+                {
+                    await _notificationService.CreateAndSendToUsersAsync(
+                        clubAdminIds,
+                        "LeagueJoinApproved",
+                        "League Membership Approved!",
+                        $"{clubName} has been accepted into {leagueName}",
+                        $"/leagues?id={id}",
+                        "League",
+                        id
+                    );
+                }
+                else
+                {
+                    await _notificationService.CreateAndSendToUsersAsync(
+                        clubAdminIds,
+                        "LeagueJoinRejected",
+                        "League Request Update",
+                        $"{clubName}'s request to join {leagueName} was not approved",
+                        $"/clubs?id={clubRequest.ClubId}",
+                        "Club",
+                        clubRequest.ClubId
+                    );
+                }
             }
 
             return Ok(new ApiResponse<LeagueClubDto>
