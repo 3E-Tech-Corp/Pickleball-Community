@@ -308,7 +308,7 @@ const Profile = () => {
   }
 
   // Handle credential change success (email or phone updated via shared auth)
-  const handleCredentialChangeSuccess = async (newValue) => {
+  const handleCredentialChangeSuccess = async (newValue, sharedUser) => {
     try {
       // Update local state
       const updateData = credentialModalType === 'email'
@@ -324,7 +324,19 @@ const Profile = () => {
 
       // Sync with local backend
       await userApi.updateProfile(updateData)
-      updateUser({ ...user, ...updateData })
+
+      // Update local user state with the new value and any shared user data
+      const updatedUserData = { ...user, ...updateData }
+
+      // If shared auth returned user data, merge relevant fields
+      if (sharedUser) {
+        if (sharedUser.email) updatedUserData.email = sharedUser.email
+        if (sharedUser.phoneNumber) updatedUserData.phone = sharedUser.phoneNumber
+        if (sharedUser.firstName) updatedUserData.firstName = sharedUser.firstName
+        if (sharedUser.lastName) updatedUserData.lastName = sharedUser.lastName
+      }
+
+      updateUser(updatedUserData)
 
       setCredentialModalOpen(false)
       toast.success(`${credentialModalType === 'email' ? 'Email' : 'Phone number'} updated successfully`)

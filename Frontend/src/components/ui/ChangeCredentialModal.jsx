@@ -28,8 +28,8 @@ const ChangeCredentialModal = ({
       localStorage.setItem('jwtToken', token)
     }
 
-    // Call the parent success handler
-    onSuccess?.(newValue)
+    // Call the parent success handler with newValue and user data
+    onSuccess?.(newValue, user)
   }
 
   const handleError = (message) => {
