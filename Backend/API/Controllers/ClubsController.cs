@@ -331,7 +331,9 @@ public class ClubsController : ControllerBase
             var hasPendingRequest = userId.HasValue && await _context.ClubJoinRequests
                 .AnyAsync(r => r.ClubId == id && r.UserId == userId.Value && r.Status == "Pending");
 
-            var isAdmin = membership?.Role == "Admin";
+            // Check if user is site admin (can manage any club)
+            var isSiteAdmin = await IsSiteAdminAsync();
+            var isAdmin = membership?.Role == "Admin" || isSiteAdmin;
             var isModerator = membership?.Role == "Moderator";
 
             // Use home venue address if no club address specified
