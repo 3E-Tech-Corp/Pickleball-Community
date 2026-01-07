@@ -12,6 +12,7 @@ public interface IActivityAwardService
     Task GrantCreatedClubAwardAsync(int userId, int clubId, string clubName);
     Task GrantJoinedEventAwardAsync(int userId, int eventId, string eventName);
     Task GrantCreatedEventAwardAsync(int userId, int eventId, string eventName);
+    Task GrantPublishedEventAwardAsync(int userId, int eventId, string eventName);
 }
 
 public class ActivityAwardService : IActivityAwardService
@@ -35,6 +36,7 @@ public class ActivityAwardService : IActivityAwardService
     private const string TitleFirstEvent = "First Event";
     private const string TitleJoinedEvent = "Event Participant";
     private const string TitleCreatedEvent = "Event Organizer";
+    private const string TitlePublishedEvent = "Event Publisher";
 
     public ActivityAwardService(ApplicationDbContext context, ILogger<ActivityAwardService> logger)
     {
@@ -354,6 +356,44 @@ public class ActivityAwardService : IActivityAwardService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error granting created event award to user {UserId} for event {EventId}", userId, eventId);
+        }
+    }
+
+    /// <summary>
+    /// Grant award when user publishes an event
+    /// </summary>
+    public async Task GrantPublishedEventAwardAsync(int userId, int eventId, string eventName)
+    {
+        try
+        {
+            // Check if user already has an award for publishing this specific event
+            var hasAward = await _context.PlayerAwards
+                .AnyAsync(a => a.UserId == userId && a.Title == TitlePublishedEvent && a.EventId == eventId);
+
+            if (hasAward) return;
+
+            var award = new PlayerAward
+            {
+                UserId = userId,
+                AwardType = AwardTypeAchievement,
+                Title = TitlePublishedEvent,
+                Description = $"Published {eventName}",
+                IconUrl = "/images/awards/event-publisher.png",
+                BadgeColor = "orange",
+                EventId = eventId,
+                PointsValue = 5,
+                AwardedBySystem = true,
+                IsActive = true
+            };
+
+            _context.PlayerAwards.Add(award);
+            await _context.SaveChangesAsync();
+
+            _logger.LogInformation("Granted '{Award}' to user {UserId} for publishing event {EventId}", TitlePublishedEvent, userId, eventId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error granting published event award to user {UserId} for event {EventId}", userId, eventId);
         }
     }
 }

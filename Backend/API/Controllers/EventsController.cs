@@ -718,11 +718,47 @@ public class EventsController : ControllerBase
             evt.UpdatedAt = DateTime.UtcNow;
             await _context.SaveChangesAsync();
 
-            return Ok(new ApiResponse<bool> { Success = true, Data = true, Message = "Event published" });
+            // Grant award for publishing event
+            await _activityAwardService.GrantPublishedEventAwardAsync(userId.Value, evt.Id, evt.Name);
+
+            return Ok(new ApiResponse<bool> { Success = true, Data = true, Message = "Event published successfully!" });
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error publishing event");
+            return StatusCode(500, new ApiResponse<bool> { Success = false, Message = "An error occurred" });
+        }
+    }
+
+    // POST: /events/{id}/unpublish - Unpublish event
+    [HttpPost("{id}/unpublish")]
+    [Authorize]
+    public async Task<ActionResult<ApiResponse<bool>>> UnpublishEvent(int id)
+    {
+        try
+        {
+            var userId = GetCurrentUserId();
+            if (!userId.HasValue)
+                return Unauthorized(new ApiResponse<bool> { Success = false, Message = "User not authenticated" });
+
+            var evt = await _context.Events.FindAsync(id);
+            if (evt == null || !evt.IsActive)
+                return NotFound(new ApiResponse<bool> { Success = false, Message = "Event not found" });
+
+            // Check if user is organizer or admin
+            var isAdmin = await IsAdminAsync();
+            if (evt.OrganizedByUserId != userId.Value && !isAdmin)
+                return Forbid();
+
+            evt.IsPublished = false;
+            evt.UpdatedAt = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
+
+            return Ok(new ApiResponse<bool> { Success = true, Data = true, Message = "Event unpublished" });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error unpublishing event");
             return StatusCode(500, new ApiResponse<bool> { Success = false, Message = "An error occurred" });
         }
     }

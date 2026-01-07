@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { Calendar, MapPin, Clock, Users, Filter, Search, Plus, DollarSign, ChevronLeft, ChevronRight, X, UserPlus, Trophy, Layers, Check, AlertCircle, Navigation, Building2, Loader2, MessageCircle, CheckCircle, Edit3, ChevronDown, ChevronUp, Trash2, List, Map, Image, Upload, Play, Link2, QrCode } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { useToast } from '../contexts/ToastContext';
 import { eventsApi, eventTypesApi, courtsApi, teamUnitsApi, skillLevelsApi, tournamentApi, sharedAssetApi, getSharedAssetUrl } from '../services/api';
 import VenueMap from '../components/ui/VenueMap';
 import ShareLink, { QrCodeModal } from '../components/ui/ShareLink';
@@ -1220,6 +1221,39 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, formatDate, f
   // Share link state
   const [linkCopied, setLinkCopied] = useState(false);
   const [showEventQrModal, setShowEventQrModal] = useState(false);
+
+  // Publishing state
+  const [publishing, setPublishing] = useState(false);
+  const toast = useToast();
+
+  // Handle publish/unpublish event
+  const handlePublishToggle = async (shouldPublish) => {
+    setPublishing(true);
+    try {
+      if (shouldPublish) {
+        const response = await eventsApi.publish(event.id);
+        if (response.success) {
+          toast.success('🎉 Event published! You earned the Event Publisher award!');
+          onUpdate();
+        } else {
+          toast.error(response.message || 'Failed to publish event');
+        }
+      } else {
+        const response = await eventsApi.unpublish(event.id);
+        if (response.success) {
+          toast.info('Event unpublished. It is now hidden from public search.');
+          onUpdate();
+        } else {
+          toast.error(response.message || 'Failed to unpublish event');
+        }
+      }
+    } catch (err) {
+      toast.error('An error occurred. Please try again.');
+      console.error('Error toggling publish:', err);
+    } finally {
+      setPublishing(false);
+    }
+  };
 
   // Copy event invite link to clipboard
   const copyEventLink = async () => {
@@ -2444,9 +2478,23 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, formatDate, f
                       <span className={`px-3 py-1 rounded-full text-sm ${event.isPublished ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
                         {event.isPublished ? 'Published' : 'Draft'}
                       </span>
-                      {!event.isPublished && (
-                        <button onClick={async () => { await eventsApi.publish(event.id); onUpdate(); }} className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700">
+                      {!event.isPublished ? (
+                        <button
+                          onClick={() => handlePublishToggle(true)}
+                          disabled={publishing}
+                          className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50 flex items-center gap-2"
+                        >
+                          {publishing ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
                           Publish Event
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => handlePublishToggle(false)}
+                          disabled={publishing}
+                          className="px-4 py-2 bg-yellow-600 text-white rounded-lg text-sm font-medium hover:bg-yellow-700 disabled:opacity-50 flex items-center gap-2"
+                        >
+                          {publishing ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                          Unpublish
                         </button>
                       )}
                       <button onClick={startEditing} className="px-4 py-2 bg-orange-600 text-white rounded-lg text-sm font-medium hover:bg-orange-700 flex items-center gap-2">

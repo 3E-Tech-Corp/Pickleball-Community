@@ -796,6 +796,9 @@ export const eventsApi = {
   // Publish event
   publish: (id) => api.post(`/events/${id}/publish`),
 
+  // Unpublish event
+  unpublish: (id) => api.post(`/events/${id}/unpublish`),
+
   // Register for an event division
   register: (eventId, data) => api.post(`/events/${eventId}/register`, data),
 
