@@ -1091,8 +1091,12 @@ public class ThemeController : ControllerBase
         try
         {
             var currentUserId = GetCurrentUserId();
+
+            // Convert to array to avoid EF Core Contains() SQL generation issues
+            var videoIdArray = request.VideoIds.ToArray();
+
             var videos = await _context.HeroVideos
-                .Where(h => request.VideoIds.Contains(h.Id))
+                .Where(h => videoIdArray.Contains(h.Id))
                 .ToListAsync();
 
             for (int i = 0; i < request.VideoIds.Count; i++)
@@ -1111,7 +1115,7 @@ public class ThemeController : ControllerBase
             _logger.LogInformation("Hero videos reordered by user {UserId}", currentUserId);
 
             var updatedVideos = await _context.HeroVideos
-                .Where(h => request.VideoIds.Contains(h.Id))
+                .Where(h => videoIdArray.Contains(h.Id))
                 .OrderBy(h => h.SortOrder)
                 .Select(h => MapToHeroVideoDto(h))
                 .ToListAsync();
