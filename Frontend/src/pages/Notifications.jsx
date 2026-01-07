@@ -5,18 +5,34 @@ import { notificationsApi } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 
 const NotificationTypeIcon = ({ type }) => {
-  const icons = {
-    General: Bell,
-    FriendRequest: () => <span className="text-lg">👋</span>,
-    ClubInvite: () => <span className="text-lg">🏓</span>,
-    EventUpdate: () => <span className="text-lg">📅</span>,
-    GameReady: () => <span className="text-lg">🎮</span>,
-    Message: () => <span className="text-lg">💬</span>,
-    System: () => <span className="text-lg">🔔</span>
-  };
-
-  const Icon = icons[type] || Bell;
-  return typeof Icon === 'function' ? <Icon className="w-5 h-5" /> : Icon;
+  switch (type) {
+    case 'FriendRequest':
+      return <span className="text-lg">👋</span>;
+    case 'ClubInvite':
+      return <span className="text-lg">🏓</span>;
+    case 'EventUpdate':
+      return <span className="text-lg">📅</span>;
+    case 'GameReady':
+      return <span className="text-lg">🎮</span>;
+    case 'Message':
+      return <span className="text-lg">💬</span>;
+    case 'System':
+      return <span className="text-lg">🔔</span>;
+    case 'Announcement':
+      return <span className="text-lg">📢</span>;
+    case 'Event':
+      return <span className="text-lg">📅</span>;
+    case 'Club':
+      return <span className="text-lg">🏓</span>;
+    case 'Certification':
+      return <span className="text-lg">🏆</span>;
+    case 'GameScore':
+      return <span className="text-lg">🎯</span>;
+    case 'Test':
+      return <span className="text-lg">🧪</span>;
+    default:
+      return <Bell className="w-5 h-5" />;
+  }
 };
 
 const NotificationItem = ({ notification, onMarkRead, onDelete }) => {
