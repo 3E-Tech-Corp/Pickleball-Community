@@ -313,7 +313,8 @@ public class NotificationsController : ControllerBase
     // ==================== ADMIN/SYSTEM ENDPOINTS ====================
 
     /// <summary>
-    /// Create a notification for a user (Admin or System use)
+    /// Create and send a notification (Admin only)
+    /// Supports different target types: user, game, event, club, broadcast
     /// </summary>
     [HttpPost]
     [Authorize(Roles = "Admin")]
@@ -321,25 +322,79 @@ public class NotificationsController : ControllerBase
     {
         try
         {
-            // Validate user exists
-            var user = await _context.Users.FindAsync(dto.UserId);
-            if (user == null)
+            var targetType = dto.TargetType?.ToLowerInvariant() ?? "user";
+            var payload = new NotificationPayload
             {
-                return BadRequest(new { success = false, message = "User not found" });
+                Type = dto.Type ?? "System",
+                Title = dto.Title,
+                Message = dto.Message,
+                ActionUrl = dto.ActionUrl,
+                ReferenceType = dto.ReferenceType,
+                ReferenceId = dto.ReferenceId,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            switch (targetType)
+            {
+                case "user":
+                    // Validate user exists
+                    if (!dto.TargetId.HasValue)
+                    {
+                        return BadRequest(new { success = false, message = "TargetId (UserId) is required for user notifications" });
+                    }
+                    var user = await _context.Users.FindAsync(dto.TargetId.Value);
+                    if (user == null)
+                    {
+                        return BadRequest(new { success = false, message = "User not found" });
+                    }
+                    // Create and save to DB, then push via SignalR
+                    var notification = await _notificationService.CreateAndSendAsync(
+                        dto.TargetId.Value,
+                        dto.Type ?? "System",
+                        dto.Title,
+                        dto.Message,
+                        dto.ActionUrl,
+                        dto.ReferenceType,
+                        dto.ReferenceId
+                    );
+                    _logger.LogInformation("Notification sent to user {UserId}: {Title}", dto.TargetId.Value, dto.Title);
+                    return Ok(new { success = true, data = notification.Id, message = "Notification sent to user" });
+
+                case "game":
+                    if (!dto.TargetId.HasValue)
+                    {
+                        return BadRequest(new { success = false, message = "TargetId (GameId) is required for game notifications" });
+                    }
+                    await _notificationService.SendToGameAsync(dto.TargetId.Value, payload);
+                    _logger.LogInformation("Notification sent to game group {GameId}: {Title}", dto.TargetId.Value, dto.Title);
+                    return Ok(new { success = true, message = $"Notification sent to game group {dto.TargetId.Value}" });
+
+                case "event":
+                    if (!dto.TargetId.HasValue)
+                    {
+                        return BadRequest(new { success = false, message = "TargetId (EventId) is required for event notifications" });
+                    }
+                    await _notificationService.SendToEventAsync(dto.TargetId.Value, payload);
+                    _logger.LogInformation("Notification sent to event group {EventId}: {Title}", dto.TargetId.Value, dto.Title);
+                    return Ok(new { success = true, message = $"Notification sent to event group {dto.TargetId.Value}" });
+
+                case "club":
+                    if (!dto.TargetId.HasValue)
+                    {
+                        return BadRequest(new { success = false, message = "TargetId (ClubId) is required for club notifications" });
+                    }
+                    await _notificationService.SendToClubAsync(dto.TargetId.Value, payload);
+                    _logger.LogInformation("Notification sent to club group {ClubId}: {Title}", dto.TargetId.Value, dto.Title);
+                    return Ok(new { success = true, message = $"Notification sent to club group {dto.TargetId.Value}" });
+
+                case "broadcast":
+                    await _notificationService.BroadcastAsync(payload);
+                    _logger.LogInformation("Notification broadcast to all users: {Title}", dto.Title);
+                    return Ok(new { success = true, message = "Notification broadcast to all connected users" });
+
+                default:
+                    return BadRequest(new { success = false, message = $"Invalid target type: {targetType}" });
             }
-
-            // Use notification service to create and push via SignalR
-            var notification = await _notificationService.CreateAndSendAsync(
-                dto.UserId,
-                dto.Type ?? "General",
-                dto.Title,
-                dto.Message,
-                dto.ActionUrl,
-                dto.ReferenceType,
-                dto.ReferenceId
-            );
-
-            return Ok(new { success = true, data = notification.Id });
         }
         catch (Exception ex)
         {
@@ -416,7 +471,17 @@ public class NotificationDto
 
 public class CreateNotificationDto
 {
-    public int UserId { get; set; }
+    /// <summary>
+    /// Target type: user, game, event, club, broadcast
+    /// </summary>
+    public string? TargetType { get; set; } = "user";
+
+    /// <summary>
+    /// Target ID (UserId for user, GameId for game, EventId for event, ClubId for club)
+    /// Not required for broadcast
+    /// </summary>
+    public int? TargetId { get; set; }
+
     public string? Type { get; set; }
     public string Title { get; set; } = string.Empty;
     public string? Message { get; set; }

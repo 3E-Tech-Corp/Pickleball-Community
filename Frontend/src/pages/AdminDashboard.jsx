@@ -58,6 +58,16 @@ const AdminDashboard = () => {
   const [isAddVideoModalOpen, setIsAddVideoModalOpen] = useState(false)
   const [editingVideo, setEditingVideo] = useState(null)
 
+  // Notification testing state
+  const [notifTestUserId, setNotifTestUserId] = useState('')
+  const [notifTestTitle, setNotifTestTitle] = useState('Test Notification')
+  const [notifTestMessage, setNotifTestMessage] = useState('This is a test notification from the admin dashboard.')
+  const [notifTestType, setNotifTestType] = useState('System')
+  const [notifGroupType, setNotifGroupType] = useState('user') // user, game, event, club, broadcast
+  const [notifGroupId, setNotifGroupId] = useState('')
+  const [sendingNotification, setSendingNotification] = useState(false)
+  const [notifTestResult, setNotifTestResult] = useState(null)
+
   // Pagination
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 10
@@ -542,7 +552,8 @@ const AdminDashboard = () => {
       title: 'Core',
       items: [
         { id: 'users', label: 'Users', icon: Users, count: users.length },
-        { id: 'theme', label: 'Theme', icon: Palette }
+        { id: 'theme', label: 'Theme', icon: Palette },
+        { id: 'notifications', label: 'Notifications', icon: Bell }
       ]
     },
     {
@@ -768,7 +779,18 @@ const AdminDashboard = () => {
                             <td className="px-6 py-4 text-sm text-gray-500">
                               {u.createdAt ? new Date(u.createdAt).toLocaleDateString() : '-'}
                             </td>
-                            <td className="px-6 py-4 text-right">
+                            <td className="px-6 py-4 text-right flex items-center justify-end gap-1">
+                              <button
+                                onClick={() => {
+                                  setNotifTestUserId(u.id.toString())
+                                  setNotifGroupType('user')
+                                  setActiveTab('notifications')
+                                }}
+                                className="text-amber-600 hover:text-amber-800 p-2 rounded-lg hover:bg-amber-50"
+                                title="Send test notification"
+                              >
+                                <Bell className="w-4 h-4" />
+                              </button>
                               <button
                                 onClick={() => handleEditUser(u)}
                                 className="text-blue-600 hover:text-blue-800 p-2 rounded-lg hover:bg-blue-50"
@@ -1941,6 +1963,233 @@ const AdminDashboard = () => {
 
           {/* League Admin */}
           {activeTab === 'leagues' && <LeagueAdmin embedded />}
+
+          {/* Notification Testing */}
+          {activeTab === 'notifications' && (
+            <div className="bg-white rounded-xl shadow-sm p-6">
+              <h2 className="text-xl font-semibold text-gray-900 mb-2">Notification Testing</h2>
+              <p className="text-gray-600 mb-6">
+                Send test notifications to individual users or groups. Use this to verify SignalR real-time notifications are working.
+              </p>
+
+              <div className="max-w-2xl space-y-6">
+                {/* Notification Target Type */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Target Type
+                  </label>
+                  <div className="grid grid-cols-5 gap-2">
+                    {[
+                      { id: 'user', label: 'User', icon: User },
+                      { id: 'game', label: 'Game', icon: Award },
+                      { id: 'event', label: 'Event', icon: Calendar },
+                      { id: 'club', label: 'Club', icon: Building2 },
+                      { id: 'broadcast', label: 'Broadcast', icon: Send }
+                    ].map(({ id, label, icon: Icon }) => (
+                      <button
+                        key={id}
+                        onClick={() => {
+                          setNotifGroupType(id)
+                          setNotifGroupId('')
+                          if (id !== 'user') setNotifTestUserId('')
+                        }}
+                        className={`flex flex-col items-center p-3 rounded-lg border-2 transition-colors ${
+                          notifGroupType === id
+                            ? 'border-blue-500 bg-blue-50 text-blue-700'
+                            : 'border-gray-200 hover:border-gray-300 text-gray-600'
+                        }`}
+                      >
+                        <Icon className="w-5 h-5 mb-1" />
+                        <span className="text-xs font-medium">{label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Target Selection */}
+                {notifGroupType === 'user' && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Target User
+                    </label>
+                    <select
+                      value={notifTestUserId}
+                      onChange={(e) => setNotifTestUserId(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    >
+                      <option value="">Select a user...</option>
+                      <option value={user?.id}>Myself ({user?.email})</option>
+                      {users.filter(u => u.id !== user?.id).map(u => (
+                        <option key={u.id} value={u.id}>
+                          {u.firstName} {u.lastName} ({u.email})
+                        </option>
+                      ))}
+                    </select>
+                    <p className="mt-1 text-xs text-gray-500">
+                      Tip: Click the bell icon next to any user in the Users tab to quickly select them.
+                    </p>
+                  </div>
+                )}
+
+                {(notifGroupType === 'game' || notifGroupType === 'event' || notifGroupType === 'club') && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      {notifGroupType.charAt(0).toUpperCase() + notifGroupType.slice(1)} ID
+                    </label>
+                    <input
+                      type="number"
+                      value={notifGroupId}
+                      onChange={(e) => setNotifGroupId(e.target.value)}
+                      placeholder={`Enter ${notifGroupType} ID...`}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                    <p className="mt-1 text-xs text-gray-500">
+                      Users must be subscribed to this {notifGroupType} group via SignalR to receive notifications.
+                    </p>
+                  </div>
+                )}
+
+                {notifGroupType === 'broadcast' && (
+                  <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                    <p className="text-sm text-yellow-800">
+                      <strong>Warning:</strong> Broadcast will send to ALL connected users. Use with caution.
+                    </p>
+                  </div>
+                )}
+
+                {/* Notification Type */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Notification Type
+                  </label>
+                  <select
+                    value={notifTestType}
+                    onChange={(e) => setNotifTestType(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value="System">System</option>
+                    <option value="Announcement">Announcement</option>
+                    <option value="Message">Message</option>
+                    <option value="GameScore">Game Score</option>
+                    <option value="Event">Event</option>
+                    <option value="Club">Club</option>
+                    <option value="Certification">Certification</option>
+                  </select>
+                </div>
+
+                {/* Title */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Title
+                  </label>
+                  <input
+                    type="text"
+                    value={notifTestTitle}
+                    onChange={(e) => setNotifTestTitle(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="Notification title"
+                  />
+                </div>
+
+                {/* Message */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Message (optional)
+                  </label>
+                  <textarea
+                    value={notifTestMessage}
+                    onChange={(e) => setNotifTestMessage(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    rows={3}
+                    placeholder="Notification message"
+                  />
+                </div>
+
+                {/* Send Button */}
+                <div className="flex items-center gap-4">
+                  <button
+                    onClick={async () => {
+                      // Validate based on target type
+                      if (notifGroupType === 'user' && !notifTestUserId) {
+                        setNotifTestResult({ success: false, message: 'Please select a user' })
+                        return
+                      }
+                      if ((notifGroupType === 'game' || notifGroupType === 'event' || notifGroupType === 'club') && !notifGroupId) {
+                        setNotifTestResult({ success: false, message: `Please enter a ${notifGroupType} ID` })
+                        return
+                      }
+                      if (!notifTestTitle.trim()) {
+                        setNotifTestResult({ success: false, message: 'Please enter a title' })
+                        return
+                      }
+
+                      setSendingNotification(true)
+                      setNotifTestResult(null)
+
+                      try {
+                        const payload = {
+                          type: notifTestType,
+                          title: notifTestTitle,
+                          message: notifTestMessage || null,
+                          targetType: notifGroupType,
+                          targetId: notifGroupType === 'user' ? parseInt(notifTestUserId) : (notifGroupId ? parseInt(notifGroupId) : null)
+                        }
+
+                        const response = await notificationsApi.create(payload)
+                        if (response?.success) {
+                          setNotifTestResult({ success: true, message: 'Notification sent successfully!' })
+                        } else {
+                          setNotifTestResult({ success: false, message: response?.message || 'Failed to send notification' })
+                        }
+                      } catch (error) {
+                        console.error('Error sending notification:', error)
+                        setNotifTestResult({ success: false, message: error.message || 'Failed to send notification' })
+                      } finally {
+                        setSendingNotification(false)
+                      }
+                    }}
+                    disabled={sendingNotification}
+                    className="flex items-center gap-2 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {sendingNotification ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 animate-spin" />
+                        Sending...
+                      </>
+                    ) : (
+                      <>
+                        <Send className="w-4 h-4" />
+                        Send Notification
+                      </>
+                    )}
+                  </button>
+
+                  {notifTestResult && (
+                    <div className={`flex items-center gap-2 ${notifTestResult.success ? 'text-green-600' : 'text-red-600'}`}>
+                      {notifTestResult.success ? (
+                        <CheckCircle className="w-5 h-5" />
+                      ) : (
+                        <XCircle className="w-5 h-5" />
+                      )}
+                      <span className="text-sm">{notifTestResult.message}</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Info Box */}
+                <div className="mt-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                  <h4 className="text-sm font-medium text-gray-900 mb-2">How Group Notifications Work</h4>
+                  <ul className="text-xs text-gray-600 space-y-1">
+                    <li>• <strong>User:</strong> Sends directly to a specific user (saved to DB + real-time push)</li>
+                    <li>• <strong>Game:</strong> Sends to all users watching a specific game (real-time only)</li>
+                    <li>• <strong>Event:</strong> Sends to all users subscribed to an event (real-time only)</li>
+                    <li>• <strong>Club:</strong> Sends to all users in a club group (real-time only)</li>
+                    <li>• <strong>Broadcast:</strong> Sends to ALL connected users (real-time only)</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
