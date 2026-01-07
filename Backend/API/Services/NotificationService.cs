@@ -291,7 +291,7 @@ public class NotificationService : INotificationService
         {
             try
             {
-                var userIds = await _context.GameParticipants
+                var userIds = await _context.EventGamePlayers
                     .Where(gp => gp.GameId == gameId)
                     .Select(gp => gp.UserId)
                     .ToListAsync();
@@ -323,9 +323,10 @@ public class NotificationService : INotificationService
         {
             try
             {
-                var userIds = await _context.EventParticipants
-                    .Where(ep => ep.EventId == eventId && ep.IsActive)
-                    .Select(ep => ep.UserId)
+                var userIds = await _context.EventRegistrations
+                    .Where(er => er.EventId == eventId)
+                    .Select(er => er.UserId)
+                    .Distinct()
                     .ToListAsync();
 
                 if (userIds.Count > 0)
