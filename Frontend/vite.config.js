@@ -9,6 +9,10 @@ export default defineConfig({
   plugins: [
     VitePWA({
       registerType: "autoUpdate",
+      // Use injectManifest to include custom push notification handling
+      strategies: 'injectManifest',
+      srcDir: 'src',
+      filename: 'sw.js',
       // Disable service worker in development
       devOptions: {
         enabled: false
@@ -32,28 +36,8 @@ export default defineConfig({
           }
         ]
       },
-      workbox: {
-        skipWaiting: true,
-        clientsClaim: true,
-        // Clean old caches on update
-        cleanupOutdatedCaches: true,
-        // Don't cache index.html - always fetch fresh
-        navigateFallback: null,
-        // Exclude API calls and assets from service worker caching
-        navigateFallbackDenylist: [/^\/auth/, /^\/api/, /^\/asset/],
-        runtimeCaching: [
-          {
-            urlPattern: /^https:\/\/.*\.(js|css)$/,
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: 'static-resources',
-              expiration: {
-                maxEntries: 50,
-                maxAgeSeconds: 60 * 60 * 24 // 24 hours
-              }
-            }
-          }
-        ]
+      injectManifest: {
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}']
       }
     }),
     react(),

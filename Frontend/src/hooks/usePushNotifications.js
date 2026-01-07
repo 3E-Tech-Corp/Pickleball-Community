@@ -46,13 +46,8 @@ export function usePushNotifications() {
   // Check current subscription status
   const checkSubscription = useCallback(async () => {
     try {
-      // Register the push service worker if not already registered
-      const registration = await navigator.serviceWorker.register('/push-sw.js', {
-        scope: '/'
-      });
-
-      // Wait for the service worker to be ready
-      await navigator.serviceWorker.ready;
+      // Wait for the main service worker to be ready (registered by Vite PWA)
+      const registration = await navigator.serviceWorker.ready;
 
       // Get the current subscription
       const sub = await registration.pushManager.getSubscription();
