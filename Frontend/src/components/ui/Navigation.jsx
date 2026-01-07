@@ -98,9 +98,8 @@ const Navigation = () => {
     setAuthKey(prev => prev + 1); // Force re-render
   }, [isAuthenticated, user]);
 
-  // Primary navigation - most used
+  // Primary navigation - most used (Home removed since logo links to dashboard)
   const primaryNav = [
-    { name: 'Home', href: '/', icon: HomeIcon },
     { name: 'Events', href: '/events', icon: Calendar },
     { name: 'Venues', href: '/venues', icon: MapPin },
     { name: 'Clubs', href: '/clubs', icon: Users },
