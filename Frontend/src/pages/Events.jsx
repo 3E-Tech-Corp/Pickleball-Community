@@ -1212,7 +1212,11 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, formatDate, f
   const [unitsLookingForPartners, setUnitsLookingForPartners] = useState([]);
   const [loadingUnits, setLoadingUnits] = useState(false);
 
-  // Registration viewer state
+  // Registration viewer state (expandable per division)
+  const [expandedDivisions, setExpandedDivisions] = useState({});
+  const [divisionRegistrationsCache, setDivisionRegistrationsCache] = useState({});
+  const [loadingDivisionId, setLoadingDivisionId] = useState(null);
+  // Legacy modal state (kept for organizer manage tab)
   const [showRegistrationViewer, setShowRegistrationViewer] = useState(false);
   const [selectedDivisionForViewing, setSelectedDivisionForViewing] = useState(null);
   const [divisionRegistrations, setDivisionRegistrations] = useState([]);
@@ -1681,7 +1685,7 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, formatDate, f
     }
   };
 
-  // Load all registrations for a division to view
+  // Load all registrations for a division to view (modal version for manage tab)
   const loadDivisionRegistrations = async (division) => {
     setSelectedDivisionForViewing(division);
     setShowRegistrationViewer(true);
@@ -1701,6 +1705,39 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, formatDate, f
       console.error('Error loading registrations:', err);
     } finally {
       setLoadingRegistrations(false);
+    }
+  };
+
+  // Toggle expand/collapse for division registrations (inline view)
+  const toggleDivisionExpand = async (division) => {
+    const divId = division.id;
+    const isCurrentlyExpanded = expandedDivisions[divId];
+
+    if (isCurrentlyExpanded) {
+      // Collapse
+      setExpandedDivisions(prev => ({ ...prev, [divId]: false }));
+    } else {
+      // Expand - load data if not cached
+      setExpandedDivisions(prev => ({ ...prev, [divId]: true }));
+
+      if (!divisionRegistrationsCache[divId]) {
+        setLoadingDivisionId(divId);
+        try {
+          const response = await tournamentApi.getEventUnits(event.id, divId);
+          if (response.success) {
+            const sorted = (response.data || []).sort((a, b) => {
+              if (a.isComplete && !b.isComplete) return -1;
+              if (!a.isComplete && b.isComplete) return 1;
+              return 0;
+            });
+            setDivisionRegistrationsCache(prev => ({ ...prev, [divId]: sorted }));
+          }
+        } catch (err) {
+          console.error('Error loading registrations:', err);
+        } finally {
+          setLoadingDivisionId(null);
+        }
+      }
     }
   };
 
@@ -2090,18 +2127,119 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, formatDate, f
                       </button>
                     )}
 
-                    {/* View Registrations Button */}
+                    {/* Expandable Registrations Section */}
                     {division.registeredCount > 0 && (
-                      <button
-                        onClick={() => loadDivisionRegistrations(division)}
-                        className="w-full px-4 py-2 border-t bg-gray-50 flex items-center justify-between gap-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
-                      >
-                        <span className="flex items-center gap-2">
-                          <Users className="w-4 h-4" />
-                          View {division.registeredCount} {teamSize > 2 ? 'team' : teamSize === 2 ? 'pair' : 'player'}{division.registeredCount !== 1 ? 's' : ''} registered
-                        </span>
-                        <ChevronRight className="w-4 h-4" />
-                      </button>
+                      <>
+                        <button
+                          onClick={() => toggleDivisionExpand(division)}
+                          className="w-full px-4 py-2 border-t bg-gray-50 flex items-center justify-between gap-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+                        >
+                          <span className="flex items-center gap-2">
+                            <Users className="w-4 h-4" />
+                            {expandedDivisions[division.id] ? 'Hide' : 'View'} {division.registeredCount} {teamSize > 2 ? 'team' : teamSize === 2 ? 'pair' : 'player'}{division.registeredCount !== 1 ? 's' : ''} registered
+                          </span>
+                          {loadingDivisionId === division.id ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : expandedDivisions[division.id] ? (
+                            <ChevronUp className="w-4 h-4" />
+                          ) : (
+                            <ChevronDown className="w-4 h-4" />
+                          )}
+                        </button>
+
+                        {/* Expanded Registrations List */}
+                        {expandedDivisions[division.id] && (
+                          <div className="border-t bg-white">
+                            {loadingDivisionId === division.id ? (
+                              <div className="p-4 text-center text-gray-500">
+                                <Loader2 className="w-5 h-5 animate-spin mx-auto mb-2" />
+                                Loading registrations...
+                              </div>
+                            ) : (divisionRegistrationsCache[division.id] || []).length === 0 ? (
+                              <div className="p-4 text-center text-gray-500">
+                                No registrations yet
+                              </div>
+                            ) : (
+                              <div className="divide-y">
+                                {(divisionRegistrationsCache[division.id] || []).map((unit, index) => {
+                                  const requiredPlayers = unit.requiredPlayers || teamSize;
+                                  const isTeam = requiredPlayers > 2;
+                                  const isDoubles = requiredPlayers === 2;
+
+                                  return (
+                                    <div key={unit.id || index} className="px-4 py-3">
+                                      {isTeam ? (
+                                        // Team display (3+ players)
+                                        <div>
+                                          <div className="flex items-center gap-2 mb-2">
+                                            <Trophy className="w-4 h-4 text-orange-500" />
+                                            <span className="font-medium text-gray-900">
+                                              {unit.teamName || `Team ${index + 1}`}
+                                            </span>
+                                            {!unit.isComplete && (
+                                              <span className="text-xs px-2 py-0.5 bg-yellow-100 text-yellow-700 rounded-full">
+                                                Looking for players
+                                              </span>
+                                            )}
+                                          </div>
+                                          <div className="ml-6 space-y-1">
+                                            {unit.members?.map((member, mIdx) => (
+                                              <div key={mIdx} className="text-sm text-gray-600 flex items-center gap-2">
+                                                <span className="w-1.5 h-1.5 bg-gray-400 rounded-full"></span>
+                                                {member.userName || member.name || 'Player'}
+                                              </div>
+                                            ))}
+                                            {unit.members?.length < requiredPlayers && (
+                                              <div className="text-sm text-gray-400 italic flex items-center gap-2">
+                                                <span className="w-1.5 h-1.5 bg-gray-300 rounded-full"></span>
+                                                {requiredPlayers - (unit.members?.length || 0)} spot{requiredPlayers - (unit.members?.length || 0) !== 1 ? 's' : ''} available
+                                              </div>
+                                            )}
+                                          </div>
+                                        </div>
+                                      ) : isDoubles ? (
+                                        // Doubles display
+                                        <div className="flex items-center gap-3">
+                                          <div className="flex -space-x-2">
+                                            {unit.members?.slice(0, 2).map((member, mIdx) => (
+                                              <div key={mIdx} className="w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center text-orange-700 text-xs font-medium border-2 border-white">
+                                                {(member.userName || member.name || 'P')[0].toUpperCase()}
+                                              </div>
+                                            ))}
+                                            {(!unit.members || unit.members.length < 2) && (
+                                              <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center text-gray-400 text-xs border-2 border-white">
+                                                ?
+                                              </div>
+                                            )}
+                                          </div>
+                                          <div className="flex-1">
+                                            <div className="text-sm text-gray-900">
+                                              {unit.members?.map(m => m.userName || m.name || 'Player').join(' & ') || 'Looking for partner'}
+                                            </div>
+                                            {!unit.isComplete && (
+                                              <span className="text-xs text-yellow-600">Looking for partner</span>
+                                            )}
+                                          </div>
+                                        </div>
+                                      ) : (
+                                        // Singles display
+                                        <div className="flex items-center gap-3">
+                                          <div className="w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center text-orange-700 text-sm font-medium">
+                                            {(unit.members?.[0]?.userName || unit.members?.[0]?.name || 'P')[0].toUpperCase()}
+                                          </div>
+                                          <span className="text-sm text-gray-900">
+                                            {unit.members?.[0]?.userName || unit.members?.[0]?.name || 'Player'}
+                                          </span>
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
                 );
