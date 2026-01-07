@@ -159,6 +159,7 @@ public class CreateEventDto
     public DateTime? RegistrationOpenDate { get; set; }
     public DateTime? RegistrationCloseDate { get; set; }
     public bool IsPrivate { get; set; } = false;
+    public bool AllowMultipleDivisions { get; set; } = true;
     public int? CourtId { get; set; }
     public string? VenueName { get; set; }
     public string? Address { get; set; }

@@ -365,7 +365,7 @@ public class EventsController : ControllerBase
                 EventTypeName = evt.EventType?.Name,
                 EventTypeIcon = evt.EventType?.Icon,
                 EventTypeColor = evt.EventType?.Color,
-                AllowMultipleDivisions = evt.EventType?.AllowMultipleDivisions ?? true,
+                AllowMultipleDivisions = evt.AllowMultipleDivisions,
                 StartDate = evt.StartDate,
                 EndDate = evt.EndDate,
                 RegistrationOpenDate = evt.RegistrationOpenDate,
@@ -480,6 +480,7 @@ public class EventsController : ControllerBase
                     ? DateTime.SpecifyKind(dto.RegistrationCloseDate.Value, DateTimeKind.Unspecified)
                     : null,
                 IsPrivate = dto.IsPrivate,
+                AllowMultipleDivisions = dto.AllowMultipleDivisions,
                 CourtId = dto.CourtId,
                 VenueName = dto.VenueName,
                 Address = dto.Address,
@@ -598,6 +599,7 @@ public class EventsController : ControllerBase
                 : null;
             evt.IsPublished = dto.IsPublished;
             evt.IsPrivate = dto.IsPrivate;
+            evt.AllowMultipleDivisions = dto.AllowMultipleDivisions;
             evt.CourtId = dto.CourtId;
             evt.VenueName = dto.VenueName;
             evt.Address = dto.Address;
@@ -792,9 +794,8 @@ public class EventsController : ControllerBase
             if (existingReg != null && existingReg.Status != "Cancelled")
                 return BadRequest(new ApiResponse<EventRegistrationDto> { Success = false, Message = "Already registered for this division" });
 
-            // Check if event type allows multiple divisions
-            var eventType = await _context.EventTypes.FindAsync(evt.EventTypeId);
-            if (eventType != null && !eventType.AllowMultipleDivisions)
+            // Check if event allows multiple divisions
+            if (!evt.AllowMultipleDivisions)
             {
                 // Check if user is already registered for any other division in this event
                 var hasOtherRegistration = await _context.EventRegistrations
@@ -1445,7 +1446,7 @@ public class EventsController : ControllerBase
             EventTypeName = evt.EventType?.Name,
             EventTypeIcon = evt.EventType?.Icon,
             EventTypeColor = evt.EventType?.Color,
-            AllowMultipleDivisions = evt.EventType?.AllowMultipleDivisions ?? true,
+            AllowMultipleDivisions = evt.AllowMultipleDivisions,
             StartDate = evt.StartDate,
             EndDate = evt.EndDate,
             RegistrationOpenDate = evt.RegistrationOpenDate,

@@ -1434,6 +1434,7 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, formatDate, f
       maxParticipants: event.maxParticipants || '',
       isPublished: event.isPublished,
       isPrivate: event.isPrivate,
+      allowMultipleDivisions: event.allowMultipleDivisions ?? true,
       posterImageUrl: event.posterImageUrl || ''
     });
     setSelectedCourt(event.courtId ? {
@@ -2251,6 +2252,47 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, formatDate, f
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Contact Phone</label>
                       <input type="tel" value={editFormData?.contactPhone || ''} onChange={(e) => setEditFormData({ ...editFormData, contactPhone: e.target.value })} className="w-full border border-gray-300 rounded-lg p-2" />
+                    </div>
+                  </div>
+
+                  {/* Event Settings */}
+                  <div className="border-t pt-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-3">Event Settings</label>
+                    <div className="space-y-3">
+                      <label className="flex items-center justify-between p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100">
+                        <div>
+                          <span className="font-medium text-gray-900">Private Event</span>
+                          <p className="text-sm text-gray-500">Private events are only visible to invited participants and club members</p>
+                        </div>
+                        <div className="relative">
+                          <input
+                            type="checkbox"
+                            checked={editFormData?.isPrivate || false}
+                            onChange={(e) => setEditFormData({ ...editFormData, isPrivate: e.target.checked })}
+                            className="sr-only"
+                          />
+                          <div className={`w-11 h-6 rounded-full transition-colors ${editFormData?.isPrivate ? 'bg-orange-600' : 'bg-gray-300'}`}>
+                            <div className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${editFormData?.isPrivate ? 'translate-x-5' : ''}`}></div>
+                          </div>
+                        </div>
+                      </label>
+                      <label className="flex items-center justify-between p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100">
+                        <div>
+                          <span className="font-medium text-gray-900">Allow Multiple Divisions</span>
+                          <p className="text-sm text-gray-500">Allow players to register for more than one division</p>
+                        </div>
+                        <div className="relative">
+                          <input
+                            type="checkbox"
+                            checked={editFormData?.allowMultipleDivisions ?? true}
+                            onChange={(e) => setEditFormData({ ...editFormData, allowMultipleDivisions: e.target.checked })}
+                            className="sr-only"
+                          />
+                          <div className={`w-11 h-6 rounded-full transition-colors ${editFormData?.allowMultipleDivisions ?? true ? 'bg-orange-600' : 'bg-gray-300'}`}>
+                            <div className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${editFormData?.allowMultipleDivisions ?? true ? 'translate-x-5' : ''}`}></div>
+                          </div>
+                        </div>
+                      </label>
                     </div>
                   </div>
 

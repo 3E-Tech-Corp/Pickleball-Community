@@ -81,6 +81,12 @@ public class Event
     public int? MaxParticipants { get; set; }
 
     /// <summary>
+    /// Whether players can register for multiple divisions in this event.
+    /// Defaults to true. If false, players can only register for one division.
+    /// </summary>
+    public bool AllowMultipleDivisions { get; set; } = true;
+
+    /// <summary>
     /// Tournament status: Draft, RegistrationOpen, RegistrationClosed, ScheduleReady, Running, Completed, Cancelled
     /// </summary>
     [MaxLength(20)]
