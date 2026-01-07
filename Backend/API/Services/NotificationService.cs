@@ -52,6 +52,12 @@ public interface INotificationService
     /// </summary>
     Task<List<Notification>> CreateAndSendToUsersAsync(IEnumerable<int> userIds, string type, string title,
         string? message = null, string? actionUrl = null, string? referenceType = null, int? referenceId = null);
+
+    /// <summary>
+    /// Send game score update to all users watching a game (SignalR only - no toast, no push, no DB)
+    /// Used for real-time game progress monitoring
+    /// </summary>
+    Task SendGameScoreAsync(int gameId, GameScorePayload scoreUpdate);
 }
 
 /// <summary>
@@ -67,6 +73,47 @@ public class NotificationPayload
     public string? ReferenceType { get; set; }
     public int? ReferenceId { get; set; }
     public DateTime CreatedAt { get; set; }
+}
+
+/// <summary>
+/// Payload for real-time game score updates (SignalR only - no toast, no push, no DB)
+/// </summary>
+public class GameScorePayload
+{
+    public int GameId { get; set; }
+    public int EventId { get; set; }
+    public string? GameName { get; set; }
+
+    // Current score
+    public int Team1Score { get; set; }
+    public int Team2Score { get; set; }
+
+    // Game sets/rounds if applicable
+    public int? CurrentSet { get; set; }
+    public List<int[]>? SetScores { get; set; } // e.g., [[11,9], [9,11], [11,7]]
+
+    // Game state
+    public string Status { get; set; } = "InProgress"; // NotStarted, InProgress, Paused, Completed
+    public string? ServingTeam { get; set; } // "Team1" or "Team2"
+    public int? ServingPlayer { get; set; } // UserId of current server
+
+    // Team info for display
+    public List<GamePlayerInfo>? Team1Players { get; set; }
+    public List<GamePlayerInfo>? Team2Players { get; set; }
+
+    // Timing
+    public DateTime UpdatedAt { get; set; }
+    public TimeSpan? ElapsedTime { get; set; }
+}
+
+/// <summary>
+/// Player info for game score display
+/// </summary>
+public class GamePlayerInfo
+{
+    public int UserId { get; set; }
+    public string? DisplayName { get; set; }
+    public string? AvatarUrl { get; set; }
 }
 
 /// <summary>
@@ -366,5 +413,27 @@ public class NotificationService : INotificationService
         _logger.LogInformation("Notification sent to {Count} users: {Title}", notifications.Count, title);
 
         return notifications;
+    }
+
+    /// <inheritdoc />
+    public async Task SendGameScoreAsync(int gameId, GameScorePayload scoreUpdate)
+    {
+        // SignalR only - no toast, no web push, no DB save
+        // This is a lightweight update for real-time game monitoring
+        try
+        {
+            scoreUpdate.GameId = gameId;
+            scoreUpdate.UpdatedAt = DateTime.UtcNow;
+
+            var groupName = $"game_{gameId}";
+            await _hubContext.Clients.Group(groupName).SendAsync("GameScoreUpdate", scoreUpdate);
+
+            _logger.LogDebug("Game score update sent to game {GameId}: {Team1}-{Team2}",
+                gameId, scoreUpdate.Team1Score, scoreUpdate.Team2Score);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error sending game score update to game {GameId}", gameId);
+        }
     }
 }
