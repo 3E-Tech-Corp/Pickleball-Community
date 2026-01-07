@@ -2,12 +2,12 @@ import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
-import { userApi, themeApi, sharedAssetApi, getAssetUrl, getSharedAssetUrl, SHARED_AUTH_URL } from '../services/api'
+import { userApi, themeApi, sharedAssetApi, getAssetUrl, getSharedAssetUrl, SHARED_AUTH_URL, notificationsApi } from '../services/api'
 import {
   Users, BookOpen, Calendar, DollarSign, Search, Edit2, Trash2,
   ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Filter, MoreVertical, Eye, X,
   Shield, GraduationCap, User, CheckCircle, XCircle, Save,
-  Palette, Upload, RefreshCw, Image, Layers, Check, Award, Tags, UserCog, Video, Building2, HelpCircle, MessageSquare, MapPin, Network, Plus, Play, ArrowUp, ArrowDown
+  Palette, Upload, RefreshCw, Image, Layers, Check, Award, Tags, UserCog, Video, Building2, HelpCircle, MessageSquare, MapPin, Network, Plus, Play, ArrowUp, ArrowDown, Bell, Send
 } from 'lucide-react'
 import VideoUploadModal from '../components/ui/VideoUploadModal'
 
@@ -57,6 +57,14 @@ const AdminDashboard = () => {
   const [loadingHeroVideos, setLoadingHeroVideos] = useState(false)
   const [isAddVideoModalOpen, setIsAddVideoModalOpen] = useState(false)
   const [editingVideo, setEditingVideo] = useState(null)
+
+  // Notification testing state
+  const [notifTestUserId, setNotifTestUserId] = useState('')
+  const [notifTestTitle, setNotifTestTitle] = useState('Test Notification')
+  const [notifTestMessage, setNotifTestMessage] = useState('This is a test notification from the admin dashboard.')
+  const [notifTestType, setNotifTestType] = useState('System')
+  const [sendingNotification, setSendingNotification] = useState(false)
+  const [notifTestResult, setNotifTestResult] = useState(null)
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1)
@@ -542,7 +550,8 @@ const AdminDashboard = () => {
       title: 'Core',
       items: [
         { id: 'users', label: 'Users', icon: Users, count: users.length },
-        { id: 'theme', label: 'Theme', icon: Palette }
+        { id: 'theme', label: 'Theme', icon: Palette },
+        { id: 'notifications', label: 'Notifications', icon: Bell }
       ]
     },
     {
@@ -1941,6 +1950,161 @@ const AdminDashboard = () => {
 
           {/* League Admin */}
           {activeTab === 'leagues' && <LeagueAdmin embedded />}
+
+          {/* Notification Testing */}
+          {activeTab === 'notifications' && (
+            <div className="bg-white rounded-xl shadow-sm p-6">
+              <h2 className="text-xl font-semibold text-gray-900 mb-6">Notification Testing</h2>
+              <p className="text-gray-600 mb-6">
+                Use this interface to test SignalR real-time notifications. Send a test notification to yourself or another user.
+              </p>
+
+              <div className="max-w-xl space-y-4">
+                {/* User ID Selection */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Target User
+                  </label>
+                  <div className="flex gap-2">
+                    <select
+                      value={notifTestUserId}
+                      onChange={(e) => setNotifTestUserId(e.target.value)}
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    >
+                      <option value="">Select a user...</option>
+                      <option value={user?.id}>Myself ({user?.email})</option>
+                      {users.filter(u => u.id !== user?.id).map(u => (
+                        <option key={u.id} value={u.id}>
+                          {u.firstName} {u.lastName} ({u.email})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Notification Type */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Notification Type
+                  </label>
+                  <select
+                    value={notifTestType}
+                    onChange={(e) => setNotifTestType(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value="System">System</option>
+                    <option value="Announcement">Announcement</option>
+                    <option value="Message">Message</option>
+                    <option value="Event">Event</option>
+                    <option value="Club">Club</option>
+                    <option value="Certification">Certification</option>
+                  </select>
+                </div>
+
+                {/* Title */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Title
+                  </label>
+                  <input
+                    type="text"
+                    value={notifTestTitle}
+                    onChange={(e) => setNotifTestTitle(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="Notification title"
+                  />
+                </div>
+
+                {/* Message */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Message
+                  </label>
+                  <textarea
+                    value={notifTestMessage}
+                    onChange={(e) => setNotifTestMessage(e.target.value)}
+                    rows={3}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="Notification message"
+                  />
+                </div>
+
+                {/* Send Button */}
+                <div className="pt-2">
+                  <button
+                    onClick={async () => {
+                      if (!notifTestUserId) {
+                        setNotifTestResult({ success: false, message: 'Please select a user' })
+                        return
+                      }
+                      setSendingNotification(true)
+                      setNotifTestResult(null)
+                      try {
+                        const response = await notificationsApi.create({
+                          userId: parseInt(notifTestUserId),
+                          type: notifTestType,
+                          title: notifTestTitle,
+                          message: notifTestMessage
+                        })
+                        setNotifTestResult({
+                          success: true,
+                          message: `Notification sent successfully! ID: ${response.data?.id || response.id || 'N/A'}`
+                        })
+                      } catch (error) {
+                        console.error('Error sending notification:', error)
+                        setNotifTestResult({
+                          success: false,
+                          message: error.response?.data?.message || error.message || 'Failed to send notification'
+                        })
+                      } finally {
+                        setSendingNotification(false)
+                      }
+                    }}
+                    disabled={sendingNotification || !notifTestUserId}
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {sendingNotification ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 animate-spin" />
+                        Sending...
+                      </>
+                    ) : (
+                      <>
+                        <Send className="w-4 h-4" />
+                        Send Test Notification
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                {/* Result Message */}
+                {notifTestResult && (
+                  <div className={`p-4 rounded-lg ${notifTestResult.success ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'}`}>
+                    <div className="flex items-center gap-2">
+                      {notifTestResult.success ? (
+                        <CheckCircle className="w-5 h-5 text-green-600" />
+                      ) : (
+                        <XCircle className="w-5 h-5 text-red-600" />
+                      )}
+                      <span>{notifTestResult.message}</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Instructions */}
+                <div className="mt-6 p-4 bg-gray-50 rounded-lg">
+                  <h3 className="font-medium text-gray-900 mb-2">How to verify:</h3>
+                  <ol className="list-decimal list-inside space-y-1 text-sm text-gray-600">
+                    <li>Open browser DevTools (F12) and go to the Console tab</li>
+                    <li>Look for "SignalR notification hub connected" message</li>
+                    <li>Send a test notification to yourself</li>
+                    <li>Watch for "ReceiveNotification" event in the console</li>
+                    <li>Check if the notification bell updates in the header</li>
+                  </ol>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

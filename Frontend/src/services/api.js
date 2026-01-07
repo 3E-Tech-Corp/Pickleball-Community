@@ -1392,6 +1392,9 @@ export const notificationsApi = {
   // Get unread count
   getUnreadCount: () => api.get('/notifications/count'),
 
+  // Create notification (admin only) - also pushes via SignalR
+  create: (data) => api.post('/notifications', data),
+
   // Mark single notification as read
   markAsRead: (id) => api.put(`/notifications/${id}/read`),
 
