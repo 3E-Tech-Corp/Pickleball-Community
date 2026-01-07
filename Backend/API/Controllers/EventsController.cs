@@ -795,11 +795,11 @@ public class EventsController : ControllerBase
             var user = await _context.Users.FindAsync(userId.Value);
             var userName = user != null ? $"{user.FirstName} {user.LastName}".Trim() : "Someone";
 
-            // Notify event organizer about new registration
-            if (evt.OrganizedByUserId.HasValue && evt.OrganizedByUserId.Value != userId.Value)
+            // Notify event organizer about new registration (don't notify self)
+            if (evt.OrganizedByUserId != userId.Value)
             {
                 await _notificationService.CreateAndSendAsync(
-                    evt.OrganizedByUserId.Value,
+                    evt.OrganizedByUserId,
                     "EventRegistration",
                     "New Event Registration",
                     $"{userName} registered for {evt.Name} ({division.Name})",
