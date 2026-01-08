@@ -24,7 +24,7 @@ CREATE PROCEDURE sp_SearchVenues
     @UserLat FLOAT = NULL,
     @UserLng FLOAT = NULL,
     @RadiusMiles FLOAT = NULL,
-    @SortBy NVARCHAR(20) = NULL,  -- 'match', 'distance', 'name', 'rating'
+    @SortBy NVARCHAR(20) = 'match',  -- 'match', 'distance', 'name', 'rating'
     @SortOrder NVARCHAR(4) = 'asc',  -- 'asc' or 'desc'
     @Page INT = 1,
     @PageSize INT = 20
