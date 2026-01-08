@@ -491,3 +491,22 @@ public class EventDivisionDetailDto
     public bool HasWaitlist => WaitlistedCount > 0;
     public List<EventUnitDto> LookingForPartner { get; set; } = new(); // Units needing partners
 }
+
+// Payment DTOs
+public class UploadPaymentProofRequest
+{
+    public string? PaymentProofUrl { get; set; }
+    public string? PaymentReference { get; set; }
+    public decimal? AmountPaid { get; set; }
+}
+
+public class PaymentInfoDto
+{
+    public int UnitId { get; set; }
+    public string PaymentStatus { get; set; } = "Pending";
+    public decimal AmountPaid { get; set; }
+    public decimal AmountDue { get; set; }
+    public string? PaymentProofUrl { get; set; }
+    public string? PaymentReference { get; set; }
+    public DateTime? PaidAt { get; set; }
+}

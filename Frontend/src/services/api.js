@@ -1276,6 +1276,12 @@ export const tournamentApi = {
   moveRegistration: (eventId, unitId, newDivisionId) =>
     api.post(`/tournament/events/${eventId}/registrations/${unitId}/move`, { newDivisionId }),
 
+  // Payment
+  uploadPaymentProof: (eventId, unitId, data) =>
+    api.post(`/tournament/events/${eventId}/units/${unitId}/payment`, data),
+  markAsPaid: (eventId, unitId) =>
+    api.post(`/tournament/events/${eventId}/units/${unitId}/mark-paid`),
+
   // Tournament Courts
   getTournamentCourts: (eventId) => api.get(`/tournament/events/${eventId}/courts`),
   createTournamentCourt: (eventId, data) => api.post(`/tournament/events/${eventId}/courts`, data),

@@ -623,6 +623,144 @@ public class TournamentController : ControllerBase
         return Ok(new ApiResponse<bool> { Success = true, Data = true, Message = "Successfully unregistered from division" });
     }
 
+    // ============================================
+    // Payment Management
+    // ============================================
+
+    /// <summary>
+    /// Upload payment proof for a registration
+    /// </summary>
+    [Authorize]
+    [HttpPost("events/{eventId}/units/{unitId}/payment")]
+    public async Task<ActionResult<ApiResponse<PaymentInfoDto>>> UploadPaymentProof(
+        int eventId,
+        int unitId,
+        [FromBody] UploadPaymentProofRequest request)
+    {
+        var userId = GetUserId();
+        if (!userId.HasValue)
+            return Unauthorized(new ApiResponse<PaymentInfoDto> { Success = false, Message = "Unauthorized" });
+
+        var unit = await _context.EventUnits
+            .Include(u => u.Members)
+            .Include(u => u.Event)
+            .Include(u => u.Division)
+            .FirstOrDefaultAsync(u => u.Id == unitId && u.EventId == eventId);
+
+        if (unit == null)
+            return NotFound(new ApiResponse<PaymentInfoDto> { Success = false, Message = "Registration not found" });
+
+        // Check if user is a member of this unit or the event organizer
+        var isMember = unit.Members.Any(m => m.UserId == userId.Value);
+        var isOrganizer = unit.Event?.OrganizedByUserId == userId.Value;
+
+        if (!isMember && !isOrganizer)
+            return Forbid();
+
+        // Update payment info
+        if (!string.IsNullOrEmpty(request.PaymentProofUrl))
+        {
+            unit.PaymentProofUrl = request.PaymentProofUrl;
+        }
+
+        if (!string.IsNullOrEmpty(request.PaymentReference))
+        {
+            unit.PaymentReference = request.PaymentReference;
+        }
+
+        if (request.AmountPaid.HasValue)
+        {
+            unit.AmountPaid = request.AmountPaid.Value;
+        }
+
+        // Calculate amount due
+        var amountDue = (unit.Event?.RegistrationFee ?? 0) + (unit.Division?.DivisionFee ?? 0);
+
+        // Auto-update payment status based on amount paid
+        if (unit.AmountPaid >= amountDue && amountDue > 0)
+        {
+            unit.PaymentStatus = "Paid";
+            unit.PaidAt = DateTime.Now;
+        }
+        else if (unit.AmountPaid > 0)
+        {
+            unit.PaymentStatus = "Partial";
+        }
+        else if (!string.IsNullOrEmpty(unit.PaymentProofUrl))
+        {
+            // If proof uploaded but no amount, mark as pending verification
+            unit.PaymentStatus = "PendingVerification";
+        }
+
+        unit.UpdatedAt = DateTime.Now;
+        await _context.SaveChangesAsync();
+
+        return Ok(new ApiResponse<PaymentInfoDto>
+        {
+            Success = true,
+            Data = new PaymentInfoDto
+            {
+                UnitId = unit.Id,
+                PaymentStatus = unit.PaymentStatus,
+                AmountPaid = unit.AmountPaid,
+                AmountDue = amountDue,
+                PaymentProofUrl = unit.PaymentProofUrl,
+                PaymentReference = unit.PaymentReference,
+                PaidAt = unit.PaidAt
+            },
+            Message = "Payment info updated"
+        });
+    }
+
+    /// <summary>
+    /// Mark registration as paid (organizer only)
+    /// </summary>
+    [Authorize]
+    [HttpPost("events/{eventId}/units/{unitId}/mark-paid")]
+    public async Task<ActionResult<ApiResponse<PaymentInfoDto>>> MarkAsPaid(int eventId, int unitId)
+    {
+        var userId = GetUserId();
+        if (!userId.HasValue)
+            return Unauthorized(new ApiResponse<PaymentInfoDto> { Success = false, Message = "Unauthorized" });
+
+        var unit = await _context.EventUnits
+            .Include(u => u.Event)
+            .Include(u => u.Division)
+            .FirstOrDefaultAsync(u => u.Id == unitId && u.EventId == eventId);
+
+        if (unit == null)
+            return NotFound(new ApiResponse<PaymentInfoDto> { Success = false, Message = "Registration not found" });
+
+        // Only organizer can mark as paid
+        if (unit.Event?.OrganizedByUserId != userId.Value)
+            return Forbid();
+
+        var amountDue = (unit.Event?.RegistrationFee ?? 0) + (unit.Division?.DivisionFee ?? 0);
+
+        unit.PaymentStatus = "Paid";
+        unit.AmountPaid = amountDue;
+        unit.PaidAt = DateTime.Now;
+        unit.UpdatedAt = DateTime.Now;
+
+        await _context.SaveChangesAsync();
+
+        return Ok(new ApiResponse<PaymentInfoDto>
+        {
+            Success = true,
+            Data = new PaymentInfoDto
+            {
+                UnitId = unit.Id,
+                PaymentStatus = unit.PaymentStatus,
+                AmountPaid = unit.AmountPaid,
+                AmountDue = amountDue,
+                PaymentProofUrl = unit.PaymentProofUrl,
+                PaymentReference = unit.PaymentReference,
+                PaidAt = unit.PaidAt
+            },
+            Message = "Marked as paid"
+        });
+    }
+
     /// <summary>
     /// Remove a registration (organizer only) - removes member from unit, deletes unit if empty
     /// </summary>

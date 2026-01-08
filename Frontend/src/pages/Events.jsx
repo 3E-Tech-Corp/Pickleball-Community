@@ -8,6 +8,7 @@ import VenueMap from '../components/ui/VenueMap';
 import ShareLink, { QrCodeModal } from '../components/ui/ShareLink';
 import { getIconByName } from '../utils/iconMap';
 import { getColorValues } from '../utils/colorMap';
+import PaymentModal from '../components/PaymentModal';
 
 export default function Events() {
   const { user, isAuthenticated } = useAuth();
@@ -1195,6 +1196,9 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
   const [showRegistrations, setShowRegistrations] = useState(false);
   const [updatingRegistration, setUpdatingRegistration] = useState(null);
 
+  // Payment modal state
+  const [selectedPaymentReg, setSelectedPaymentReg] = useState(null);
+
   // Court selection for editing
   const [topCourts, setTopCourts] = useState([]);
   const [courtsLoading, setCourtsLoading] = useState(false);
@@ -2346,21 +2350,20 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
                               {/* Payment status/button */}
                               {reg.amountDue > 0 && (
                                 <button
-                                  onClick={() => {
-                                    // TODO: Open payment modal
-                                    toast.info(`Payment: ${reg.paymentStatus}${reg.paymentStatus !== 'Paid' ? ` - $${reg.amountDue} due` : ''}`);
-                                  }}
+                                  onClick={() => setSelectedPaymentReg(reg)}
                                   className={`px-2 py-1 text-sm rounded-lg flex items-center gap-1 ${
                                     reg.paymentStatus === 'Paid'
                                       ? 'bg-green-100 text-green-700'
-                                      : reg.paymentStatus === 'Partial'
+                                      : reg.paymentStatus === 'Partial' || reg.paymentStatus === 'PendingVerification'
                                       ? 'bg-yellow-100 text-yellow-700'
                                       : 'bg-orange-100 text-orange-700 hover:bg-orange-200'
                                   }`}
                                   title={reg.paymentStatus === 'Paid' ? 'Payment complete' : `$${reg.amountDue - reg.amountPaid} remaining`}
                                 >
                                   <DollarSign className="w-4 h-4" />
-                                  {reg.paymentStatus === 'Paid' ? 'Paid' : reg.paymentStatus === 'Partial' ? 'Partial' : 'Pay'}
+                                  {reg.paymentStatus === 'Paid' ? 'Paid' :
+                                   reg.paymentStatus === 'PendingVerification' ? 'Pending' :
+                                   reg.paymentStatus === 'Partial' ? 'Partial' : 'Pay'}
                                 </button>
                               )}
                               {/* Cancel button */}
@@ -3997,6 +4000,18 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
         title={`Share: ${event.name}`}
         isOpen={showEventQrModal}
         onClose={() => setShowEventQrModal(false)}
+      />
+
+      {/* Payment Modal */}
+      <PaymentModal
+        isOpen={!!selectedPaymentReg}
+        onClose={() => setSelectedPaymentReg(null)}
+        registration={selectedPaymentReg}
+        event={event}
+        onPaymentUpdated={(paymentInfo) => {
+          // Update the registration in myRegistrations with new payment info
+          onUpdate();
+        }}
       />
     </div>
   );
