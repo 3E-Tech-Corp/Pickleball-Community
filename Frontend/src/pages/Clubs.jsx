@@ -936,6 +936,7 @@ export default function Clubs() {
             loadClubs();
           }}
           memberRoles={memberRoles}
+          onViewProfile={setProfileModalUserId}
         />
       )}
 
@@ -1042,7 +1043,7 @@ function ClubCard({ club, onViewDetails, showManageButton = false }) {
   );
 }
 
-function ClubDetailModal({ club, isAuthenticated, currentUserId, onClose, onJoin, onUpdate, memberRoles }) {
+function ClubDetailModal({ club, isAuthenticated, currentUserId, onClose, onJoin, onUpdate, memberRoles, onViewProfile }) {
   const toast = useToast();
   const [activeTab, setActiveTab] = useState('about');
   const [financeSubTab, setFinanceSubTab] = useState('internal'); // internal, league
@@ -2258,7 +2259,7 @@ function ClubDetailModal({ club, isAuthenticated, currentUserId, onClose, onJoin
                         <div key={request.id} className="flex items-center justify-between p-3 bg-orange-50 rounded-lg border border-orange-100">
                           <div
                             className="flex items-center gap-3 cursor-pointer hover:opacity-80"
-                            onClick={() => setProfileModalUserId(request.userId)}
+                            onClick={() => onViewProfile(request.userId)}
                           >
                             {request.userProfileImageUrl ? (
                               <img src={getSharedAssetUrl(request.userProfileImageUrl)} alt="" className="w-10 h-10 rounded-full object-cover" />
@@ -2311,7 +2312,7 @@ function ClubDetailModal({ club, isAuthenticated, currentUserId, onClose, onJoin
                     <div key={member.id} className={`flex items-center justify-between p-3 rounded-lg ${member.isMembershipExpired ? 'bg-red-50' : 'bg-gray-50'}`}>
                       <div
                         className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity"
-                        onClick={() => setProfileModalUserId(member.userId)}
+                        onClick={() => onViewProfile(member.userId)}
                       >
                         {member.profileImageUrl ? (
                           <img src={getSharedAssetUrl(member.profileImageUrl)} alt="" className="w-10 h-10 rounded-full object-cover" />
