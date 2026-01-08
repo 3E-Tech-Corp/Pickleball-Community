@@ -190,6 +190,13 @@ public class TournamentController : ControllerBase
             return NotFound(new ApiResponse<List<EventUnitDto>> { Success = false, Message = "User not found" });
 
         var createdUnits = new List<EventUnit>();
+        var warnings = new List<string>();
+
+        // Check if user has gender set in profile
+        if (string.IsNullOrEmpty(user.Gender))
+        {
+            warnings.Add("Please update your profile with your gender for accurate division placement.");
+        }
 
         // Check if event allows multiple divisions
         if (!evt.AllowMultipleDivisions && request.DivisionIds.Count > 1)
@@ -227,6 +234,24 @@ public class TournamentController : ControllerBase
                     m.InviteStatus == "Accepted");
 
             if (existingMember != null) continue;
+
+            // Check gender compatibility with division
+            if (!string.IsNullOrEmpty(division.Gender) && division.Gender != "Open")
+            {
+                if (!string.IsNullOrEmpty(user.Gender))
+                {
+                    // For Men's/Women's divisions, check if gender matches
+                    if (division.Gender == "Men" && user.Gender != "Male")
+                    {
+                        warnings.Add($"Division '{division.Name}' is for Men. Your profile indicates a different gender.");
+                    }
+                    else if (division.Gender == "Women" && user.Gender != "Female")
+                    {
+                        warnings.Add($"Division '{division.Name}' is for Women. Your profile indicates a different gender.");
+                    }
+                    // For Mixed divisions, any gender is welcome but we note it for team composition tracking
+                }
+            }
 
             var teamSize = division.TeamUnit?.TotalPlayers ?? division.TeamSize;
             var isSingles = teamSize == 1;
@@ -293,7 +318,8 @@ public class TournamentController : ControllerBase
             return Ok(new ApiResponse<List<EventUnitDto>>
             {
                 Success = true,
-                Data = new List<EventUnitDto>()
+                Data = new List<EventUnitDto>(),
+                Warnings = warnings.Any() ? warnings : null
             });
         }
 
@@ -311,7 +337,8 @@ public class TournamentController : ControllerBase
         return Ok(new ApiResponse<List<EventUnitDto>>
         {
             Success = true,
-            Data = units.Select(MapToUnitDto).ToList()
+            Data = units.Select(MapToUnitDto).ToList(),
+            Warnings = warnings.Any() ? warnings : null
         });
     }
 

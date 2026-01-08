@@ -1973,6 +1973,12 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
       });
       if (response.success) {
         toast.success('Successfully registered for division!');
+        // Display any warnings (e.g., gender mismatch, profile incomplete)
+        if (response.warnings && response.warnings.length > 0) {
+          response.warnings.forEach(warning => {
+            toast.warning(warning);
+          });
+        }
         onUpdate();
         setShowTeamRegistration(false);
         setSelectedDivisionForRegistration(null);
