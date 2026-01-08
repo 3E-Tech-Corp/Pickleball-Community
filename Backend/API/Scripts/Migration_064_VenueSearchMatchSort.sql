@@ -39,7 +39,7 @@ BEGIN
     PRINT 'sp_SearchVenues called with:'
     PRINT '  @Query: ' + ISNULL(@Query, 'NULL')
     PRINT '  @SortBy: ' + ISNULL(@SortBy, 'NULL')
-    PRINT '  @QueryLower: ' + ISNULL(@QueryLower, 'NULL')
+    PRINT '  @QueryLower: ' + ISNULL(@QueryLower, 'NULL');
 
     WITH VenueResults AS (
         SELECT
