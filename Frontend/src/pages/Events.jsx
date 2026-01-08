@@ -2695,14 +2695,15 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
                                 No registrations yet
                               </div>
                             ) : (
-                              <div className="divide-y">
+                              <div className="p-4">
+                                <div className="flex flex-wrap gap-4">
                                 {(divisionRegistrationsCache[division.id] || []).map((unit, index) => {
                                   const requiredPlayers = unit.requiredPlayers || teamSize;
                                   const isTeam = requiredPlayers > 2;
                                   const isDoubles = requiredPlayers === 2;
 
                                   return (
-                                    <div key={unit.id || index} className="px-4 py-3">
+                                    <div key={unit.id || index} className={isTeam ? "w-full border-b pb-3 last:border-b-0" : ""}>
                                       {isTeam ? (
                                         // Team display (3+ players)
                                         <div>
@@ -2739,55 +2740,55 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
                                           </div>
                                         </div>
                                       ) : isDoubles ? (
-                                        // Doubles display
-                                        <div className="flex items-center gap-3">
-                                          <div className="flex -space-x-2">
+                                        // Doubles display - avatars with names below
+                                        <div className="flex flex-col">
+                                          <div className="flex items-start gap-4">
                                             {unit.members?.slice(0, 2).map((member, mIdx) => (
-                                              member.profileImageUrl ? (
-                                                <img key={mIdx} src={getSharedAssetUrl(member.profileImageUrl)} alt="" className="w-8 h-8 rounded-full object-cover border-2 border-white" />
-                                              ) : (
-                                                <div key={mIdx} className="w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center text-orange-700 text-xs font-medium border-2 border-white">
-                                                  {(member.firstName || 'P')[0].toUpperCase()}
-                                                </div>
-                                              )
+                                              <div key={mIdx} className="flex flex-col items-center text-center">
+                                                {member.profileImageUrl ? (
+                                                  <img src={getSharedAssetUrl(member.profileImageUrl)} alt="" className="w-10 h-10 rounded-full object-cover" />
+                                                ) : (
+                                                  <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center text-orange-700 text-sm font-medium">
+                                                    {(member.firstName || 'P')[0].toUpperCase()}
+                                                  </div>
+                                                )}
+                                                <span className="text-xs text-gray-700 mt-1 max-w-[80px] truncate">
+                                                  {member.firstName || 'Player'}
+                                                </span>
+                                              </div>
                                             ))}
                                             {(unit.members?.length || 0) < 2 && (
-                                              <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center text-gray-400 text-xs border-2 border-white">
-                                                ?
+                                              <div className="flex flex-col items-center text-center">
+                                                <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center text-gray-400 text-sm">
+                                                  ?
+                                                </div>
+                                                <span className="text-xs text-gray-400 mt-1">Partner</span>
                                               </div>
                                             )}
                                           </div>
-                                          <div className="flex-1">
-                                            <div className="text-sm text-gray-900">
-                                              {unit.members?.length > 0
-                                                ? unit.members.map(m => m.firstName && m.lastName ? `${m.firstName} ${m.lastName}` : m.firstName || 'Player').join(' & ')
-                                                : unit.name || 'Looking for partner'}
-                                            </div>
-                                            {!unit.isComplete && (
-                                              <span className="text-xs text-yellow-600">Looking for partner</span>
-                                            )}
-                                          </div>
+                                          {!unit.isComplete && (
+                                            <span className="text-xs text-yellow-600 mt-1">Looking for partner</span>
+                                          )}
                                         </div>
                                       ) : (
-                                        // Singles display
-                                        <div className="flex items-center gap-3">
+                                        // Singles display - avatar with name below
+                                        <div className="flex flex-col items-center text-center">
                                           {unit.members?.[0]?.profileImageUrl ? (
-                                            <img src={getSharedAssetUrl(unit.members[0].profileImageUrl)} alt="" className="w-8 h-8 rounded-full object-cover" />
+                                            <img src={getSharedAssetUrl(unit.members[0].profileImageUrl)} alt="" className="w-10 h-10 rounded-full object-cover" />
                                           ) : (
-                                            <div className="w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center text-orange-700 text-sm font-medium">
+                                            <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center text-orange-700 text-sm font-medium">
                                               {(unit.members?.[0]?.firstName || unit.name || 'P')[0].toUpperCase()}
                                             </div>
                                           )}
-                                          <span className="text-sm text-gray-900">
-                                            {unit.members?.[0]?.firstName && unit.members?.[0]?.lastName
-                                              ? `${unit.members[0].firstName} ${unit.members[0].lastName}`
-                                              : unit.members?.[0]?.firstName || unit.name || 'Player'}
+                                          <span className="text-xs text-gray-700 mt-1">
+                                            {unit.members?.[0]?.firstName || unit.name || 'Player'}
                                           </span>
                                         </div>
                                       )}
                                     </div>
                                   );
                                 })}
+                                </div>
                               </div>
                             )}
                           </div>
