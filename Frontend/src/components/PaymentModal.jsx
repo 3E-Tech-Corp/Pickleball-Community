@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { X, DollarSign, Upload, CheckCircle, AlertCircle, Loader2, Image, ExternalLink } from 'lucide-react';
-import { toast } from 'react-hot-toast';
+import { useToast } from '../contexts/ToastContext';
 import { tournamentApi, assetsApi } from '../services/api';
 
 export default function PaymentModal({ isOpen, onClose, registration, event, onPaymentUpdated }) {
+  const toast = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [paymentReference, setPaymentReference] = useState('');
