@@ -6,10 +6,10 @@ using Pickleball.Community.Models.Entities;
 using Pickleball.Community.Database;
 using System.Security.Claims;
 
-namespace Pickleball.Community.Controllers;
+namespace Pickleball.Community.API.Controllers;
 
 [ApiController]
-[Route("api/player-history")]
+[Route("player-history")]
 public class PlayerHistoryController : ControllerBase
 {
     private readonly ApplicationDbContext _context;

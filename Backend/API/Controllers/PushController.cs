@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Pickleball.Community.Services;
 using System.Security.Claims;
 
-namespace Pickleball.Community.Controllers;
+namespace Pickleball.Community.API.Controllers;
 
 [ApiController]
 [Route("[controller]")]

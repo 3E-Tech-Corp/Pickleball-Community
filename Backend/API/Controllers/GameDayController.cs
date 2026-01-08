@@ -5,7 +5,7 @@ using Pickleball.Community.Database;
 using Pickleball.Community.Models.Entities;
 using System.Security.Claims;
 
-namespace Pickleball.Community.Controllers;
+namespace Pickleball.Community.API.Controllers;
 
 /// <summary>
 /// Controller for managing Game Day events (non-tournament casual play sessions)

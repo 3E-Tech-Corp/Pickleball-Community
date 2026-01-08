@@ -6,7 +6,7 @@ using Pickleball.Community.Models.Entities;
 using API.Models.DTOs;
 using System.Security.Claims;
 
-namespace Pickleball.Community.Controllers;
+namespace Pickleball.Community.API.Controllers;
 
 [ApiController]
 [Route("[controller]")]
