@@ -1267,6 +1267,8 @@ export const tournamentApi = {
   respondToInvitation: (unitId, accept) =>
     api.post('/tournament/units/invitation/respond', { unitId, accept }),
   leaveUnit: (unitId) => api.delete(`/tournament/units/${unitId}/leave`),
+  unregisterFromDivision: (eventId, divisionId) =>
+    api.delete(`/tournament/events/${eventId}/divisions/${divisionId}/unregister`),
 
   // Registration Management (organizer)
   removeRegistration: (eventId, unitId, userId) =>

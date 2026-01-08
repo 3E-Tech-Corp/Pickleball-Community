@@ -572,6 +572,58 @@ public class TournamentController : ControllerBase
     }
 
     /// <summary>
+    /// Unregister from a division - allows player to withdraw their registration
+    /// For singles/solo: deletes the unit entirely
+    /// For captain of team: deletes entire unit (team withdraws)
+    /// </summary>
+    [Authorize]
+    [HttpDelete("events/{eventId}/divisions/{divisionId}/unregister")]
+    public async Task<ActionResult<ApiResponse<bool>>> UnregisterFromDivision(int eventId, int divisionId)
+    {
+        var userId = GetUserId();
+        if (!userId.HasValue)
+            return Unauthorized(new ApiResponse<bool> { Success = false, Message = "Unauthorized" });
+
+        // Find user's unit in this division
+        var membership = await _context.EventUnitMembers
+            .Include(m => m.Unit)
+            .ThenInclude(u => u!.Members)
+            .FirstOrDefaultAsync(m => m.UserId == userId.Value
+                && m.Unit!.EventId == eventId
+                && m.Unit.DivisionId == divisionId
+                && m.Unit.Status != "Cancelled");
+
+        if (membership?.Unit == null)
+            return NotFound(new ApiResponse<bool> { Success = false, Message = "You are not registered for this division" });
+
+        var unit = membership.Unit;
+
+        // Check if tournament has started (matches scheduled)
+        var hasScheduledMatches = await _context.EventMatches
+            .AnyAsync(m => m.DivisionId == divisionId && (m.Unit1Id == unit.Id || m.Unit2Id == unit.Id) && m.Status != "Cancelled");
+
+        if (hasScheduledMatches)
+            return BadRequest(new ApiResponse<bool> { Success = false, Message = "Cannot unregister after tournament schedule has been created. Contact the organizer." });
+
+        // If user is captain or solo player, delete the entire unit
+        if (unit.CaptainUserId == userId.Value || unit.Members.Count == 1)
+        {
+            // Remove all members first
+            _context.EventUnitMembers.RemoveRange(unit.Members);
+            _context.EventUnits.Remove(unit);
+        }
+        else
+        {
+            // Just remove this member
+            _context.EventUnitMembers.Remove(membership);
+        }
+
+        await _context.SaveChangesAsync();
+
+        return Ok(new ApiResponse<bool> { Success = true, Data = true, Message = "Successfully unregistered from division" });
+    }
+
+    /// <summary>
     /// Remove a registration (organizer only) - removes member from unit, deletes unit if empty
     /// </summary>
     [Authorize]

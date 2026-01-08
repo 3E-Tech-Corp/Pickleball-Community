@@ -1437,8 +1437,8 @@ public class EventsController : ControllerBase
 
             // Check if user can see private documents
             var isOrganizer = evt.OrganizedByUserId == userId;
-            var isRegistered = userId.HasValue && await _context.EventRegistrations
-                .AnyAsync(r => r.EventId == id && r.UserId == userId.Value && r.Status != "Cancelled");
+            var isRegistered = userId.HasValue && await _context.EventUnitMembers
+                .AnyAsync(m => m.Unit!.EventId == id && m.UserId == userId.Value && m.Unit.Status != "Cancelled");
             var canSeePrivate = isOrganizer || isAdmin || isRegistered;
 
             var query = _context.EventDocuments

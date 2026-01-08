@@ -2090,10 +2090,16 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
   const handleCancelRegistration = async (divisionId) => {
     if (!confirm('Are you sure you want to cancel your registration?')) return;
     try {
-      await eventsApi.cancelRegistration(event.id, divisionId);
-      onUpdate();
+      const response = await tournamentApi.unregisterFromDivision(event.id, divisionId);
+      if (response.success) {
+        toast.success('Successfully unregistered from division');
+        onUpdate();
+      } else {
+        toast.error(response.message || 'Failed to unregister');
+      }
     } catch (err) {
       console.error('Error cancelling registration:', err);
+      toast.error(err.message || 'Failed to unregister');
     }
   };
 
