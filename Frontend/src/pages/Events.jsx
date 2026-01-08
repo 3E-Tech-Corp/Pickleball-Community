@@ -2188,13 +2188,15 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
                     <span className="flex items-center gap-1">
                       <MapPin className="w-4 h-4" />
                       {event.courtId && event.venueName ? (
-                        <Link
-                          to={`/venues?venueId=${event.courtId}`}
+                        <a
+                          href={`/venues?venueId=${event.courtId}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
                           onClick={(e) => e.stopPropagation()}
                           className="text-orange-600 hover:text-orange-700 hover:underline"
                         >
                           {event.venueName}
-                        </Link>
+                        </a>
                       ) : (
                         <span>{event.venueName || `${event.city}, ${event.state}`}</span>
                       )}
