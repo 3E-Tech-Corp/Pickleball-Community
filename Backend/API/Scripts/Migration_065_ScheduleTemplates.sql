@@ -147,7 +147,7 @@ BEGIN
         CONSTRAINT FK_EventMatchSlots_EventMatch FOREIGN KEY (EventMatchId) REFERENCES EventMatches(Id) ON DELETE CASCADE,
         CONSTRAINT FK_EventMatchSlots_DivisionSlot FOREIGN KEY (DivisionMatchSlotId) REFERENCES DivisionMatchSlots(Id) ON DELETE NO ACTION,
         CONSTRAINT FK_EventMatchSlots_Winner FOREIGN KEY (WinnerUnitId) REFERENCES EventUnits(Id) ON DELETE NO ACTION,
-        CONSTRAINT FK_EventMatchSlots_Court FOREIGN KEY (TournamentCourtId) REFERENCES TournamentCourts(Id) ON DELETE SET NULL
+        CONSTRAINT FK_EventMatchSlots_Court FOREIGN KEY (TournamentCourtId) REFERENCES TournamentCourts(Id) ON DELETE NO ACTION
     )
     CREATE INDEX IX_EventMatchSlots_EventMatchId ON EventMatchSlots(EventMatchId)
     PRINT 'EventMatchSlots table created.'
@@ -288,8 +288,7 @@ BEGIN
     -- Update division status
     UPDATE EventDivisions
     SET ScheduleStatus = 'TemplateReady',
-        PoolCount = @PoolCount,
-        UpdatedAt = GETUTCDATE()
+        PoolCount = @PoolCount
     WHERE Id = @DivisionId
 
     SELECT
@@ -383,8 +382,7 @@ BEGIN
     -- Update division status
     UPDATE EventDivisions
     SET ScheduleStatus = 'TemplateReady',
-        ScheduleType = 'SingleElimination',
-        UpdatedAt = GETUTCDATE()
+        ScheduleType = 'SingleElimination'
     WHERE Id = @DivisionId
 
     SELECT
@@ -500,8 +498,7 @@ BEGIN
 
     UPDATE EventDivisions
     SET ScheduleStatus = 'TemplateReady',
-        ScheduleType = 'DoubleElimination',
-        UpdatedAt = GETUTCDATE()
+        ScheduleType = 'DoubleElimination'
     WHERE Id = @DivisionId
 
     SELECT @MatchNum AS TotalMatches
@@ -566,8 +563,7 @@ BEGIN
 
     UPDATE EventDivisions
     SET ScheduleType = 'RoundRobinPlayoff',
-        PlayoffFromPools = @AdvancePerPool,
-        UpdatedAt = GETUTCDATE()
+        PlayoffFromPools = @AdvancePerPool
     WHERE Id = @DivisionId
 
     SELECT 'Round Robin + Playoff schedule generated' AS Result
