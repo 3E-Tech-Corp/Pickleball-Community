@@ -1210,22 +1210,22 @@ export const siteContentApi = {
 // Skill Levels API (for event divisions)
 export const skillLevelsApi = {
   // Get all active skill levels
-  getAll: () => api.get('/skilllevels'),
+  getAll: () => api.get('/skill-levels'),
 
   // Get all skill levels including inactive (admin only)
-  getAllIncludingInactive: () => api.get('/skilllevels/all'),
+  getAllIncludingInactive: () => api.get('/skill-levels/all'),
 
   // Get single skill level
-  getById: (id) => api.get(`/skilllevels/${id}`),
+  getById: (id) => api.get(`/skill-levels/${id}`),
 
   // Create new skill level (admin only)
-  create: (data) => api.post('/skilllevels', data),
+  create: (data) => api.post('/skill-levels', data),
 
   // Update skill level (admin only)
-  update: (id, data) => api.put(`/skilllevels/${id}`, data),
+  update: (id, data) => api.put(`/skill-levels/${id}`, data),
 
   // Delete skill level (admin only - soft delete)
-  delete: (id) => api.delete(`/skilllevels/${id}`)
+  delete: (id) => api.delete(`/skill-levels/${id}`)
 }
 
 // Tournament API

@@ -9,7 +9,7 @@ using System.Security.Claims;
 namespace Pickleball.Community.API.Controllers;
 
 [ApiController]
-[Route("[controller]")]
+[Route("skill-levels")]
 public class SkillLevelsController : ControllerBase
 {
     private readonly ApplicationDbContext _context;
