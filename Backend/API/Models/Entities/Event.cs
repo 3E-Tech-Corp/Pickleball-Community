@@ -114,6 +114,7 @@ public class Event
     public ICollection<EventUnit> Units { get; set; } = new List<EventUnit>();
     public ICollection<TournamentCourt> TournamentCourts { get; set; } = new List<TournamentCourt>();
     public ICollection<EventMatch> Matches { get; set; } = new List<EventMatch>();
+    public ICollection<EventDocument> Documents { get; set; } = new List<EventDocument>();
 }
 
 public class EventDivision
@@ -299,4 +300,48 @@ public class EventPartnerRequest
 
     [ForeignKey("RequestedByUserId")]
     public User? RequestedBy { get; set; }
+}
+
+public class EventDocument
+{
+    public int Id { get; set; }
+
+    public int EventId { get; set; }
+
+    [Required]
+    [MaxLength(200)]
+    public string Title { get; set; } = string.Empty;
+
+    [Required]
+    [MaxLength(500)]
+    public string FileUrl { get; set; } = string.Empty;
+
+    [Required]
+    [MaxLength(200)]
+    public string FileName { get; set; } = string.Empty;
+
+    [MaxLength(50)]
+    public string? FileType { get; set; }
+
+    public int? FileSize { get; set; }
+
+    /// <summary>
+    /// If true, document is visible to all users.
+    /// If false, only visible to organizers and registered participants.
+    /// </summary>
+    public bool IsPublic { get; set; } = true;
+
+    public int SortOrder { get; set; } = 0;
+
+    public int UploadedByUserId { get; set; }
+
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime? UpdatedAt { get; set; }
+
+    // Navigation
+    [ForeignKey("EventId")]
+    public Event? Event { get; set; }
+
+    [ForeignKey("UploadedByUserId")]
+    public User? UploadedBy { get; set; }
 }

@@ -71,6 +71,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<EventGame> EventGames { get; set; }
     public DbSet<EventGamePlayer> EventGamePlayers { get; set; }
     public DbSet<TournamentCourt> TournamentCourts { get; set; }
+    public DbSet<EventDocument> EventDocuments { get; set; }
 
     // Clubs
     public DbSet<Club> Clubs { get; set; }

@@ -1422,6 +1422,227 @@ public class EventsController : ControllerBase
         }
     }
 
+    // GET: /events/{id}/documents - Get event documents
+    [HttpGet("{id}/documents")]
+    public async Task<ActionResult<ApiResponse<List<EventDocumentDto>>>> GetEventDocuments(int id)
+    {
+        try
+        {
+            var userId = GetCurrentUserId();
+            var isAdmin = await IsAdminAsync();
+
+            var evt = await _context.Events.FindAsync(id);
+            if (evt == null || !evt.IsActive)
+                return NotFound(new ApiResponse<List<EventDocumentDto>> { Success = false, Message = "Event not found" });
+
+            // Check if user can see private documents
+            var isOrganizer = evt.OrganizedByUserId == userId;
+            var isRegistered = userId.HasValue && await _context.EventRegistrations
+                .AnyAsync(r => r.EventId == id && r.UserId == userId.Value && r.Status != "Cancelled");
+            var canSeePrivate = isOrganizer || isAdmin || isRegistered;
+
+            var query = _context.EventDocuments
+                .Include(d => d.UploadedBy)
+                .Where(d => d.EventId == id);
+
+            if (!canSeePrivate)
+                query = query.Where(d => d.IsPublic);
+
+            var documents = await query
+                .OrderBy(d => d.SortOrder)
+                .ThenBy(d => d.CreatedAt)
+                .Select(d => new EventDocumentDto
+                {
+                    Id = d.Id,
+                    EventId = d.EventId,
+                    Title = d.Title,
+                    FileUrl = d.FileUrl,
+                    FileName = d.FileName,
+                    FileType = d.FileType,
+                    FileSize = d.FileSize,
+                    IsPublic = d.IsPublic,
+                    SortOrder = d.SortOrder,
+                    UploadedByUserId = d.UploadedByUserId,
+                    UploadedByUserName = d.UploadedBy != null ? (d.UploadedBy.FirstName + " " + d.UploadedBy.LastName).Trim() : null,
+                    CreatedAt = d.CreatedAt
+                })
+                .ToListAsync();
+
+            return Ok(new ApiResponse<List<EventDocumentDto>> { Success = true, Data = documents });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting event documents for event {EventId}", id);
+            return StatusCode(500, new ApiResponse<List<EventDocumentDto>> { Success = false, Message = "An error occurred" });
+        }
+    }
+
+    // POST: /events/{id}/documents - Add document to event (organizer/admin only)
+    [HttpPost("{id}/documents")]
+    [Authorize]
+    public async Task<ActionResult<ApiResponse<EventDocumentDto>>> AddEventDocument(int id, [FromBody] CreateEventDocumentDto dto)
+    {
+        try
+        {
+            var userId = GetCurrentUserId();
+            if (!userId.HasValue)
+                return Unauthorized(new ApiResponse<EventDocumentDto> { Success = false, Message = "User not authenticated" });
+
+            var evt = await _context.Events.FindAsync(id);
+            if (evt == null || !evt.IsActive)
+                return NotFound(new ApiResponse<EventDocumentDto> { Success = false, Message = "Event not found" });
+
+            // Check if user is organizer or admin
+            var isAdmin = await IsAdminAsync();
+            if (evt.OrganizedByUserId != userId.Value && !isAdmin)
+                return Forbid();
+
+            var document = new EventDocument
+            {
+                EventId = id,
+                Title = dto.Title,
+                FileUrl = dto.FileUrl,
+                FileName = dto.FileName,
+                FileType = dto.FileType,
+                FileSize = dto.FileSize,
+                IsPublic = dto.IsPublic,
+                SortOrder = dto.SortOrder,
+                UploadedByUserId = userId.Value,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            _context.EventDocuments.Add(document);
+            await _context.SaveChangesAsync();
+
+            var user = await _context.Users.FindAsync(userId.Value);
+
+            return Ok(new ApiResponse<EventDocumentDto>
+            {
+                Success = true,
+                Data = new EventDocumentDto
+                {
+                    Id = document.Id,
+                    EventId = document.EventId,
+                    Title = document.Title,
+                    FileUrl = document.FileUrl,
+                    FileName = document.FileName,
+                    FileType = document.FileType,
+                    FileSize = document.FileSize,
+                    IsPublic = document.IsPublic,
+                    SortOrder = document.SortOrder,
+                    UploadedByUserId = document.UploadedByUserId,
+                    UploadedByUserName = user != null ? (user.FirstName + " " + user.LastName).Trim() : null,
+                    CreatedAt = document.CreatedAt
+                },
+                Message = "Document added successfully"
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error adding document to event {EventId}", id);
+            return StatusCode(500, new ApiResponse<EventDocumentDto> { Success = false, Message = "An error occurred" });
+        }
+    }
+
+    // PUT: /events/{id}/documents/{docId} - Update document (organizer/admin only)
+    [HttpPut("{id}/documents/{docId}")]
+    [Authorize]
+    public async Task<ActionResult<ApiResponse<EventDocumentDto>>> UpdateEventDocument(int id, int docId, [FromBody] UpdateEventDocumentDto dto)
+    {
+        try
+        {
+            var userId = GetCurrentUserId();
+            if (!userId.HasValue)
+                return Unauthorized(new ApiResponse<EventDocumentDto> { Success = false, Message = "User not authenticated" });
+
+            var evt = await _context.Events.FindAsync(id);
+            if (evt == null || !evt.IsActive)
+                return NotFound(new ApiResponse<EventDocumentDto> { Success = false, Message = "Event not found" });
+
+            // Check if user is organizer or admin
+            var isAdmin = await IsAdminAsync();
+            if (evt.OrganizedByUserId != userId.Value && !isAdmin)
+                return Forbid();
+
+            var document = await _context.EventDocuments
+                .Include(d => d.UploadedBy)
+                .FirstOrDefaultAsync(d => d.Id == docId && d.EventId == id);
+
+            if (document == null)
+                return NotFound(new ApiResponse<EventDocumentDto> { Success = false, Message = "Document not found" });
+
+            // Update fields if provided
+            if (dto.Title != null) document.Title = dto.Title;
+            if (dto.IsPublic.HasValue) document.IsPublic = dto.IsPublic.Value;
+            if (dto.SortOrder.HasValue) document.SortOrder = dto.SortOrder.Value;
+            document.UpdatedAt = DateTime.UtcNow;
+
+            await _context.SaveChangesAsync();
+
+            return Ok(new ApiResponse<EventDocumentDto>
+            {
+                Success = true,
+                Data = new EventDocumentDto
+                {
+                    Id = document.Id,
+                    EventId = document.EventId,
+                    Title = document.Title,
+                    FileUrl = document.FileUrl,
+                    FileName = document.FileName,
+                    FileType = document.FileType,
+                    FileSize = document.FileSize,
+                    IsPublic = document.IsPublic,
+                    SortOrder = document.SortOrder,
+                    UploadedByUserId = document.UploadedByUserId,
+                    UploadedByUserName = document.UploadedBy != null ? (document.UploadedBy.FirstName + " " + document.UploadedBy.LastName).Trim() : null,
+                    CreatedAt = document.CreatedAt
+                },
+                Message = "Document updated successfully"
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating document {DocId}", docId);
+            return StatusCode(500, new ApiResponse<EventDocumentDto> { Success = false, Message = "An error occurred" });
+        }
+    }
+
+    // DELETE: /events/{id}/documents/{docId} - Delete document (organizer/admin only)
+    [HttpDelete("{id}/documents/{docId}")]
+    [Authorize]
+    public async Task<ActionResult<ApiResponse<bool>>> DeleteEventDocument(int id, int docId)
+    {
+        try
+        {
+            var userId = GetCurrentUserId();
+            if (!userId.HasValue)
+                return Unauthorized(new ApiResponse<bool> { Success = false, Message = "User not authenticated" });
+
+            var evt = await _context.Events.FindAsync(id);
+            if (evt == null || !evt.IsActive)
+                return NotFound(new ApiResponse<bool> { Success = false, Message = "Event not found" });
+
+            // Check if user is organizer or admin
+            var isAdmin = await IsAdminAsync();
+            if (evt.OrganizedByUserId != userId.Value && !isAdmin)
+                return Forbid();
+
+            var document = await _context.EventDocuments.FirstOrDefaultAsync(d => d.Id == docId && d.EventId == id);
+            if (document == null)
+                return NotFound(new ApiResponse<bool> { Success = false, Message = "Document not found" });
+
+            _context.EventDocuments.Remove(document);
+            await _context.SaveChangesAsync();
+
+            return Ok(new ApiResponse<bool> { Success = true, Data = true, Message = "Document deleted successfully" });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error deleting document {DocId}", docId);
+            return StatusCode(500, new ApiResponse<bool> { Success = false, Message = "An error occurred" });
+        }
+    }
+
     // GET: /events/{id}/registrations - Get all registrations for an event (organizer only)
     [HttpGet("{id}/registrations")]
     [Authorize]

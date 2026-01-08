@@ -328,3 +328,40 @@ public class FeaturedEventsDto
     public List<EventDto> PopularEvents { get; set; } = new();
     public List<EventDto> RecentPastEvents { get; set; } = new();
 }
+
+// Event document
+public class EventDocumentDto
+{
+    public int Id { get; set; }
+    public int EventId { get; set; }
+    public string Title { get; set; } = string.Empty;
+    public string FileUrl { get; set; } = string.Empty;
+    public string FileName { get; set; } = string.Empty;
+    public string? FileType { get; set; }
+    public int? FileSize { get; set; }
+    public bool IsPublic { get; set; }
+    public int SortOrder { get; set; }
+    public int UploadedByUserId { get; set; }
+    public string? UploadedByUserName { get; set; }
+    public DateTime CreatedAt { get; set; }
+}
+
+// Create event document
+public class CreateEventDocumentDto
+{
+    public string Title { get; set; } = string.Empty;
+    public string FileUrl { get; set; } = string.Empty;
+    public string FileName { get; set; } = string.Empty;
+    public string? FileType { get; set; }
+    public int? FileSize { get; set; }
+    public bool IsPublic { get; set; } = true;
+    public int SortOrder { get; set; } = 0;
+}
+
+// Update event document
+public class UpdateEventDocumentDto
+{
+    public string? Title { get; set; }
+    public bool? IsPublic { get; set; }
+    public int? SortOrder { get; set; }
+}

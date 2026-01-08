@@ -838,7 +838,20 @@ export const eventsApi = {
     api.get(`/events/${eventId}/registrations`),
 
   updateRegistration: (eventId, registrationId, data) =>
-    api.put(`/events/${eventId}/registrations/${registrationId}`, data)
+    api.put(`/events/${eventId}/registrations/${registrationId}`, data),
+
+  // Document management
+  getDocuments: (eventId) =>
+    api.get(`/events/${eventId}/documents`),
+
+  addDocument: (eventId, data) =>
+    api.post(`/events/${eventId}/documents`, data),
+
+  updateDocument: (eventId, docId, data) =>
+    api.put(`/events/${eventId}/documents/${docId}`, data),
+
+  deleteDocument: (eventId, docId) =>
+    api.delete(`/events/${eventId}/documents/${docId}`)
 }
 
 // Clubs API

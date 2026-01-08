@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
-import { Calendar, MapPin, Clock, Users, Filter, Search, Plus, DollarSign, ChevronLeft, ChevronRight, X, UserPlus, Trophy, Layers, Check, AlertCircle, Navigation, Building2, Loader2, MessageCircle, CheckCircle, Edit3, ChevronDown, ChevronUp, Trash2, List, Map, Image, Upload, Play, Link2, QrCode, Download, ArrowRightLeft } from 'lucide-react';
+import { Calendar, MapPin, Clock, Users, Filter, Search, Plus, DollarSign, ChevronLeft, ChevronRight, X, UserPlus, Trophy, Layers, Check, AlertCircle, Navigation, Building2, Loader2, MessageCircle, CheckCircle, Edit3, ChevronDown, ChevronUp, Trash2, List, Map, Image, Upload, Play, Link2, QrCode, Download, ArrowRightLeft, FileText, Eye, EyeOff, ExternalLink } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import { eventsApi, eventTypesApi, courtsApi, teamUnitsApi, skillLevelsApi, tournamentApi, sharedAssetApi, getSharedAssetUrl } from '../services/api';
@@ -1231,6 +1231,15 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, formatDate, f
   const [linkCopied, setLinkCopied] = useState(false);
   const [showEventQrModal, setShowEventQrModal] = useState(false);
 
+  // Document management state
+  const [documents, setDocuments] = useState([]);
+  const [loadingDocuments, setLoadingDocuments] = useState(false);
+  const [showAddDocument, setShowAddDocument] = useState(false);
+  const [uploadingDocument, setUploadingDocument] = useState(false);
+  const [newDocument, setNewDocument] = useState({ title: '', isPublic: true, sortOrder: 0 });
+  const [editingDocument, setEditingDocument] = useState(null);
+  const [deletingDocumentId, setDeletingDocumentId] = useState(null);
+
   // Publishing state
   const [publishing, setPublishing] = useState(false);
   const toast = useToast();
@@ -1369,12 +1378,22 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, formatDate, f
     }
   };
 
-  // Load registrations when switching to manage tab
+  // Load registrations and documents when switching to manage tab
   useEffect(() => {
-    if (activeTab === 'manage' && isOrganizer && allRegistrations.length === 0) {
-      loadAllRegistrations();
+    if (activeTab === 'manage' && isOrganizer) {
+      if (allRegistrations.length === 0) {
+        loadAllRegistrations();
+      }
+      if (documents.length === 0) {
+        loadDocuments();
+      }
     }
   }, [activeTab, isOrganizer]);
+
+  // Load documents on initial render for public viewing
+  useEffect(() => {
+    loadDocuments();
+  }, [event.id]);
 
   // Load courts for editing
   const loadTopCourts = async () => {
@@ -1594,6 +1613,112 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, formatDate, f
       toast.error('Failed to update division');
     } finally {
       setSavingDivision(false);
+    }
+  };
+
+  // Load event documents
+  const loadDocuments = async () => {
+    setLoadingDocuments(true);
+    try {
+      const response = await eventsApi.getDocuments(event.id);
+      if (response.success) {
+        setDocuments(response.data || []);
+      }
+    } catch (err) {
+      console.error('Error loading documents:', err);
+    } finally {
+      setLoadingDocuments(false);
+    }
+  };
+
+  // Handle document file upload
+  const handleDocumentUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error('File must be less than 10MB');
+      return;
+    }
+
+    if (!newDocument.title.trim()) {
+      toast.error('Please enter a document title first');
+      return;
+    }
+
+    setUploadingDocument(true);
+    try {
+      // Upload file to shared assets
+      const uploadResponse = await sharedAssetApi.upload(file, 'document', 'event');
+      const fileUrl = uploadResponse?.data?.url || uploadResponse?.url;
+
+      if (!fileUrl) {
+        toast.error('Failed to upload file');
+        return;
+      }
+
+      // Create document record
+      const response = await eventsApi.addDocument(event.id, {
+        title: newDocument.title,
+        fileUrl: fileUrl,
+        fileName: file.name,
+        fileType: file.type,
+        fileSize: file.size,
+        isPublic: newDocument.isPublic,
+        sortOrder: newDocument.sortOrder
+      });
+
+      if (response.success) {
+        toast.success('Document added successfully');
+        setDocuments([...documents, response.data]);
+        setShowAddDocument(false);
+        setNewDocument({ title: '', isPublic: true, sortOrder: 0 });
+      } else {
+        toast.error(response.message || 'Failed to add document');
+      }
+    } catch (err) {
+      console.error('Error adding document:', err);
+      toast.error('Failed to add document');
+    } finally {
+      setUploadingDocument(false);
+    }
+  };
+
+  // Update document
+  const handleUpdateDocument = async (docId, updates) => {
+    try {
+      const response = await eventsApi.updateDocument(event.id, docId, updates);
+      if (response.success) {
+        setDocuments(documents.map(d => d.id === docId ? response.data : d));
+        setEditingDocument(null);
+        toast.success('Document updated');
+      } else {
+        toast.error(response.message || 'Failed to update document');
+      }
+    } catch (err) {
+      console.error('Error updating document:', err);
+      toast.error('Failed to update document');
+    }
+  };
+
+  // Delete document
+  const handleDeleteDocument = async (docId) => {
+    if (!confirm('Are you sure you want to delete this document?')) return;
+
+    setDeletingDocumentId(docId);
+    try {
+      const response = await eventsApi.deleteDocument(event.id, docId);
+      if (response.success) {
+        setDocuments(documents.filter(d => d.id !== docId));
+        toast.success('Document deleted');
+      } else {
+        toast.error(response.message || 'Failed to delete document');
+      }
+    } catch (err) {
+      console.error('Error deleting document:', err);
+      toast.error('Failed to delete document');
+    } finally {
+      setDeletingDocumentId(null);
     }
   };
 
@@ -2169,6 +2294,26 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, formatDate, f
                 </div>
               </div>
 
+              {/* Register Button */}
+              <div className="flex justify-center">
+                {canRegister() ? (
+                  <button
+                    onClick={() => setActiveTab('divisions')}
+                    className="px-8 py-3 bg-orange-600 text-white rounded-lg font-semibold hover:bg-orange-700 transition-colors flex items-center gap-2"
+                  >
+                    <UserPlus className="w-5 h-5" />
+                    Register Now
+                  </button>
+                ) : (
+                  <div className={`px-6 py-3 rounded-lg font-medium flex items-center gap-2 ${
+                    status.color === 'yellow' ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'
+                  }`}>
+                    <AlertCircle className="w-5 h-5" />
+                    Registration {status.text}
+                  </div>
+                )}
+              </div>
+
               {/* Description */}
               {event.description && (
                 <div>
@@ -2241,6 +2386,34 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, formatDate, f
                   {event.clubName || event.organizerName || 'Event Organizer'}
                 </p>
               </div>
+
+              {/* Event Documents (for public viewing) */}
+              {documents.filter(d => d.isPublic || isOrganizer).length > 0 && (
+                <div>
+                  <h3 className="font-medium text-gray-900 mb-2 flex items-center gap-2">
+                    <FileText className="w-5 h-5 text-orange-600" />
+                    Event Documents
+                  </h3>
+                  <div className="space-y-2">
+                    {documents.filter(d => d.isPublic || isOrganizer).map((doc) => (
+                      <a
+                        key={doc.id}
+                        href={getSharedAssetUrl(doc.fileUrl)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+                      >
+                        <FileText className="w-5 h-5 text-gray-400" />
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-gray-900 truncate">{doc.title}</p>
+                          <p className="text-sm text-gray-500 truncate">{doc.fileName}</p>
+                        </div>
+                        <ExternalLink className="w-4 h-4 text-gray-400" />
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -2519,6 +2692,210 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, formatDate, f
                   </div>
                   <ChevronRight className="w-5 h-5" />
                 </Link>
+              </div>
+
+              {/* Event Documents Section */}
+              <div className="bg-white border border-gray-200 rounded-lg">
+                <div className="p-4 border-b border-gray-200 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <FileText className="w-5 h-5 text-gray-600" />
+                    <h3 className="font-medium text-gray-900">Event Documents</h3>
+                    <span className="text-sm text-gray-500">({documents.length})</span>
+                  </div>
+                  <button
+                    onClick={() => setShowAddDocument(true)}
+                    className="flex items-center gap-1 px-3 py-1.5 text-sm bg-orange-600 text-white rounded-lg hover:bg-orange-700"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Add Document
+                  </button>
+                </div>
+
+                {loadingDocuments ? (
+                  <div className="p-8 flex items-center justify-center">
+                    <Loader2 className="w-6 h-6 animate-spin text-orange-600" />
+                  </div>
+                ) : documents.length === 0 ? (
+                  <div className="p-8 text-center text-gray-500">
+                    <FileText className="w-12 h-12 mx-auto mb-2 text-gray-300" />
+                    <p>No documents uploaded yet</p>
+                    <p className="text-sm">Add rules, schedules, or other event materials</p>
+                  </div>
+                ) : (
+                  <div className="divide-y divide-gray-100">
+                    {documents.map((doc) => (
+                      <div key={doc.id} className="p-4 flex items-center justify-between hover:bg-gray-50">
+                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                          <FileText className="w-8 h-8 text-gray-400 flex-shrink-0" />
+                          <div className="min-w-0">
+                            {editingDocument?.id === doc.id ? (
+                              <input
+                                type="text"
+                                value={editingDocument.title}
+                                onChange={(e) => setEditingDocument({ ...editingDocument, title: e.target.value })}
+                                className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                                autoFocus
+                              />
+                            ) : (
+                              <p className="font-medium text-gray-900 truncate">{doc.title}</p>
+                            )}
+                            <p className="text-sm text-gray-500 truncate">{doc.fileName}</p>
+                            <div className="flex items-center gap-2 mt-1">
+                              {doc.isPublic ? (
+                                <span className="inline-flex items-center gap-1 text-xs text-green-600 bg-green-50 px-2 py-0.5 rounded">
+                                  <Eye className="w-3 h-3" /> Public
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 text-xs text-amber-600 bg-amber-50 px-2 py-0.5 rounded">
+                                  <EyeOff className="w-3 h-3" /> Registered Only
+                                </span>
+                              )}
+                              {doc.fileSize && (
+                                <span className="text-xs text-gray-400">
+                                  {(doc.fileSize / 1024).toFixed(0)} KB
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 ml-4">
+                          {editingDocument?.id === doc.id ? (
+                            <>
+                              <button
+                                onClick={() => setEditingDocument({ ...editingDocument, isPublic: !editingDocument.isPublic })}
+                                className={`p-2 rounded ${editingDocument.isPublic ? 'text-green-600 bg-green-50' : 'text-amber-600 bg-amber-50'}`}
+                                title={editingDocument.isPublic ? 'Make Private' : 'Make Public'}
+                              >
+                                {editingDocument.isPublic ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+                              </button>
+                              <button
+                                onClick={() => handleUpdateDocument(doc.id, { title: editingDocument.title, isPublic: editingDocument.isPublic })}
+                                className="p-2 text-green-600 hover:bg-green-50 rounded"
+                              >
+                                <Check className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => setEditingDocument(null)}
+                                className="p-2 text-gray-400 hover:bg-gray-100 rounded"
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <a
+                                href={getSharedAssetUrl(doc.fileUrl)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="p-2 text-blue-600 hover:bg-blue-50 rounded"
+                                title="Open Document"
+                              >
+                                <ExternalLink className="w-4 h-4" />
+                              </a>
+                              <button
+                                onClick={() => setEditingDocument({ id: doc.id, title: doc.title, isPublic: doc.isPublic })}
+                                className="p-2 text-gray-400 hover:bg-gray-100 rounded"
+                                title="Edit"
+                              >
+                                <Edit3 className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteDocument(doc.id)}
+                                disabled={deletingDocumentId === doc.id}
+                                className="p-2 text-red-400 hover:bg-red-50 rounded disabled:opacity-50"
+                                title="Delete"
+                              >
+                                {deletingDocumentId === doc.id ? (
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                  <Trash2 className="w-4 h-4" />
+                                )}
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Add Document Form */}
+                {showAddDocument && (
+                  <div className="p-4 bg-gray-50 border-t border-gray-200">
+                    <div className="space-y-3">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Document Title *</label>
+                        <input
+                          type="text"
+                          value={newDocument.title}
+                          onChange={(e) => setNewDocument({ ...newDocument, title: e.target.value })}
+                          placeholder="e.g., Tournament Rules, Schedule, Waiver Form"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                        />
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={newDocument.isPublic}
+                            onChange={(e) => setNewDocument({ ...newDocument, isPublic: e.target.checked })}
+                            className="w-4 h-4 text-orange-600 rounded focus:ring-orange-500"
+                          />
+                          <span className="text-sm text-gray-700">Public (visible to everyone)</span>
+                        </label>
+                        <div className="flex items-center gap-2">
+                          <label className="text-sm text-gray-700">Sort Order:</label>
+                          <input
+                            type="number"
+                            value={newDocument.sortOrder}
+                            onChange={(e) => setNewDocument({ ...newDocument, sortOrder: parseInt(e.target.value) || 0 })}
+                            className="w-16 px-2 py-1 border border-gray-300 rounded text-sm"
+                          />
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <label className="flex-1">
+                          <input
+                            type="file"
+                            onChange={handleDocumentUpload}
+                            disabled={uploadingDocument || !newDocument.title.trim()}
+                            className="hidden"
+                            accept=".pdf,.doc,.docx,.xls,.xlsx,.txt,.rtf,.png,.jpg,.jpeg"
+                          />
+                          <span className={`flex items-center justify-center gap-2 px-4 py-2 rounded-lg cursor-pointer transition-colors ${
+                            uploadingDocument || !newDocument.title.trim()
+                              ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                              : 'bg-orange-600 text-white hover:bg-orange-700'
+                          }`}>
+                            {uploadingDocument ? (
+                              <>
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                                Uploading...
+                              </>
+                            ) : (
+                              <>
+                                <Upload className="w-4 h-4" />
+                                Select & Upload File
+                              </>
+                            )}
+                          </span>
+                        </label>
+                        <button
+                          onClick={() => {
+                            setShowAddDocument(false);
+                            setNewDocument({ title: '', isPublic: true, sortOrder: 0 });
+                          }}
+                          className="px-4 py-2 text-gray-600 hover:bg-gray-200 rounded-lg"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                      <p className="text-xs text-gray-500">
+                        Accepted formats: PDF, Word, Excel, text files, images. Max 10MB.
+                      </p>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {isEditing ? (
