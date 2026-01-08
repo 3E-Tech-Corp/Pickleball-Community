@@ -2502,14 +2502,6 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
                 </div>
               )}
 
-              {/* Organizer */}
-              <div>
-                <h3 className="font-medium text-gray-900 mb-2">Organizer</h3>
-                <p className="text-gray-600">
-                  {event.clubName || event.organizerName || 'Event Organizer'}
-                </p>
-              </div>
-
               {/* Event Documents (for public viewing) */}
               {documents.filter(d => d.isPublic || isOrganizer).length > 0 && (
                 <div>
