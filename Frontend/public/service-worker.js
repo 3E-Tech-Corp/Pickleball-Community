@@ -6,12 +6,24 @@ self.addEventListener('install', () => {
 });
 
 self.addEventListener('activate', (event) => {
+  // Clear all caches from the old service worker
   event.waitUntil(
-    self.registration.unregister().then(() => {
-      console.log('Old service worker unregistered, VitePWA sw.js will take over');
+    caches.keys().then((cacheNames) => {
+      return Promise.all(
+        cacheNames.map((cacheName) => caches.delete(cacheName))
+      );
+    }).then(() => {
+      console.log('Old caches cleared, unregistering old service worker');
+      return self.registration.unregister();
+    }).then(() => {
       return self.clients.matchAll();
     }).then((clients) => {
       clients.forEach(client => client.navigate(client.url));
     })
   );
+});
+
+// Pass all fetch requests directly to network (no caching)
+self.addEventListener('fetch', (event) => {
+  event.respondWith(fetch(event.request));
 });
