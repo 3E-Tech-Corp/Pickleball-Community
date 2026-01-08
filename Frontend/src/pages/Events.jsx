@@ -1050,6 +1050,7 @@ export default function Events() {
           event={selectedEvent}
           isAuthenticated={isAuthenticated}
           currentUserId={user?.id}
+          user={user}
           formatDate={formatDate}
           formatTime={formatTime}
           teamUnits={teamUnits}
@@ -1176,7 +1177,7 @@ function EventCard({ event, formatDate, formatTime, onViewDetails, showManage = 
   );
 }
 
-function EventDetailModal({ event, isAuthenticated, currentUserId, formatDate, formatTime, teamUnits = [], skillLevels = [], onClose, onUpdate }) {
+function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatDate, formatTime, teamUnits = [], skillLevels = [], onClose, onUpdate }) {
   const [activeTab, setActiveTab] = useState('details');
   const [registrations, setRegistrations] = useState({});
   const [partnerRequests, setPartnerRequests] = useState({});
