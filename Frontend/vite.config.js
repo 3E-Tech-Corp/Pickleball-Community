@@ -15,8 +15,8 @@ export default defineConfig({
       },
       // Use existing manifest.json from public folder (more complete)
       manifest: false,
-      // Ensure service worker is registered even without manifest generation
-      injectRegister: 'auto',
+      // Manual registration via registerSW() in main.jsx
+      injectRegister: false,
       workbox: {
         // Import push notification handlers into the service worker
         importScripts: ['/push-handler.js'],
