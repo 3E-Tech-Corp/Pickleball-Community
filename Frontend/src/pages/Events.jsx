@@ -2491,7 +2491,7 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
                             className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg"
                             title="Edit Division"
                           >
-                            <Edit2 className="w-4 h-4" />
+                            <Edit3 className="w-4 h-4" />
                           </button>
                         )}
                         {event.registeredDivisionIds?.includes(division.id) ? (
