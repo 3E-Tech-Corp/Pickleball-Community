@@ -1681,6 +1681,7 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, formatDate, f
         partnerUserId: partnerUserId > 0 ? partnerUserId : null
       });
       if (response.success) {
+        toast.showSuccess('Successfully registered for division!');
         onUpdate();
         setShowTeamRegistration(false);
         setSelectedDivisionForRegistration(null);
@@ -1689,9 +1690,12 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, formatDate, f
         if (updated.success) {
           Object.assign(event, updated.data);
         }
+      } else {
+        toast.showError(response.message || 'Failed to register');
       }
     } catch (err) {
       console.error('Error registering:', err);
+      toast.showError(err.response?.data?.message || 'Failed to register. Please try again.');
     } finally {
       setRegisteringDivision(null);
     }
