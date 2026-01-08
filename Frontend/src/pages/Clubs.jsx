@@ -16,6 +16,7 @@ import { useToast } from '../contexts/ToastContext';
 import { clubsApi, sharedAssetApi, clubMemberRolesApi, venuesApi, leaguesApi, grantsApi, clubFinanceApi, getSharedAssetUrl, SHARED_AUTH_URL } from '../services/api';
 import PublicProfileModal from '../components/ui/PublicProfileModal';
 import VenueMap from '../components/ui/VenueMap';
+import VenuePicker from '../components/ui/VenuePicker';
 import ShareLink from '../components/ui/ShareLink';
 
 export default function Clubs() {
@@ -3348,52 +3349,15 @@ function ClubDetailModal({ club, isAuthenticated, currentUserId, onClose, onJoin
                       />
                     </div>
 
-                    {/* Home Venue Search */}
+                    {/* Home Venue */}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Home Venue</label>
-                      {selectedVenue ? (
-                        <div className="flex items-center justify-between bg-purple-50 border border-purple-200 rounded-lg p-3">
-                          <div>
-                            <span className="font-medium text-purple-700">{selectedVenue.name}</span>
-                            {selectedVenue.city && <span className="text-sm text-gray-500 ml-2">({selectedVenue.city})</span>}
-                          </div>
-                          <button
-                            onClick={() => setSelectedVenue(null)}
-                            className="text-gray-400 hover:text-gray-600"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="relative">
-                          <input
-                            type="text"
-                            value={venueSearch}
-                            onChange={(e) => setVenueSearch(e.target.value)}
-                            placeholder="Search for a venue..."
-                            className="w-full border border-gray-300 rounded-lg p-2 focus:ring-purple-500 focus:border-purple-500"
-                          />
-                          {searchingVenues && (
-                            <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                              <Loader2 className="w-4 h-4 animate-spin text-gray-400" />
-                            </div>
-                          )}
-                          {venueResults.length > 0 && (
-                            <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
-                              {venueResults.map(venue => (
-                                <button
-                                  key={venue.venueId || venue.id}
-                                  onClick={() => handleSelectVenue({ id: venue.venueId || venue.id, name: venue.name, city: venue.city })}
-                                  className="w-full px-3 py-2 text-left hover:bg-gray-50 flex flex-col"
-                                >
-                                  <span className="font-medium">{venue.name}</span>
-                                  <span className="text-xs text-gray-500">{[venue.city, venue.state].filter(Boolean).join(', ')}</span>
-                                </button>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      )}
+                      <VenuePicker
+                        value={selectedVenue}
+                        onChange={setSelectedVenue}
+                        label="Select Home Venue"
+                        placeholder="Choose a home venue..."
+                      />
                       <p className="text-xs text-gray-500 mt-1">The club's home venue location will be used for the club address</p>
                     </div>
 
@@ -4064,43 +4028,11 @@ function CreateClubModal({ onClose, onCreate }) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
   const [uploadingLogo, setUploadingLogo] = useState(false);
-  const [venueSearch, setVenueSearch] = useState('');
-  const [venueResults, setVenueResults] = useState([]);
-  const [searchingVenues, setSearchingVenues] = useState(false);
   const [selectedVenue, setSelectedVenue] = useState(null);
-
-  // Search venues for home venue selection
-  useEffect(() => {
-    if (!venueSearch || venueSearch.length < 2) {
-      setVenueResults([]);
-      return;
-    }
-    const timer = setTimeout(async () => {
-      setSearchingVenues(true);
-      try {
-        const response = await venuesApi.search({ query: venueSearch, pageSize: 10 });
-        if (response.success) {
-          setVenueResults(response.data?.items || []);
-        }
-      } catch (err) {
-        console.error('Error searching venues:', err);
-      } finally {
-        setSearchingVenues(false);
-      }
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [venueSearch]);
 
   const handleSelectVenue = (venue) => {
     setSelectedVenue(venue);
-    setFormData({ ...formData, homeVenueId: venue.id });
-    setVenueSearch('');
-    setVenueResults([]);
-  };
-
-  const handleClearVenue = () => {
-    setSelectedVenue(null);
-    setFormData({ ...formData, homeVenueId: null });
+    setFormData({ ...formData, homeVenueId: venue?.id || null });
   };
 
   const handleLogoUpload = async (e) => {
@@ -4242,51 +4174,12 @@ function CreateClubModal({ onClose, onCreate }) {
           {/* Home Venue Selection */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Home Venue (Optional)</label>
-            {selectedVenue ? (
-              <div className="flex items-center justify-between bg-purple-50 border border-purple-200 rounded-lg p-3">
-                <div>
-                  <span className="font-medium text-purple-700">{selectedVenue.name}</span>
-                  {selectedVenue.city && <span className="text-sm text-gray-500 ml-2">({selectedVenue.city})</span>}
-                </div>
-                <button
-                  type="button"
-                  onClick={handleClearVenue}
-                  className="text-gray-400 hover:text-gray-600"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-            ) : (
-              <div className="relative">
-                <input
-                  type="text"
-                  value={venueSearch}
-                  onChange={(e) => setVenueSearch(e.target.value)}
-                  placeholder="Search for a venue..."
-                  className="w-full border border-gray-300 rounded-lg p-2 focus:ring-purple-500 focus:border-purple-500"
-                />
-                {searchingVenues && (
-                  <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                    <Loader2 className="w-4 h-4 animate-spin text-gray-400" />
-                  </div>
-                )}
-                {venueResults.length > 0 && (
-                  <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
-                    {venueResults.map(venue => (
-                      <button
-                        key={venue.venueId || venue.id}
-                        type="button"
-                        onClick={() => handleSelectVenue({ id: venue.venueId || venue.id, name: venue.name, city: venue.city })}
-                        className="w-full px-3 py-2 text-left hover:bg-gray-50 flex flex-col"
-                      >
-                        <span className="font-medium">{venue.name}</span>
-                        <span className="text-xs text-gray-500">{[venue.city, venue.state].filter(Boolean).join(', ')}</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
+            <VenuePicker
+              value={selectedVenue}
+              onChange={handleSelectVenue}
+              label="Select Home Venue"
+              placeholder="Choose a home venue..."
+            />
             <p className="text-xs text-gray-500 mt-1">Select a home venue for the club. The venue's address will be used as the club location.</p>
           </div>
 
