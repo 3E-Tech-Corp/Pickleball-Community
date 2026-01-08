@@ -156,7 +156,7 @@ public class TournamentController : ControllerBase
                     AgeGroupName = d.AgeGroupEntity?.Name,
                     DivisionFee = d.DivisionFee,
                     MaxUnits = d.MaxUnits,
-                    RegisteredUnits = regCount,
+                    RegisteredCount = regCount,
                     WaitlistedCount = waitlistCount,
                     IsFull = d.MaxUnits.HasValue && regCount >= d.MaxUnits.Value,
                     LookingForPartner = incompleteUnits.ContainsKey(d.Id)

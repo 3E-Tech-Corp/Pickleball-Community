@@ -478,7 +478,7 @@ public class EventDivisionDetailDto
     public string? AgeGroupName { get; set; }
     public decimal? DivisionFee { get; set; }
     public int? MaxUnits { get; set; }
-    public int RegisteredUnits { get; set; }
+    public int RegisteredCount { get; set; }
     public int WaitlistedCount { get; set; }
     public bool IsFull { get; set; }
     public bool HasWaitlist => WaitlistedCount > 0;

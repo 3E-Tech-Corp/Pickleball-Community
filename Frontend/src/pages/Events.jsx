@@ -2174,7 +2174,7 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, formatDate, f
                                           <div className="flex items-center gap-2 mb-2">
                                             <Trophy className="w-4 h-4 text-orange-500" />
                                             <span className="font-medium text-gray-900">
-                                              {unit.teamName || `Team ${index + 1}`}
+                                              {unit.name || `Team ${index + 1}`}
                                             </span>
                                             {!unit.isComplete && (
                                               <span className="text-xs px-2 py-0.5 bg-yellow-100 text-yellow-700 rounded-full">
@@ -2214,7 +2214,9 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, formatDate, f
                                           </div>
                                           <div className="flex-1">
                                             <div className="text-sm text-gray-900">
-                                              {unit.members?.filter(m => m.inviteStatus === 'Accepted').map(m => m.firstName && m.lastName ? `${m.firstName} ${m.lastName}` : m.firstName || 'Player').join(' & ') || 'Looking for partner'}
+                                              {unit.members?.filter(m => m.inviteStatus === 'Accepted').length > 0
+                                                ? unit.members.filter(m => m.inviteStatus === 'Accepted').map(m => m.firstName && m.lastName ? `${m.firstName} ${m.lastName}` : m.firstName || 'Player').join(' & ')
+                                                : unit.name || 'Looking for partner'}
                                             </div>
                                             {!unit.isComplete && (
                                               <span className="text-xs text-yellow-600">Looking for partner</span>
@@ -2225,12 +2227,15 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, formatDate, f
                                         // Singles display
                                         <div className="flex items-center gap-3">
                                           <div className="w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center text-orange-700 text-sm font-medium">
-                                            {(unit.members?.find(m => m.inviteStatus === 'Accepted')?.firstName || 'P')[0].toUpperCase()}
+                                            {(() => {
+                                              const m = unit.members?.find(m => m.inviteStatus === 'Accepted');
+                                              return (m?.firstName || unit.name || 'P')[0].toUpperCase();
+                                            })()}
                                           </div>
                                           <span className="text-sm text-gray-900">
                                             {(() => {
                                               const m = unit.members?.find(m => m.inviteStatus === 'Accepted');
-                                              return m?.firstName && m?.lastName ? `${m.firstName} ${m.lastName}` : m?.firstName || 'Player';
+                                              return m?.firstName && m?.lastName ? `${m.firstName} ${m.lastName}` : m?.firstName || unit.name || 'Player';
                                             })()}
                                           </span>
                                         </div>
