@@ -2186,11 +2186,27 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
                   )}
                 </div>
                 <h2 className="text-xl font-semibold text-gray-900 truncate">{event.name}</h2>
-                <div className="flex items-center gap-4 mt-1 text-sm text-gray-500">
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1 text-sm text-gray-500">
                   <span className="flex items-center gap-1">
                     <Calendar className="w-4 h-4" />
                     {formatDate(event.startDate)}
                   </span>
+                  {(event.venueName || event.city) && (
+                    <span className="flex items-center gap-1">
+                      <MapPin className="w-4 h-4" />
+                      {event.courtId && event.venueName ? (
+                        <Link
+                          to={`/venues?venueId=${event.courtId}`}
+                          onClick={(e) => e.stopPropagation()}
+                          className="text-orange-600 hover:text-orange-700 hover:underline"
+                        >
+                          {event.venueName}
+                        </Link>
+                      ) : (
+                        <span>{event.venueName || `${event.city}, ${event.state}`}</span>
+                      )}
+                    </span>
+                  )}
                   <span className="flex items-center gap-1">
                     <Users className="w-4 h-4" />
                     {event.registeredCount || 0} registered
@@ -2279,31 +2295,6 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
                   <span>{event.divisions?.length || 0} division{(event.divisions?.length || 0) !== 1 ? 's' : ''}</span>
                 </div>
               </div>
-
-              {/* Location */}
-              {(event.venueName || event.city) && (
-                <div className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
-                  <MapPin className="w-5 h-5 text-orange-500 flex-shrink-0 mt-0.5" />
-                  <div>
-                    {event.courtId && event.venueName ? (
-                      <Link
-                        to={`/venues?venueId=${event.courtId}`}
-                        className="font-medium text-orange-600 hover:text-orange-700 hover:underline"
-                      >
-                        {event.venueName}
-                      </Link>
-                    ) : event.venueName ? (
-                      <div className="font-medium text-gray-900">{event.venueName}</div>
-                    ) : null}
-                    {(event.address || event.city) && (
-                      <div className="text-sm text-gray-500">
-                        {event.address && <span>{event.address}, </span>}
-                        {event.city}{event.state && `, ${event.state}`}{event.country && `, ${event.country}`}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
 
               {/* Registration Status / Register Button */}
               <div className="flex flex-col items-center gap-3">
