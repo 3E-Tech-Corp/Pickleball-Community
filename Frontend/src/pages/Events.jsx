@@ -2246,7 +2246,8 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
               </div>
 
               {/* Action buttons */}
-              <div className="flex items-center gap-1 flex-shrink-0">
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <span className="text-xs text-gray-400">Share Event</span>
                 <button
                   onClick={copyEventLink}
                   className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg"
@@ -2261,6 +2262,7 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
                 >
                   <QrCode className="w-5 h-5" />
                 </button>
+                <div className="w-px h-5 bg-gray-200"></div>
                 <button
                   onClick={onClose}
                   className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg"
