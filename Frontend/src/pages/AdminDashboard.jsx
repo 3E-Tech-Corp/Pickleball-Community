@@ -936,7 +936,7 @@ const AdminDashboard = () => {
                           <div className="w-24 h-24 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center overflow-hidden bg-gray-50">
                             {themeSettings.logoUrl ? (
                               <img
-                                src={getAssetUrl(themeSettings.logoUrl)}
+                                src={getSharedAssetUrl(themeSettings.logoUrl)}
                                 alt="Logo"
                                 className="max-w-full max-h-full object-contain"
                               />
@@ -975,7 +975,7 @@ const AdminDashboard = () => {
                           <div className="w-16 h-16 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center overflow-hidden bg-gray-50">
                             {themeSettings.faviconUrl ? (
                               <img
-                                src={getAssetUrl(themeSettings.faviconUrl)}
+                                src={getSharedAssetUrl(themeSettings.faviconUrl)}
                                 alt="Favicon"
                                 className="max-w-full max-h-full object-contain"
                               />
@@ -1865,7 +1865,7 @@ const AdminDashboard = () => {
                       <div className="flex items-center mb-4">
                         {themeSettings.logoUrl && (
                           <img
-                            src={getAssetUrl(themeSettings.logoUrl)}
+                            src={getSharedAssetUrl(themeSettings.logoUrl)}
                             alt="Logo Preview"
                             className="h-10 mr-4"
                           />

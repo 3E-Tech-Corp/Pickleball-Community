@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import { certificationApi, SHARED_AUTH_URL } from '../services/api';
-import { getAssetUrl } from '../services/api';
+import { certificationApi, SHARED_AUTH_URL, getSharedAssetUrl } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import { User, Star, CheckCircle, AlertCircle, Award, GraduationCap, RefreshCw, Info } from 'lucide-react';
 
@@ -181,7 +180,7 @@ export default function PlayerReview() {
           <div className="flex items-center gap-4">
             {pageInfo.playerProfileImageUrl ? (
               <img
-                src={getAssetUrl(pageInfo.playerProfileImageUrl)}
+                src={getSharedAssetUrl(pageInfo.playerProfileImageUrl)}
                 alt={pageInfo.playerName}
                 className="w-20 h-20 rounded-full object-cover"
               />
