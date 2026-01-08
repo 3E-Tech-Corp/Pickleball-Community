@@ -337,8 +337,6 @@ public class EventsController : ControllerBase
                 .Include(e => e.OrganizedByClub)
                 .Include(e => e.Venue)
                 .Include(e => e.Divisions)
-                    .ThenInclude(d => d.Registrations)
-                .Include(e => e.Divisions)
                     .ThenInclude(d => d.Units)
                         .ThenInclude(u => u.Members)
                 .Include(e => e.Divisions)
@@ -1403,13 +1401,13 @@ public class EventsController : ControllerBase
                 return Forbid();
 
             var division = await _context.EventDivisions
-                .Include(d => d.Registrations)
+                .Include(d => d.Units)
                 .FirstOrDefaultAsync(d => d.Id == divisionId && d.EventId == id);
 
             if (division == null)
                 return NotFound(new ApiResponse<bool> { Success = false, Message = "Division not found" });
 
-            if (division.Registrations.Any(r => r.Status != "Cancelled"))
+            if (division.Units.Any(u => u.Status != "Cancelled"))
                 return BadRequest(new ApiResponse<bool> { Success = false, Message = "Cannot delete division with active registrations" });
 
             division.IsActive = false;
