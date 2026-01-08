@@ -2148,7 +2148,13 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
       const response = await tournamentApi.unregisterFromDivision(event.id, divisionId);
       if (response.success) {
         toast.success('Successfully unregistered from division');
-        onUpdate();
+        // Refetch event data to update the view
+        const updatedEventResponse = await eventsApi.getEvent(event.id);
+        if (updatedEventResponse.success) {
+          onUpdate(updatedEventResponse.data);
+        } else {
+          onUpdate();
+        }
       } else {
         toast.error(response.message || 'Failed to unregister');
       }
