@@ -2738,24 +2738,36 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
                                         <div>
                                           <div className="text-xs text-gray-400 mb-2">Pair {index + 1}</div>
                                           <div className="flex items-start gap-3">
-                                            {unit.members?.slice(0, 2).map((member, mIdx) => (
-                                              <Link
-                                                key={mIdx}
-                                                to={`/players/${member.userId}`}
-                                                className="flex flex-col items-center text-center hover:opacity-80"
-                                              >
-                                                {member.profileImageUrl ? (
-                                                  <img src={getSharedAssetUrl(member.profileImageUrl)} alt="" className="w-10 h-10 rounded-full object-cover" />
-                                                ) : (
-                                                  <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center text-orange-700 text-sm font-medium">
-                                                    {(member.firstName || 'P')[0].toUpperCase()}
-                                                  </div>
-                                                )}
-                                                <span className="text-xs text-gray-700 mt-1 max-w-[70px] truncate">
-                                                  {member.firstName || 'Player'}
-                                                </span>
-                                              </Link>
-                                            ))}
+                                            {unit.members?.slice(0, 2).map((member, mIdx) => {
+                                              const playerId = member.userId || member.id;
+                                              const content = (
+                                                <>
+                                                  {member.profileImageUrl ? (
+                                                    <img src={getSharedAssetUrl(member.profileImageUrl)} alt="" className="w-10 h-10 rounded-full object-cover" />
+                                                  ) : (
+                                                    <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center text-orange-700 text-sm font-medium">
+                                                      {(member.firstName || 'P')[0].toUpperCase()}
+                                                    </div>
+                                                  )}
+                                                  <span className="text-xs text-gray-700 mt-1 max-w-[70px] truncate">
+                                                    {member.firstName || 'Player'}
+                                                  </span>
+                                                </>
+                                              );
+                                              return playerId ? (
+                                                <Link
+                                                  key={mIdx}
+                                                  to={`/players/${playerId}`}
+                                                  className="flex flex-col items-center text-center hover:opacity-80"
+                                                >
+                                                  {content}
+                                                </Link>
+                                              ) : (
+                                                <div key={mIdx} className="flex flex-col items-center text-center">
+                                                  {content}
+                                                </div>
+                                              );
+                                            })}
                                             {(unit.members?.length || 0) < 2 && (
                                               <div className="flex flex-col items-center text-center">
                                                 <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center text-gray-400 text-sm">
