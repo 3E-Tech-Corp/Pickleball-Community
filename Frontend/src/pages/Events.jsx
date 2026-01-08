@@ -2193,8 +2193,8 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
     }
   };
 
-  // Handle joining another unit
-  const handleJoinUnit = async (unitId) => {
+  // Handle joining another unit from partner finder
+  const handleJoinPartnerUnit = async (unitId) => {
     setJoiningUnitId(unitId);
     try {
       const response = await tournamentApi.requestToJoinUnit(unitId, 'I would like to join your team');
@@ -2489,7 +2489,7 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
                                                 ))}
                                               </div>
                                               <button
-                                                onClick={() => handleJoinUnit(unit.id)}
+                                                onClick={() => handleJoinPartnerUnit(unit.id)}
                                                 disabled={joiningUnitId === unit.id}
                                                 className="px-3 py-1 text-xs bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50"
                                               >
