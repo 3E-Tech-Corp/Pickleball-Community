@@ -313,6 +313,12 @@ export default function Venues() {
         if (courtNameSearch && courtNameSearch.trim()) {
           const searchLower = courtNameSearch.toLowerCase().trim();
           items = [...items].sort((a, b) => {
+            // First: verified venues (with user confirmations) come first
+            const aVerified = (a.aggregatedInfo?.confirmationCount || 0) > 0;
+            const bVerified = (b.aggregatedInfo?.confirmationCount || 0) > 0;
+            if (aVerified && !bVerified) return -1;
+            if (!aVerified && bVerified) return 1;
+
             const aName = (a.name || '').toLowerCase();
             const bName = (b.name || '').toLowerCase();
             const aAddress = (a.address || '').toLowerCase();
