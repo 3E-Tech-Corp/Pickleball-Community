@@ -58,14 +58,14 @@ public class EventsController : ControllerBase
                 .Include(e => e.OrganizedBy)
                 .Include(e => e.OrganizedByClub)
                 .Include(e => e.Divisions)
-                .Include(e => e.Registrations)
+                    .ThenInclude(d => d.Units)
                 .Include(e => e.Venue) // Include venue for GPS-based distance calculation
                 .Where(e => e.IsActive && e.IsPublished)
                 // Filter out private events unless user is organizer, registered, or club member
                 .Where(e => !e.IsPrivate ||
                     (userId.HasValue && (
                         e.OrganizedByUserId == userId.Value ||
-                        e.Registrations.Any(r => r.UserId == userId.Value) ||
+                        e.Divisions.Any(d => d.Units.Any(u => u.Status != "Cancelled" && u.Members.Any(m => m.UserId == userId.Value))) ||
                         (e.OrganizedByClubId.HasValue && _context.ClubMembers.Any(cm =>
                             cm.ClubId == e.OrganizedByClubId.Value &&
                             cm.UserId == userId.Value &&
@@ -278,20 +278,20 @@ public class EventsController : ControllerBase
                 .Include(e => e.EventType)
                 .Include(e => e.OrganizedBy)
                 .Include(e => e.Divisions)
-                .Include(e => e.Registrations)
+                    .ThenInclude(d => d.Units)
                 .Where(e => e.IsActive && e.IsPublished && e.StartDate >= now)
                 .OrderBy(e => e.StartDate)
                 .Take(limit)
                 .ToListAsync();
 
-            // Popular events (most registrations)
+            // Popular events (most registrations via Units)
             var popularEvents = await _context.Events
                 .Include(e => e.EventType)
                 .Include(e => e.OrganizedBy)
                 .Include(e => e.Divisions)
-                .Include(e => e.Registrations)
+                    .ThenInclude(d => d.Units)
                 .Where(e => e.IsActive && e.IsPublished && e.StartDate >= now)
-                .OrderByDescending(e => e.Registrations.Count)
+                .OrderByDescending(e => e.Divisions.SelectMany(d => d.Units).Count(u => u.Status != "Cancelled"))
                 .Take(limit)
                 .ToListAsync();
 
@@ -300,7 +300,7 @@ public class EventsController : ControllerBase
                 .Include(e => e.EventType)
                 .Include(e => e.OrganizedBy)
                 .Include(e => e.Divisions)
-                .Include(e => e.Registrations)
+                    .ThenInclude(d => d.Units)
                 .Where(e => e.IsActive && e.IsPublished && e.StartDate < now && e.StartDate >= pastCutoff)
                 .OrderByDescending(e => e.StartDate)
                 .Take(limit)
@@ -340,6 +340,7 @@ public class EventsController : ControllerBase
                     .ThenInclude(d => d.Registrations)
                 .Include(e => e.Divisions)
                     .ThenInclude(d => d.Units)
+                        .ThenInclude(u => u.Members)
                 .Include(e => e.Divisions)
                     .ThenInclude(d => d.PartnerRequests)
                 .Include(e => e.Divisions)
@@ -350,7 +351,6 @@ public class EventsController : ControllerBase
                     .ThenInclude(d => d.SkillLevel)
                 .Include(e => e.Divisions)
                     .ThenInclude(d => d.Rewards)
-                .Include(e => e.Registrations)
                 .FirstOrDefaultAsync(e => e.Id == id && e.IsActive);
 
             if (evt == null)
@@ -390,7 +390,7 @@ public class EventsController : ControllerBase
                 ContactEmail = evt.ContactEmail,
                 ContactPhone = evt.ContactPhone,
                 MaxParticipants = evt.MaxParticipants,
-                RegisteredCount = evt.Registrations.Count,
+                RegisteredCount = evt.Divisions.Where(d => d.IsActive).SelectMany(d => d.Units).Count(u => u.Status != "Cancelled"),
                 DivisionCount = evt.Divisions.Count(d => d.IsActive),
                 OrganizedByUserId = evt.OrganizedByUserId,
                 OrganizerName = evt.OrganizedBy != null ? $"{evt.OrganizedBy.FirstName} {evt.OrganizedBy.LastName}".Trim() : null,
@@ -398,9 +398,9 @@ public class EventsController : ControllerBase
                 ClubName = evt.OrganizedByClub?.Name,
                 CreatedAt = evt.CreatedAt,
                 IsOrganizer = userId.HasValue && evt.OrganizedByUserId == userId.Value,
-                IsRegistered = userId.HasValue && evt.Registrations.Any(r => r.UserId == userId.Value),
+                IsRegistered = userId.HasValue && evt.Divisions.Any(d => d.Units.Any(u => u.Status != "Cancelled" && u.Members.Any(m => m.UserId == userId.Value))),
                 RegisteredDivisionIds = userId.HasValue
-                    ? evt.Registrations.Where(r => r.UserId == userId.Value).Select(r => r.DivisionId).ToList()
+                    ? evt.Divisions.Where(d => d.Units.Any(u => u.Status != "Cancelled" && u.Members.Any(m => m.UserId == userId.Value))).Select(d => d.Id).ToList()
                     : new List<int>(),
                 Divisions = evt.Divisions
                     .Where(d => d.IsActive)
@@ -1119,33 +1119,35 @@ public class EventsController : ControllerBase
             var eventsIOrganize = await _context.Events
                 .Include(e => e.EventType)
                 .Include(e => e.Divisions)
-                .Include(e => e.Registrations)
+                    .ThenInclude(d => d.Units)
                 .Where(e => e.OrganizedByUserId == userId.Value && e.IsActive)
                 .OrderByDescending(e => e.StartDate)
                 .ToListAsync();
 
-            // Events I'm registered for
-            var myRegistrations = await _context.EventRegistrations
-                .Include(r => r.Event)
-                    .ThenInclude(e => e!.EventType)
-                .Include(r => r.Division)
-                .Where(r => r.UserId == userId.Value && r.Status != "Cancelled" && r.Event != null && r.Event.IsActive)
+            // Events I'm registered for (via EventUnitMembers)
+            var myMemberships = await _context.EventUnitMembers
+                .Include(m => m.Unit)
+                    .ThenInclude(u => u!.Event)
+                        .ThenInclude(e => e!.EventType)
+                .Include(m => m.Unit)
+                    .ThenInclude(u => u!.Division)
+                .Where(m => m.UserId == userId.Value && m.Unit != null && m.Unit.Status != "Cancelled" && m.Unit.Event != null && m.Unit.Event.IsActive)
                 .ToListAsync();
 
-            var registrationSummaries = myRegistrations
-                .GroupBy(r => r.EventId)
+            var registrationSummaries = myMemberships
+                .GroupBy(m => m.Unit!.EventId)
                 .Select(g => new EventRegistrationSummaryDto
                 {
                     EventId = g.Key,
-                    EventName = g.First().Event!.Name,
-                    StartDate = g.First().Event!.StartDate,
-                    VenueName = g.First().Event!.VenueName,
-                    City = g.First().Event!.City,
-                    State = g.First().Event!.State,
-                    PosterImageUrl = g.First().Event!.PosterImageUrl,
-                    RegisteredDivisions = g.Select(r => r.Division?.Name ?? "").ToList(),
-                    PaymentStatus = g.All(r => r.PaymentStatus == "Paid") ? "Paid" : "Pending",
-                    Status = g.First().Status
+                    EventName = g.First().Unit!.Event!.Name,
+                    StartDate = g.First().Unit!.Event!.StartDate,
+                    VenueName = g.First().Unit!.Event!.VenueName,
+                    City = g.First().Unit!.Event!.City,
+                    State = g.First().Unit!.Event!.State,
+                    PosterImageUrl = g.First().Unit!.Event!.PosterImageUrl,
+                    RegisteredDivisions = g.Select(m => m.Unit?.Division?.Name ?? "").ToList(),
+                    PaymentStatus = g.All(m => m.Unit?.PaymentStatus == "Paid") ? "Paid" : "Pending",
+                    Status = g.First().Unit?.Status ?? "Registered"
                 })
                 .OrderBy(s => s.StartDate)
                 .ToList();
@@ -1817,7 +1819,7 @@ public class EventsController : ControllerBase
             RegistrationFee = evt.RegistrationFee,
             PerDivisionFee = evt.PerDivisionFee,
             MaxParticipants = evt.MaxParticipants,
-            RegisteredCount = evt.Registrations?.Count ?? 0,
+            RegisteredCount = evt.Divisions?.Where(d => d.IsActive).SelectMany(d => d.Units ?? Enumerable.Empty<EventUnit>()).Count(u => u.Status != "Cancelled") ?? 0,
             DivisionCount = evt.Divisions?.Count(d => d.IsActive) ?? 0,
             Distance = distance,
             OrganizedByUserId = evt.OrganizedByUserId,
