@@ -50,7 +50,25 @@ export default function VenuePicker({
           pageSize: 20
         });
         if (response.success) {
-          setVenues(response.data?.items || []);
+          let results = response.data?.items || [];
+
+          // Sort results: name matches first, then location matches
+          if (search) {
+            const searchLower = search.toLowerCase();
+            results = results.sort((a, b) => {
+              const aNameMatch = a.name?.toLowerCase().includes(searchLower);
+              const bNameMatch = b.name?.toLowerCase().includes(searchLower);
+
+              // Name matches come first
+              if (aNameMatch && !bNameMatch) return -1;
+              if (!aNameMatch && bNameMatch) return 1;
+
+              // Within same category, sort alphabetically
+              return (a.name || '').localeCompare(b.name || '');
+            });
+          }
+
+          setVenues(results);
         }
       } catch (err) {
         console.error('Error searching venues:', err);
@@ -223,6 +241,9 @@ export default function VenuePicker({
 
 // Individual venue item component
 function VenueItem({ venue, isSelected, onSelect, showDetails = false }) {
+  // Build location string
+  const location = [venue.city, venue.state].filter(Boolean).join(', ');
+
   return (
     <button
       onClick={onSelect}
@@ -240,14 +261,15 @@ function VenueItem({ venue, isSelected, onSelect, showDetails = false }) {
 
       <div className="flex-1 min-w-0">
         <div className="font-medium text-gray-900 truncate">{venue.name}</div>
-        <div className="text-sm text-gray-500 truncate">
-          {[venue.city, venue.state].filter(Boolean).join(', ') || 'Location not specified'}
-        </div>
-        {showDetails && venue.numberOfCourts && (
-          <div className="text-xs text-gray-400 mt-0.5">
-            {venue.numberOfCourts} court{venue.numberOfCourts !== 1 ? 's' : ''}
-          </div>
+        {showDetails && venue.address && (
+          <div className="text-sm text-gray-600 truncate">{venue.address}</div>
         )}
+        <div className="text-sm text-gray-500 truncate">
+          {location || 'Location not specified'}
+          {showDetails && venue.numberOfCourts && (
+            <span className="text-gray-400"> · {venue.numberOfCourts} court{venue.numberOfCourts !== 1 ? 's' : ''}</span>
+          )}
+        </div>
       </div>
 
       {isSelected ? (
