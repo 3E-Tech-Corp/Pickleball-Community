@@ -2398,13 +2398,22 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
                 {!isRegistered && (
                   canRegister() ? (
                     isAuthenticated ? (
-                      <button
-                        onClick={() => setActiveTab('divisions')}
-                        className="px-8 py-3 bg-orange-600 text-white rounded-lg font-semibold hover:bg-orange-700 transition-colors flex items-center gap-2"
-                      >
-                        <UserPlus className="w-5 h-5" />
-                        Register Now
-                      </button>
+                      <div className="text-center">
+                        <button
+                          onClick={() => setActiveTab('divisions')}
+                          className="px-8 py-3 bg-orange-600 text-white rounded-lg font-semibold hover:bg-orange-700 transition-colors flex items-center gap-2"
+                        >
+                          <UserPlus className="w-5 h-5" />
+                          Register Now
+                        </button>
+                        <p className="mt-2 text-sm text-gray-600">
+                          Before registering, please ensure your{' '}
+                          <Link to="/profile" className="text-orange-600 font-medium hover:underline">
+                            profile name and gender
+                          </Link>{' '}
+                          are correct.
+                        </p>
+                      </div>
                     ) : (
                       <div className="text-center">
                         <button
@@ -2419,7 +2428,7 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
                           <Link to="/register" className="text-orange-600 font-medium hover:underline">create an account</Link>.
                         </p>
                         <p className="text-xs text-gray-500 mt-1">
-                          Make sure to update your name in your profile before registering.
+                          Make sure to update your name and gender in your profile before registering.
                         </p>
                       </div>
                     )
@@ -2544,6 +2553,17 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
                 <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg flex items-center gap-2 text-yellow-700">
                   <AlertCircle className="w-5 h-5" />
                   <span>Registration is currently {status.text.toLowerCase()}</span>
+                </div>
+              )}
+
+              {/* Profile Reminder */}
+              {canRegister() && isAuthenticated && (
+                <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800">
+                  Before registering, please ensure your{' '}
+                  <Link to="/profile" className="font-medium text-blue-600 hover:underline">
+                    profile name and gender
+                  </Link>{' '}
+                  are up to date.
                 </div>
               )}
 
@@ -3584,6 +3604,13 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
             </div>
 
             <div className="flex-1 overflow-y-auto p-4 space-y-6">
+              {/* Profile Reminder */}
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm">
+                <span className="text-blue-800">
+                  Ensure your <Link to="/profile" className="font-medium text-blue-600 hover:underline">profile name and gender</Link> are correct before registering.
+                </span>
+              </div>
+
               {/* Create New Team Option */}
               <div>
                 <h4 className="font-medium text-gray-900 mb-3 flex items-center gap-2">
