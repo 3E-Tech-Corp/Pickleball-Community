@@ -2662,7 +2662,7 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
                                   const isDoubles = requiredPlayers === 2;
 
                                   return (
-                                    <div key={unit.id || index} className={isTeam ? "w-full border-b pb-3 last:border-b-0" : ""}>
+                                    <div key={unit.id || index} className={isTeam ? "w-full border-b pb-3 last:border-b-0" : isDoubles ? "bg-gray-50 rounded-lg p-3" : ""}>
                                       {isTeam ? (
                                         // Team display (3+ players)
                                         <div>
@@ -2699,11 +2699,16 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
                                           </div>
                                         </div>
                                       ) : isDoubles ? (
-                                        // Doubles display - avatars with names below
-                                        <div className="flex flex-col">
-                                          <div className="flex items-start gap-4">
+                                        // Doubles display - pair card with unit number
+                                        <div>
+                                          <div className="text-xs text-gray-400 mb-2">Pair {index + 1}</div>
+                                          <div className="flex items-start gap-3">
                                             {unit.members?.slice(0, 2).map((member, mIdx) => (
-                                              <div key={mIdx} className="flex flex-col items-center text-center">
+                                              <Link
+                                                key={mIdx}
+                                                to={`/players/${member.odataId || member.odataUserId || member.userId}`}
+                                                className="flex flex-col items-center text-center hover:opacity-80"
+                                              >
                                                 {member.profileImageUrl ? (
                                                   <img src={getSharedAssetUrl(member.profileImageUrl)} alt="" className="w-10 h-10 rounded-full object-cover" />
                                                 ) : (
@@ -2711,27 +2716,26 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
                                                     {(member.firstName || 'P')[0].toUpperCase()}
                                                   </div>
                                                 )}
-                                                <span className="text-xs text-gray-700 mt-1 max-w-[80px] truncate">
+                                                <span className="text-xs text-gray-700 mt-1 max-w-[70px] truncate">
                                                   {member.firstName || 'Player'}
                                                 </span>
-                                              </div>
+                                              </Link>
                                             ))}
                                             {(unit.members?.length || 0) < 2 && (
                                               <div className="flex flex-col items-center text-center">
-                                                <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center text-gray-400 text-sm">
+                                                <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center text-gray-400 text-sm">
                                                   ?
                                                 </div>
-                                                <span className="text-xs text-gray-400 mt-1">Partner</span>
                                               </div>
                                             )}
                                           </div>
-                                          {!unit.isComplete && (
-                                            <span className="text-xs text-yellow-600 mt-1">Looking for partner</span>
-                                          )}
                                         </div>
                                       ) : (
                                         // Singles display - avatar with name below
-                                        <div className="flex flex-col items-center text-center">
+                                        <Link
+                                          to={`/players/${unit.members?.[0]?.odataId || unit.members?.[0]?.odataUserId || unit.members?.[0]?.userId}`}
+                                          className="flex flex-col items-center text-center hover:opacity-80"
+                                        >
                                           {unit.members?.[0]?.profileImageUrl ? (
                                             <img src={getSharedAssetUrl(unit.members[0].profileImageUrl)} alt="" className="w-10 h-10 rounded-full object-cover" />
                                           ) : (
@@ -2742,7 +2746,7 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
                                           <span className="text-xs text-gray-700 mt-1">
                                             {unit.members?.[0]?.firstName || unit.name || 'Player'}
                                           </span>
-                                        </div>
+                                        </Link>
                                       )}
                                     </div>
                                   );
