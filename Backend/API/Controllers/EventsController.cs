@@ -1144,7 +1144,7 @@ public class EventsController : ControllerBase
                     State = g.First().Unit!.Event!.State,
                     PosterImageUrl = g.First().Unit!.Event!.PosterImageUrl,
                     RegisteredDivisions = g.Select(m => m.Unit?.Division?.Name ?? "").ToList(),
-                    PaymentStatus = g.All(m => m.Unit?.PaymentStatus == "Paid") ? "Paid" : "Pending",
+                    PaymentStatus = "Pending", // EventUnits don't track payment - handled separately
                     Status = g.First().Unit?.Status ?? "Registered"
                 })
                 .OrderBy(s => s.StartDate)
