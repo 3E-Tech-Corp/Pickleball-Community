@@ -2156,9 +2156,8 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, formatDate, f
                         ) : (
                           <button
                             onClick={() => handleRegister(division.id)}
-                            disabled={!isAuthenticated || !canRegister() || !canRegisterForDivision(division.id) || registeringDivision === division.id}
+                            disabled={!isAuthenticated || !canRegister() || registeringDivision === division.id}
                             className="px-4 py-2 bg-orange-600 text-white rounded-lg text-sm font-medium hover:bg-orange-700 disabled:opacity-50"
-                            title={!canRegisterForDivision(division.id) ? 'Already registered for another division' : ''}
                           >
                             {registeringDivision === division.id ? 'Registering...' : (isFull ? 'Join Waitlist' : 'Register')}
                           </button>
@@ -2172,7 +2171,7 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, formatDate, f
                       </div>
                     )}
 
-                    {teamSize > 1 && division.lookingForPartnerCount > 0 && canRegisterForDivision(division.id) && (
+                    {teamSize > 1 && division.lookingForPartnerCount > 0 && !event.registeredDivisionIds?.includes(division.id) && (
                       <button
                         onClick={() => {
                           setSelectedDivisionForRegistration(division);
@@ -2247,13 +2246,19 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, formatDate, f
                                           <div className="ml-6 space-y-1">
                                             {unit.members?.map((member, mIdx) => (
                                               <div key={mIdx} className="text-sm text-gray-600 flex items-center gap-2">
-                                                <span className="w-1.5 h-1.5 bg-gray-400 rounded-full"></span>
+                                                {member.profileImageUrl ? (
+                                                  <img src={getSharedAssetUrl(member.profileImageUrl)} alt="" className="w-5 h-5 rounded-full object-cover" />
+                                                ) : (
+                                                  <div className="w-5 h-5 bg-orange-100 rounded-full flex items-center justify-center text-orange-700 text-xs font-medium">
+                                                    {(member.firstName || 'P')[0].toUpperCase()}
+                                                  </div>
+                                                )}
                                                 {member.firstName && member.lastName ? `${member.firstName} ${member.lastName}` : member.firstName || 'Player'}
                                               </div>
                                             ))}
                                             {(unit.members?.length || 0) < requiredPlayers && (
                                               <div className="text-sm text-gray-400 italic flex items-center gap-2">
-                                                <span className="w-1.5 h-1.5 bg-gray-300 rounded-full"></span>
+                                                <div className="w-5 h-5 bg-gray-100 rounded-full flex items-center justify-center text-gray-400 text-xs">?</div>
                                                 {requiredPlayers - (unit.members?.length || 0)} spot{requiredPlayers - (unit.members?.length || 0) !== 1 ? 's' : ''} available
                                               </div>
                                             )}
@@ -2264,9 +2269,13 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, formatDate, f
                                         <div className="flex items-center gap-3">
                                           <div className="flex -space-x-2">
                                             {unit.members?.slice(0, 2).map((member, mIdx) => (
-                                              <div key={mIdx} className="w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center text-orange-700 text-xs font-medium border-2 border-white">
-                                                {(member.firstName || 'P')[0].toUpperCase()}
-                                              </div>
+                                              member.profileImageUrl ? (
+                                                <img key={mIdx} src={getSharedAssetUrl(member.profileImageUrl)} alt="" className="w-8 h-8 rounded-full object-cover border-2 border-white" />
+                                              ) : (
+                                                <div key={mIdx} className="w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center text-orange-700 text-xs font-medium border-2 border-white">
+                                                  {(member.firstName || 'P')[0].toUpperCase()}
+                                                </div>
+                                              )
                                             ))}
                                             {(unit.members?.length || 0) < 2 && (
                                               <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center text-gray-400 text-xs border-2 border-white">
@@ -2288,9 +2297,13 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, formatDate, f
                                       ) : (
                                         // Singles display
                                         <div className="flex items-center gap-3">
-                                          <div className="w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center text-orange-700 text-sm font-medium">
-                                            {(unit.members?.[0]?.firstName || unit.name || 'P')[0].toUpperCase()}
-                                          </div>
+                                          {unit.members?.[0]?.profileImageUrl ? (
+                                            <img src={getSharedAssetUrl(unit.members[0].profileImageUrl)} alt="" className="w-8 h-8 rounded-full object-cover" />
+                                          ) : (
+                                            <div className="w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center text-orange-700 text-sm font-medium">
+                                              {(unit.members?.[0]?.firstName || unit.name || 'P')[0].toUpperCase()}
+                                            </div>
+                                          )}
                                           <span className="text-sm text-gray-900">
                                             {unit.members?.[0]?.firstName && unit.members?.[0]?.lastName
                                               ? `${unit.members[0].firstName} ${unit.members[0].lastName}`
