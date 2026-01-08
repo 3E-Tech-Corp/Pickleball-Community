@@ -3618,14 +3618,16 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
                 </span>
               </div>
 
-              {/* Create New Team Option */}
+              {/* Create New Team/Pair Option */}
               <div>
                 <h4 className="font-medium text-gray-900 mb-3 flex items-center gap-2">
                   <Plus className="w-4 h-4" />
-                  Create New Team
+                  {selectedDivisionForRegistration.teamSize === 2 ? 'Register & Find Partner' : 'Create New Team'}
                 </h4>
                 <p className="text-sm text-gray-600 mb-3">
-                  Register as team captain and find or invite a partner later.
+                  {selectedDivisionForRegistration.teamSize === 2
+                    ? 'Register now and find or invite a partner later.'
+                    : 'Register as team captain and find or invite players later.'}
                 </p>
                 <button
                   onClick={() => handleRegister(selectedDivisionForRegistration.id, -1)}
@@ -3640,17 +3642,17 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
                   ) : (
                     <>
                       <Plus className="w-4 h-4" />
-                      Create Team & Find Partner Later
+                      {selectedDivisionForRegistration.teamSize === 2 ? 'Register & Find Partner Later' : 'Create Team & Find Players Later'}
                     </>
                   )}
                 </button>
               </div>
 
-              {/* Join Existing Team */}
+              {/* Join Existing Team/Pair */}
               <div>
                 <h4 className="font-medium text-gray-900 mb-3 flex items-center gap-2">
                   <UserPlus className="w-4 h-4" />
-                  Join Existing Team
+                  {selectedDivisionForRegistration.teamSize === 2 ? 'Partner with Someone' : 'Join Existing Team'}
                 </h4>
                 {loadingUnits ? (
                   <div className="flex items-center justify-center py-6">
@@ -3658,7 +3660,9 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
                   </div>
                 ) : unitsLookingForPartners.length === 0 ? (
                   <p className="text-sm text-gray-500 py-4 text-center">
-                    No teams are currently looking for partners in this division.
+                    {selectedDivisionForRegistration.teamSize === 2
+                      ? 'No one is currently looking for a partner in this division.'
+                      : 'No teams are currently looking for players in this division.'}
                   </p>
                 ) : (
                   <div className="space-y-3">
@@ -3678,13 +3682,22 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
                               </div>
                             )}
                             <div>
-                              <div className="font-medium text-gray-900">{unit.name}</div>
-                              <div className="text-sm text-gray-500">
-                                Captain: {unit.captainName || 'Unknown'}
-                              </div>
-                              <div className="text-xs text-gray-400">
-                                {unit.members?.length || 1} / {unit.requiredPlayers} players
-                              </div>
+                              {selectedDivisionForRegistration.teamSize === 2 ? (
+                                <>
+                                  <div className="font-medium text-gray-900">{unit.captainName || 'Unknown'}</div>
+                                  <div className="text-sm text-gray-500">Looking for partner</div>
+                                </>
+                              ) : (
+                                <>
+                                  <div className="font-medium text-gray-900">{unit.name}</div>
+                                  <div className="text-sm text-gray-500">
+                                    Captain: {unit.captainName || 'Unknown'}
+                                  </div>
+                                  <div className="text-xs text-gray-400">
+                                    {unit.members?.length || 1} / {unit.requiredPlayers} players
+                                  </div>
+                                </>
+                              )}
                             </div>
                           </div>
                           <button
