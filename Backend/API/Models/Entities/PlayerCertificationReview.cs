@@ -54,7 +54,7 @@ public class PlayerCertificationReview
     [MaxLength(2000)]
     public string? Comments { get; set; }
 
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime CreatedAt { get; set; } = DateTime.Now;
 
     /// <summary>
     /// When the review was last updated (null if never updated)

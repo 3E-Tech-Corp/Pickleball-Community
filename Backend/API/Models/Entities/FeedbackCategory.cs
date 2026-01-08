@@ -23,9 +23,9 @@ public class FeedbackCategory
 
     public bool IsActive { get; set; } = true;
 
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime CreatedAt { get; set; } = DateTime.Now;
 
-    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime UpdatedAt { get; set; } = DateTime.Now;
 
     // Navigation
     public virtual ICollection<FeedbackEntry> Entries { get; set; } = new List<FeedbackEntry>();

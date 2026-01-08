@@ -190,7 +190,7 @@ public class FaqController : ControllerBase
             category.Color = dto.Color;
             category.SortOrder = dto.SortOrder;
             category.IsActive = dto.IsActive;
-            category.UpdatedAt = DateTime.UtcNow;
+            category.UpdatedAt = DateTime.Now;
 
             await _context.SaveChangesAsync();
 
@@ -233,7 +233,7 @@ public class FaqController : ControllerBase
                 return NotFound(new ApiResponse<bool> { Success = false, Message = "Category not found" });
 
             category.IsActive = false;
-            category.UpdatedAt = DateTime.UtcNow;
+            category.UpdatedAt = DateTime.Now;
             await _context.SaveChangesAsync();
 
             return Ok(new ApiResponse<bool> { Success = true, Data = true, Message = "Category deleted" });
@@ -354,7 +354,7 @@ public class FaqController : ControllerBase
             entry.Answer = dto.Answer;
             entry.SortOrder = dto.SortOrder;
             entry.IsActive = dto.IsActive;
-            entry.UpdatedAt = DateTime.UtcNow;
+            entry.UpdatedAt = DateTime.Now;
 
             await _context.SaveChangesAsync();
 
@@ -399,7 +399,7 @@ public class FaqController : ControllerBase
                 return NotFound(new ApiResponse<bool> { Success = false, Message = "Entry not found" });
 
             entry.IsActive = false;
-            entry.UpdatedAt = DateTime.UtcNow;
+            entry.UpdatedAt = DateTime.Now;
             await _context.SaveChangesAsync();
 
             return Ok(new ApiResponse<bool> { Success = true, Data = true, Message = "Entry deleted" });

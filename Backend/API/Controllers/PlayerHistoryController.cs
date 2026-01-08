@@ -105,7 +105,7 @@ public class PlayerHistoryController : ControllerBase
             .Where(r => r.UserId == userId)
             .MaxAsync(r => (decimal?)r.Rating);
 
-        var thirtyDaysAgo = DateTime.UtcNow.AddDays(-30);
+        var thirtyDaysAgo = DateTime.Now.AddDays(-30);
         var ratingTrend = await _context.Set<PlayerRatingHistory>()
             .Where(r => r.UserId == userId && r.EffectiveDate >= thirtyDaysAgo)
             .OrderByDescending(r => r.EffectiveDate)
@@ -388,7 +388,7 @@ public class PlayerHistoryController : ControllerBase
 
         if (request.ActiveOnly == true)
         {
-            query = query.Where(a => a.IsActive && (!a.ExpiresAt.HasValue || a.ExpiresAt > DateTime.UtcNow));
+            query = query.Where(a => a.IsActive && (!a.ExpiresAt.HasValue || a.ExpiresAt > DateTime.Now));
         }
 
         var totalCount = await query.CountAsync();
@@ -490,7 +490,7 @@ public class PlayerHistoryController : ControllerBase
             ClubId = dto.ClubId,
             SeasonId = dto.SeasonId,
             PlacementRank = dto.PlacementRank,
-            AwardedAt = DateTime.UtcNow,
+            AwardedAt = DateTime.Now,
             AwardedBySystem = false,
             AwardedByUserId = currentUserId.Value,
             ExpiresAt = dto.ExpiresAt,
@@ -609,7 +609,7 @@ public class PlayerHistoryController : ControllerBase
         var lowestRating = allRatings.Any() ? allRatings.Min(r => r.Rating) : (decimal?)null;
 
         // Rating trend over last 30 days
-        var thirtyDaysAgo = DateTime.UtcNow.AddDays(-30);
+        var thirtyDaysAgo = DateTime.Now.AddDays(-30);
         var recentRatings = allRatings.Where(r => r.EffectiveDate >= thirtyDaysAgo).OrderBy(r => r.EffectiveDate).ToList();
         decimal? ratingTrend = null;
         if (recentRatings.Count >= 2)
@@ -675,7 +675,7 @@ public class PlayerHistoryController : ControllerBase
             PeerReviewId = dto.PeerReviewId,
             CalculatedBySystem = false,
             UpdatedByUserId = currentUserId.Value,
-            EffectiveDate = DateTime.UtcNow,
+            EffectiveDate = DateTime.Now,
             Notes = dto.Notes
         };
 

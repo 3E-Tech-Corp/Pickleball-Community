@@ -165,7 +165,7 @@ public class ChatHub : Hub
 
         if (participant == null) return;
 
-        participant.LastReadAt = DateTime.UtcNow;
+        participant.LastReadAt = DateTime.Now;
         await _context.SaveChangesAsync();
 
         var notification = new MessageReadNotification
@@ -194,7 +194,7 @@ public class ChatHub : Hub
         {
             UserId = userId,
             IsOnline = isOnline,
-            LastSeen = isOnline ? null : DateTime.UtcNow
+            LastSeen = isOnline ? null : DateTime.Now
         };
 
         foreach (var conversationId in conversationIds)

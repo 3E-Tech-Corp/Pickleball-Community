@@ -92,8 +92,8 @@ public class Event
     [MaxLength(20)]
     public string TournamentStatus { get; set; } = "Draft";
 
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime CreatedAt { get; set; } = DateTime.Now;
+    public DateTime UpdatedAt { get; set; } = DateTime.Now;
     public bool IsActive { get; set; } = true;
 
     // Navigation
@@ -247,7 +247,7 @@ public class EventRegistration
     [MaxLength(20)]
     public string Status { get; set; } = "Registered"; // Registered, Confirmed, Waitlisted, Cancelled, CheckedIn
 
-    public DateTime RegisteredAt { get; set; } = DateTime.UtcNow;
+    public DateTime RegisteredAt { get; set; } = DateTime.Now;
     public DateTime? CheckedInAt { get; set; }
 
     // Navigation
@@ -280,7 +280,7 @@ public class EventPartnerRequest
     [MaxLength(20)]
     public string Status { get; set; } = "Open"; // Open, Matched, Closed
 
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime CreatedAt { get; set; } = DateTime.Now;
 
     // Navigation
     [ForeignKey("EventId")]

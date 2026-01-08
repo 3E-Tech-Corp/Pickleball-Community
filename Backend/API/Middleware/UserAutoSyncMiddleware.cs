@@ -80,8 +80,8 @@ public class UserAutoSyncMiddleware
                         AllowDirectMessages = true,
                         AllowClubMessages = true,
                         CanWriteBlog = false,
-                        CreatedAt = DateTime.UtcNow,
-                        UpdatedAt = DateTime.UtcNow
+                        CreatedAt = DateTime.Now,
+                        UpdatedAt = DateTime.Now
                     };
 
                     try

@@ -322,8 +322,8 @@ public class GameDayController : ControllerBase
             ScoreFormatId = dto.ScoreFormatId ?? unit1.Division?.DefaultScoreFormatId,
             RoundType = "GameDay",
             RoundNumber = 1,
-            CreatedAt = DateTime.UtcNow,
-            UpdatedAt = DateTime.UtcNow
+            CreatedAt = DateTime.Now,
+            UpdatedAt = DateTime.Now
         };
 
         _context.EventMatches.Add(match);
@@ -339,8 +339,8 @@ public class GameDayController : ControllerBase
                 ScoreFormatId = match.ScoreFormatId,
                 TournamentCourtId = i == 1 ? dto.CourtId : null, // Only first game gets court
                 Status = i == 1 && dto.CourtId.HasValue ? "Queued" : "New",
-                CreatedAt = DateTime.UtcNow,
-                UpdatedAt = DateTime.UtcNow
+                CreatedAt = DateTime.Now,
+                UpdatedAt = DateTime.Now
             };
             _context.EventGames.Add(game);
         }
@@ -386,7 +386,7 @@ public class GameDayController : ControllerBase
         if (!await IsEventOrganizer(match.EventId, userId.Value))
             return Forbid();
 
-        var now = DateTime.UtcNow;
+        var now = DateTime.Now;
         match.Status = dto.Status;
         match.UpdatedAt = now;
 
@@ -454,7 +454,7 @@ public class GameDayController : ControllerBase
         if (game == null)
             return BadRequest(new { success = false, message = "Invalid game number" });
 
-        var now = DateTime.UtcNow;
+        var now = DateTime.Now;
         game.Unit1Score = dto.Unit1Score;
         game.Unit2Score = dto.Unit2Score;
         game.UpdatedAt = now;
@@ -559,7 +559,7 @@ public class GameDayController : ControllerBase
 
         match.TournamentCourtId = dto.CourtId;
         match.Status = dto.CourtId.HasValue ? "Queued" : "Pending";
-        match.UpdatedAt = DateTime.UtcNow;
+        match.UpdatedAt = DateTime.Now;
 
         // Update current game
         var currentGame = match.Games.OrderBy(g => g.GameNumber).FirstOrDefault(g => g.Status != "Finished");
@@ -567,7 +567,7 @@ public class GameDayController : ControllerBase
         {
             currentGame.TournamentCourtId = dto.CourtId;
             currentGame.Status = dto.CourtId.HasValue ? "Queued" : "New";
-            currentGame.UpdatedAt = DateTime.UtcNow;
+            currentGame.UpdatedAt = DateTime.Now;
         }
 
         await _context.SaveChangesAsync();
@@ -641,8 +641,8 @@ public class GameDayController : ControllerBase
             MidpointScore = dto.MidpointScore,
             TimeLimitMinutes = dto.TimeLimitMinutes,
             IsActive = true,
-            CreatedAt = DateTime.UtcNow,
-            UpdatedAt = DateTime.UtcNow
+            CreatedAt = DateTime.Now,
+            UpdatedAt = DateTime.Now
         };
 
         _context.ScoreFormats.Add(format);

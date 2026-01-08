@@ -47,7 +47,7 @@ public class UserPushSubscription
     [MaxLength(100)]
     public string? DeviceName { get; set; }
 
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime CreatedAt { get; set; } = DateTime.Now;
 
     /// <summary>
     /// Last time a push notification was successfully sent to this subscription

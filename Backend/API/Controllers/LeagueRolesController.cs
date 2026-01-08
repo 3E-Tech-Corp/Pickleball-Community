@@ -193,7 +193,7 @@ public class LeagueRolesController : ControllerBase
             role.CanManageDocuments = dto.CanManageDocuments;
             role.CanApproveRequests = dto.CanApproveRequests;
             role.IsActive = dto.IsActive;
-            role.UpdatedAt = DateTime.UtcNow;
+            role.UpdatedAt = DateTime.Now;
 
             await _context.SaveChangesAsync();
 
@@ -244,7 +244,7 @@ public class LeagueRolesController : ControllerBase
             {
                 // Soft delete - just mark as inactive
                 role.IsActive = false;
-                role.UpdatedAt = DateTime.UtcNow;
+                role.UpdatedAt = DateTime.Now;
                 await _context.SaveChangesAsync();
                 return Ok(new ApiResponse<bool> { Success = true, Data = true, Message = "Role deactivated (in use by managers)" });
             }
@@ -274,7 +274,7 @@ public class LeagueRolesController : ControllerBase
                 return NotFound(new ApiResponse<LeagueRoleDto> { Success = false, Message = "Role not found" });
 
             role.IsActive = true;
-            role.UpdatedAt = DateTime.UtcNow;
+            role.UpdatedAt = DateTime.Now;
             await _context.SaveChangesAsync();
 
             var result = new LeagueRoleDto
@@ -316,7 +316,7 @@ public class LeagueRolesController : ControllerBase
                 if (role != null)
                 {
                     role.SortOrder = (i + 1) * 10;
-                    role.UpdatedAt = DateTime.UtcNow;
+                    role.UpdatedAt = DateTime.Now;
                 }
             }
 

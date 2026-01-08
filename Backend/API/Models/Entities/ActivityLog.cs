@@ -20,7 +20,7 @@ public class ActivityLog
     [MaxLength(100)]
     public string? IpAddress { get; set; }
 
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime CreatedAt { get; set; } = DateTime.Now;
 
     // Navigation property
     [ForeignKey("UserId")]

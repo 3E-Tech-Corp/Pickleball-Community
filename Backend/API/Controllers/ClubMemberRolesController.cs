@@ -180,7 +180,7 @@ public class ClubMemberRolesController : ControllerBase
             role.CanManageClub = dto.CanManageClub ?? role.CanManageClub;
             role.CanPostAnnouncements = dto.CanPostAnnouncements ?? role.CanPostAnnouncements;
             role.IsActive = dto.IsActive ?? role.IsActive;
-            role.UpdatedAt = DateTime.UtcNow;
+            role.UpdatedAt = DateTime.Now;
 
             await _context.SaveChangesAsync();
 
@@ -229,7 +229,7 @@ public class ClubMemberRolesController : ControllerBase
             {
                 // Soft delete - just mark as inactive
                 role.IsActive = false;
-                role.UpdatedAt = DateTime.UtcNow;
+                role.UpdatedAt = DateTime.Now;
                 await _context.SaveChangesAsync();
                 return Ok(new ApiResponse<bool> { Success = true, Data = true, Message = "Role deactivated (in use by members)" });
             }
@@ -259,7 +259,7 @@ public class ClubMemberRolesController : ControllerBase
                 return NotFound(new ApiResponse<ClubMemberRoleDto> { Success = false, Message = "Role not found" });
 
             role.IsActive = true;
-            role.UpdatedAt = DateTime.UtcNow;
+            role.UpdatedAt = DateTime.Now;
             await _context.SaveChangesAsync();
 
             var result = new ClubMemberRoleDto
@@ -299,7 +299,7 @@ public class ClubMemberRolesController : ControllerBase
                 if (role != null)
                 {
                     role.SortOrder = i;
-                    role.UpdatedAt = DateTime.UtcNow;
+                    role.UpdatedAt = DateTime.Now;
                 }
             }
 

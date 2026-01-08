@@ -52,7 +52,7 @@ public class PlayerAward
     /// </summary>
     public int? PlacementRank { get; set; }
 
-    public DateTime AwardedAt { get; set; } = DateTime.UtcNow;
+    public DateTime AwardedAt { get; set; } = DateTime.Now;
     public bool AwardedBySystem { get; set; } = true;
     public int? AwardedByUserId { get; set; }
 
@@ -65,8 +65,8 @@ public class PlayerAward
     [MaxLength(500)]
     public string? Notes { get; set; }
 
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime CreatedAt { get; set; } = DateTime.Now;
+    public DateTime UpdatedAt { get; set; } = DateTime.Now;
 
     // Navigation
     [ForeignKey("UserId")]

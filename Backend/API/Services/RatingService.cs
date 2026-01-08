@@ -41,7 +41,7 @@ public class RatingService : IRatingService
             // Update existing rating
             existingRating.Stars = request.Stars;
             existingRating.Review = request.Review;
-            existingRating.UpdatedAt = DateTime.UtcNow;
+            existingRating.UpdatedAt = DateTime.Now;
             await _context.SaveChangesAsync();
             return await MapToDto(existingRating);
         }

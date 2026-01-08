@@ -73,8 +73,8 @@ public class ClubGrantTransaction
     [MaxLength(500)]
     public string? VoidReason { get; set; }
 
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime CreatedAt { get; set; } = DateTime.Now;
+    public DateTime UpdatedAt { get; set; } = DateTime.Now;
 
     // Navigation properties
     [ForeignKey("AccountId")]

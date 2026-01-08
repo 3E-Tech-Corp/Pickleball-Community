@@ -61,8 +61,8 @@ public class EventUnit
     public int PointsScored { get; set; } = 0;
     public int PointsAgainst { get; set; } = 0;
 
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime CreatedAt { get; set; } = DateTime.Now;
+    public DateTime UpdatedAt { get; set; } = DateTime.Now;
 
     // Navigation
     [ForeignKey("EventId")]
@@ -109,7 +109,7 @@ public class EventUnitMember
     public bool IsCheckedIn { get; set; } = false;
     public DateTime? CheckedInAt { get; set; }
 
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime CreatedAt { get; set; } = DateTime.Now;
 
     // Navigation
     [ForeignKey("UnitId")]
@@ -142,7 +142,7 @@ public class EventUnitJoinRequest
     public string? ResponseMessage { get; set; }
     public DateTime? RespondedAt { get; set; }
 
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime CreatedAt { get; set; } = DateTime.Now;
 
     // Navigation
     [ForeignKey("UnitId")]

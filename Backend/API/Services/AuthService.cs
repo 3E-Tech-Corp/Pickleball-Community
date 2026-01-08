@@ -120,8 +120,8 @@ public class AuthService : IAuthService
             FirstName = request.FirstName,
             LastName = request.LastName,
             Role = request.Role,
-            CreatedAt = DateTime.UtcNow,
-            UpdatedAt = DateTime.UtcNow
+            CreatedAt = DateTime.Now,
+            UpdatedAt = DateTime.Now
         };
 
         _context.Users.Add(user);
@@ -171,7 +171,7 @@ public class AuthService : IAuthService
         }
 
         user.Role = role;
-        user.UpdatedAt = DateTime.UtcNow;
+        user.UpdatedAt = DateTime.Now;
         await _context.SaveChangesAsync();
 
         return user;

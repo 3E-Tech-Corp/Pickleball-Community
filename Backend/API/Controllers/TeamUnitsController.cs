@@ -223,7 +223,7 @@ public class TeamUnitsController : ControllerBase
             unit.Color = dto.Color;
             unit.SortOrder = dto.SortOrder;
             unit.IsActive = dto.IsActive;
-            unit.UpdatedAt = DateTime.UtcNow;
+            unit.UpdatedAt = DateTime.Now;
 
             await _context.SaveChangesAsync();
 
@@ -271,7 +271,7 @@ public class TeamUnitsController : ControllerBase
 
             // Soft delete
             unit.IsActive = false;
-            unit.UpdatedAt = DateTime.UtcNow;
+            unit.UpdatedAt = DateTime.Now;
             await _context.SaveChangesAsync();
 
             return Ok(new ApiResponse<bool> { Success = true, Data = true, Message = "Team unit deleted" });

@@ -108,7 +108,7 @@ public class AssetService : IAssetService
                 ObjectType = objectType,
                 ObjectId = objectId,
                 UploadedBy = uploadedBy,
-                CreatedAt = DateTime.UtcNow,
+                CreatedAt = DateTime.Now,
                 IsDeleted = false
             };
 

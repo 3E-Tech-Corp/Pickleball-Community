@@ -61,8 +61,8 @@ public class ClubDocument
     public int SortOrder { get; set; } = 0;
 
     public int UploadedByUserId { get; set; }
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime CreatedAt { get; set; } = DateTime.Now;
+    public DateTime UpdatedAt { get; set; } = DateTime.Now;
     public bool IsActive { get; set; } = true;
 
     // Navigation

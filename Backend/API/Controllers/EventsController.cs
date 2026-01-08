@@ -117,7 +117,7 @@ public class EventsController : ControllerBase
 
             if (request.IsUpcoming == true)
             {
-                query = query.Where(e => e.StartDate >= DateTime.UtcNow);
+                query = query.Where(e => e.StartDate >= DateTime.Now);
             }
 
             // Get events with counts
@@ -270,7 +270,7 @@ public class EventsController : ControllerBase
     {
         try
         {
-            var now = DateTime.UtcNow;
+            var now = DateTime.Now;
             var pastCutoff = now.AddDays(-pastDays);
 
             // Upcoming events
@@ -617,7 +617,7 @@ public class EventsController : ControllerBase
             evt.ContactEmail = dto.ContactEmail;
             evt.ContactPhone = dto.ContactPhone;
             evt.MaxParticipants = dto.MaxParticipants;
-            evt.UpdatedAt = DateTime.UtcNow;
+            evt.UpdatedAt = DateTime.Now;
 
             // Handle divisions update
             if (dto.Divisions != null)
@@ -717,7 +717,7 @@ public class EventsController : ControllerBase
                 return Forbid();
 
             evt.IsPublished = true;
-            evt.UpdatedAt = DateTime.UtcNow;
+            evt.UpdatedAt = DateTime.Now;
             await _context.SaveChangesAsync();
 
             // Grant award for publishing event
@@ -753,7 +753,7 @@ public class EventsController : ControllerBase
                 return Forbid();
 
             evt.IsPublished = false;
-            evt.UpdatedAt = DateTime.UtcNow;
+            evt.UpdatedAt = DateTime.Now;
             await _context.SaveChangesAsync();
 
             return Ok(new ApiResponse<bool> { Success = true, Data = true, Message = "Event unpublished" });
@@ -786,7 +786,7 @@ public class EventsController : ControllerBase
                 return Forbid();
 
             evt.IsActive = false;
-            evt.UpdatedAt = DateTime.UtcNow;
+            evt.UpdatedAt = DateTime.Now;
             await _context.SaveChangesAsync();
 
             return Ok(new ApiResponse<bool> { Success = true, Data = true, Message = "Event deleted" });
@@ -814,7 +814,7 @@ public class EventsController : ControllerBase
                 return NotFound(new ApiResponse<EventRegistrationDto> { Success = false, Message = "Event not found" });
 
             // Check registration period
-            var now = DateTime.UtcNow;
+            var now = DateTime.Now;
             if (evt.RegistrationOpenDate.HasValue && now < evt.RegistrationOpenDate.Value)
                 return BadRequest(new ApiResponse<EventRegistrationDto> { Success = false, Message = "Registration has not opened yet" });
 
@@ -1419,7 +1419,7 @@ public class EventsController : ControllerBase
             if (dto.Status != null)
                 registration.Status = dto.Status;
             if (dto.CheckedIn.HasValue && dto.CheckedIn.Value)
-                registration.CheckedInAt = DateTime.UtcNow;
+                registration.CheckedInAt = DateTime.Now;
 
             await _context.SaveChangesAsync();
 

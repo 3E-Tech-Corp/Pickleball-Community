@@ -130,7 +130,7 @@ public class SiteContentController : ControllerBase
         }
 
         content.LastUpdatedByUserId = GetUserId();
-        content.UpdatedAt = DateTime.UtcNow;
+        content.UpdatedAt = DateTime.Now;
 
         await _context.SaveChangesAsync();
 
@@ -169,7 +169,7 @@ public class SiteContentController : ControllerBase
             Title = request.Title ?? key,
             Content = request.Content ?? "",
             LastUpdatedByUserId = GetUserId(),
-            CreatedAt = DateTime.UtcNow
+            CreatedAt = DateTime.Now
         };
 
         _context.SiteContents.Add(content);

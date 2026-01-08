@@ -14,7 +14,7 @@ public class MessageReadReceipt
     [Required]
     public int UserId { get; set; }
 
-    public DateTime ReadAt { get; set; } = DateTime.UtcNow;
+    public DateTime ReadAt { get; set; } = DateTime.Now;
 
     // Navigation properties
     [ForeignKey("MessageId")]

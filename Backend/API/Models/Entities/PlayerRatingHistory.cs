@@ -56,12 +56,12 @@ public class PlayerRatingHistory
     public bool CalculatedBySystem { get; set; } = true;
     public int? UpdatedByUserId { get; set; }
 
-    public DateTime EffectiveDate { get; set; } = DateTime.UtcNow;
+    public DateTime EffectiveDate { get; set; } = DateTime.Now;
 
     [MaxLength(500)]
     public string? Notes { get; set; }
 
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime CreatedAt { get; set; } = DateTime.Now;
 
     // Navigation
     [ForeignKey("UserId")]

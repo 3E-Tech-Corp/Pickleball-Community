@@ -106,7 +106,7 @@ public class PushNotificationService : IPushNotificationService
             existing.UserAgent = userAgent;
             existing.DeviceName = deviceName;
             existing.IsActive = true;
-            existing.LastUsedAt = DateTime.UtcNow;
+            existing.LastUsedAt = DateTime.Now;
         }
         else
         {
@@ -119,7 +119,7 @@ public class PushNotificationService : IPushNotificationService
                 Auth = auth,
                 UserAgent = userAgent,
                 DeviceName = deviceName,
-                CreatedAt = DateTime.UtcNow,
+                CreatedAt = DateTime.Now,
                 IsActive = true
             };
             _context.PushSubscriptions.Add(existing);
@@ -238,7 +238,7 @@ public class PushNotificationService : IPushNotificationService
 
                 await _webPushClient.SendNotificationAsync(pushSubscription, payload, _vapidDetails);
 
-                subscription.LastUsedAt = DateTime.UtcNow;
+                subscription.LastUsedAt = DateTime.Now;
                 successCount++;
             }
             catch (WebPushException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Gone ||

@@ -109,7 +109,7 @@ public class PlayerCertificationService : IPlayerCertificationService
         entity.Description = dto.Description;
         entity.SortOrder = dto.SortOrder;
         entity.IsActive = dto.IsActive;
-        entity.UpdatedAt = DateTime.UtcNow;
+        entity.UpdatedAt = DateTime.Now;
 
         await _context.SaveChangesAsync();
         return MapToKnowledgeLevelDto(entity);
@@ -126,7 +126,7 @@ public class PlayerCertificationService : IPlayerCertificationService
         {
             // Soft delete by deactivating
             entity.IsActive = false;
-            entity.UpdatedAt = DateTime.UtcNow;
+            entity.UpdatedAt = DateTime.Now;
         }
         else
         {
@@ -192,7 +192,7 @@ public class PlayerCertificationService : IPlayerCertificationService
         entity.Weight = dto.Weight;
         entity.SortOrder = dto.SortOrder;
         entity.IsActive = dto.IsActive;
-        entity.UpdatedAt = DateTime.UtcNow;
+        entity.UpdatedAt = DateTime.Now;
 
         await _context.SaveChangesAsync();
         return MapToSkillGroupDto(entity);
@@ -209,7 +209,7 @@ public class PlayerCertificationService : IPlayerCertificationService
         {
             // Soft delete by deactivating
             entity.IsActive = false;
-            entity.UpdatedAt = DateTime.UtcNow;
+            entity.UpdatedAt = DateTime.Now;
         }
         else
         {
@@ -280,7 +280,7 @@ public class PlayerCertificationService : IPlayerCertificationService
         entity.SkillGroupId = dto.SkillGroupId;
         entity.SortOrder = dto.SortOrder;
         entity.IsActive = dto.IsActive;
-        entity.UpdatedAt = DateTime.UtcNow;
+        entity.UpdatedAt = DateTime.Now;
 
         await _context.SaveChangesAsync();
 
@@ -300,7 +300,7 @@ public class PlayerCertificationService : IPlayerCertificationService
         {
             // Soft delete by deactivating
             entity.IsActive = false;
-            entity.UpdatedAt = DateTime.UtcNow;
+            entity.UpdatedAt = DateTime.Now;
         }
         else
         {
@@ -544,7 +544,7 @@ public class PlayerCertificationService : IPlayerCertificationService
             {
                 RequestId = requestId,
                 InvitedUserId = userId,
-                InvitedAt = DateTime.UtcNow
+                InvitedAt = DateTime.Now
             });
             newInvitedUserIds.Add(userId);
         }
@@ -586,7 +586,7 @@ public class PlayerCertificationService : IPlayerCertificationService
             .Where(i => i.InvitedUserId == userId
                 && !i.HasReviewed
                 && i.Request.IsActive
-                && (!i.Request.ExpiresAt.HasValue || i.Request.ExpiresAt.Value > DateTime.UtcNow))
+                && (!i.Request.ExpiresAt.HasValue || i.Request.ExpiresAt.Value > DateTime.Now))
             .OrderByDescending(i => i.InvitedAt)
             .ToListAsync();
 
@@ -636,7 +636,7 @@ public class PlayerCertificationService : IPlayerCertificationService
             };
         }
 
-        if (request.ExpiresAt.HasValue && request.ExpiresAt.Value < DateTime.UtcNow)
+        if (request.ExpiresAt.HasValue && request.ExpiresAt.Value < DateTime.Now)
         {
             return new ReviewPageInfoDto
             {
@@ -718,7 +718,7 @@ public class PlayerCertificationService : IPlayerCertificationService
 
         if (request == null) return false;
 
-        if (request.ExpiresAt.HasValue && request.ExpiresAt.Value < DateTime.UtcNow)
+        if (request.ExpiresAt.HasValue && request.ExpiresAt.Value < DateTime.Now)
             return false;
 
         // Check visibility permissions before allowing submission
@@ -745,7 +745,7 @@ public class PlayerCertificationService : IPlayerCertificationService
 
         // Check for existing review from the same reviewer
         // If within 1 month, update existing review; otherwise create new
-        var oneMonthAgo = DateTime.UtcNow.AddMonths(-1);
+        var oneMonthAgo = DateTime.Now.AddMonths(-1);
         PlayerCertificationReview? existingReview = null;
 
         if (currentUserId.HasValue)
@@ -783,7 +783,7 @@ public class PlayerCertificationService : IPlayerCertificationService
             review.KnowledgeLevelId = knowledgeLevelId;
             review.IsAnonymous = dto.IsAnonymous;
             review.Comments = dto.Comments;
-            review.UpdatedAt = DateTime.UtcNow;
+            review.UpdatedAt = DateTime.Now;
 
             // Remove existing scores and add new ones
             _context.PlayerCertificationScores.RemoveRange(existingReview.Scores);
@@ -839,7 +839,7 @@ public class PlayerCertificationService : IPlayerCertificationService
             if (invitation != null)
             {
                 invitation.HasReviewed = true;
-                invitation.ReviewedAt = DateTime.UtcNow;
+                invitation.ReviewedAt = DateTime.Now;
             }
         }
 
@@ -913,7 +913,7 @@ public class PlayerCertificationService : IPlayerCertificationService
                 SkillAverages = new List<SkillAverageSummaryDto>(),
                 Reviews = new List<CertificationReviewSummaryDto>(),
                 KnowledgeLevels = knowledgeLevels,
-                LastUpdated = DateTime.UtcNow
+                LastUpdated = DateTime.Now
             };
         }
 
@@ -973,7 +973,7 @@ public class PlayerCertificationService : IPlayerCertificationService
             Reviews = reviewSummaries,
             SelfReview = selfReviewSummary,
             KnowledgeLevels = knowledgeLevels,
-            LastUpdated = allReviews.Any() ? allReviews.Max(r => r.CreatedAt) : DateTime.UtcNow
+            LastUpdated = allReviews.Any() ? allReviews.Max(r => r.CreatedAt) : DateTime.Now
         };
     }
 

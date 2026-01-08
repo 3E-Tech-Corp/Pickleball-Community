@@ -108,8 +108,8 @@ public class FeedbackController : ControllerBase
                 UserName = userName?.Trim(),
                 UserId = userId,
                 Status = "New",
-                CreatedAt = DateTime.UtcNow,
-                UpdatedAt = DateTime.UtcNow
+                CreatedAt = DateTime.Now,
+                UpdatedAt = DateTime.Now
             };
 
             _context.FeedbackEntries.Add(entry);
@@ -184,8 +184,8 @@ public class FeedbackController : ControllerBase
                 Color = dto.Color?.Trim(),
                 SortOrder = dto.SortOrder,
                 IsActive = dto.IsActive,
-                CreatedAt = DateTime.UtcNow,
-                UpdatedAt = DateTime.UtcNow
+                CreatedAt = DateTime.Now,
+                UpdatedAt = DateTime.Now
             };
 
             _context.FeedbackCategories.Add(category);
@@ -221,7 +221,7 @@ public class FeedbackController : ControllerBase
             category.Color = dto.Color?.Trim();
             category.SortOrder = dto.SortOrder;
             category.IsActive = dto.IsActive;
-            category.UpdatedAt = DateTime.UtcNow;
+            category.UpdatedAt = DateTime.Now;
 
             await _context.SaveChangesAsync();
 
@@ -256,7 +256,7 @@ public class FeedbackController : ControllerBase
             {
                 // Soft delete - just deactivate
                 category.IsActive = false;
-                category.UpdatedAt = DateTime.UtcNow;
+                category.UpdatedAt = DateTime.Now;
             }
             else
             {
@@ -393,7 +393,7 @@ public class FeedbackController : ControllerBase
             }
 
             entry.AdminNotes = dto.AdminNotes;
-            entry.UpdatedAt = DateTime.UtcNow;
+            entry.UpdatedAt = DateTime.Now;
 
             await _context.SaveChangesAsync();
 

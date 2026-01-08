@@ -73,8 +73,8 @@ public class Club
     public int? HomeVenueId { get; set; }
 
     public int CreatedByUserId { get; set; }
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime CreatedAt { get; set; } = DateTime.Now;
+    public DateTime UpdatedAt { get; set; } = DateTime.Now;
     public bool IsActive { get; set; } = true;
 
     // Chat settings (opt-in by club owner)
@@ -109,7 +109,7 @@ public class ClubMember
     [MaxLength(100)]
     public string? Title { get; set; } // Custom title like "Treasurer", "Secretary", "Tournament Director"
 
-    public DateTime JoinedAt { get; set; } = DateTime.UtcNow;
+    public DateTime JoinedAt { get; set; } = DateTime.Now;
     public DateTime? MembershipValidTo { get; set; } // When membership expires (null = lifetime/no expiry)
 
     [MaxLength(500)]
@@ -141,7 +141,7 @@ public class ClubJoinRequest
     public int? ReviewedByUserId { get; set; }
     public DateTime? ReviewedAt { get; set; }
 
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime CreatedAt { get; set; } = DateTime.Now;
 
     // Navigation
     [ForeignKey("ClubId")]
@@ -168,7 +168,7 @@ public class ClubNotification
     [Required]
     public string Message { get; set; } = string.Empty;
 
-    public DateTime SentAt { get; set; } = DateTime.UtcNow;
+    public DateTime SentAt { get; set; } = DateTime.Now;
 
     // Navigation
     [ForeignKey("ClubId")]
@@ -205,6 +205,6 @@ public class ClubMemberRole
     public bool CanPostAnnouncements { get; set; } = false;
 
     public bool IsActive { get; set; } = true;
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime CreatedAt { get; set; } = DateTime.Now;
+    public DateTime UpdatedAt { get; set; } = DateTime.Now;
 }

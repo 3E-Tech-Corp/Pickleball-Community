@@ -77,8 +77,8 @@ public class League
     public int SortOrder { get; set; } = 0;
 
     public bool IsActive { get; set; } = true;
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime CreatedAt { get; set; } = DateTime.Now;
+    public DateTime UpdatedAt { get; set; } = DateTime.Now;
 
     // Navigation properties
     [ForeignKey("ParentLeagueId")]
@@ -115,8 +115,8 @@ public class LeagueManager
     public string? Title { get; set; }
 
     public bool IsActive { get; set; } = true;
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime CreatedAt { get; set; } = DateTime.Now;
+    public DateTime UpdatedAt { get; set; } = DateTime.Now;
 
     // Navigation
     [ForeignKey("LeagueId")]
@@ -145,7 +145,7 @@ public class LeagueClub
     /// <summary>
     /// When the club joined the league
     /// </summary>
-    public DateTime JoinedAt { get; set; } = DateTime.UtcNow;
+    public DateTime JoinedAt { get; set; } = DateTime.Now;
 
     /// <summary>
     /// Membership expiration date if applicable
@@ -158,8 +158,8 @@ public class LeagueClub
     [MaxLength(500)]
     public string? Notes { get; set; }
 
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime CreatedAt { get; set; } = DateTime.Now;
+    public DateTime UpdatedAt { get; set; } = DateTime.Now;
 
     // Navigation
     [ForeignKey("LeagueId")]
@@ -208,7 +208,7 @@ public class LeagueClubRequest
     public int? ProcessedByUserId { get; set; }
 
     public DateTime? ProcessedAt { get; set; }
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime CreatedAt { get; set; } = DateTime.Now;
 
     // Navigation
     [ForeignKey("LeagueId")]
@@ -281,8 +281,8 @@ public class LeagueDocument
     public bool IsPublic { get; set; } = true;
 
     public bool IsActive { get; set; } = true;
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime CreatedAt { get; set; } = DateTime.Now;
+    public DateTime UpdatedAt { get; set; } = DateTime.Now;
 
     /// <summary>
     /// User who uploaded the document
@@ -329,6 +329,6 @@ public class LeagueRole
     public bool CanApproveRequests { get; set; } = false;
 
     public bool IsActive { get; set; } = true;
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime CreatedAt { get; set; } = DateTime.Now;
+    public DateTime UpdatedAt { get; set; } = DateTime.Now;
 }

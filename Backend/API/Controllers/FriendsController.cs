@@ -532,7 +532,7 @@ public class FriendsController : ControllerBase
                 return BadRequest(new ApiResponse<object> { Success = false, Message = "Request is no longer pending" });
 
             request.Status = "Accepted";
-            request.RespondedAt = DateTime.UtcNow;
+            request.RespondedAt = DateTime.Now;
 
             // Create friendship (ensure UserId1 < UserId2 for uniqueness)
             var friendship = new Friendship
@@ -597,7 +597,7 @@ public class FriendsController : ControllerBase
                 return BadRequest(new ApiResponse<object> { Success = false, Message = "Request is no longer pending" });
 
             request.Status = "Rejected";
-            request.RespondedAt = DateTime.UtcNow;
+            request.RespondedAt = DateTime.Now;
             await _context.SaveChangesAsync();
 
             return Ok(new ApiResponse<object> { Success = true, Message = "Friend request rejected" });
@@ -630,7 +630,7 @@ public class FriendsController : ControllerBase
                 return BadRequest(new ApiResponse<object> { Success = false, Message = "Request is no longer pending" });
 
             request.Status = "Cancelled";
-            request.RespondedAt = DateTime.UtcNow;
+            request.RespondedAt = DateTime.Now;
             await _context.SaveChangesAsync();
 
             return Ok(new ApiResponse<object> { Success = true, Message = "Friend request cancelled" });

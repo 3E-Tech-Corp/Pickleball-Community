@@ -168,7 +168,7 @@ public class NotificationService : INotificationService
             ReferenceType = referenceType,
             ReferenceId = referenceId,
             IsRead = false,
-            CreatedAt = DateTime.UtcNow
+            CreatedAt = DateTime.Now
         };
 
         _context.Notifications.Add(notification);
@@ -379,7 +379,7 @@ public class NotificationService : INotificationService
     public async Task<List<Notification>> CreateAndSendToUsersAsync(IEnumerable<int> userIds, string type, string title,
         string? message = null, string? actionUrl = null, string? referenceType = null, int? referenceId = null)
     {
-        var now = DateTime.UtcNow;
+        var now = DateTime.Now;
         var notifications = userIds.Select(userId => new Notification
         {
             UserId = userId,
@@ -424,7 +424,7 @@ public class NotificationService : INotificationService
         try
         {
             scoreUpdate.GameId = gameId;
-            scoreUpdate.UpdatedAt = DateTime.UtcNow;
+            scoreUpdate.UpdatedAt = DateTime.Now;
 
             var groupName = $"game_{gameId}";
             await _hubContext.Clients.Group(groupName).SendAsync("GameScoreUpdate", scoreUpdate);

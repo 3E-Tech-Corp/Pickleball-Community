@@ -207,7 +207,7 @@ public class AgeGroupsController : ControllerBase
             group.Color = dto.Color;
             group.SortOrder = dto.SortOrder;
             group.IsActive = dto.IsActive;
-            group.UpdatedAt = DateTime.UtcNow;
+            group.UpdatedAt = DateTime.Now;
 
             await _context.SaveChangesAsync();
 
@@ -252,7 +252,7 @@ public class AgeGroupsController : ControllerBase
 
             // Soft delete
             group.IsActive = false;
-            group.UpdatedAt = DateTime.UtcNow;
+            group.UpdatedAt = DateTime.Now;
             await _context.SaveChangesAsync();
 
             return Ok(new ApiResponse<bool> { Success = true, Data = true, Message = "Age group deleted" });

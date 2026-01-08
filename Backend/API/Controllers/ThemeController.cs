@@ -231,7 +231,7 @@ public class ThemeController : ControllerBase
             if (request.MarqueeSpeed.HasValue)
                 theme.MarqueeSpeed = Math.Clamp(request.MarqueeSpeed.Value, 10, 120);
 
-            theme.UpdatedAt = DateTime.UtcNow;
+            theme.UpdatedAt = DateTime.Now;
 
             await _context.SaveChangesAsync();
 
@@ -315,7 +315,7 @@ public class ThemeController : ControllerBase
             if (theme != null)
             {
                 theme.LogoUrl = result.Url;
-                theme.UpdatedAt = DateTime.UtcNow;
+                theme.UpdatedAt = DateTime.Now;
                 await _context.SaveChangesAsync();
             }
 
@@ -397,7 +397,7 @@ public class ThemeController : ControllerBase
             if (theme != null)
             {
                 theme.FaviconUrl = result.Url;
-                theme.UpdatedAt = DateTime.UtcNow;
+                theme.UpdatedAt = DateTime.Now;
                 await _context.SaveChangesAsync();
             }
 
@@ -489,7 +489,7 @@ public class ThemeController : ControllerBase
             if (theme != null)
             {
                 theme.HeroVideoUrl = result.Url;
-                theme.UpdatedAt = DateTime.UtcNow;
+                theme.UpdatedAt = DateTime.Now;
                 await _context.SaveChangesAsync();
             }
 
@@ -541,7 +541,7 @@ public class ThemeController : ControllerBase
                 await _assetService.DeleteFileAsync(theme.HeroVideoUrl);
                 theme.HeroVideoUrl = null;
                 theme.HeroVideoThumbnailUrl = null;
-                theme.UpdatedAt = DateTime.UtcNow;
+                theme.UpdatedAt = DateTime.Now;
                 await _context.SaveChangesAsync();
             }
 
@@ -601,7 +601,7 @@ public class ThemeController : ControllerBase
             if (theme != null)
             {
                 theme.HeroImageUrl = result.Url;
-                theme.UpdatedAt = DateTime.UtcNow;
+                theme.UpdatedAt = DateTime.Now;
                 await _context.SaveChangesAsync();
             }
 
@@ -652,7 +652,7 @@ public class ThemeController : ControllerBase
             {
                 await _assetService.DeleteFileAsync(theme.HeroImageUrl);
                 theme.HeroImageUrl = null;
-                theme.UpdatedAt = DateTime.UtcNow;
+                theme.UpdatedAt = DateTime.Now;
                 await _context.SaveChangesAsync();
             }
 
@@ -749,7 +749,7 @@ public class ThemeController : ControllerBase
             theme.HeadingFontFamily = defaultTheme.HeadingFontFamily;
             theme.CustomCss = null;
 
-            theme.UpdatedAt = DateTime.UtcNow;
+            theme.UpdatedAt = DateTime.Now;
 
             await _context.SaveChangesAsync();
 
@@ -870,8 +870,8 @@ public class ThemeController : ControllerBase
                 DisplayDuration = request.DisplayDuration,
                 SortOrder = maxSortOrder + 1,
                 IsActive = true,
-                CreatedAt = DateTime.UtcNow,
-                UpdatedAt = DateTime.UtcNow,
+                CreatedAt = DateTime.Now,
+                UpdatedAt = DateTime.Now,
                 CreatedBy = currentUserId
             };
 
@@ -926,7 +926,7 @@ public class ThemeController : ControllerBase
             if (request.IsActive.HasValue) heroVideo.IsActive = request.IsActive.Value;
             if (request.DisplayDuration.HasValue) heroVideo.DisplayDuration = request.DisplayDuration.Value;
 
-            heroVideo.UpdatedAt = DateTime.UtcNow;
+            heroVideo.UpdatedAt = DateTime.Now;
             heroVideo.UpdatedBy = currentUserId;
 
             await _context.SaveChangesAsync();
@@ -1013,7 +1013,7 @@ public class ThemeController : ControllerBase
             }
 
             heroVideo.IsActive = true;
-            heroVideo.UpdatedAt = DateTime.UtcNow;
+            heroVideo.UpdatedAt = DateTime.Now;
             heroVideo.UpdatedBy = currentUserId;
 
             await _context.SaveChangesAsync();
@@ -1058,7 +1058,7 @@ public class ThemeController : ControllerBase
             }
 
             heroVideo.IsActive = false;
-            heroVideo.UpdatedAt = DateTime.UtcNow;
+            heroVideo.UpdatedAt = DateTime.Now;
             heroVideo.UpdatedBy = currentUserId;
 
             await _context.SaveChangesAsync();
@@ -1117,7 +1117,7 @@ public class ThemeController : ControllerBase
                 if (video != null)
                 {
                     video.SortOrder = i;
-                    video.UpdatedAt = DateTime.UtcNow;
+                    video.UpdatedAt = DateTime.Now;
                     video.UpdatedBy = currentUserId;
                 }
             }
@@ -1195,7 +1195,7 @@ public class ThemeController : ControllerBase
             FontFamily = "Inter, system-ui, sans-serif",
             HeadingFontFamily = "Playfair Display, serif",
             IsActive = true,
-            UpdatedAt = DateTime.UtcNow
+            UpdatedAt = DateTime.Now
         };
 
         _context.ThemeSettings.Add(defaultTheme);

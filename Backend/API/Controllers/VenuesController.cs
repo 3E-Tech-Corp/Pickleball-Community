@@ -474,7 +474,7 @@ public class VenuesController : ControllerBase
                 existingConfirmation.ConfirmedCountry = dto.ConfirmedCountry ?? existingConfirmation.ConfirmedCountry;
                 if (dto.Amenities != null)
                     existingConfirmation.Amenities = string.Join(",", dto.Amenities);
-                existingConfirmation.UpdatedAt = DateTime.UtcNow;
+                existingConfirmation.UpdatedAt = DateTime.Now;
 
                 await _context.SaveChangesAsync();
 

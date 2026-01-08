@@ -74,7 +74,7 @@ public class SharedAuthService : ISharedAuthService
             var jwtToken = handler.ReadJwtToken(token);
 
             // Check if token is expired
-            if (jwtToken.ValidTo < DateTime.UtcNow)
+            if (jwtToken.ValidTo < DateTime.Now)
             {
                 _logger.LogWarning("JWT token is expired");
                 return Task.FromResult<SharedUserInfo?>(null);
@@ -160,8 +160,8 @@ public class SharedAuthService : ISharedAuthService
                 Role = "Player",  // Default role for new users
                 PasswordHash = null,  // No local password - auth handled by shared service
                 IsActive = true,
-                CreatedAt = DateTime.UtcNow,
-                UpdatedAt = DateTime.UtcNow
+                CreatedAt = DateTime.Now,
+                UpdatedAt = DateTime.Now
             };
 
             _context.Users.Add(newUser);
@@ -184,7 +184,7 @@ public class SharedAuthService : ISharedAuthService
                 existingUser.ProfileImageUrl = sharedUser.ProfileImageUrl;
             }
 
-            existingUser.UpdatedAt = DateTime.UtcNow;
+            existingUser.UpdatedAt = DateTime.Now;
             await _context.SaveChangesAsync();
 
             _logger.LogInformation("Updated local user {UserId} from shared auth", sharedUser.Id);
@@ -215,8 +215,8 @@ public class SharedAuthService : ISharedAuthService
             Role = "Player",
             PasswordHash = null,
             IsActive = true,
-            CreatedAt = DateTime.UtcNow,
-            UpdatedAt = DateTime.UtcNow
+            CreatedAt = DateTime.Now,
+            UpdatedAt = DateTime.Now
         };
 
         _context.Users.Add(newUser);

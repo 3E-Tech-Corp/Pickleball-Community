@@ -218,7 +218,7 @@ public class VenueAssetsController : ControllerBase
             {
                 // Update existing vote
                 existingVote.IsLike = dto.IsLike;
-                existingVote.CreatedAt = DateTime.UtcNow;
+                existingVote.CreatedAt = DateTime.Now;
             }
             else
             {

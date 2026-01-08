@@ -250,7 +250,7 @@ public class MessagingController : ControllerBase
                 };
 
                 _context.Messages.Add(message);
-                conversation.LastMessageAt = DateTime.UtcNow;
+                conversation.LastMessageAt = DateTime.Now;
                 await _context.SaveChangesAsync();
             }
 
@@ -432,11 +432,11 @@ public class MessagingController : ControllerBase
             _context.Messages.Add(message);
 
             // Update conversation last message time
-            conversation.LastMessageAt = DateTime.UtcNow;
-            conversation.UpdatedAt = DateTime.UtcNow;
+            conversation.LastMessageAt = DateTime.Now;
+            conversation.UpdatedAt = DateTime.Now;
 
             // Update sender's last read time
-            participant.LastReadAt = DateTime.UtcNow;
+            participant.LastReadAt = DateTime.Now;
 
             await _context.SaveChangesAsync();
 
@@ -492,7 +492,7 @@ public class MessagingController : ControllerBase
                 return Forbid();
 
             message.Content = request.Content;
-            message.EditedAt = DateTime.UtcNow;
+            message.EditedAt = DateTime.Now;
 
             await _context.SaveChangesAsync();
 
@@ -573,7 +573,7 @@ public class MessagingController : ControllerBase
             if (participant == null)
                 return Forbid();
 
-            participant.LastReadAt = DateTime.UtcNow;
+            participant.LastReadAt = DateTime.Now;
             await _context.SaveChangesAsync();
 
             // Get user info for broadcast
@@ -627,7 +627,7 @@ public class MessagingController : ControllerBase
             if (request.Name != null)
             {
                 conversation.Name = request.Name;
-                conversation.UpdatedAt = DateTime.UtcNow;
+                conversation.UpdatedAt = DateTime.Now;
                 await _context.SaveChangesAsync();
             }
 

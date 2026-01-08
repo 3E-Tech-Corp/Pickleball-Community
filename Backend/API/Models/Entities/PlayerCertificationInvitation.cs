@@ -28,7 +28,7 @@ public class PlayerCertificationInvitation
     /// </summary>
     public bool HasReviewed { get; set; } = false;
 
-    public DateTime InvitedAt { get; set; } = DateTime.UtcNow;
+    public DateTime InvitedAt { get; set; } = DateTime.Now;
 
     public DateTime? ReviewedAt { get; set; }
 }

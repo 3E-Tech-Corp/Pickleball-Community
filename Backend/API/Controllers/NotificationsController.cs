@@ -161,7 +161,7 @@ public class NotificationsController : ControllerBase
             if (!notification.IsRead)
             {
                 notification.IsRead = true;
-                notification.ReadAt = DateTime.UtcNow;
+                notification.ReadAt = DateTime.Now;
                 await _context.SaveChangesAsync();
             }
 
@@ -188,7 +188,7 @@ public class NotificationsController : ControllerBase
                 return Unauthorized(new { success = false, message = "Unauthorized" });
             }
 
-            var now = DateTime.UtcNow;
+            var now = DateTime.Now;
             var unreadNotifications = await _context.Notifications
                 .Where(n => n.UserId == userId.Value && !n.IsRead)
                 .ToListAsync();
@@ -372,7 +372,7 @@ public class NotificationsController : ControllerBase
                 ActionUrl = dto.ActionUrl,
                 ReferenceType = dto.ReferenceType,
                 ReferenceId = dto.ReferenceId,
-                CreatedAt = DateTime.UtcNow
+                CreatedAt = DateTime.Now
             };
 
             switch (targetType)
@@ -495,7 +495,7 @@ public class NotificationsController : ControllerBase
         try
         {
             var notifications = new List<Notification>();
-            var now = DateTime.UtcNow;
+            var now = DateTime.Now;
 
             foreach (var userId in dto.UserIds)
             {

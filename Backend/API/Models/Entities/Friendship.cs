@@ -13,7 +13,7 @@ public class Friendship
     [Required]
     public int UserId2 { get; set; } // Always the larger UserId
 
-    public DateTime FriendsSince { get; set; } = DateTime.UtcNow;
+    public DateTime FriendsSince { get; set; } = DateTime.Now;
 
     public int? OriginatingRequestId { get; set; }
 

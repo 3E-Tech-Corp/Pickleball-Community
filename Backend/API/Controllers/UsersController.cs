@@ -262,7 +262,7 @@ public class UsersController : ControllerBase
             if (request.IntroVideo != null)
                 user.IntroVideo = request.IntroVideo;
 
-            user.UpdatedAt = DateTime.UtcNow;
+            user.UpdatedAt = DateTime.Now;
 
             await _context.SaveChangesAsync();
 
@@ -354,7 +354,7 @@ public class UsersController : ControllerBase
 
             // Update user
             user.ProfileImageUrl = result.Url;
-            user.UpdatedAt = DateTime.UtcNow;
+            user.UpdatedAt = DateTime.Now;
             await _context.SaveChangesAsync();
 
             // Log activity
@@ -418,7 +418,7 @@ public class UsersController : ControllerBase
             }
 
             user.ProfileImageUrl = null;
-            user.UpdatedAt = DateTime.UtcNow;
+            user.UpdatedAt = DateTime.Now;
             await _context.SaveChangesAsync();
 
             // Log activity
@@ -459,7 +459,7 @@ public class UsersController : ControllerBase
             count = Math.Clamp(count, 5, 50);
             days = Math.Clamp(days, 1, 365);
 
-            var cutoffDate = DateTime.UtcNow.AddDays(-days);
+            var cutoffDate = DateTime.Now.AddDays(-days);
 
             var recentPlayers = await _context.Users
                 .Where(u => u.IsActive && !string.IsNullOrEmpty(u.FirstName) && u.CreatedAt >= cutoffDate)
@@ -675,7 +675,7 @@ public class UsersController : ControllerBase
             if (request.IsActive.HasValue)
                 user.IsActive = request.IsActive.Value;
 
-            user.UpdatedAt = DateTime.UtcNow;
+            user.UpdatedAt = DateTime.Now;
 
             await _context.SaveChangesAsync();
 

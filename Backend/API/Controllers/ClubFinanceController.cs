@@ -161,7 +161,7 @@ public class ClubFinanceController : ControllerBase
             });
         }
 
-        var startOfMonth = new DateTime(DateTime.UtcNow.Year, DateTime.UtcNow.Month, 1);
+        var startOfMonth = new DateTime(DateTime.Now.Year, DateTime.Now.Month, 1);
 
         var transactions = await _context.ClubFinanceTransactions
             .Where(t => t.AccountId == account.Id && !t.IsVoided)
@@ -369,7 +369,7 @@ public class ClubFinanceController : ControllerBase
             account.CurrentBalance = newBalance;
             account.TotalExpenses += dto.Amount;
         }
-        account.UpdatedAt = DateTime.UtcNow;
+        account.UpdatedAt = DateTime.Now;
 
         var transaction = new ClubFinanceTransaction
         {
@@ -472,7 +472,7 @@ public class ClubFinanceController : ControllerBase
         if (dto.PeriodEnd.HasValue) transaction.PeriodEnd = dto.PeriodEnd;
         if (dto.ReferenceNumber != null) transaction.ReferenceNumber = dto.ReferenceNumber;
         if (dto.Notes != null) transaction.Notes = dto.Notes;
-        transaction.UpdatedAt = DateTime.UtcNow;
+        transaction.UpdatedAt = DateTime.Now;
 
         await _context.SaveChangesAsync();
 
@@ -538,13 +538,13 @@ public class ClubFinanceController : ControllerBase
             account.CurrentBalance += transaction.Amount;
             account.TotalExpenses -= transaction.Amount;
         }
-        account.UpdatedAt = DateTime.UtcNow;
+        account.UpdatedAt = DateTime.Now;
 
         transaction.IsVoided = true;
         transaction.VoidedByUserId = userId.Value;
-        transaction.VoidedAt = DateTime.UtcNow;
+        transaction.VoidedAt = DateTime.Now;
         transaction.VoidReason = dto.Reason;
-        transaction.UpdatedAt = DateTime.UtcNow;
+        transaction.UpdatedAt = DateTime.Now;
 
         await _context.SaveChangesAsync();
 

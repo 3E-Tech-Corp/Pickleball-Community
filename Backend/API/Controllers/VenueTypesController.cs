@@ -157,7 +157,7 @@ public class VenueTypesController : ControllerBase
             venueType.Color = dto.Color ?? venueType.Color;
             venueType.SortOrder = dto.SortOrder ?? venueType.SortOrder;
             venueType.IsActive = dto.IsActive ?? venueType.IsActive;
-            venueType.UpdatedAt = DateTime.UtcNow;
+            venueType.UpdatedAt = DateTime.Now;
 
             await _context.SaveChangesAsync();
 
@@ -194,7 +194,7 @@ public class VenueTypesController : ControllerBase
 
             // Soft delete - just mark as inactive
             venueType.IsActive = false;
-            venueType.UpdatedAt = DateTime.UtcNow;
+            venueType.UpdatedAt = DateTime.Now;
             await _context.SaveChangesAsync();
 
             return Ok(new ApiResponse<bool> { Success = true, Data = true, Message = "Venue type deactivated" });
@@ -218,7 +218,7 @@ public class VenueTypesController : ControllerBase
                 return NotFound(new ApiResponse<VenueTypeDto> { Success = false, Message = "Venue type not found" });
 
             venueType.IsActive = true;
-            venueType.UpdatedAt = DateTime.UtcNow;
+            venueType.UpdatedAt = DateTime.Now;
             await _context.SaveChangesAsync();
 
             var result = new VenueTypeDto
@@ -254,7 +254,7 @@ public class VenueTypesController : ControllerBase
                 if (venueType != null)
                 {
                     venueType.SortOrder = i;
-                    venueType.UpdatedAt = DateTime.UtcNow;
+                    venueType.UpdatedAt = DateTime.Now;
                 }
             }
 

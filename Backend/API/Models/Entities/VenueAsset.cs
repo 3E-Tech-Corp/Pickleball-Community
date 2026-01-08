@@ -39,8 +39,8 @@ public class VenueAsset
 
     public bool IsApproved { get; set; } = true;
 
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime CreatedAt { get; set; } = DateTime.Now;
+    public DateTime UpdatedAt { get; set; } = DateTime.Now;
 
     // Navigation properties
     [ForeignKey("VenueId")]
@@ -67,7 +67,7 @@ public class VenueAssetLike
 
     public bool IsLike { get; set; } // true = like, false = dislike
 
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime CreatedAt { get; set; } = DateTime.Now;
 
     // Navigation properties
     [ForeignKey("AssetId")]

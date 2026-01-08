@@ -52,7 +52,7 @@ public class TagService : ITagService
             tagDefinition = new TagDefinition
             {
                 Name = normalizedTagName,
-                CreatedAt = DateTime.UtcNow
+                CreatedAt = DateTime.Now
             };
             _context.TagDefinitions.Add(tagDefinition);
             await _context.SaveChangesAsync();
@@ -69,7 +69,7 @@ public class TagService : ITagService
         if (existingUserTag != null)
         {
             // Update the date and return existing tag
-            existingUserTag.CreatedAt = DateTime.UtcNow;
+            existingUserTag.CreatedAt = DateTime.Now;
             await _context.SaveChangesAsync();
 
             _logger.LogInformation("Tag '{TagName}' updated for {ObjectType} {ObjectId} by user {UserId}",
@@ -94,7 +94,7 @@ public class TagService : ITagService
             ObjectType = request.ObjectType,
             ObjectId = request.ObjectId,
             CreatedByUserId = userId,
-            CreatedAt = DateTime.UtcNow
+            CreatedAt = DateTime.Now
         };
 
         _context.ObjectTags.Add(objectTag);

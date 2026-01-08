@@ -106,7 +106,7 @@ public class PlayerAwardDto
     public string? AwardedByName { get; set; }
     public DateTime? ExpiresAt { get; set; }
     public bool IsActive { get; set; }
-    public bool IsExpired => ExpiresAt.HasValue && ExpiresAt.Value < DateTime.UtcNow;
+    public bool IsExpired => ExpiresAt.HasValue && ExpiresAt.Value < DateTime.Now;
     public string? Notes { get; set; }
 }
 

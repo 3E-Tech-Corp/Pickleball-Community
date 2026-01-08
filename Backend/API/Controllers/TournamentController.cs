@@ -108,7 +108,7 @@ public class TournamentController : ControllerBase
             .GroupBy(u => u.DivisionId)
             .ToDictionary(g => g.Key, g => g.ToList());
 
-        var now = DateTime.UtcNow;
+        var now = DateTime.Now;
         var isRegistrationOpen = evt.TournamentStatus == "RegistrationOpen" ||
             (evt.RegistrationOpenDate <= now && (evt.RegistrationCloseDate == null || evt.RegistrationCloseDate > now));
 
@@ -250,8 +250,8 @@ public class TournamentController : ControllerBase
                 Status = isWaitlisted ? "Waitlisted" : "Registered",
                 WaitlistPosition = isWaitlisted ? await GetNextWaitlistPosition(divisionId) : null,
                 CaptainUserId = userId.Value,
-                CreatedAt = DateTime.UtcNow,
-                UpdatedAt = DateTime.UtcNow
+                CreatedAt = DateTime.Now,
+                UpdatedAt = DateTime.Now
             };
 
             _context.EventUnits.Add(unit);
@@ -264,7 +264,7 @@ public class TournamentController : ControllerBase
                 UserId = userId.Value,
                 Role = "Captain",
                 InviteStatus = "Accepted",
-                CreatedAt = DateTime.UtcNow
+                CreatedAt = DateTime.Now
             };
             _context.EventUnitMembers.Add(member);
 
@@ -277,8 +277,8 @@ public class TournamentController : ControllerBase
                     UserId = request.PartnerUserId.Value,
                     Role = "Player",
                     InviteStatus = "Pending",
-                    InvitedAt = DateTime.UtcNow,
-                    CreatedAt = DateTime.UtcNow
+                    InvitedAt = DateTime.Now,
+                    CreatedAt = DateTime.Now
                 };
                 _context.EventUnitMembers.Add(partnerMember);
             }
@@ -378,7 +378,7 @@ public class TournamentController : ControllerBase
             UserId = userId.Value,
             Message = request.Message,
             Status = "Pending",
-            CreatedAt = DateTime.UtcNow
+            CreatedAt = DateTime.Now
         };
 
         _context.EventUnitJoinRequests.Add(joinRequest);
@@ -424,7 +424,7 @@ public class TournamentController : ControllerBase
 
         joinRequest.Status = request.Accept ? "Accepted" : "Declined";
         joinRequest.ResponseMessage = request.Message;
-        joinRequest.RespondedAt = DateTime.UtcNow;
+        joinRequest.RespondedAt = DateTime.Now;
 
         if (request.Accept)
         {
@@ -434,7 +434,7 @@ public class TournamentController : ControllerBase
                 UserId = joinRequest.UserId,
                 Role = "Player",
                 InviteStatus = "Accepted",
-                CreatedAt = DateTime.UtcNow
+                CreatedAt = DateTime.Now
             };
             _context.EventUnitMembers.Add(member);
         }
@@ -537,7 +537,7 @@ public class TournamentController : ControllerBase
             return NotFound(new ApiResponse<bool> { Success = false, Message = "Invitation not found" });
 
         membership.InviteStatus = request.Accept ? "Accepted" : "Declined";
-        membership.RespondedAt = DateTime.UtcNow;
+        membership.RespondedAt = DateTime.Now;
 
         await _context.SaveChangesAsync();
 
@@ -752,8 +752,8 @@ public class TournamentController : ControllerBase
                     GameNumber = g,
                     ScoreFormatId = request.ScoreFormatId,
                     Status = "New",
-                    CreatedAt = DateTime.UtcNow,
-                    UpdatedAt = DateTime.UtcNow
+                    CreatedAt = DateTime.Now,
+                    UpdatedAt = DateTime.Now
                 };
                 _context.EventGames.Add(game);
             }
@@ -793,7 +793,7 @@ public class TournamentController : ControllerBase
         for (int i = 0; i < shuffled.Count; i++)
         {
             shuffled[i].UnitNumber = i + 1;
-            shuffled[i].UpdatedAt = DateTime.UtcNow;
+            shuffled[i].UpdatedAt = DateTime.Now;
         }
 
         // Update matches with actual unit IDs
@@ -805,7 +805,7 @@ public class TournamentController : ControllerBase
         {
             match.Unit1Id = units.FirstOrDefault(u => u.UnitNumber == match.Unit1Number)?.Id;
             match.Unit2Id = units.FirstOrDefault(u => u.UnitNumber == match.Unit2Number)?.Id;
-            match.UpdatedAt = DateTime.UtcNow;
+            match.UpdatedAt = DateTime.Now;
         }
 
         await _context.SaveChangesAsync();
@@ -857,7 +857,7 @@ public class TournamentController : ControllerBase
             DivisionId = divisionId,
             DivisionName = division.Name,
             EventName = division.Event?.Name ?? "",
-            ExportedAt = DateTime.UtcNow,
+            ExportedAt = DateTime.Now,
             Rounds = matches.GroupBy(m => new { m.RoundType, m.RoundNumber, m.RoundName })
                 .OrderBy(g => g.Key.RoundType == "Pool" ? 0 : g.Key.RoundType == "Bracket" ? 1 : 2)
                 .ThenBy(g => g.Key.RoundNumber)
@@ -927,8 +927,8 @@ public class TournamentController : ControllerBase
         var oldStatus = game.Status;
         game.TournamentCourtId = request.TournamentCourtId;
         game.Status = "Queued";
-        game.QueuedAt = DateTime.UtcNow;
-        game.UpdatedAt = DateTime.UtcNow;
+        game.QueuedAt = DateTime.Now;
+        game.UpdatedAt = DateTime.Now;
 
         court.CurrentGameId = game.Id;
         court.Status = "InUse";
@@ -959,15 +959,15 @@ public class TournamentController : ControllerBase
 
         var oldStatus = game.Status;
         game.Status = request.Status;
-        game.UpdatedAt = DateTime.UtcNow;
+        game.UpdatedAt = DateTime.Now;
 
         if (request.Status == "Started" || request.Status == "Playing")
         {
-            game.StartedAt ??= DateTime.UtcNow;
+            game.StartedAt ??= DateTime.Now;
         }
         else if (request.Status == "Finished")
         {
-            game.FinishedAt = DateTime.UtcNow;
+            game.FinishedAt = DateTime.Now;
 
             // Free up the court
             if (game.TournamentCourt != null)
@@ -1019,8 +1019,8 @@ public class TournamentController : ControllerBase
         game.Unit1Score = request.Unit1Score;
         game.Unit2Score = request.Unit2Score;
         game.ScoreSubmittedByUnitId = userUnit.Id;
-        game.ScoreSubmittedAt = DateTime.UtcNow;
-        game.UpdatedAt = DateTime.UtcNow;
+        game.ScoreSubmittedAt = DateTime.Now;
+        game.UpdatedAt = DateTime.Now;
 
         await _context.SaveChangesAsync();
 
@@ -1062,9 +1062,9 @@ public class TournamentController : ControllerBase
         if (request.Confirm)
         {
             game.ScoreConfirmedByUnitId = userUnit.Id;
-            game.ScoreConfirmedAt = DateTime.UtcNow;
+            game.ScoreConfirmedAt = DateTime.Now;
             game.Status = "Finished";
-            game.FinishedAt = DateTime.UtcNow;
+            game.FinishedAt = DateTime.Now;
 
             // Determine winner
             var unit1Id = game.Match!.Unit1Id;
@@ -1090,11 +1090,11 @@ public class TournamentController : ControllerBase
         }
         else
         {
-            game.ScoreDisputedAt = DateTime.UtcNow;
+            game.ScoreDisputedAt = DateTime.Now;
             game.ScoreDisputeReason = request.DisputeReason;
         }
 
-        game.UpdatedAt = DateTime.UtcNow;
+        game.UpdatedAt = DateTime.Now;
         await _context.SaveChangesAsync();
 
         return Ok(new ApiResponse<EventGameDto>
@@ -1128,7 +1128,7 @@ public class TournamentController : ControllerBase
         foreach (var member in members)
         {
             member.IsCheckedIn = true;
-            member.CheckedInAt = DateTime.UtcNow;
+            member.CheckedInAt = DateTime.Now;
 
             // Check if all members of unit are checked in
             var allCheckedIn = await _context.EventUnitMembers
@@ -1138,7 +1138,7 @@ public class TournamentController : ControllerBase
             if (allCheckedIn && member.Unit != null)
             {
                 member.Unit.Status = "CheckedIn";
-                member.Unit.UpdatedAt = DateTime.UtcNow;
+                member.Unit.UpdatedAt = DateTime.Now;
             }
         }
 
@@ -1270,7 +1270,7 @@ public class TournamentController : ControllerBase
             return BadRequest(new ApiResponse<bool> { Success = false, Message = "Invalid status" });
 
         evt.TournamentStatus = status;
-        evt.UpdatedAt = DateTime.UtcNow;
+        evt.UpdatedAt = DateTime.Now;
 
         await _context.SaveChangesAsync();
 
@@ -1428,8 +1428,8 @@ public class TournamentController : ControllerBase
                         BestOf = request.BestOf,
                         ScoreFormatId = request.ScoreFormatId,
                         Status = "Scheduled",
-                        CreatedAt = DateTime.UtcNow,
-                        UpdatedAt = DateTime.UtcNow
+                        CreatedAt = DateTime.Now,
+                        UpdatedAt = DateTime.Now
                     });
                 }
             }
@@ -1472,8 +1472,8 @@ public class TournamentController : ControllerBase
                     BestOf = request.BestOf,
                     ScoreFormatId = request.ScoreFormatId,
                     Status = "Scheduled",
-                    CreatedAt = DateTime.UtcNow,
-                    UpdatedAt = DateTime.UtcNow
+                    CreatedAt = DateTime.Now,
+                    UpdatedAt = DateTime.Now
                 });
             }
         }
@@ -1523,7 +1523,7 @@ public class TournamentController : ControllerBase
 
             unit1.PointsScored += game.Unit1Score;
             unit1.PointsAgainst += game.Unit2Score;
-            unit1.UpdatedAt = DateTime.UtcNow;
+            unit1.UpdatedAt = DateTime.Now;
         }
 
         if (unit2 != null)
@@ -1535,7 +1535,7 @@ public class TournamentController : ControllerBase
 
             unit2.PointsScored += game.Unit2Score;
             unit2.PointsAgainst += game.Unit1Score;
-            unit2.UpdatedAt = DateTime.UtcNow;
+            unit2.UpdatedAt = DateTime.Now;
         }
     }
 
@@ -1555,8 +1555,8 @@ public class TournamentController : ControllerBase
         {
             match.WinnerUnitId = unit1Wins >= gamesNeeded ? match.Unit1Id : match.Unit2Id;
             match.Status = "Completed";
-            match.CompletedAt = DateTime.UtcNow;
-            match.UpdatedAt = DateTime.UtcNow;
+            match.CompletedAt = DateTime.Now;
+            match.UpdatedAt = DateTime.Now;
 
             // Update match stats
             var winner = await _context.EventUnits.FindAsync(match.WinnerUnitId);
@@ -1567,14 +1567,14 @@ public class TournamentController : ControllerBase
             {
                 winner.MatchesPlayed++;
                 winner.MatchesWon++;
-                winner.UpdatedAt = DateTime.UtcNow;
+                winner.UpdatedAt = DateTime.Now;
             }
 
             if (loser != null)
             {
                 loser.MatchesPlayed++;
                 loser.MatchesLost++;
-                loser.UpdatedAt = DateTime.UtcNow;
+                loser.UpdatedAt = DateTime.Now;
             }
         }
     }

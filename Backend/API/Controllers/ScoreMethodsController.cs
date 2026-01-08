@@ -224,7 +224,7 @@ public class ScoreMethodsController : ControllerBase
             if (dto.IsDefault.HasValue)
                 method.IsDefault = dto.IsDefault.Value;
 
-            method.UpdatedAt = DateTime.UtcNow;
+            method.UpdatedAt = DateTime.Now;
 
             await _context.SaveChangesAsync();
 
@@ -271,7 +271,7 @@ public class ScoreMethodsController : ControllerBase
             {
                 // Soft delete by deactivating
                 method.IsActive = false;
-                method.UpdatedAt = DateTime.UtcNow;
+                method.UpdatedAt = DateTime.Now;
                 await _context.SaveChangesAsync();
                 return Ok(new ApiResponse<bool> { Success = true, Data = true, Message = "Score method deactivated (in use by score formats)" });
             }

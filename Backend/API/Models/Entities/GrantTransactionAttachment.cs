@@ -29,7 +29,7 @@ public class GrantTransactionAttachment
     [Required]
     public int UploadedByUserId { get; set; }
 
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime CreatedAt { get; set; } = DateTime.Now;
 
     // Navigation properties
     [ForeignKey("TransactionId")]

@@ -606,7 +606,7 @@ public class GrantsController : ControllerBase
                 account.TotalCredits += dto.Amount;
             else
                 account.TotalDebits += dto.Amount;
-            account.UpdatedAt = DateTime.UtcNow;
+            account.UpdatedAt = DateTime.Now;
 
             await _context.SaveChangesAsync();
 
@@ -691,14 +691,14 @@ public class GrantsController : ControllerBase
             else
                 transaction.Account.TotalDebits -= transaction.Amount;
 
-            transaction.Account.UpdatedAt = DateTime.UtcNow;
+            transaction.Account.UpdatedAt = DateTime.Now;
 
             // Mark as voided
             transaction.IsVoided = true;
             transaction.VoidedByUserId = userId.Value;
-            transaction.VoidedAt = DateTime.UtcNow;
+            transaction.VoidedAt = DateTime.Now;
             transaction.VoidReason = dto.Reason;
-            transaction.UpdatedAt = DateTime.UtcNow;
+            transaction.UpdatedAt = DateTime.Now;
 
             await _context.SaveChangesAsync();
 
@@ -808,7 +808,7 @@ public class GrantsController : ControllerBase
                 FileSize = dto.FileSize,
                 Description = dto.Description,
                 UploadedByUserId = userId.Value,
-                CreatedAt = DateTime.UtcNow
+                CreatedAt = DateTime.Now
             };
 
             _context.GrantTransactionAttachments.Add(attachment);
@@ -1039,7 +1039,7 @@ public class GrantsController : ControllerBase
             if (dto.CanVoidTransactions.HasValue) manager.CanVoidTransactions = dto.CanVoidTransactions.Value;
             if (dto.CanManageManagers.HasValue) manager.CanManageManagers = dto.CanManageManagers.Value;
             if (dto.IsActive.HasValue) manager.IsActive = dto.IsActive.Value;
-            manager.UpdatedAt = DateTime.UtcNow;
+            manager.UpdatedAt = DateTime.Now;
 
             await _context.SaveChangesAsync();
 
@@ -1071,7 +1071,7 @@ public class GrantsController : ControllerBase
                 return NotFound(new ApiResponse<bool> { Success = false, Message = "Grant manager not found" });
 
             manager.IsActive = false;
-            manager.UpdatedAt = DateTime.UtcNow;
+            manager.UpdatedAt = DateTime.Now;
 
             await _context.SaveChangesAsync();
 

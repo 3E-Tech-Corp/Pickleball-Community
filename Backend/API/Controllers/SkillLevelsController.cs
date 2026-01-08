@@ -201,7 +201,7 @@ public class SkillLevelsController : ControllerBase
             level.Color = dto.Color;
             level.SortOrder = dto.SortOrder;
             level.IsActive = dto.IsActive;
-            level.UpdatedAt = DateTime.UtcNow;
+            level.UpdatedAt = DateTime.Now;
 
             await _context.SaveChangesAsync();
 
@@ -245,7 +245,7 @@ public class SkillLevelsController : ControllerBase
 
             // Soft delete
             level.IsActive = false;
-            level.UpdatedAt = DateTime.UtcNow;
+            level.UpdatedAt = DateTime.Now;
             await _context.SaveChangesAsync();
 
             return Ok(new ApiResponse<bool> { Success = true, Data = true, Message = "Skill level deleted" });

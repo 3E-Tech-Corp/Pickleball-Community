@@ -518,8 +518,8 @@ public class LeaguesController : ControllerBase
                 Country = request.Country ?? "USA",
                 SortOrder = request.SortOrder,
                 IsActive = true,
-                CreatedAt = DateTime.UtcNow,
-                UpdatedAt = DateTime.UtcNow
+                CreatedAt = DateTime.Now,
+                UpdatedAt = DateTime.Now
             };
 
             _context.Leagues.Add(league);
@@ -536,8 +536,8 @@ public class LeaguesController : ControllerBase
                     Role = "Admin",
                     Title = "Administrator",
                     IsActive = true,
-                    CreatedAt = DateTime.UtcNow,
-                    UpdatedAt = DateTime.UtcNow
+                    CreatedAt = DateTime.Now,
+                    UpdatedAt = DateTime.Now
                 };
                 _context.LeagueManagers.Add(manager);
                 await _context.SaveChangesAsync();
@@ -610,7 +610,7 @@ public class LeaguesController : ControllerBase
             league.Region = request.Region;
             league.Country = request.Country ?? "USA";
             league.SortOrder = request.SortOrder;
-            league.UpdatedAt = DateTime.UtcNow;
+            league.UpdatedAt = DateTime.Now;
 
             await _context.SaveChangesAsync();
 
@@ -660,7 +660,7 @@ public class LeaguesController : ControllerBase
 
             // Soft delete
             league.IsActive = false;
-            league.UpdatedAt = DateTime.UtcNow;
+            league.UpdatedAt = DateTime.Now;
 
             await _context.SaveChangesAsync();
 
@@ -704,7 +704,7 @@ public class LeaguesController : ControllerBase
                     existing.IsActive = true;
                     existing.Role = request.Role;
                     existing.Title = request.Title;
-                    existing.UpdatedAt = DateTime.UtcNow;
+                    existing.UpdatedAt = DateTime.Now;
                     await _context.SaveChangesAsync();
                 }
                 else
@@ -735,8 +735,8 @@ public class LeaguesController : ControllerBase
                 Role = request.Role,
                 Title = request.Title,
                 IsActive = true,
-                CreatedAt = DateTime.UtcNow,
-                UpdatedAt = DateTime.UtcNow
+                CreatedAt = DateTime.Now,
+                UpdatedAt = DateTime.Now
             };
 
             _context.LeagueManagers.Add(manager);
@@ -783,7 +783,7 @@ public class LeaguesController : ControllerBase
 
             manager.Role = request.Role;
             manager.Title = request.Title;
-            manager.UpdatedAt = DateTime.UtcNow;
+            manager.UpdatedAt = DateTime.Now;
 
             await _context.SaveChangesAsync();
 
@@ -838,7 +838,7 @@ public class LeaguesController : ControllerBase
 
             // Soft delete
             manager.IsActive = false;
-            manager.UpdatedAt = DateTime.UtcNow;
+            manager.UpdatedAt = DateTime.Now;
 
             await _context.SaveChangesAsync();
 
@@ -953,7 +953,7 @@ public class LeaguesController : ControllerBase
                 RequestedByUserId = userId.Value,
                 Status = "Pending",
                 Message = request.Message,
-                CreatedAt = DateTime.UtcNow
+                CreatedAt = DateTime.Now
             };
 
             _context.LeagueClubRequests.Add(clubRequest);
@@ -1026,7 +1026,7 @@ public class LeaguesController : ControllerBase
             clubRequest.Status = request.Approve ? "Approved" : "Rejected";
             clubRequest.ResponseMessage = request.ResponseMessage;
             clubRequest.ProcessedByUserId = userId;
-            clubRequest.ProcessedAt = DateTime.UtcNow;
+            clubRequest.ProcessedAt = DateTime.Now;
 
             LeagueClubDto? resultDto = null;
 
@@ -1055,9 +1055,9 @@ public class LeaguesController : ControllerBase
                     LeagueId = id,
                     ClubId = clubRequest.ClubId,
                     Status = "Active",
-                    JoinedAt = DateTime.UtcNow,
-                    CreatedAt = DateTime.UtcNow,
-                    UpdatedAt = DateTime.UtcNow
+                    JoinedAt = DateTime.Now,
+                    CreatedAt = DateTime.Now,
+                    UpdatedAt = DateTime.Now
                 };
 
                 _context.LeagueClubs.Add(leagueClub);
@@ -1157,7 +1157,7 @@ public class LeaguesController : ControllerBase
             leagueClub.Status = request.Status;
             leagueClub.ExpiresAt = request.ExpiresAt;
             leagueClub.Notes = request.Notes;
-            leagueClub.UpdatedAt = DateTime.UtcNow;
+            leagueClub.UpdatedAt = DateTime.Now;
 
             await _context.SaveChangesAsync();
 
@@ -1203,7 +1203,7 @@ public class LeaguesController : ControllerBase
 
             // Set to inactive rather than delete
             leagueClub.Status = "Inactive";
-            leagueClub.UpdatedAt = DateTime.UtcNow;
+            leagueClub.UpdatedAt = DateTime.Now;
 
             await _context.SaveChangesAsync();
 
@@ -1470,8 +1470,8 @@ public class LeaguesController : ControllerBase
                 IsPublic = request.IsPublic,
                 IsActive = true,
                 UploadedByUserId = userId,
-                CreatedAt = DateTime.UtcNow,
-                UpdatedAt = DateTime.UtcNow
+                CreatedAt = DateTime.Now,
+                UpdatedAt = DateTime.Now
             };
 
             _context.LeagueDocuments.Add(document);
@@ -1531,7 +1531,7 @@ public class LeaguesController : ControllerBase
             document.FileSize = request.FileSize;
             document.SortOrder = request.SortOrder;
             document.IsPublic = request.IsPublic;
-            document.UpdatedAt = DateTime.UtcNow;
+            document.UpdatedAt = DateTime.Now;
 
             await _context.SaveChangesAsync();
 
@@ -1580,7 +1580,7 @@ public class LeaguesController : ControllerBase
 
             // Soft delete
             document.IsActive = false;
-            document.UpdatedAt = DateTime.UtcNow;
+            document.UpdatedAt = DateTime.Now;
 
             await _context.SaveChangesAsync();
 
@@ -1613,7 +1613,7 @@ public class LeaguesController : ControllerBase
                 if (doc != null)
                 {
                     doc.SortOrder = i + 1;
-                    doc.UpdatedAt = DateTime.UtcNow;
+                    doc.UpdatedAt = DateTime.Now;
                 }
             }
 
@@ -1643,7 +1643,7 @@ public class LeaguesController : ControllerBase
                 return NotFound(new ApiResponse<LeagueDto> { Success = false, Message = "League not found" });
 
             league.AvatarUrl = request.AvatarUrl;
-            league.UpdatedAt = DateTime.UtcNow;
+            league.UpdatedAt = DateTime.Now;
 
             await _context.SaveChangesAsync();
 

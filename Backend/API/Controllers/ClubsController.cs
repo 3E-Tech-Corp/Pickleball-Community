@@ -57,7 +57,7 @@ public class ClubsController : ControllerBase
             count = Math.Clamp(count, 5, 50);
             days = Math.Clamp(days, 1, 365);
 
-            var cutoffDate = DateTime.UtcNow.AddDays(-days);
+            var cutoffDate = DateTime.Now.AddDays(-days);
 
             var recentClubs = await _context.Clubs
                 .Where(c => c.IsActive && c.IsPublic && c.CreatedAt >= cutoffDate)
@@ -403,7 +403,7 @@ public class ClubsController : ControllerBase
                         JoinedAt = m.JoinedAt,
                         MembershipValidTo = isAdmin ? m.MembershipValidTo : null, // Only show to admins
                         MembershipNotes = isAdmin ? m.MembershipNotes : null, // Only show to admins
-                        IsMembershipExpired = m.MembershipValidTo.HasValue && m.MembershipValidTo.Value < DateTime.UtcNow
+                        IsMembershipExpired = m.MembershipValidTo.HasValue && m.MembershipValidTo.Value < DateTime.Now
                     }).ToList()
             };
 
@@ -529,7 +529,7 @@ public class ClubsController : ControllerBase
             club.MembershipFeePeriod = dto.MembershipFeePeriod;
             club.PaymentInstructions = dto.PaymentInstructions;
             club.HomeVenueId = dto.HomeVenueId;
-            club.UpdatedAt = DateTime.UtcNow;
+            club.UpdatedAt = DateTime.Now;
 
             await _context.SaveChangesAsync();
 
@@ -566,7 +566,7 @@ public class ClubsController : ControllerBase
                 return Forbid();
 
             club.IsActive = false;
-            club.UpdatedAt = DateTime.UtcNow;
+            club.UpdatedAt = DateTime.Now;
 
             await _context.SaveChangesAsync();
 
@@ -617,7 +617,7 @@ public class ClubsController : ControllerBase
                 if (existingMembership != null)
                 {
                     existingMembership.IsActive = true;
-                    existingMembership.JoinedAt = DateTime.UtcNow;
+                    existingMembership.JoinedAt = DateTime.Now;
                 }
                 else
                 {
@@ -767,7 +767,7 @@ public class ClubsController : ControllerBase
                     JoinedAt = m.JoinedAt,
                     MembershipValidTo = m.MembershipValidTo,
                     MembershipNotes = m.MembershipNotes,
-                    IsMembershipExpired = m.MembershipValidTo.HasValue && m.MembershipValidTo.Value < DateTime.UtcNow
+                    IsMembershipExpired = m.MembershipValidTo.HasValue && m.MembershipValidTo.Value < DateTime.Now
                 })
                 .ToListAsync();
 
@@ -911,7 +911,7 @@ public class ClubsController : ControllerBase
                 JoinedAt = membership.JoinedAt,
                 MembershipValidTo = membership.MembershipValidTo,
                 MembershipNotes = membership.MembershipNotes,
-                IsMembershipExpired = membership.MembershipValidTo.HasValue && membership.MembershipValidTo.Value < DateTime.UtcNow
+                IsMembershipExpired = membership.MembershipValidTo.HasValue && membership.MembershipValidTo.Value < DateTime.Now
             };
 
             return Ok(new ApiResponse<ClubMemberDto> { Success = true, Data = result, Message = "Member updated" });
@@ -1041,7 +1041,7 @@ public class ClubsController : ControllerBase
 
             request.Status = dto.Approve ? "Approved" : "Rejected";
             request.ReviewedByUserId = userId.Value;
-            request.ReviewedAt = DateTime.UtcNow;
+            request.ReviewedAt = DateTime.Now;
 
             if (dto.Approve)
             {
@@ -1052,7 +1052,7 @@ public class ClubsController : ControllerBase
                 if (existingMembership != null)
                 {
                     existingMembership.IsActive = true;
-                    existingMembership.JoinedAt = DateTime.UtcNow;
+                    existingMembership.JoinedAt = DateTime.Now;
                 }
                 else
                 {
@@ -1738,7 +1738,7 @@ public class ClubsController : ControllerBase
             if (dto.SortOrder.HasValue)
                 document.SortOrder = dto.SortOrder.Value;
 
-            document.UpdatedAt = DateTime.UtcNow;
+            document.UpdatedAt = DateTime.Now;
 
             await _context.SaveChangesAsync();
 
@@ -1798,7 +1798,7 @@ public class ClubsController : ControllerBase
                 return NotFound(new ApiResponse<bool> { Success = false, Message = "Document not found" });
 
             document.IsActive = false;
-            document.UpdatedAt = DateTime.UtcNow;
+            document.UpdatedAt = DateTime.Now;
 
             await _context.SaveChangesAsync();
 
@@ -1842,7 +1842,7 @@ public class ClubsController : ControllerBase
                 if (doc != null)
                 {
                     doc.SortOrder = order.SortOrder;
-                    doc.UpdatedAt = DateTime.UtcNow;
+                    doc.UpdatedAt = DateTime.Now;
                 }
             }
 

@@ -17,8 +17,8 @@ public class Conversation
 
     public int? ClubId { get; set; }
 
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime CreatedAt { get; set; } = DateTime.Now;
+    public DateTime UpdatedAt { get; set; } = DateTime.Now;
     public DateTime? LastMessageAt { get; set; }
 
     public bool IsDeleted { get; set; } = false;

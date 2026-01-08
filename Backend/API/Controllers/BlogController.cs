@@ -118,7 +118,7 @@ public class BlogController : ControllerBase
             var existingSlug = await _context.BlogCategories.AnyAsync(c => c.Slug == slug);
             if (existingSlug)
             {
-                slug = $"{slug}-{DateTime.UtcNow.Ticks % 10000}";
+                slug = $"{slug}-{DateTime.Now.Ticks % 10000}";
             }
 
             var category = new BlogCategory
@@ -128,7 +128,7 @@ public class BlogController : ControllerBase
                 Description = request.Description,
                 SortOrder = request.SortOrder,
                 IsActive = true,
-                CreatedAt = DateTime.UtcNow
+                CreatedAt = DateTime.Now
             };
 
             _context.BlogCategories.Add(category);
@@ -175,7 +175,7 @@ public class BlogController : ControllerBase
             if (request.Description != null) category.Description = request.Description;
             if (request.IsActive.HasValue) category.IsActive = request.IsActive.Value;
             if (request.SortOrder.HasValue) category.SortOrder = request.SortOrder.Value;
-            category.UpdatedAt = DateTime.UtcNow;
+            category.UpdatedAt = DateTime.Now;
 
             await _context.SaveChangesAsync();
 
@@ -487,7 +487,7 @@ public class BlogController : ControllerBase
             var existingSlug = await _context.BlogPosts.AnyAsync(p => p.Slug == slug);
             if (existingSlug)
             {
-                slug = $"{slug}-{DateTime.UtcNow.Ticks % 10000}";
+                slug = $"{slug}-{DateTime.Now.Ticks % 10000}";
             }
 
             var post = new BlogPost
@@ -501,8 +501,8 @@ public class BlogController : ControllerBase
                 CategoryId = request.CategoryId,
                 AllowComments = request.AllowComments,
                 Status = request.Publish ? BlogPostStatus.Published : BlogPostStatus.Draft,
-                PublishedAt = request.Publish ? DateTime.UtcNow : null,
-                CreatedAt = DateTime.UtcNow
+                PublishedAt = request.Publish ? DateTime.Now : null,
+                CreatedAt = DateTime.Now
             };
 
             _context.BlogPosts.Add(post);
@@ -591,12 +591,12 @@ public class BlogController : ControllerBase
                 var newStatus = Enum.Parse<BlogPostStatus>(request.Status);
                 if (newStatus == BlogPostStatus.Published && post.Status != BlogPostStatus.Published)
                 {
-                    post.PublishedAt = DateTime.UtcNow;
+                    post.PublishedAt = DateTime.Now;
                 }
                 post.Status = newStatus;
             }
 
-            post.UpdatedAt = DateTime.UtcNow;
+            post.UpdatedAt = DateTime.Now;
             await _context.SaveChangesAsync();
 
             // Reload category if changed
@@ -734,7 +734,7 @@ public class BlogController : ControllerBase
                 Content = request.Content,
                 ParentId = request.ParentId,
                 IsApproved = true,
-                CreatedAt = DateTime.UtcNow
+                CreatedAt = DateTime.Now
             };
 
             _context.BlogComments.Add(comment);
@@ -789,7 +789,7 @@ public class BlogController : ControllerBase
             }
 
             comment.Content = request.Content;
-            comment.UpdatedAt = DateTime.UtcNow;
+            comment.UpdatedAt = DateTime.Now;
             await _context.SaveChangesAsync();
 
             var dto = new BlogCommentDto
@@ -842,7 +842,7 @@ public class BlogController : ControllerBase
             }
 
             comment.IsDeleted = true;
-            comment.UpdatedAt = DateTime.UtcNow;
+            comment.UpdatedAt = DateTime.Now;
             await _context.SaveChangesAsync();
 
             return Ok(new ApiResponse<object> { Success = true, Message = "Comment deleted" });
@@ -902,7 +902,7 @@ public class BlogController : ControllerBase
             }
 
             user.CanWriteBlog = true;
-            user.UpdatedAt = DateTime.UtcNow;
+            user.UpdatedAt = DateTime.Now;
             await _context.SaveChangesAsync();
 
             return Ok(new ApiResponse<object> { Success = true, Message = "Blog writing permission granted" });
@@ -928,7 +928,7 @@ public class BlogController : ControllerBase
             }
 
             user.CanWriteBlog = false;
-            user.UpdatedAt = DateTime.UtcNow;
+            user.UpdatedAt = DateTime.Now;
             await _context.SaveChangesAsync();
 
             return Ok(new ApiResponse<object> { Success = true, Message = "Blog writing permission revoked" });

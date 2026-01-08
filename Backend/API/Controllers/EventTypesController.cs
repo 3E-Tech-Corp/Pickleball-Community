@@ -162,7 +162,7 @@ public class EventTypesController : ControllerBase
             eventType.AllowMultipleDivisions = dto.AllowMultipleDivisions ?? eventType.AllowMultipleDivisions;
             eventType.SortOrder = dto.SortOrder ?? eventType.SortOrder;
             eventType.IsActive = dto.IsActive ?? eventType.IsActive;
-            eventType.UpdatedAt = DateTime.UtcNow;
+            eventType.UpdatedAt = DateTime.Now;
 
             await _context.SaveChangesAsync();
 
@@ -200,7 +200,7 @@ public class EventTypesController : ControllerBase
 
             // Soft delete - just mark as inactive
             eventType.IsActive = false;
-            eventType.UpdatedAt = DateTime.UtcNow;
+            eventType.UpdatedAt = DateTime.Now;
             await _context.SaveChangesAsync();
 
             return Ok(new ApiResponse<bool> { Success = true, Data = true, Message = "Event type deactivated" });
@@ -224,7 +224,7 @@ public class EventTypesController : ControllerBase
                 return NotFound(new ApiResponse<EventTypeDto> { Success = false, Message = "Event type not found" });
 
             eventType.IsActive = true;
-            eventType.UpdatedAt = DateTime.UtcNow;
+            eventType.UpdatedAt = DateTime.Now;
             await _context.SaveChangesAsync();
 
             var result = new EventTypeDto
@@ -261,7 +261,7 @@ public class EventTypesController : ControllerBase
                 if (eventType != null)
                 {
                     eventType.SortOrder = i;
-                    eventType.UpdatedAt = DateTime.UtcNow;
+                    eventType.UpdatedAt = DateTime.Now;
                 }
             }
 

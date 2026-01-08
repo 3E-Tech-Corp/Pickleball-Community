@@ -23,7 +23,7 @@ public class Message
 
     public int? ReplyToMessageId { get; set; }
 
-    public DateTime SentAt { get; set; } = DateTime.UtcNow;
+    public DateTime SentAt { get; set; } = DateTime.Now;
     public DateTime? EditedAt { get; set; }
 
     public bool IsDeleted { get; set; } = false;
