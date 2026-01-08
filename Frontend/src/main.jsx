@@ -6,29 +6,32 @@ import { AuthProvider } from './contexts/AuthContext'
 import { ThemeProvider } from './contexts/ThemeContext'
 import { ToastProvider } from './contexts/ToastContext'
 import Navigation from './components/ui/Navigation' // Import here
-import { registerSW } from 'virtual:pwa-register'
 
 import Footer from './components/landing/Footer'; // Make sure this is imported
 import App from './App'
 import './styles/globals.css'
 import 'leaflet/dist/leaflet.css'
 
-// Register service worker for PWA
-const updateSW = registerSW({
-  onNeedRefresh() {
-    // New content available, could prompt user to refresh
-    console.log('New content available, refresh to update')
-  },
-  onOfflineReady() {
-    console.log('App ready to work offline')
-  },
-  onRegistered(registration) {
-    console.log('Service worker registered:', registration)
-  },
-  onRegisterError(error) {
-    console.error('Service worker registration error:', error)
-  }
-})
+// Register service worker for PWA with cache-busting version
+// The version is set at build time to force browsers to fetch fresh sw.js
+const SW_VERSION = import.meta.env.VITE_BUILD_TIME || Date.now()
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register(`/sw.js?v=${SW_VERSION}`)
+      .then(registration => {
+        console.log('Service worker registered:', registration)
+
+        // Check for updates periodically
+        setInterval(() => {
+          registration.update()
+        }, 60 * 60 * 1000) // Check every hour
+      })
+      .catch(error => {
+        console.error('Service worker registration error:', error)
+      })
+  })
+}
 
 const queryClient = new QueryClient()
 

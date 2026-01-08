@@ -6,6 +6,10 @@ import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig({
   base: "/",
+  // Set build time for service worker cache-busting
+  define: {
+    'import.meta.env.VITE_BUILD_TIME': JSON.stringify(Date.now().toString())
+  },
   plugins: [
     VitePWA({
       registerType: "autoUpdate",
