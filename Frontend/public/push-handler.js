@@ -8,8 +8,8 @@ self.addEventListener('push', function(event) {
   let data = {
     title: 'Pickleball Community',
     body: 'You have a new notification',
-    icon: '/icon-192.png',
-    badge: '/icon-192.png',
+    icon: '/logo-192.png',
+    badge: '/logo-192.png',
     url: '/notifications'
   };
 
@@ -24,8 +24,8 @@ self.addEventListener('push', function(event) {
 
   const options = {
     body: data.body,
-    icon: data.icon || '/icon-192.png',
-    badge: data.badge || '/icon-192.png',
+    icon: data.icon || '/logo-192.png',
+    badge: data.badge || '/logo-192.png',
     vibrate: [100, 50, 100],
     data: {
       url: data.url || '/notifications',
