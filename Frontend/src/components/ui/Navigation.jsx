@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Menu, X, LogOut, HomeIcon, School2Icon, User, Bell, FileText, Calendar, MapPin, Users, MessageCircle, HelpCircle, MessageSquarePlus, Network } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { getAssetUrl, getSharedAssetUrl, notificationsApi, leaguesApi } from '../../services/api';
@@ -12,6 +13,7 @@ const SHARED_AUTH_URL = import.meta.env.VITE_SHARED_AUTH_URL || 'https://shared.
 const SITE_KEY = 'community';
 
 const Navigation = () => {
+  const { t } = useTranslation('nav');
   const [isOpen, setIsOpen] = useState(false);
   const [showUserDropdown, setShowUserDropdown] = useState(false);
   const [authKey, setAuthKey] = useState(0); // Add this
@@ -101,16 +103,16 @@ const Navigation = () => {
 
   // Primary navigation - most used (Home removed since logo links to dashboard)
   const primaryNav = [
-    { name: 'Events', href: '/events', icon: Calendar },
-    { name: 'Venues', href: '/venues', icon: MapPin },
-    { name: 'Clubs', href: '/clubs', icon: Users },
+    { name: t('events'), href: '/events', icon: Calendar },
+    { name: t('venues'), href: '/venues', icon: MapPin },
+    { name: t('clubs'), href: '/clubs', icon: Users },
   ];
 
   // Secondary navigation - less frequently used
   const secondaryNav = [
-    { name: 'Blog', href: '/blog', icon: FileText },
-    { name: 'FAQ', href: '/faq', icon: HelpCircle },
-    { name: 'Feedback', href: '/feedback', icon: MessageSquarePlus },
+    { name: t('blog'), href: '/blog', icon: FileText },
+    { name: t('faq'), href: '/faq', icon: HelpCircle },
+    { name: t('feedback'), href: '/feedback', icon: MessageSquarePlus },
   ];
 
   // Combined for desktop
@@ -156,7 +158,7 @@ const Navigation = () => {
   const userMenuItems = [
     // Admin Dashboard - only shown for admin users
     ...(isAdmin ? [{
-      name: 'Admin Dashboard',
+      name: t('adminDashboard'),
       href: '/admin/dashboard',
       icon: School2Icon,
       isAdmin: true
@@ -169,15 +171,15 @@ const Navigation = () => {
       isLeagueAdmin: true
     })) : []),
     {
-      name: 'Dashboard',
+      name: t('dashboard'),
       href: getDashboardPath(),
       icon: HomeIcon,
       isDashboard: true
     },
-    { name: 'Profile', href: '/profile', icon: User },
-    { name: 'Messages', href: '/messages', icon: MessageCircle },
-    { name: 'Notifications', href: '/notifications', icon: Bell },
-    { name: 'Sign Out', action: handleLogout, icon: LogOut, isDestructive: true },
+    { name: t('profile'), href: '/profile', icon: User },
+    { name: t('messages'), href: '/messages', icon: MessageCircle },
+    { name: t('notifications'), href: '/notifications', icon: Bell },
+    { name: t('signOut'), action: handleLogout, icon: LogOut, isDestructive: true },
   ];
 
   // Get user initials safely
@@ -393,13 +395,13 @@ const Navigation = () => {
                   onClick={() => redirectToLogin()}
                   className="text-gray-600 hover:text-blue-600 px-4 py-2 font-medium transition-colors"
                 >
-                  Sign In
+                  {t('signIn')}
                 </button>
                 <button
                   onClick={() => redirectToRegister()}
                   className="px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg font-medium hover:shadow-lg transition-shadow"
                 >
-                  Enroll Now
+                  {t('enroll')}
                 </button>
               </div>
             )}
@@ -472,7 +474,7 @@ const Navigation = () => {
                     className="flex items-center space-x-1 px-3 py-2 text-red-600 hover:bg-red-50 rounded-lg font-medium transition-colors text-sm"
                   >
                     <LogOut className="w-4 h-4" />
-                    <span>Logout</span>
+                    <span>{t('logout')}</span>
                   </button>
                 </div>
 
@@ -484,7 +486,7 @@ const Navigation = () => {
                     onClick={() => setIsOpen(false)}
                   >
                     <HomeIcon className="w-5 h-5" />
-                    <span className="text-xs mt-1">Dashboard</span>
+                    <span className="text-xs mt-1">{t('dashboard')}</span>
                   </Link>
                   <Link
                     to="/profile"
@@ -492,7 +494,7 @@ const Navigation = () => {
                     onClick={() => setIsOpen(false)}
                   >
                     <User className="w-5 h-5" />
-                    <span className="text-xs mt-1">Profile</span>
+                    <span className="text-xs mt-1">{t('profile')}</span>
                   </Link>
                   <Link
                     to="/messages"
@@ -500,7 +502,7 @@ const Navigation = () => {
                     onClick={() => setIsOpen(false)}
                   >
                     <MessageCircle className="w-5 h-5" />
-                    <span className="text-xs mt-1">Messages</span>
+                    <span className="text-xs mt-1">{t('messages')}</span>
                   </Link>
                   <Link
                     to="/notifications"
@@ -515,7 +517,7 @@ const Navigation = () => {
                         </span>
                       )}
                     </div>
-                    <span className="text-xs mt-1">Alerts</span>
+                    <span className="text-xs mt-1">{t('alerts')}</span>
                   </Link>
                 </div>
 
@@ -527,7 +529,7 @@ const Navigation = () => {
                     onClick={() => setIsOpen(false)}
                   >
                     <School2Icon className="w-4 h-4" />
-                    <span>Admin Dashboard</span>
+                    <span>{t('adminDashboard')}</span>
                   </Link>
                 )}
 
@@ -555,13 +557,13 @@ const Navigation = () => {
                   onClick={() => { setIsOpen(false); redirectToLogin(); }}
                   className="flex-1 text-center px-3 py-2 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors text-sm"
                 >
-                  Sign In
+                  {t('signIn')}
                 </button>
                 <button
                   onClick={() => { setIsOpen(false); redirectToRegister(); }}
                   className="flex-1 text-center px-3 py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg font-medium hover:shadow-lg transition-shadow text-sm"
                 >
-                  Enroll
+                  {t('enroll')}
                 </button>
               </div>
             )}
