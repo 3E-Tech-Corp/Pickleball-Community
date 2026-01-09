@@ -313,6 +313,13 @@ export default function Clubs() {
   };
 
   const handleViewDetails = async (club) => {
+    // Redirect unauthenticated users to login
+    if (!isAuthenticated) {
+      toast.info('Please log in to view club details');
+      navigate('/login', { state: { from: '/clubs', clubId: club.id } });
+      return;
+    }
+
     try {
       const response = await clubsApi.getClub(club.id);
       if (response.success) {
@@ -320,6 +327,12 @@ export default function Clubs() {
       }
     } catch (err) {
       console.error('Error loading club details:', err);
+      // Check if this is a 401 Unauthorized
+      if (err?.status === 401 || err?.response?.status === 401) {
+        toast.info('Please log in to view club details');
+        navigate('/login', { state: { from: '/clubs', clubId: club.id } });
+        return;
+      }
       // Check if this is a profile completion requirement (403)
       if (err?.message?.toLowerCase().includes('complete your profile')) {
         toast.warning('Please complete your profile to view club details');

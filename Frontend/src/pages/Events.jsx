@@ -369,6 +369,13 @@ export default function Events() {
   const toast = useToast();
 
   const handleViewDetails = async (event) => {
+    // Redirect unauthenticated users to login
+    if (!isAuthenticated) {
+      toast.info('Please log in to view event details');
+      navigate('/login', { state: { from: '/events', eventId: event.id } });
+      return;
+    }
+
     try {
       const response = await eventsApi.getEvent(event.id);
       if (response.success) {
@@ -376,6 +383,12 @@ export default function Events() {
       }
     } catch (err) {
       console.error('Error loading event details:', err);
+      // Check if this is a 401 Unauthorized
+      if (err?.status === 401 || err?.response?.status === 401) {
+        toast.info('Please log in to view event details');
+        navigate('/login', { state: { from: '/events', eventId: event.id } });
+        return;
+      }
       // Check if this is a profile completion requirement (403)
       if (err?.message?.toLowerCase().includes('complete your profile')) {
         toast.warning('Please complete your profile to view event details');
