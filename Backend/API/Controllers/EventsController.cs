@@ -1178,26 +1178,74 @@ public class EventsController : ControllerBase
                 .AsSplitQuery()
                 .Include(m => m.Unit)
                     .ThenInclude(u => u!.Event)
-                        .ThenInclude(e => e!.EventType)
                 .Include(m => m.Unit)
                     .ThenInclude(u => u!.Division)
+                        .ThenInclude(d => d!.TeamUnit)
+                .Include(m => m.Unit)
+                    .ThenInclude(u => u!.Members)
+                        .ThenInclude(mem => mem.User)
                 .Where(m => m.UserId == userId.Value && m.Unit != null && m.Unit.Status != "Cancelled" && m.Unit.Event != null && m.Unit.Event.IsActive)
                 .ToListAsync();
 
             var registrationSummaries = myMemberships
                 .GroupBy(m => m.Unit!.EventId)
-                .Select(g => new EventRegistrationSummaryDto
-                {
-                    EventId = g.Key,
-                    EventName = g.First().Unit!.Event!.Name,
-                    StartDate = g.First().Unit!.Event!.StartDate,
-                    VenueName = g.First().Unit!.Event!.VenueName,
-                    City = g.First().Unit!.Event!.City,
-                    State = g.First().Unit!.Event!.State,
-                    PosterImageUrl = g.First().Unit!.Event!.PosterImageUrl,
-                    RegisteredDivisions = g.Select(m => m.Unit?.Division?.Name ?? "").ToList(),
-                    PaymentStatus = "Pending", // EventUnits don't track payment - handled separately
-                    Status = g.First().Unit?.Status ?? "Registered"
+                .Select(g => {
+                    var firstUnit = g.First().Unit!;
+                    var evt = firstUnit.Event!;
+
+                    // Build unit details for each unit the user is in
+                    var units = g.Select(m => {
+                        var unit = m.Unit!;
+                        var division = unit.Division;
+                        var requiredPlayers = division?.TeamUnit?.TotalPlayers ?? division?.TeamSize ?? 1;
+                        var acceptedMembers = unit.Members.Count(mem => mem.InviteStatus == "Accepted");
+                        var isComplete = acceptedMembers >= requiredPlayers;
+                        var amountDue = evt.RegistrationFee + (division?.DivisionFee ?? 0m);
+
+                        return new MyRegistrationUnitDto
+                        {
+                            UnitId = unit.Id,
+                            DivisionId = unit.DivisionId,
+                            DivisionName = division?.Name ?? "",
+                            TeamUnitName = division?.TeamUnit?.Name,
+                            RequiredPlayers = requiredPlayers,
+                            IsComplete = isComplete,
+                            NeedsPartner = !isComplete && requiredPlayers > 1,
+                            Status = unit.Status,
+                            PaymentStatus = unit.PaymentStatus,
+                            AmountDue = amountDue,
+                            AmountPaid = unit.AmountPaid,
+                            Members = unit.Members.Select(mem => new TeamMemberDto
+                            {
+                                UserId = mem.UserId,
+                                Name = mem.User != null ? $"{mem.User.FirstName} {mem.User.LastName}".Trim() : "Unknown",
+                                ProfileImageUrl = mem.User?.ProfileImageUrl,
+                                Role = mem.Role,
+                                InviteStatus = mem.InviteStatus,
+                                IsCurrentUser = mem.UserId == userId.Value
+                            }).ToList()
+                        };
+                    }).ToList();
+
+                    // Determine overall payment status
+                    var overallPaymentStatus = units.All(u => u.PaymentStatus == "Paid") ? "Paid" :
+                        units.Any(u => u.PaymentStatus == "Paid" || u.PaymentStatus == "Partial") ? "Partial" : "Pending";
+
+                    return new EventRegistrationSummaryDto
+                    {
+                        EventId = g.Key,
+                        EventName = evt.Name,
+                        StartDate = evt.StartDate,
+                        VenueName = evt.VenueName,
+                        City = evt.City,
+                        State = evt.State,
+                        PosterImageUrl = evt.PosterImageUrl,
+                        PaymentInstructions = evt.PaymentInstructions,
+                        RegisteredDivisions = g.Select(m => m.Unit?.Division?.Name ?? "").ToList(),
+                        PaymentStatus = overallPaymentStatus,
+                        Status = firstUnit.Status,
+                        Units = units
+                    };
                 })
                 .OrderBy(s => s.StartDate)
                 .ToList();

@@ -359,9 +359,51 @@ public class EventRegistrationSummaryDto
     public string? City { get; set; }
     public string? State { get; set; }
     public string? PosterImageUrl { get; set; }
+    public string? PaymentInstructions { get; set; }
     public List<string> RegisteredDivisions { get; set; } = new();
     public string PaymentStatus { get; set; } = "Pending";
     public string Status { get; set; } = "Registered";
+
+    /// <summary>
+    /// Detailed registration info for each unit the user is in
+    /// </summary>
+    public List<MyRegistrationUnitDto> Units { get; set; } = new();
+}
+
+/// <summary>
+/// Detailed info about a unit the user is registered in
+/// </summary>
+public class MyRegistrationUnitDto
+{
+    public int UnitId { get; set; }
+    public int DivisionId { get; set; }
+    public string DivisionName { get; set; } = string.Empty;
+    public string? TeamUnitName { get; set; }
+    public int RequiredPlayers { get; set; } = 1;
+    public bool IsComplete { get; set; }
+    public bool NeedsPartner { get; set; }
+    public string Status { get; set; } = "Registered";
+
+    // Payment info
+    public string PaymentStatus { get; set; } = "Pending";
+    public decimal AmountDue { get; set; }
+    public decimal AmountPaid { get; set; }
+
+    // Team members (including self)
+    public List<TeamMemberDto> Members { get; set; } = new();
+}
+
+/// <summary>
+/// Info about a team member
+/// </summary>
+public class TeamMemberDto
+{
+    public int UserId { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public string? ProfileImageUrl { get; set; }
+    public string Role { get; set; } = "Player"; // Captain or Player
+    public string InviteStatus { get; set; } = "Accepted"; // Pending, Accepted, Declined
+    public bool IsCurrentUser { get; set; }
 }
 
 // Featured events for home page

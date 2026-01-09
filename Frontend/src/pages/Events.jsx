@@ -807,33 +807,131 @@ export default function Events() {
                 </h2>
                 <div className="space-y-3">
                   {myEvents.eventsImRegisteredFor.map(reg => (
-                    <div key={reg.eventId} className="bg-white rounded-lg shadow-sm p-4 flex items-center gap-4">
-                      {reg.posterImageUrl && (
-                        <img
-                          src={getSharedAssetUrl(reg.posterImageUrl)}
-                          alt=""
-                          className="w-16 h-16 rounded-lg object-cover"
-                        />
-                      )}
-                      <div className="flex-1">
-                        <h3 className="font-medium text-gray-900">{reg.eventName}</h3>
-                        <p className="text-sm text-gray-500">
-                          {formatDate(reg.startDate)} • {reg.venueName || `${reg.city}, ${reg.state}`}
-                        </p>
-                        <div className="flex gap-2 mt-1">
-                          {reg.registeredDivisions.map((div, i) => (
-                            <span key={i} className="text-xs px-2 py-0.5 bg-orange-100 text-orange-700 rounded">
-                              {div}
-                            </span>
-                          ))}
+                    <div key={reg.eventId} className="bg-white rounded-lg shadow-sm p-4">
+                      {/* Event Header - Clickable */}
+                      <div className="flex items-start gap-3 mb-3">
+                        <button
+                          onClick={() => viewEventDetail({ id: reg.eventId })}
+                          className="flex-shrink-0 hover:opacity-80 transition-opacity"
+                        >
+                          {reg.posterImageUrl ? (
+                            <img
+                              src={getSharedAssetUrl(reg.posterImageUrl)}
+                              alt=""
+                              className="w-14 h-14 rounded-lg object-cover"
+                            />
+                          ) : (
+                            <div className="w-14 h-14 rounded-lg bg-orange-100 flex items-center justify-center">
+                              <Calendar className="w-6 h-6 text-orange-600" />
+                            </div>
+                          )}
+                        </button>
+                        <div className="flex-1 min-w-0">
+                          <button
+                            onClick={() => viewEventDetail({ id: reg.eventId })}
+                            className="font-medium text-gray-900 hover:text-orange-600 text-left block"
+                          >
+                            {reg.eventName}
+                          </button>
+                          <p className="text-sm text-gray-500">
+                            {formatDate(reg.startDate)} • {reg.venueName || `${reg.city}, ${reg.state}`}
+                          </p>
                         </div>
                       </div>
-                      <div className="text-right">
-                        <span className={`px-2 py-1 text-xs rounded-full ${
-                          reg.paymentStatus === 'Paid' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
-                        }`}>
-                          {reg.paymentStatus}
-                        </span>
+
+                      {/* Units/Divisions */}
+                      <div className="space-y-2">
+                        {reg.units?.map(unit => {
+                          const partners = unit.members?.filter(m => !m.isCurrentUser) || [];
+                          const isPairs = unit.requiredPlayers === 2;
+
+                          return (
+                            <div key={unit.unitId} className="bg-gray-50 rounded-lg p-3">
+                              <div className="flex items-center justify-between gap-2">
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="text-sm font-medium text-gray-900">{unit.divisionName}</span>
+                                    {unit.teamUnitName && !isPairs && (
+                                      <span className="text-xs text-gray-500">• {unit.teamUnitName}</span>
+                                    )}
+                                  </div>
+
+                                  {/* Team Members */}
+                                  {partners.length > 0 && (
+                                    <div className="flex items-center gap-2 mt-1.5">
+                                      <span className="text-xs text-gray-500">with</span>
+                                      <div className="flex items-center gap-1.5">
+                                        {partners.map(partner => (
+                                          <button
+                                            key={partner.userId}
+                                            onClick={() => setSelectedProfileUserId(partner.userId)}
+                                            className="flex items-center gap-1 hover:opacity-80"
+                                          >
+                                            {partner.profileImageUrl ? (
+                                              <img
+                                                src={getSharedAssetUrl(partner.profileImageUrl)}
+                                                alt=""
+                                                className="w-6 h-6 rounded-full object-cover"
+                                              />
+                                            ) : (
+                                              <div className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center text-xs text-gray-600">
+                                                {partner.name?.charAt(0) || '?'}
+                                              </div>
+                                            )}
+                                            <span className="text-xs text-gray-700">{partner.name?.split(' ')[0]}</span>
+                                            {partner.inviteStatus === 'Pending' && (
+                                              <span className="text-xs text-yellow-600">(pending)</span>
+                                            )}
+                                          </button>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {/* Looking for partner */}
+                                  {unit.needsPartner && (
+                                    <div className="text-xs text-orange-600 mt-1 flex items-center gap-1">
+                                      <UserPlus className="w-3 h-3" />
+                                      Looking for partner
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* Payment Status & Button */}
+                                <div className="flex items-center gap-2 flex-shrink-0">
+                                  {unit.isComplete && unit.paymentStatus !== 'Paid' && (
+                                    <button
+                                      onClick={() => {
+                                        setSelectedPaymentReg({
+                                          ...unit,
+                                          partners: partners.map(p => ({ ...p })),
+                                          paymentReference: null,
+                                          paymentProofUrl: null
+                                        });
+                                        setSelectedPaymentEvent({
+                                          id: reg.eventId,
+                                          paymentInstructions: reg.paymentInstructions
+                                        });
+                                      }}
+                                      className="px-2 py-1 text-xs bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 flex items-center gap-1"
+                                    >
+                                      <DollarSign className="w-3 h-3" />
+                                      Pay
+                                    </button>
+                                  )}
+                                  <span className={`px-2 py-0.5 text-xs rounded-full ${
+                                    unit.paymentStatus === 'Paid' ? 'bg-green-100 text-green-700' :
+                                    unit.paymentStatus === 'PendingVerification' ? 'bg-blue-100 text-blue-700' :
+                                    unit.paymentStatus === 'Partial' ? 'bg-yellow-100 text-yellow-700' :
+                                    'bg-gray-100 text-gray-600'
+                                  }`}>
+                                    {unit.paymentStatus === 'PendingVerification' ? 'Verifying' : unit.paymentStatus}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   ))}
@@ -1204,6 +1302,7 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
 
   // Payment modal state
   const [selectedPaymentReg, setSelectedPaymentReg] = useState(null);
+  const [selectedPaymentEvent, setSelectedPaymentEvent] = useState(null); // Event info for payment from My Events
 
   // Profile modal state
   const [selectedProfileUserId, setSelectedProfileUserId] = useState(null);
@@ -4288,12 +4387,19 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
       {/* Payment Modal */}
       <PaymentModal
         isOpen={!!selectedPaymentReg}
-        onClose={() => setSelectedPaymentReg(null)}
+        onClose={() => {
+          setSelectedPaymentReg(null);
+          setSelectedPaymentEvent(null);
+        }}
         registration={selectedPaymentReg}
-        event={event}
+        event={selectedPaymentEvent || event}
         onPaymentUpdated={(paymentInfo) => {
           // Update the registration in myRegistrations with new payment info
           onUpdate();
+          // Also refresh my events if payment was from there
+          if (selectedPaymentEvent) {
+            loadMyEvents();
+          }
         }}
       />
 
