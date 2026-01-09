@@ -323,7 +323,7 @@ export default function Clubs() {
       // Check if this is a profile completion requirement (403)
       if (err?.message?.toLowerCase().includes('complete your profile')) {
         toast.warning('Please complete your profile to view club details');
-        navigate('/profile-completion');
+        navigate('/complete-profile');
       }
     }
   };
