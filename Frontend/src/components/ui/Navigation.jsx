@@ -276,12 +276,12 @@ const Navigation = () => {
               <Link
                 key={item.name}
                 to={item.href}
-                className={`px-4 py-2 rounded-lg font-medium transition-colors ${isActive(item.href)
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-lg font-medium transition-colors whitespace-nowrap ${isActive(item.href)
                   ? 'bg-blue-50 text-blue-600'
                   : 'text-gray-600 hover:text-blue-600 hover:bg-gray-50'
                   }`}
               >
-                {item.icon && <item.icon className="w-8 h-8 inline mr-2" />}
+                {item.icon && <item.icon className="w-5 h-5 flex-shrink-0" />}
                 <span>{item.name}</span>
               </Link>
             ))}
