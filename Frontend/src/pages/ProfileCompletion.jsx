@@ -11,8 +11,8 @@ const ProfileCompletion = () => {
   const navigate = useNavigate()
   const location = useLocation()
 
-  const [firstName, setFirstName] = useState(user?.firstName === 'New' ? '' : (user?.firstName || ''))
-  const [lastName, setLastName] = useState(user?.lastName === 'User' ? '' : (user?.lastName || ''))
+  const [firstName, setFirstName] = useState(user?.firstName?.toLowerCase() === 'new' ? '' : (user?.firstName || ''))
+  const [lastName, setLastName] = useState(user?.lastName?.toLowerCase() === 'user' ? '' : (user?.lastName || ''))
   const [saving, setSaving] = useState(false)
   const [errors, setErrors] = useState({})
 
