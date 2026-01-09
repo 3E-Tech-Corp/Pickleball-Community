@@ -811,7 +811,7 @@ export default function Events() {
                       {/* Event Header - Clickable */}
                       <div className="flex items-start gap-3 mb-3">
                         <button
-                          onClick={() => viewEventDetail({ id: reg.eventId })}
+                          onClick={() => handleViewDetails({ id: reg.eventId })}
                           className="flex-shrink-0 hover:opacity-80 transition-opacity"
                         >
                           {reg.posterImageUrl ? (
@@ -828,7 +828,7 @@ export default function Events() {
                         </button>
                         <div className="flex-1 min-w-0">
                           <button
-                            onClick={() => viewEventDetail({ id: reg.eventId })}
+                            onClick={() => handleViewDetails({ id: reg.eventId })}
                             className="font-medium text-gray-900 hover:text-orange-600 text-left block"
                           >
                             {reg.eventName}
@@ -897,8 +897,19 @@ export default function Events() {
                                   )}
                                 </div>
 
-                                {/* Payment Status & Button */}
+                                {/* Status & Payment */}
                                 <div className="flex items-center gap-2 flex-shrink-0">
+                                  {/* Unit Status */}
+                                  <span className={`px-2 py-0.5 text-xs rounded-full ${
+                                    unit.status === 'CheckedIn' ? 'bg-purple-100 text-purple-700' :
+                                    unit.status === 'Confirmed' ? 'bg-blue-100 text-blue-700' :
+                                    unit.status === 'Waitlisted' ? 'bg-yellow-100 text-yellow-700' :
+                                    unit.status === 'Cancelled' ? 'bg-red-100 text-red-700' :
+                                    'bg-green-100 text-green-700'
+                                  }`}>
+                                    {unit.status === 'CheckedIn' ? 'Checked In' : unit.status || 'Registered'}
+                                  </span>
+                                  {/* Pay Button */}
                                   {unit.isComplete && unit.paymentStatus !== 'Paid' && (
                                     <button
                                       onClick={() => {
@@ -919,6 +930,7 @@ export default function Events() {
                                       Pay
                                     </button>
                                   )}
+                                  {/* Payment Status */}
                                   <span className={`px-2 py-0.5 text-xs rounded-full ${
                                     unit.paymentStatus === 'Paid' ? 'bg-green-100 text-green-700' :
                                     unit.paymentStatus === 'PendingVerification' ? 'bg-blue-100 text-blue-700' :
