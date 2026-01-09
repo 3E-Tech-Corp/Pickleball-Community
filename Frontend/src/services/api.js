@@ -150,6 +150,12 @@ sharedAuthApi.interceptors.request.use((config) => {
   return Promise.reject(error);
 });
 
+// Response interceptor for shared auth API - extract data like main api
+sharedAuthApi.interceptors.response.use(
+  (response) => response.data,
+  (error) => Promise.reject(error.response?.data || error.message)
+);
+
 // Shared User API (for Funtime-Shared user profile operations)
 // Note: SHARED_AUTH_URL already includes /api, so endpoints should NOT have /api prefix
 export const sharedUserApi = {
