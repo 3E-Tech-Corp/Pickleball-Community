@@ -40,7 +40,7 @@ export default function Events() {
   const [totalPages, setTotalPages] = useState(1);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [activeTab, setActiveTab] = useState(isAuthenticated ? 'my-events' : 'search'); // my-events, search
-  const [myEventsSubTab, setMyEventsSubTab] = useState('organized'); // organized, registered
+  const [myEventsSubTab, setMyEventsSubTab] = useState('registered'); // registered, organized
   const pageSize = 20;
 
   // View mode: 'list' or 'map'
@@ -777,27 +777,9 @@ export default function Events() {
 
         {activeTab === 'my-events' && myEvents && (
           <div className="space-y-6">
-            {/* Sub-tabs for Organized/Registered */}
+            {/* Sub-tabs for Registered/Organized */}
             <div className="bg-white rounded-xl shadow-sm p-4">
               <div className="flex gap-2">
-                <button
-                  onClick={() => setMyEventsSubTab('organized')}
-                  className={`flex-1 py-2 px-4 rounded-lg font-medium text-sm transition-colors flex items-center justify-center gap-2 ${
-                    myEventsSubTab === 'organized'
-                      ? 'bg-orange-600 text-white'
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                  }`}
-                >
-                  <Trophy className="w-4 h-4" />
-                  Organized
-                  {myEvents.eventsIOrganize.length > 0 && (
-                    <span className={`px-1.5 py-0.5 text-xs rounded-full ${
-                      myEventsSubTab === 'organized' ? 'bg-orange-500 text-white' : 'bg-gray-200 text-gray-600'
-                    }`}>
-                      {myEvents.eventsIOrganize.length}
-                    </span>
-                  )}
-                </button>
                 <button
                   onClick={() => setMyEventsSubTab('registered')}
                   className={`flex-1 py-2 px-4 rounded-lg font-medium text-sm transition-colors flex items-center justify-center gap-2 ${
@@ -813,6 +795,24 @@ export default function Events() {
                       myEventsSubTab === 'registered' ? 'bg-orange-500 text-white' : 'bg-gray-200 text-gray-600'
                     }`}>
                       {myEvents.eventsImRegisteredFor.length}
+                    </span>
+                  )}
+                </button>
+                <button
+                  onClick={() => setMyEventsSubTab('organized')}
+                  className={`flex-1 py-2 px-4 rounded-lg font-medium text-sm transition-colors flex items-center justify-center gap-2 ${
+                    myEventsSubTab === 'organized'
+                      ? 'bg-orange-600 text-white'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
+                >
+                  <Trophy className="w-4 h-4" />
+                  Organized
+                  {myEvents.eventsIOrganize.length > 0 && (
+                    <span className={`px-1.5 py-0.5 text-xs rounded-full ${
+                      myEventsSubTab === 'organized' ? 'bg-orange-500 text-white' : 'bg-gray-200 text-gray-600'
+                    }`}>
+                      {myEvents.eventsIOrganize.length}
                     </span>
                   )}
                 </button>
