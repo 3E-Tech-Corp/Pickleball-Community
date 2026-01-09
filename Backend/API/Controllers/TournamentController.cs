@@ -746,7 +746,7 @@ public class TournamentController : ControllerBase
         }
 
         // Calculate amount due
-        var amountDue = (unit.Event?.RegistrationFee ?? 0) + (unit.Division?.DivisionFee ?? 0);
+        var amountDue = (unit.Event?.RegistrationFee ?? 0m) + (unit.Division?.DivisionFee ?? 0m);
 
         // Auto-update payment status based on amount paid
         if (unit.AmountPaid >= amountDue && amountDue > 0)
@@ -809,7 +809,7 @@ public class TournamentController : ControllerBase
         if (unit.Event?.OrganizedByUserId != userId.Value && !isAdmin)
             return Forbid();
 
-        var amountDue = (unit.Event?.RegistrationFee ?? 0) + (unit.Division?.DivisionFee ?? 0);
+        var amountDue = (unit.Event?.RegistrationFee ?? 0m) + (unit.Division?.DivisionFee ?? 0m);
 
         unit.PaymentStatus = "Paid";
         unit.AmountPaid = amountDue;
@@ -860,7 +860,7 @@ public class TournamentController : ControllerBase
         if (unit.Event?.OrganizedByUserId != userId.Value && !isAdmin)
             return Forbid();
 
-        var amountDue = (unit.Event?.RegistrationFee ?? 0) + (unit.Division?.DivisionFee ?? 0);
+        var amountDue = (unit.Event?.RegistrationFee ?? 0m) + (unit.Division?.DivisionFee ?? 0m);
 
         // Reset payment status based on what's still present
         if (!string.IsNullOrEmpty(unit.PaymentProofUrl))
@@ -1744,7 +1744,7 @@ public class TournamentController : ControllerBase
             // Payment info
             PaymentStatus = u.PaymentStatus ?? "Pending",
             AmountPaid = u.AmountPaid,
-            AmountDue = (u.Event?.RegistrationFee ?? 0) + (u.Division?.DivisionFee ?? 0),
+            AmountDue = (u.Event?.RegistrationFee ?? 0m) + (u.Division?.DivisionFee ?? 0m),
             PaymentProofUrl = u.PaymentProofUrl,
             PaymentReference = u.PaymentReference,
             ReferenceId = u.ReferenceId,
