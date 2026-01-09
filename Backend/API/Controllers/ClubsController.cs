@@ -46,6 +46,19 @@ public class ClubsController : ControllerBase
         return user?.Role?.ToLower() == "admin";
     }
 
+    // Check if user has completed their profile (not a "New User")
+    private async Task<bool> HasCompletedProfileAsync()
+    {
+        var userId = GetCurrentUserId();
+        if (!userId.HasValue) return false;
+
+        var user = await _context.Users.FindAsync(userId.Value);
+        if (user == null) return false;
+
+        var fullName = $"{user.FirstName} {user.LastName}".Trim();
+        return !fullName.Equals("New User", StringComparison.OrdinalIgnoreCase);
+    }
+
     // GET: /clubs/recent - Get recently created clubs (public, for home page marquee)
     [HttpGet("recent")]
     [AllowAnonymous]
@@ -323,6 +336,16 @@ public class ClubsController : ControllerBase
     {
         try
         {
+            // Require profile completion before accessing club details
+            if (!await HasCompletedProfileAsync())
+            {
+                return StatusCode(403, new ApiResponse<ClubDetailDto>
+                {
+                    Success = false,
+                    Message = "Please complete your profile before viewing club details"
+                });
+            }
+
             var club = await _context.Clubs
                 .Include(c => c.CreatedBy)
                 .Include(c => c.HomeVenue)

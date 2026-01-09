@@ -45,6 +45,19 @@ public class EventsController : ControllerBase
         return user?.Role == "Admin";
     }
 
+    // Check if user has completed their profile (not a "New User")
+    private async Task<bool> HasCompletedProfileAsync()
+    {
+        var userId = GetCurrentUserId();
+        if (!userId.HasValue) return false;
+
+        var user = await _context.Users.FindAsync(userId.Value);
+        if (user == null) return false;
+
+        var fullName = $"{user.FirstName} {user.LastName}".Trim();
+        return !fullName.Equals("New User", StringComparison.OrdinalIgnoreCase);
+    }
+
     // GET: /events/search - Search for events
     [HttpGet("search")]
     public async Task<ActionResult<ApiResponse<PagedResult<EventDto>>>> SearchEvents([FromQuery] EventSearchRequest request)
@@ -335,6 +348,16 @@ public class EventsController : ControllerBase
     {
         try
         {
+            // Require profile completion before accessing event details
+            if (!await HasCompletedProfileAsync())
+            {
+                return StatusCode(403, new ApiResponse<EventDetailDto>
+                {
+                    Success = false,
+                    Message = "Please complete your profile before viewing event details"
+                });
+            }
+
             // Load event with all related data (avoiding filtered includes that can cause SQL Server issues)
             var evt = await _context.Events
                 .AsSplitQuery() // Use split queries to avoid cartesian explosion with multiple collections
