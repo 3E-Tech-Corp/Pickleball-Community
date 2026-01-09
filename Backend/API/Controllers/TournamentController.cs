@@ -1642,7 +1642,7 @@ public class TournamentController : ControllerBase
                 PaymentsSubmitted = paymentsSubmitted,
                 PaymentsPaid = paymentsPaid,
                 PaymentsPending = paymentsPending,
-                TotalAmountDue = activeUnits.Sum(u => (evt.RegistrationFee ?? 0) + (evt.Divisions.FirstOrDefault(d => d.Id == u.DivisionId)?.DivisionFee ?? 0)),
+                TotalAmountDue = activeUnits.Sum(u => (evt.RegistrationFee ?? 0m) + (evt.Divisions.FirstOrDefault(d => d.Id == u.DivisionId)?.DivisionFee ?? 0m)),
                 TotalAmountPaid = activeUnits.Sum(u => u.AmountPaid)
             },
             Divisions = evt.Divisions.Where(d => d.IsActive).Select(d => new DivisionStatusDto
