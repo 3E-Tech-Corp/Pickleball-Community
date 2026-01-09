@@ -9,6 +9,7 @@ import ShareLink, { QrCodeModal } from '../components/ui/ShareLink';
 import { getIconByName } from '../utils/iconMap';
 import { getColorValues } from '../utils/colorMap';
 import PaymentModal from '../components/PaymentModal';
+import AdminPaymentModal from '../components/AdminPaymentModal';
 import PublicProfileModal from '../components/ui/PublicProfileModal';
 
 export default function Events() {
@@ -1440,6 +1441,14 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
   // Profile modal state
   const [selectedProfileUserId, setSelectedProfileUserId] = useState(null);
 
+  // Admin payment modal state
+  const [selectedAdminPaymentUnit, setSelectedAdminPaymentUnit] = useState(null);
+
+  // Registration filters state
+  const [regFilterDivision, setRegFilterDivision] = useState('');
+  const [regFilterStatus, setRegFilterStatus] = useState('');
+  const [regSearchQuery, setRegSearchQuery] = useState('');
+
   // Partner finder state
   const [findingPartnerForReg, setFindingPartnerForReg] = useState(null);
   const [availableUnits, setAvailableUnits] = useState([]);
@@ -1647,7 +1656,15 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
               paymentStatus: unit.paymentStatus || 'Pending',
               role: member.role,
               isComplete: unit.isComplete,
-              registeredAt: unit.createdAt
+              registeredAt: unit.createdAt,
+              // Payment info
+              amountPaid: unit.amountPaid || 0,
+              amountDue: unit.amountDue || 0,
+              paymentProofUrl: unit.paymentProofUrl,
+              paymentReference: unit.paymentReference,
+              paidAt: unit.paidAt,
+              // Store full members for modal
+              members: unit.members
             });
           });
         });
@@ -4004,6 +4021,47 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
 
                     {showRegistrations && (
                       <div className="mt-3 border rounded-lg overflow-hidden">
+                        {/* Filters */}
+                        <div className="p-3 bg-white border-b space-y-2">
+                          <div className="flex flex-wrap gap-2">
+                            {/* Search */}
+                            <div className="relative flex-1 min-w-[150px]">
+                              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                              <input
+                                type="text"
+                                value={regSearchQuery}
+                                onChange={(e) => setRegSearchQuery(e.target.value)}
+                                placeholder="Search by name..."
+                                className="w-full pl-8 pr-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                              />
+                            </div>
+                            {/* Division filter */}
+                            <select
+                              value={regFilterDivision}
+                              onChange={(e) => setRegFilterDivision(e.target.value)}
+                              className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                            >
+                              <option value="">All Divisions</option>
+                              {event.divisions?.map(d => (
+                                <option key={d.id} value={d.id}>{d.name}</option>
+                              ))}
+                            </select>
+                            {/* Status filter */}
+                            <select
+                              value={regFilterStatus}
+                              onChange={(e) => setRegFilterStatus(e.target.value)}
+                              className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                            >
+                              <option value="">All Statuses</option>
+                              <option value="complete">Complete Teams</option>
+                              <option value="needPartner">Need Partner</option>
+                              <option value="Pending">Payment Pending</option>
+                              <option value="PendingVerification">Payment Submitted</option>
+                              <option value="Paid">Paid</option>
+                            </select>
+                          </div>
+                        </div>
+
                         {registrationsLoading ? (
                           <div className="flex justify-center py-8">
                             <Loader2 className="w-6 h-6 animate-spin text-orange-600" />
@@ -4014,9 +4072,27 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
                           <div className="divide-y">
                             {/* Group by division, then by unit */}
                             {(() => {
+                              // Filter registrations
+                              const filteredRegs = allRegistrations.filter(reg => {
+                                // Division filter
+                                if (regFilterDivision && reg.divisionId !== parseInt(regFilterDivision)) return false;
+                                // Status filter
+                                if (regFilterStatus) {
+                                  if (regFilterStatus === 'complete' && !reg.isComplete) return false;
+                                  if (regFilterStatus === 'needPartner' && reg.isComplete) return false;
+                                  if (['Pending', 'PendingVerification', 'Paid'].includes(regFilterStatus) && reg.paymentStatus !== regFilterStatus) return false;
+                                }
+                                // Search filter
+                                if (regSearchQuery) {
+                                  const query = regSearchQuery.toLowerCase();
+                                  if (!reg.userName?.toLowerCase().includes(query)) return false;
+                                }
+                                return true;
+                              });
+
                               // Group registrations by unitId
                               const unitMap = new Map();
-                              allRegistrations.forEach(reg => {
+                              filteredRegs.forEach(reg => {
                                 if (!unitMap.has(reg.unitId)) {
                                   unitMap.set(reg.unitId, {
                                     unitId: reg.unitId,
@@ -4025,6 +4101,12 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
                                     teamName: reg.teamName,
                                     paymentStatus: reg.paymentStatus,
                                     registeredAt: reg.registeredAt,
+                                    isComplete: reg.isComplete,
+                                    amountPaid: reg.amountPaid,
+                                    amountDue: reg.amountDue,
+                                    paymentProofUrl: reg.paymentProofUrl,
+                                    paymentReference: reg.paymentReference,
+                                    paidAt: reg.paidAt,
                                     members: []
                                   });
                                 }
@@ -4038,6 +4120,10 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
                                 }
                                 return new Date(a.registeredAt) - new Date(b.registeredAt);
                               });
+
+                              if (units.length === 0) {
+                                return <div className="p-8 text-center text-gray-500">No registrations match filters</div>;
+                              }
 
                               // Track unit number per division
                               const divisionUnitCounts = {};
@@ -4061,19 +4147,20 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
                                         </span>
                                       </div>
                                       <div className="flex items-center gap-1">
-                                        <span className={`px-2 py-0.5 text-xs rounded-full ${unit.paymentStatus === 'Paid' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
-                                          {unit.paymentStatus}
+                                        <span className={`px-2 py-0.5 text-xs rounded-full ${
+                                          unit.paymentStatus === 'Paid' ? 'bg-green-100 text-green-700' :
+                                          unit.paymentStatus === 'PendingVerification' ? 'bg-blue-100 text-blue-700' :
+                                          'bg-yellow-100 text-yellow-700'
+                                        }`}>
+                                          {unit.paymentStatus === 'PendingVerification' ? 'Submitted' : unit.paymentStatus}
                                         </span>
-                                        {unit.paymentStatus !== 'Paid' && (
-                                          <button
-                                            onClick={() => markAsPaid(firstMember)}
-                                            disabled={updatingRegistration === firstMember?.id}
-                                            className="p-1.5 text-green-600 hover:bg-green-50 rounded transition-colors disabled:opacity-50"
-                                            title="Mark as Paid"
-                                          >
-                                            <DollarSign className="w-4 h-4" />
-                                          </button>
-                                        )}
+                                        <button
+                                          onClick={() => setSelectedAdminPaymentUnit(unit)}
+                                          className="p-1.5 text-green-600 hover:bg-green-50 rounded transition-colors"
+                                          title="View Payment Details"
+                                        >
+                                          <DollarSign className="w-4 h-4" />
+                                        </button>
                                         <button
                                           onClick={() => handleChangeDivision(firstMember)}
                                           disabled={updatingRegistration === firstMember?.id}
@@ -4798,6 +4885,28 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
           if (selectedPaymentEvent) {
             loadMyEvents();
           }
+        }}
+      />
+
+      {/* Admin Payment Modal */}
+      <AdminPaymentModal
+        isOpen={!!selectedAdminPaymentUnit}
+        onClose={() => setSelectedAdminPaymentUnit(null)}
+        unit={selectedAdminPaymentUnit}
+        event={event}
+        onPaymentUpdated={(unitId, paymentInfo) => {
+          // Update the registration in allRegistrations with new payment info
+          setAllRegistrations(prev =>
+            prev.map(r => r.unitId === unitId ? {
+              ...r,
+              paymentStatus: paymentInfo.paymentStatus,
+              amountPaid: paymentInfo.amountPaid,
+              amountDue: paymentInfo.amountDue,
+              paymentProofUrl: paymentInfo.paymentProofUrl,
+              paymentReference: paymentInfo.paymentReference,
+              paidAt: paymentInfo.paidAt
+            } : r)
+          );
         }}
       />
 

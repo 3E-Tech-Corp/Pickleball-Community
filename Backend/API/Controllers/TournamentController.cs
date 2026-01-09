@@ -364,6 +364,7 @@ public class TournamentController : ControllerBase
             .Include(u => u.Division)
                 .ThenInclude(d => d!.TeamUnit)
             .Include(u => u.Captain)
+            .Include(u => u.Event)
             .Where(u => u.EventId == eventId && u.Status != "Cancelled");
 
         if (divisionId.HasValue)
@@ -824,6 +825,64 @@ public class TournamentController : ControllerBase
                 PaidAt = unit.PaidAt
             },
             Message = "Marked as paid"
+        });
+    }
+
+    /// <summary>
+    /// Unmark registration payment (organizer only) - resets to Pending
+    /// </summary>
+    [Authorize]
+    [HttpPost("events/{eventId}/units/{unitId}/unmark-paid")]
+    public async Task<ActionResult<ApiResponse<PaymentInfoDto>>> UnmarkPaid(int eventId, int unitId)
+    {
+        var userId = GetUserId();
+        if (!userId.HasValue)
+            return Unauthorized(new ApiResponse<PaymentInfoDto> { Success = false, Message = "Unauthorized" });
+
+        var unit = await _context.EventUnits
+            .Include(u => u.Event)
+            .Include(u => u.Division)
+            .FirstOrDefaultAsync(u => u.Id == unitId && u.EventId == eventId);
+
+        if (unit == null)
+            return NotFound(new ApiResponse<PaymentInfoDto> { Success = false, Message = "Registration not found" });
+
+        // Only organizer or site admin can unmark payment
+        var isAdmin = await IsAdminAsync();
+        if (unit.Event?.OrganizedByUserId != userId.Value && !isAdmin)
+            return Forbid();
+
+        var amountDue = (unit.Event?.RegistrationFee ?? 0) + (unit.Division?.DivisionFee ?? 0);
+
+        // Reset payment status based on what's still present
+        if (!string.IsNullOrEmpty(unit.PaymentProofUrl))
+        {
+            unit.PaymentStatus = "PendingVerification";
+        }
+        else
+        {
+            unit.PaymentStatus = "Pending";
+        }
+        unit.AmountPaid = 0;
+        unit.PaidAt = null;
+        unit.UpdatedAt = DateTime.Now;
+
+        await _context.SaveChangesAsync();
+
+        return Ok(new ApiResponse<PaymentInfoDto>
+        {
+            Success = true,
+            Data = new PaymentInfoDto
+            {
+                UnitId = unit.Id,
+                PaymentStatus = unit.PaymentStatus,
+                AmountPaid = unit.AmountPaid,
+                AmountDue = amountDue,
+                PaymentProofUrl = unit.PaymentProofUrl,
+                PaymentReference = unit.PaymentReference,
+                PaidAt = unit.PaidAt
+            },
+            Message = "Payment unmarked"
         });
     }
 
@@ -1661,6 +1720,13 @@ public class TournamentController : ControllerBase
             RequiredPlayers = teamSize,
             IsComplete = acceptedMembers.Count >= teamSize,
             AllCheckedIn = acceptedMembers.All(m => m.IsCheckedIn),
+            // Payment info
+            PaymentStatus = u.PaymentStatus ?? "Pending",
+            AmountPaid = u.AmountPaid,
+            AmountDue = (u.Event?.RegistrationFee ?? 0) + (u.Division?.DivisionFee ?? 0),
+            PaymentProofUrl = u.PaymentProofUrl,
+            PaymentReference = u.PaymentReference,
+            PaidAt = u.PaidAt,
             CreatedAt = u.CreatedAt,
             Members = u.Members.Select(m => new EventUnitMemberDto
             {

@@ -95,6 +95,14 @@ public class EventUnitDto
     public bool IsComplete { get; set; }
     public bool AllCheckedIn { get; set; }
 
+    // Payment info
+    public string PaymentStatus { get; set; } = "Pending";
+    public decimal AmountPaid { get; set; }
+    public decimal AmountDue { get; set; }
+    public string? PaymentProofUrl { get; set; }
+    public string? PaymentReference { get; set; }
+    public DateTime? PaidAt { get; set; }
+
     public DateTime CreatedAt { get; set; }
 }
 
