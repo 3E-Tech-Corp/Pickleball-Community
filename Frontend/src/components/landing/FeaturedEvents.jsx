@@ -356,6 +356,7 @@ function EventCard({ event, formatDate, formatTime }) {
               {event.priceUnit && event.priceUnit !== 'person' && (
                 <span className="text-xs text-gray-500 ml-1">
                   /{event.priceUnit}
+                  {event.paymentModel === 'per_person' && ' ea'}
                 </span>
               )}
               {(!event.priceUnit || event.priceUnit === 'person') && (

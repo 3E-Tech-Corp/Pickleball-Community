@@ -29,6 +29,7 @@ public class EventDto
     public decimal RegistrationFee { get; set; }
     public decimal PerDivisionFee { get; set; }
     public string? PriceUnit { get; set; }
+    public string? PaymentModel { get; set; }
     public int? MaxParticipants { get; set; }
     public int RegisteredCount { get; set; }
     public int DivisionCount { get; set; }
@@ -269,6 +270,7 @@ public class CreateEventDto
     public decimal RegistrationFee { get; set; } = 0;
     public decimal PerDivisionFee { get; set; } = 0;
     public string? PriceUnit { get; set; }
+    public string? PaymentModel { get; set; } = "per_unit";
     public string? ContactName { get; set; }
     public string? ContactEmail { get; set; }
     public string? ContactPhone { get; set; }

@@ -594,6 +594,7 @@ public class EventsController : ControllerBase
                 RegistrationFee = dto.RegistrationFee,
                 PerDivisionFee = dto.PerDivisionFee,
                 PriceUnit = dto.PriceUnit,
+                PaymentModel = dto.PaymentModel,
                 ContactName = dto.ContactName,
                 ContactEmail = dto.ContactEmail,
                 ContactPhone = dto.ContactPhone,
@@ -716,6 +717,7 @@ public class EventsController : ControllerBase
             evt.RegistrationFee = dto.RegistrationFee;
             evt.PerDivisionFee = dto.PerDivisionFee;
             evt.PriceUnit = dto.PriceUnit;
+            evt.PaymentModel = dto.PaymentModel;
             evt.ContactName = dto.ContactName;
             evt.ContactEmail = dto.ContactEmail;
             evt.ContactPhone = dto.ContactPhone;
@@ -1981,6 +1983,7 @@ public class EventsController : ControllerBase
             RegistrationFee = evt.RegistrationFee,
             PerDivisionFee = evt.PerDivisionFee,
             PriceUnit = evt.PriceUnit,
+            PaymentModel = evt.PaymentModel,
             MaxParticipants = evt.MaxParticipants,
             RegisteredCount = evt.Divisions?.Where(d => d.IsActive).SelectMany(d => d.Units ?? Enumerable.Empty<EventUnit>()).Count(u => u.Status != "Cancelled") ?? 0,
             DivisionCount = evt.Divisions?.Count(d => d.IsActive) ?? 0,

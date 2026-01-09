@@ -400,10 +400,11 @@ export default function Events() {
     });
   };
 
-  const formatPrice = (fee, priceUnit) => {
+  const formatPrice = (fee, priceUnit, paymentModel = 'per_unit') => {
     if (!fee || fee <= 0) return null;
     const unitLabel = priceUnit === 'pair' ? '/pair' : priceUnit === 'team' ? '/team' : '/person';
-    return `$${fee}${unitLabel}`;
+    const perPersonNote = (priceUnit === 'pair' || priceUnit === 'team') && paymentModel === 'per_person' ? ' ea' : '';
+    return `$${fee}${unitLabel}${perPersonNote}`;
   };
 
   return (
@@ -770,7 +771,7 @@ export default function Events() {
                               </button>
                               {event.registrationFee > 0 && (
                                 <span className="text-sm font-medium text-gray-700 flex-shrink-0">
-                                  {formatPrice(event.registrationFee, event.priceUnit)}
+                                  {formatPrice(event.registrationFee, event.priceUnit, event.paymentModel)}
                                 </span>
                               )}
                             </div>
@@ -966,7 +967,7 @@ export default function Events() {
                               {event.registrationFee > 0 && (
                                 <span className="flex items-center gap-1">
                                   <DollarSign className="w-3 h-3" />
-                                  {formatPrice(event.registrationFee, event.priceUnit)}
+                                  {formatPrice(event.registrationFee, event.priceUnit, event.paymentModel)}
                                 </span>
                               )}
                             </div>
@@ -1376,7 +1377,7 @@ function EventCard({ event, formatDate, formatTime, onViewDetails, showManage = 
           })()}
           {event.registrationFee > 0 && (
             <span className="text-sm font-medium text-gray-700">
-              {formatPrice(event.registrationFee, event.priceUnit)}
+              {formatPrice(event.registrationFee, event.priceUnit, event.paymentModel)}
             </span>
           )}
         </div>
@@ -2706,7 +2707,7 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
                 </div>
                 <div className="flex items-center gap-2 text-gray-600">
                   <DollarSign className="w-4 h-4 text-orange-500" />
-                  <span>{event.registrationFee > 0 ? formatPrice(event.registrationFee, event.priceUnit) : 'Free Entry'}</span>
+                  <span>{event.registrationFee > 0 ? formatPrice(event.registrationFee, event.priceUnit, event.paymentModel) : 'Free Entry'}</span>
                 </div>
                 <div className="flex items-center gap-2 text-gray-600">
                   <Trophy className="w-4 h-4 text-orange-500" />
@@ -3721,7 +3722,7 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-3 gap-4">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Registration Fee ($)</label>
                       <input type="number" min="0" step="0.01" value={editFormData?.registrationFee || 0} onChange={(e) => setEditFormData({ ...editFormData, registrationFee: e.target.value })} className="w-full border border-gray-300 rounded-lg p-2" />
@@ -3732,6 +3733,13 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
                         <option value="person">Per Person</option>
                         <option value="pair">Per Pair</option>
                         <option value="team">Per Team</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Payment Model</label>
+                      <select value={editFormData?.paymentModel || 'per_unit'} onChange={(e) => setEditFormData({ ...editFormData, paymentModel: e.target.value })} className="w-full border border-gray-300 rounded-lg p-2">
+                        <option value="per_unit">Per Unit (team pays)</option>
+                        <option value="per_person">Per Person (each pays)</option>
                       </select>
                     </div>
                     <div>
@@ -4970,6 +4978,7 @@ function CreateEventModal({ eventTypes, teamUnits = [], skillLevels = [], courtI
     registrationFee: 0,
     perDivisionFee: 0,
     priceUnit: 'person',
+    paymentModel: 'per_unit',
     contactName: '',
     contactEmail: '',
     contactPhone: '',
@@ -5513,7 +5522,7 @@ function CreateEventModal({ eventTypes, teamUnits = [], skillLevels = [], courtI
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Registration Fee ($)</label>
                   <input
@@ -5535,6 +5544,17 @@ function CreateEventModal({ eventTypes, teamUnits = [], skillLevels = [], courtI
                     <option value="person">Per Person</option>
                     <option value="pair">Per Pair</option>
                     <option value="team">Per Team</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Payment Model</label>
+                  <select
+                    value={formData.paymentModel}
+                    onChange={(e) => setFormData({ ...formData, paymentModel: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg p-2"
+                  >
+                    <option value="per_unit">Per Unit (team pays)</option>
+                    <option value="per_person">Per Person (each pays)</option>
                   </select>
                 </div>
                 <div>

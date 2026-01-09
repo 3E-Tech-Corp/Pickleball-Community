@@ -72,6 +72,12 @@ public class Event
     [MaxLength(20)]
     public string? PriceUnit { get; set; }
 
+    /// <summary>
+    /// How the fee is charged: "per_unit" (team pays once) or "per_person" (each player pays)
+    /// </summary>
+    [MaxLength(20)]
+    public string? PaymentModel { get; set; } = "per_unit";
+
     // Contact
     [MaxLength(100)]
     public string? ContactName { get; set; }
