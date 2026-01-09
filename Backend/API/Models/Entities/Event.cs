@@ -66,6 +66,12 @@ public class Event
     [Column(TypeName = "decimal(10,2)")]
     public decimal PerDivisionFee { get; set; } = 0;
 
+    /// <summary>
+    /// Unit for the registration fee: "person", "pair", or "team"
+    /// </summary>
+    [MaxLength(20)]
+    public string? PriceUnit { get; set; }
+
     // Contact
     [MaxLength(100)]
     public string? ContactName { get; set; }

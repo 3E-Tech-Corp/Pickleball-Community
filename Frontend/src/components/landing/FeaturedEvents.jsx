@@ -351,7 +351,17 @@ function EventCard({ event, formatDate, formatTime }) {
         {event.registrationFee > 0 && (
           <div className="mt-3 pt-3 border-t border-gray-100 flex items-center justify-between">
             <span className="text-sm text-gray-500">Entry fee</span>
-            <span className="font-semibold text-orange-600">${event.registrationFee}</span>
+            <span className="font-semibold text-orange-600">
+              ${event.registrationFee}
+              {event.priceUnit && event.priceUnit !== 'person' && (
+                <span className="text-xs text-gray-500 ml-1">
+                  /{event.priceUnit}
+                </span>
+              )}
+              {(!event.priceUnit || event.priceUnit === 'person') && (
+                <span className="text-xs text-gray-500 ml-1">/person</span>
+              )}
+            </span>
           </div>
         )}
       </div>

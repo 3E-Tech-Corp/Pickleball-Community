@@ -593,6 +593,7 @@ public class EventsController : ControllerBase
                 BannerImageUrl = dto.BannerImageUrl,
                 RegistrationFee = dto.RegistrationFee,
                 PerDivisionFee = dto.PerDivisionFee,
+                PriceUnit = dto.PriceUnit,
                 ContactName = dto.ContactName,
                 ContactEmail = dto.ContactEmail,
                 ContactPhone = dto.ContactPhone,
@@ -714,6 +715,7 @@ public class EventsController : ControllerBase
             evt.BannerImageUrl = dto.BannerImageUrl;
             evt.RegistrationFee = dto.RegistrationFee;
             evt.PerDivisionFee = dto.PerDivisionFee;
+            evt.PriceUnit = dto.PriceUnit;
             evt.ContactName = dto.ContactName;
             evt.ContactEmail = dto.ContactEmail;
             evt.ContactPhone = dto.ContactPhone;
@@ -1978,6 +1980,7 @@ public class EventsController : ControllerBase
             PosterImageUrl = evt.PosterImageUrl,
             RegistrationFee = evt.RegistrationFee,
             PerDivisionFee = evt.PerDivisionFee,
+            PriceUnit = evt.PriceUnit,
             MaxParticipants = evt.MaxParticipants,
             RegisteredCount = evt.Divisions?.Where(d => d.IsActive).SelectMany(d => d.Units ?? Enumerable.Empty<EventUnit>()).Count(u => u.Status != "Cancelled") ?? 0,
             DivisionCount = evt.Divisions?.Count(d => d.IsActive) ?? 0,
