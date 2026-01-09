@@ -10,6 +10,7 @@ export const LanguageProvider = ({ children }) => {
     { code: 'en', name: 'English', flag: '🇺🇸' },
     { code: 'es', name: 'Español', flag: '🇪🇸' },
     { code: 'fr', name: 'Français', flag: '🇫🇷' },
+    { code: 'zh', name: '中文', flag: '🇨🇳' },
   ];
 
   const changeLanguage = (langCode) => {
