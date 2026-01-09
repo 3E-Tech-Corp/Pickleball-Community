@@ -40,6 +40,7 @@ export default function Events() {
   const [totalPages, setTotalPages] = useState(1);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [activeTab, setActiveTab] = useState(isAuthenticated ? 'my-events' : 'search'); // my-events, search
+  const [myEventsSubTab, setMyEventsSubTab] = useState('organized'); // organized, registered
   const pageSize = 20;
 
   // View mode: 'list' or 'map'
@@ -775,335 +776,442 @@ export default function Events() {
         )}
 
         {activeTab === 'my-events' && myEvents && (
-          <div className="space-y-8">
-            {/* Events I Organize */}
-            {myEvents.eventsIOrganize.length > 0 && (
-              <div>
-                <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                  <Trophy className="w-5 h-5 text-orange-500" />
-                  Events I Organize
-                </h2>
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                  {myEvents.eventsIOrganize.map(event => (
-                    <EventCard
-                      key={event.id}
-                      event={event}
-                      formatDate={formatDate}
-                      formatTime={formatTime}
-                      onViewDetails={() => handleViewDetails(event)}
-                      showManage
-                    />
-                  ))}
-                </div>
+          <div className="space-y-6">
+            {/* Sub-tabs for Organized/Registered */}
+            <div className="bg-white rounded-xl shadow-sm p-4">
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setMyEventsSubTab('organized')}
+                  className={`flex-1 py-2 px-4 rounded-lg font-medium text-sm transition-colors flex items-center justify-center gap-2 ${
+                    myEventsSubTab === 'organized'
+                      ? 'bg-orange-600 text-white'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
+                >
+                  <Trophy className="w-4 h-4" />
+                  Organized
+                  {myEvents.eventsIOrganize.length > 0 && (
+                    <span className={`px-1.5 py-0.5 text-xs rounded-full ${
+                      myEventsSubTab === 'organized' ? 'bg-orange-500 text-white' : 'bg-gray-200 text-gray-600'
+                    }`}>
+                      {myEvents.eventsIOrganize.length}
+                    </span>
+                  )}
+                </button>
+                <button
+                  onClick={() => setMyEventsSubTab('registered')}
+                  className={`flex-1 py-2 px-4 rounded-lg font-medium text-sm transition-colors flex items-center justify-center gap-2 ${
+                    myEventsSubTab === 'registered'
+                      ? 'bg-orange-600 text-white'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
+                >
+                  <Check className="w-4 h-4" />
+                  Registered
+                  {myEvents.eventsImRegisteredFor.length > 0 && (
+                    <span className={`px-1.5 py-0.5 text-xs rounded-full ${
+                      myEventsSubTab === 'registered' ? 'bg-orange-500 text-white' : 'bg-gray-200 text-gray-600'
+                    }`}>
+                      {myEvents.eventsImRegisteredFor.length}
+                    </span>
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {/* Organized Events Tab */}
+            {myEventsSubTab === 'organized' && (
+              <div className="space-y-6">
+                {myEvents.eventsIOrganize.length > 0 ? (
+                  <div className="space-y-3">
+                    {myEvents.eventsIOrganize.map(event => (
+                      <div key={event.id} className="bg-white rounded-lg shadow-sm p-4">
+                        {/* Event Header - Clickable */}
+                        <div className="flex items-start gap-3">
+                          <button
+                            onClick={() => handleViewDetails(event)}
+                            className="flex-shrink-0 hover:opacity-80 transition-opacity"
+                          >
+                            {event.posterImageUrl ? (
+                              <img
+                                src={getSharedAssetUrl(event.posterImageUrl)}
+                                alt=""
+                                className="w-14 h-14 rounded-lg object-cover"
+                              />
+                            ) : (
+                              <div className="w-14 h-14 rounded-lg bg-orange-100 flex items-center justify-center">
+                                <Trophy className="w-6 h-6 text-orange-600" />
+                              </div>
+                            )}
+                          </button>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-start justify-between gap-2">
+                              <button
+                                onClick={() => handleViewDetails(event)}
+                                className="font-medium text-gray-900 hover:text-orange-600 text-left block"
+                              >
+                                {event.name}
+                              </button>
+                              <div className="flex items-center gap-2 flex-shrink-0">
+                                {!event.isPublished && (
+                                  <span className="px-2 py-0.5 text-xs bg-yellow-100 text-yellow-700 rounded-full">
+                                    Draft
+                                  </span>
+                                )}
+                                {event.isPublished && (
+                                  <span className="px-2 py-0.5 text-xs bg-green-100 text-green-700 rounded-full">
+                                    Published
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            <p className="text-sm text-gray-500">
+                              {formatDate(event.startDate)} • {event.venueName || `${event.city}, ${event.state}`}
+                            </p>
+                            <div className="flex items-center gap-3 mt-2 text-xs text-gray-500">
+                              <span className="flex items-center gap-1">
+                                <Users className="w-3 h-3" />
+                                {event.registeredCount || 0} registered
+                              </span>
+                              <span className="flex items-center gap-1">
+                                <Layers className="w-3 h-3" />
+                                {event.divisionCount || 0} division{(event.divisionCount || 0) !== 1 ? 's' : ''}
+                              </span>
+                              {event.registrationFee > 0 && (
+                                <span className="flex items-center gap-1">
+                                  <DollarSign className="w-3 h-3" />
+                                  ${event.registrationFee}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        {/* Manage Button */}
+                        <div className="mt-3 pt-3 border-t border-gray-100">
+                          <button
+                            onClick={() => handleViewDetails(event)}
+                            className="w-full py-2 bg-orange-600 text-white rounded-lg font-medium hover:bg-orange-700 transition-colors text-sm"
+                          >
+                            Manage Event
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="bg-white rounded-xl shadow-sm p-12 text-center">
+                    <Trophy className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                    <h3 className="text-xl font-semibold text-gray-900 mb-2">No Organized Events</h3>
+                    <p className="text-gray-500 mb-6">
+                      You haven't created any events yet.
+                    </p>
+                    <button
+                      onClick={() => setShowCreateModal(true)}
+                      className="inline-flex items-center gap-2 px-6 py-2 bg-orange-600 text-white rounded-lg font-medium hover:bg-orange-700"
+                    >
+                      <Plus className="w-5 h-5" />
+                      Create Event
+                    </button>
+                  </div>
+                )}
+
+                {/* Pending Join Requests (for captains) - only show in organized tab */}
+                {myUnits?.pendingJoinRequestsAsCaption?.length > 0 && (
+                  <div>
+                    <h2 className="text-lg font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                      <Users className="w-5 h-5 text-purple-500" />
+                      Join Requests for My Teams
+                    </h2>
+                    <div className="space-y-3">
+                      {myUnits.pendingJoinRequestsAsCaption.map(request => (
+                        <div key={request.id} className="bg-white rounded-lg shadow-sm p-4">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              {request.profileImageUrl ? (
+                                <img
+                                  src={getSharedAssetUrl(request.profileImageUrl)}
+                                  alt=""
+                                  className="w-12 h-12 rounded-full object-cover"
+                                />
+                              ) : (
+                                <div className="w-12 h-12 rounded-full bg-purple-100 flex items-center justify-center text-purple-600 font-medium text-lg">
+                                  {request.userName?.charAt(0) || '?'}
+                                </div>
+                              )}
+                              <div>
+                                <h3 className="font-medium text-gray-900">{request.userName}</h3>
+                                <p className="text-sm text-gray-500">
+                                  Wants to join: {request.unitName}
+                                </p>
+                                {request.message && (
+                                  <p className="text-xs text-gray-400 mt-1">"{request.message}"</p>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => handleRespondToJoinRequest(request.id, false)}
+                                className="px-3 py-1.5 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50"
+                              >
+                                Decline
+                              </button>
+                              <button
+                                onClick={() => handleRespondToJoinRequest(request.id, true)}
+                                className="px-3 py-1.5 bg-orange-600 text-white rounded-lg text-sm font-medium hover:bg-orange-700"
+                              >
+                                Accept
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
-            {/* Events I'm Registered For */}
-            {myEvents.eventsImRegisteredFor.length > 0 && (
-              <div>
-                <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                  <Check className="w-5 h-5 text-green-500" />
-                  Events I'm Registered For
-                </h2>
-                <div className="space-y-3">
-                  {myEvents.eventsImRegisteredFor.map(reg => (
-                    <div key={reg.eventId} className="bg-white rounded-lg shadow-sm p-4">
-                      {/* Event Header - Clickable */}
-                      <div className="flex items-start gap-3 mb-3">
-                        <button
-                          onClick={() => handleViewDetails({ id: reg.eventId })}
-                          className="flex-shrink-0 hover:opacity-80 transition-opacity"
-                        >
-                          {reg.posterImageUrl ? (
-                            <img
-                              src={getSharedAssetUrl(reg.posterImageUrl)}
-                              alt=""
-                              className="w-14 h-14 rounded-lg object-cover"
-                            />
-                          ) : (
-                            <div className="w-14 h-14 rounded-lg bg-orange-100 flex items-center justify-center">
-                              <Calendar className="w-6 h-6 text-orange-600" />
+            {/* Registered Events Tab */}
+            {myEventsSubTab === 'registered' && (
+              <div className="space-y-6">
+                {/* Pending Team Invitations */}
+                {myUnits?.pendingInvitations?.length > 0 && (
+                  <div>
+                    <h2 className="text-lg font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                      <UserPlus className="w-5 h-5 text-blue-500" />
+                      Team Invitations
+                    </h2>
+                    <div className="space-y-3">
+                      {myUnits.pendingInvitations.map(unit => (
+                        <div key={unit.id} className="bg-white rounded-lg shadow-sm p-4">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              {unit.captainProfileImageUrl ? (
+                                <img
+                                  src={getSharedAssetUrl(unit.captainProfileImageUrl)}
+                                  alt=""
+                                  className="w-12 h-12 rounded-full object-cover"
+                                />
+                              ) : (
+                                <div className="w-12 h-12 rounded-full bg-orange-100 flex items-center justify-center text-orange-600 font-medium text-lg">
+                                  {unit.captainName?.charAt(0) || '?'}
+                                </div>
+                              )}
+                              <div>
+                                <h3 className="font-medium text-gray-900">{unit.name}</h3>
+                                {(unit.eventName || unit.divisionName) && (
+                                  <p className="text-xs text-blue-600">
+                                    {unit.eventName}{unit.divisionName && ` - ${unit.divisionName}`}
+                                  </p>
+                                )}
+                                <p className="text-sm text-gray-500">
+                                  Captain: {unit.captainName || 'Unknown'}
+                                </p>
+                                <p className="text-xs text-gray-400">
+                                  {unit.members?.length || 1} / {unit.requiredPlayers} players
+                                </p>
+                              </div>
                             </div>
-                          )}
-                        </button>
-                        <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => handleRespondToInvitation(unit.id, false)}
+                                className="px-3 py-1.5 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50"
+                              >
+                                Decline
+                              </button>
+                              <button
+                                onClick={() => handleRespondToInvitation(unit.id, true)}
+                                className="px-3 py-1.5 bg-orange-600 text-white rounded-lg text-sm font-medium hover:bg-orange-700"
+                              >
+                                Accept
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Registered Events */}
+                {myEvents.eventsImRegisteredFor.length > 0 ? (
+                  <div className="space-y-3">
+                    {myEvents.eventsImRegisteredFor.map(reg => (
+                      <div key={reg.eventId} className="bg-white rounded-lg shadow-sm p-4">
+                        {/* Event Header - Clickable */}
+                        <div className="flex items-start gap-3 mb-3">
                           <button
                             onClick={() => handleViewDetails({ id: reg.eventId })}
-                            className="font-medium text-gray-900 hover:text-orange-600 text-left block"
+                            className="flex-shrink-0 hover:opacity-80 transition-opacity"
                           >
-                            {reg.eventName}
+                            {reg.posterImageUrl ? (
+                              <img
+                                src={getSharedAssetUrl(reg.posterImageUrl)}
+                                alt=""
+                                className="w-14 h-14 rounded-lg object-cover"
+                              />
+                            ) : (
+                              <div className="w-14 h-14 rounded-lg bg-orange-100 flex items-center justify-center">
+                                <Calendar className="w-6 h-6 text-orange-600" />
+                              </div>
+                            )}
                           </button>
-                          <p className="text-sm text-gray-500">
-                            {formatDate(reg.startDate)} • {reg.venueName || `${reg.city}, ${reg.state}`}
-                          </p>
+                          <div className="flex-1 min-w-0">
+                            <button
+                              onClick={() => handleViewDetails({ id: reg.eventId })}
+                              className="font-medium text-gray-900 hover:text-orange-600 text-left block"
+                            >
+                              {reg.eventName}
+                            </button>
+                            <p className="text-sm text-gray-500">
+                              {formatDate(reg.startDate)} • {reg.venueName || `${reg.city}, ${reg.state}`}
+                            </p>
+                          </div>
                         </div>
-                      </div>
 
-                      {/* Units/Divisions */}
-                      <div className="space-y-2">
-                        {reg.units?.map(unit => {
-                          const allMembers = unit.members || [];
-                          const isPairs = unit.requiredPlayers === 2;
-                          const isCaptain = allMembers.some(m => m.isCurrentUser && m.role === 'Captain');
+                        {/* Units/Divisions */}
+                        <div className="space-y-2">
+                          {reg.units?.map(unit => {
+                            const allMembers = unit.members || [];
+                            const isPairs = unit.requiredPlayers === 2;
+                            const isCaptain = allMembers.some(m => m.isCurrentUser && m.role === 'Captain');
 
-                          return (
-                            <div key={unit.unitId} className="bg-gray-50 rounded-lg p-3">
-                              <div className="flex items-center justify-between gap-2 mb-2">
-                                <div className="flex-1 min-w-0">
-                                  <div className="flex items-center gap-2 flex-wrap">
-                                    <span className="text-sm font-medium text-gray-900">{unit.divisionName}</span>
-                                    {unit.teamUnitName && !isPairs && (
-                                      <span className="text-xs text-gray-500">• {unit.teamUnitName}</span>
+                            return (
+                              <div key={unit.unitId} className="bg-gray-50 rounded-lg p-3">
+                                <div className="flex items-center justify-between gap-2 mb-2">
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      <span className="text-sm font-medium text-gray-900">{unit.divisionName}</span>
+                                      {unit.teamUnitName && !isPairs && (
+                                        <span className="text-xs text-gray-500">• {unit.teamUnitName}</span>
+                                      )}
+                                      <span className="text-xs text-gray-400">
+                                        {unit.isComplete ? '• Team Complete' : `• ${allMembers.length}/${unit.requiredPlayers} players`}
+                                      </span>
+                                    </div>
+                                  </div>
+
+                                  {/* Status & Payment */}
+                                  <div className="flex items-center gap-2 flex-shrink-0">
+                                    {/* Unit Status */}
+                                    <span className={`px-2 py-0.5 text-xs rounded-full ${
+                                      unit.status === 'CheckedIn' ? 'bg-purple-100 text-purple-700' :
+                                      unit.status === 'Confirmed' ? 'bg-blue-100 text-blue-700' :
+                                      unit.status === 'Waitlisted' ? 'bg-yellow-100 text-yellow-700' :
+                                      unit.status === 'Cancelled' ? 'bg-red-100 text-red-700' :
+                                      'bg-green-100 text-green-700'
+                                    }`}>
+                                      {unit.status === 'CheckedIn' ? 'Checked In' : unit.status || 'Registered'}
+                                    </span>
+                                    {/* Pay Button */}
+                                    {unit.isComplete && unit.paymentStatus !== 'Paid' && (
+                                      <button
+                                        onClick={() => {
+                                          setSelectedPaymentReg({
+                                            ...unit,
+                                            partners: allMembers.filter(m => !m.isCurrentUser).map(p => ({ ...p })),
+                                            paymentReference: null,
+                                            paymentProofUrl: null
+                                          });
+                                          setSelectedPaymentEvent({
+                                            id: reg.eventId,
+                                            paymentInstructions: reg.paymentInstructions
+                                          });
+                                        }}
+                                        className="px-2 py-1 text-xs bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 flex items-center gap-1"
+                                      >
+                                        <DollarSign className="w-3 h-3" />
+                                        Pay
+                                      </button>
                                     )}
-                                    <span className="text-xs text-gray-400">
-                                      {unit.isComplete ? '• Team Complete' : `• ${allMembers.length}/${unit.requiredPlayers} players`}
+                                    {/* Payment Status */}
+                                    <span className={`px-2 py-0.5 text-xs rounded-full ${
+                                      unit.paymentStatus === 'Paid' ? 'bg-green-100 text-green-700' :
+                                      unit.paymentStatus === 'PendingVerification' ? 'bg-blue-100 text-blue-700' :
+                                      unit.paymentStatus === 'Partial' ? 'bg-yellow-100 text-yellow-700' :
+                                      'bg-gray-100 text-gray-600'
+                                    }`}>
+                                      {unit.paymentStatus === 'PendingVerification' ? 'Verifying' : unit.paymentStatus}
                                     </span>
                                   </div>
                                 </div>
 
-                                {/* Status & Payment */}
-                                <div className="flex items-center gap-2 flex-shrink-0">
-                                  {/* Unit Status */}
-                                  <span className={`px-2 py-0.5 text-xs rounded-full ${
-                                    unit.status === 'CheckedIn' ? 'bg-purple-100 text-purple-700' :
-                                    unit.status === 'Confirmed' ? 'bg-blue-100 text-blue-700' :
-                                    unit.status === 'Waitlisted' ? 'bg-yellow-100 text-yellow-700' :
-                                    unit.status === 'Cancelled' ? 'bg-red-100 text-red-700' :
-                                    'bg-green-100 text-green-700'
-                                  }`}>
-                                    {unit.status === 'CheckedIn' ? 'Checked In' : unit.status || 'Registered'}
-                                  </span>
-                                  {/* Pay Button */}
-                                  {unit.isComplete && unit.paymentStatus !== 'Paid' && (
-                                    <button
-                                      onClick={() => {
-                                        setSelectedPaymentReg({
-                                          ...unit,
-                                          partners: allMembers.filter(m => !m.isCurrentUser).map(p => ({ ...p })),
-                                          paymentReference: null,
-                                          paymentProofUrl: null
-                                        });
-                                        setSelectedPaymentEvent({
-                                          id: reg.eventId,
-                                          paymentInstructions: reg.paymentInstructions
-                                        });
-                                      }}
-                                      className="px-2 py-1 text-xs bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 flex items-center gap-1"
-                                    >
-                                      <DollarSign className="w-3 h-3" />
-                                      Pay
-                                    </button>
-                                  )}
-                                  {/* Payment Status */}
-                                  <span className={`px-2 py-0.5 text-xs rounded-full ${
-                                    unit.paymentStatus === 'Paid' ? 'bg-green-100 text-green-700' :
-                                    unit.paymentStatus === 'PendingVerification' ? 'bg-blue-100 text-blue-700' :
-                                    unit.paymentStatus === 'Partial' ? 'bg-yellow-100 text-yellow-700' :
-                                    'bg-gray-100 text-gray-600'
-                                  }`}>
-                                    {unit.paymentStatus === 'PendingVerification' ? 'Verifying' : unit.paymentStatus}
-                                  </span>
-                                </div>
-                              </div>
-
-                              {/* Team Members - Stacked Avatars */}
-                              {allMembers.length > 0 && (
-                                <div className="flex items-center gap-3">
-                                  <div className="flex -space-x-2 overflow-hidden">
-                                    {allMembers.slice(0, 5).map(member => (
-                                      <button
-                                        key={member.userId}
-                                        onClick={() => !member.isCurrentUser && setSelectedProfileUserId(member.userId)}
-                                        className={`relative ${!member.isCurrentUser ? 'hover:z-10' : ''}`}
-                                        title={`${member.name}${member.role === 'Captain' ? ' (Captain)' : ''}${member.isCurrentUser ? ' (You)' : ''}`}
-                                      >
-                                        {member.profileImageUrl ? (
-                                          <img
-                                            src={getSharedAssetUrl(member.profileImageUrl)}
-                                            alt=""
-                                            className={`w-8 h-8 rounded-full border-2 object-cover ${
-                                              member.isCurrentUser ? 'border-orange-400' : 'border-white'
-                                            }`}
-                                          />
-                                        ) : (
-                                          <div className={`w-8 h-8 rounded-full border-2 flex items-center justify-center text-xs font-medium ${
-                                            member.isCurrentUser
-                                              ? 'border-orange-400 bg-orange-100 text-orange-600'
-                                              : 'border-white bg-gray-200 text-gray-600'
-                                          }`}>
-                                            {member.name?.charAt(0) || '?'}
-                                          </div>
-                                        )}
-                                        {member.inviteStatus === 'Pending' && (
-                                          <span className="absolute -bottom-1 -right-1 w-3 h-3 bg-yellow-400 rounded-full border border-white" />
-                                        )}
-                                      </button>
-                                    ))}
-                                    {allMembers.length > 5 && (
-                                      <div className="w-8 h-8 rounded-full border-2 border-white bg-gray-200 flex items-center justify-center text-gray-600 text-xs font-medium">
-                                        +{allMembers.length - 5}
-                                      </div>
+                                {/* Team Members - Stacked Avatars */}
+                                {allMembers.length > 0 && (
+                                  <div className="flex items-center gap-3">
+                                    <div className="flex -space-x-2 overflow-hidden">
+                                      {allMembers.slice(0, 5).map(member => (
+                                        <button
+                                          key={member.userId}
+                                          onClick={() => !member.isCurrentUser && setSelectedProfileUserId(member.userId)}
+                                          className={`relative ${!member.isCurrentUser ? 'hover:z-10' : ''}`}
+                                          title={`${member.name}${member.role === 'Captain' ? ' (Captain)' : ''}${member.isCurrentUser ? ' (You)' : ''}`}
+                                        >
+                                          {member.profileImageUrl ? (
+                                            <img
+                                              src={getSharedAssetUrl(member.profileImageUrl)}
+                                              alt=""
+                                              className={`w-8 h-8 rounded-full border-2 object-cover ${
+                                                member.isCurrentUser ? 'border-orange-400' : 'border-white'
+                                              }`}
+                                            />
+                                          ) : (
+                                            <div className={`w-8 h-8 rounded-full border-2 flex items-center justify-center text-xs font-medium ${
+                                              member.isCurrentUser
+                                                ? 'border-orange-400 bg-orange-100 text-orange-600'
+                                                : 'border-white bg-gray-200 text-gray-600'
+                                            }`}>
+                                              {member.name?.charAt(0) || '?'}
+                                            </div>
+                                          )}
+                                          {member.inviteStatus === 'Pending' && (
+                                            <span className="absolute -bottom-1 -right-1 w-3 h-3 bg-yellow-400 rounded-full border border-white" />
+                                          )}
+                                        </button>
+                                      ))}
+                                      {allMembers.length > 5 && (
+                                        <div className="w-8 h-8 rounded-full border-2 border-white bg-gray-200 flex items-center justify-center text-gray-600 text-xs font-medium">
+                                          +{allMembers.length - 5}
+                                        </div>
+                                      )}
+                                    </div>
+                                    {allMembers.some(m => m.inviteStatus === 'Pending') && (
+                                      <span className="text-xs text-yellow-600">Pending invites</span>
                                     )}
                                   </div>
-                                  {allMembers.some(m => m.inviteStatus === 'Pending') && (
-                                    <span className="text-xs text-yellow-600">Pending invites</span>
-                                  )}
-                                </div>
-                              )}
+                                )}
 
-                              {/* Looking for partner / more players */}
-                              {unit.needsPartner && (
-                                <div className="text-xs text-orange-600 mt-2 flex items-center gap-1">
-                                  <UserPlus className="w-3 h-3" />
-                                  {isCaptain ? 'Looking for more players to complete the team' : 'Looking for partner'}
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Pending Team Invitations */}
-            {myUnits?.pendingInvitations?.length > 0 && (
-              <div>
-                <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                  <UserPlus className="w-5 h-5 text-blue-500" />
-                  Team Invitations
-                </h2>
-                <div className="space-y-3">
-                  {myUnits.pendingInvitations.map(unit => (
-                    <div key={unit.id} className="bg-white rounded-lg shadow-sm p-4">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          {unit.captainProfileImageUrl ? (
-                            <img
-                              src={getSharedAssetUrl(unit.captainProfileImageUrl)}
-                              alt=""
-                              className="w-12 h-12 rounded-full object-cover"
-                            />
-                          ) : (
-                            <div className="w-12 h-12 rounded-full bg-orange-100 flex items-center justify-center text-orange-600 font-medium text-lg">
-                              {unit.captainName?.charAt(0) || '?'}
-                            </div>
-                          )}
-                          <div>
-                            <h3 className="font-medium text-gray-900">{unit.name}</h3>
-                            {(unit.eventName || unit.divisionName) && (
-                              <p className="text-xs text-blue-600">
-                                {unit.eventName}{unit.divisionName && ` - ${unit.divisionName}`}
-                              </p>
-                            )}
-                            <p className="text-sm text-gray-500">
-                              Captain: {unit.captainName || 'Unknown'}
-                            </p>
-                            <p className="text-xs text-gray-400">
-                              {unit.members?.length || 1} / {unit.requiredPlayers} players
-                            </p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => handleRespondToInvitation(unit.id, false)}
-                            className="px-3 py-1.5 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50"
-                          >
-                            Decline
-                          </button>
-                          <button
-                            onClick={() => handleRespondToInvitation(unit.id, true)}
-                            className="px-3 py-1.5 bg-orange-600 text-white rounded-lg text-sm font-medium hover:bg-orange-700"
-                          >
-                            Accept
-                          </button>
+                                {/* Looking for partner / more players */}
+                                {unit.needsPartner && (
+                                  <div className="text-xs text-orange-600 mt-2 flex items-center gap-1">
+                                    <UserPlus className="w-3 h-3" />
+                                    {isCaptain ? 'Looking for more players to complete the team' : 'Looking for partner'}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
                         </div>
                       </div>
+                    ))}
+                  </div>
+                ) : (
+                  !myUnits?.pendingInvitations?.length && (
+                    <div className="bg-white rounded-xl shadow-sm p-12 text-center">
+                      <Check className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                      <h3 className="text-xl font-semibold text-gray-900 mb-2">No Registrations</h3>
+                      <p className="text-gray-500 mb-6">
+                        You haven't registered for any events yet.
+                      </p>
+                      <button
+                        onClick={() => setActiveTab('search')}
+                        className="px-6 py-2 border border-orange-600 text-orange-600 rounded-lg font-medium hover:bg-orange-50"
+                      >
+                        Search Events
+                      </button>
                     </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Pending Join Requests (for captains) */}
-            {myUnits?.pendingJoinRequestsAsCaption?.length > 0 && (
-              <div>
-                <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                  <Users className="w-5 h-5 text-purple-500" />
-                  Join Requests for My Teams
-                </h2>
-                <div className="space-y-3">
-                  {myUnits.pendingJoinRequestsAsCaption.map(request => (
-                    <div key={request.id} className="bg-white rounded-lg shadow-sm p-4">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          {request.profileImageUrl ? (
-                            <img
-                              src={getSharedAssetUrl(request.profileImageUrl)}
-                              alt=""
-                              className="w-12 h-12 rounded-full object-cover"
-                            />
-                          ) : (
-                            <div className="w-12 h-12 rounded-full bg-purple-100 flex items-center justify-center text-purple-600 font-medium text-lg">
-                              {request.userName?.charAt(0) || '?'}
-                            </div>
-                          )}
-                          <div>
-                            <h3 className="font-medium text-gray-900">{request.userName}</h3>
-                            <p className="text-sm text-gray-500">
-                              Wants to join: {request.unitName}
-                            </p>
-                            {request.message && (
-                              <p className="text-xs text-gray-400 mt-1">"{request.message}"</p>
-                            )}
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => handleRespondToJoinRequest(request.id, false)}
-                            className="px-3 py-1.5 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50"
-                          >
-                            Decline
-                          </button>
-                          <button
-                            onClick={() => handleRespondToJoinRequest(request.id, true)}
-                            className="px-3 py-1.5 bg-orange-600 text-white rounded-lg text-sm font-medium hover:bg-orange-700"
-                          >
-                            Accept
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Empty State */}
-            {myEvents.eventsIOrganize.length === 0 && myEvents.eventsImRegisteredFor.length === 0 && (!myUnits || myUnits.pendingInvitations?.length === 0) && (
-              <div className="bg-white rounded-xl shadow-sm p-12 text-center">
-                <Calendar className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                <h3 className="text-xl font-semibold text-gray-900 mb-2">No Events Yet</h3>
-                <p className="text-gray-500 mb-6">
-                  You haven't organized or registered for any events yet.
-                </p>
-                <div className="flex gap-4 justify-center">
-                  <button
-                    onClick={() => setActiveTab('search')}
-                    className="px-6 py-2 border border-orange-600 text-orange-600 rounded-lg font-medium hover:bg-orange-50"
-                  >
-                    Search Events
-                  </button>
-                  <button
-                    onClick={() => setShowCreateModal(true)}
-                    className="inline-flex items-center gap-2 px-6 py-2 bg-orange-600 text-white rounded-lg font-medium hover:bg-orange-700"
-                  >
-                    <Plus className="w-5 h-5" />
-                    Create Event
-                  </button>
-                </div>
+                  )
+                )}
               </div>
             )}
           </div>
