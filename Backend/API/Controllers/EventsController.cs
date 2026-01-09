@@ -1344,7 +1344,9 @@ public class EventsController : ControllerBase
             if (evt == null || !evt.IsActive)
                 return NotFound(new ApiResponse<EventDivisionDto> { Success = false, Message = "Event not found" });
 
-            if (evt.OrganizedByUserId != userId.Value)
+            // Check if user is organizer or site admin
+            var isAdmin = await IsAdminAsync();
+            if (evt.OrganizedByUserId != userId.Value && !isAdmin)
                 return Forbid();
 
             var maxSortOrder = await _context.EventDivisions
@@ -1563,7 +1565,9 @@ public class EventsController : ControllerBase
             if (evt == null || !evt.IsActive)
                 return NotFound(new ApiResponse<bool> { Success = false, Message = "Event not found" });
 
-            if (evt.OrganizedByUserId != userId.Value)
+            // Check if user is organizer or site admin
+            var isAdmin = await IsAdminAsync();
+            if (evt.OrganizedByUserId != userId.Value && !isAdmin)
                 return Forbid();
 
             var division = await _context.EventDivisions
@@ -1824,7 +1828,9 @@ public class EventsController : ControllerBase
             if (evt == null || !evt.IsActive)
                 return NotFound(new ApiResponse<List<EventRegistrationDto>> { Success = false, Message = "Event not found" });
 
-            if (evt.OrganizedByUserId != userId.Value)
+            // Check if user is organizer or site admin
+            var isAdmin = await IsAdminAsync();
+            if (evt.OrganizedByUserId != userId.Value && !isAdmin)
                 return Forbid();
 
             var registrations = await _context.EventRegistrations
@@ -1877,7 +1883,9 @@ public class EventsController : ControllerBase
             if (evt == null || !evt.IsActive)
                 return NotFound(new ApiResponse<EventRegistrationDto> { Success = false, Message = "Event not found" });
 
-            if (evt.OrganizedByUserId != userId.Value)
+            // Check if user is organizer or site admin
+            var isAdmin = await IsAdminAsync();
+            if (evt.OrganizedByUserId != userId.Value && !isAdmin)
                 return Forbid();
 
             var registration = await _context.EventRegistrations
