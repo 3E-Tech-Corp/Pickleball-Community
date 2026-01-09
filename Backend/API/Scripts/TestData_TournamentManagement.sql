@@ -78,8 +78,9 @@ BEGIN
     PRINT ''
     PRINT 'Creating default division for event...'
 
-    INSERT INTO EventDivisions (EventId, Name, Description, TeamUnit, MinPlayers, MaxPlayers, MaxTeams, RegistrationFee, SkillLevelId, AgeGroupId, PoolCount, BracketType, GamesPerMatch, IsActive, CreatedAt, UpdatedAt)
-    VALUES (@EventId, 'Open Doubles', 'Open division for all skill levels', 'pair', 2, 2, 16, 25.00, NULL, NULL, 2, 'RoundRobin', 3, 1, GETUTCDATE(), GETUTCDATE())
+    -- TeamUnitId 2 = 'pair' (doubles), TeamSize 2, MaxTeams 16, DivisionFee 25.00
+    INSERT INTO EventDivisions (EventId, Name, Description, TeamSize, TeamUnitId, MaxTeams, DivisionFee, SkillLevelId, AgeGroupId, PoolCount, BracketType, GamesPerMatch, SortOrder, IsActive)
+    VALUES (@EventId, 'Open Doubles', 'Open division for all skill levels', 2, 2, 16, 25.00, NULL, NULL, 2, 'RoundRobin', 3, 0, 1)
 
     SET @DivisionId = SCOPE_IDENTITY()
     PRINT 'Created division: Open Doubles (ID: ' + CAST(@DivisionId AS NVARCHAR(10)) + ')'
@@ -90,11 +91,11 @@ BEGIN
     PRINT 'Using existing division ID: ' + CAST(@DivisionId AS NVARCHAR(10))
 END
 
--- Get division details
-DECLARE @TeamUnit NVARCHAR(20), @MinPlayers INT
-SELECT @TeamUnit = TeamUnit, @MinPlayers = MinPlayers FROM EventDivisions WHERE Id = @DivisionId
-SET @MinPlayers = ISNULL(@MinPlayers, 2)
-PRINT 'Division team unit: ' + ISNULL(@TeamUnit, 'pair') + ', Players per team: ' + CAST(@MinPlayers AS NVARCHAR(10))
+-- Get division details (TeamSize determines players per team)
+DECLARE @TeamSize INT
+SELECT @TeamSize = TeamSize FROM EventDivisions WHERE Id = @DivisionId
+SET @TeamSize = ISNULL(@TeamSize, 2)
+PRINT 'Division team size: ' + CAST(@TeamSize AS NVARCHAR(10)) + ' players per team'
 
 -- ============================================
 -- Create Tournament Courts
@@ -117,7 +118,7 @@ PRINT 'Created 4 tournament courts.'
 PRINT ''
 PRINT 'Creating event units (teams)...'
 
-DECLARE @NumUnits INT = @UserCount / @MinPlayers
+DECLARE @NumUnits INT = @UserCount / @TeamSize
 IF @NumUnits > 8 SET @NumUnits = 8  -- Cap at 8 teams for manageable test data
 
 DECLARE @TeamNames TABLE (Idx INT, TeamName NVARCHAR(100))
@@ -137,8 +138,8 @@ DECLARE @UserId1 INT, @UserId2 INT, @TeamName NVARCHAR(100), @UnitId INT
 WHILE @i <= @NumUnits
 BEGIN
     -- Get user IDs for this team
-    SELECT @UserId1 = Id FROM @TestUsers WHERE RowNum = (@i - 1) * @MinPlayers + 1
-    SELECT @UserId2 = Id FROM @TestUsers WHERE RowNum = (@i - 1) * @MinPlayers + 2
+    SELECT @UserId1 = Id FROM @TestUsers WHERE RowNum = (@i - 1) * @TeamSize + 1
+    SELECT @UserId2 = Id FROM @TestUsers WHERE RowNum = (@i - 1) * @TeamSize + 2
     SELECT @TeamName = TeamName FROM @TeamNames WHERE Idx = @i
 
     -- Assign to pool (round robin pools)
@@ -155,7 +156,7 @@ BEGIN
     INSERT INTO EventUnitMembers (UnitId, UserId, Role, InviteStatus, IsCheckedIn, CheckedInAt, CreatedAt)
     VALUES (@UnitId, @UserId1, 'Captain', 'Accepted', 1, GETUTCDATE(), GETUTCDATE())
 
-    IF @MinPlayers >= 2 AND @UserId2 IS NOT NULL
+    IF @TeamSize >= 2 AND @UserId2 IS NOT NULL
     BEGIN
         INSERT INTO EventUnitMembers (UnitId, UserId, Role, InviteStatus, IsCheckedIn, CheckedInAt, CreatedAt)
         VALUES (@UnitId, @UserId2, 'Player', 'Accepted', 1, GETUTCDATE(), GETUTCDATE())
