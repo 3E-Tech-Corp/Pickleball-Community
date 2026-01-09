@@ -1447,6 +1447,7 @@ public class EventsController : ControllerBase
             var division = await _context.EventDivisions
                 .Include(d => d.TeamUnit)
                 .Include(d => d.SkillLevel)
+                .Include(d => d.AgeGroupEntity)
                 .FirstOrDefaultAsync(d => d.Id == divisionId && d.EventId == id && d.IsActive);
 
             if (division == null)
@@ -1475,6 +1476,7 @@ public class EventsController : ControllerBase
             // Reload with navigation properties
             await _context.Entry(division).Reference(d => d.TeamUnit).LoadAsync();
             await _context.Entry(division).Reference(d => d.SkillLevel).LoadAsync();
+            await _context.Entry(division).Reference(d => d.AgeGroupEntity).LoadAsync();
 
             var registeredCount = await _context.EventUnits
                 .CountAsync(u => u.DivisionId == division.Id && u.Status != "Cancelled");
@@ -1490,6 +1492,8 @@ public class EventsController : ControllerBase
                     Description = division.Description,
                     TeamUnitId = division.TeamUnitId,
                     TeamUnitName = division.TeamUnit?.Name,
+                    AgeGroupId = division.AgeGroupId,
+                    AgeGroupName = division.AgeGroupEntity?.Name,
                     SkillLevelId = division.SkillLevelId,
                     SkillLevelName = division.SkillLevel?.Name,
                     MaxUnits = division.MaxUnits,
