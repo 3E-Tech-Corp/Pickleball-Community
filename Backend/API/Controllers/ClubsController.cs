@@ -958,19 +958,20 @@ public class ClubsController : ControllerBase
             if (!userId.HasValue)
                 return Unauthorized(new ApiResponse<bool> { Success = false, Message = "User not authenticated" });
 
-            // Check if user is admin or moderator
+            // Check if user is site admin, club admin, or moderator
+            var isSiteAdmin = await IsSiteAdminAsync();
             var userMembership = await _context.ClubMembers
                 .FirstOrDefaultAsync(m => m.ClubId == id && m.UserId == userId.Value && m.IsActive);
 
-            if (userMembership == null || (userMembership.Role != "Admin" && userMembership.Role != "Moderator"))
+            if (!isSiteAdmin && (userMembership == null || (userMembership.Role != "Admin" && userMembership.Role != "Moderator")))
                 return Forbid();
 
             var membership = await _context.ClubMembers.FindAsync(memberId);
             if (membership == null || membership.ClubId != id || !membership.IsActive)
                 return NotFound(new ApiResponse<bool> { Success = false, Message = "Member not found" });
 
-            // Cannot remove an admin unless you are an admin
-            if (membership.Role == "Admin" && userMembership.Role != "Admin")
+            // Cannot remove an admin unless you are an admin or site admin
+            if (membership.Role == "Admin" && !isSiteAdmin && userMembership?.Role != "Admin")
                 return Forbid();
 
             // Cannot remove yourself
@@ -1370,11 +1371,12 @@ public class ClubsController : ControllerBase
             if (!userId.HasValue)
                 return Unauthorized(new ApiResponse<string> { Success = false, Message = "User not authenticated" });
 
-            // Check if user is admin
+            // Check if user is site admin or club admin
+            var isSiteAdmin = await IsSiteAdminAsync();
             var isAdmin = await _context.ClubMembers
                 .AnyAsync(m => m.ClubId == id && m.UserId == userId.Value && m.Role == "Admin" && m.IsActive);
 
-            if (!isAdmin)
+            if (!isAdmin && !isSiteAdmin)
                 return Forbid();
 
             var club = await _context.Clubs.FindAsync(id);
@@ -1448,11 +1450,12 @@ public class ClubsController : ControllerBase
             if (club == null || !club.IsActive)
                 return NotFound(new ApiResponse<bool> { Success = false, Message = "Club not found" });
 
-            // Check if user is admin
+            // Check if user is site admin or club admin
+            var isSiteAdmin = await IsSiteAdminAsync();
             var isAdmin = await _context.ClubMembers
                 .AnyAsync(m => m.ClubId == id && m.UserId == userId.Value && m.Role == "Admin" && m.IsActive);
 
-            if (!isAdmin)
+            if (!isAdmin && !isSiteAdmin)
                 return Forbid();
 
             if (club.ChatEnabled && club.ChatConversationId.HasValue)
@@ -1516,11 +1519,12 @@ public class ClubsController : ControllerBase
             if (club == null || !club.IsActive)
                 return NotFound(new ApiResponse<bool> { Success = false, Message = "Club not found" });
 
-            // Check if user is admin
+            // Check if user is site admin or club admin
+            var isSiteAdmin = await IsSiteAdminAsync();
             var isAdmin = await _context.ClubMembers
                 .AnyAsync(m => m.ClubId == id && m.UserId == userId.Value && m.Role == "Admin" && m.IsActive);
 
-            if (!isAdmin)
+            if (!isAdmin && !isSiteAdmin)
                 return Forbid();
 
             club.ChatEnabled = false;
@@ -1653,11 +1657,12 @@ public class ClubsController : ControllerBase
             if (club == null || !club.IsActive)
                 return NotFound(new ApiResponse<ClubDocumentDto> { Success = false, Message = "Club not found" });
 
-            // Check if user is admin
+            // Check if user is site admin or club admin
+            var isSiteAdmin = await IsSiteAdminAsync();
             var isAdmin = await _context.ClubMembers
                 .AnyAsync(m => m.ClubId == id && m.UserId == userId.Value && m.Role == "Admin" && m.IsActive);
 
-            if (!isAdmin)
+            if (!isAdmin && !isSiteAdmin)
                 return Forbid();
 
             // Validate visibility
@@ -1730,11 +1735,12 @@ public class ClubsController : ControllerBase
             if (!userId.HasValue)
                 return Unauthorized(new ApiResponse<ClubDocumentDto> { Success = false, Message = "User not authenticated" });
 
-            // Check if user is admin
+            // Check if user is site admin or club admin
+            var isSiteAdmin = await IsSiteAdminAsync();
             var isAdmin = await _context.ClubMembers
                 .AnyAsync(m => m.ClubId == id && m.UserId == userId.Value && m.Role == "Admin" && m.IsActive);
 
-            if (!isAdmin)
+            if (!isAdmin && !isSiteAdmin)
                 return Forbid();
 
             var document = await _context.ClubDocuments
@@ -1808,11 +1814,12 @@ public class ClubsController : ControllerBase
             if (!userId.HasValue)
                 return Unauthorized(new ApiResponse<bool> { Success = false, Message = "User not authenticated" });
 
-            // Check if user is admin
+            // Check if user is site admin or club admin
+            var isSiteAdmin = await IsSiteAdminAsync();
             var isAdmin = await _context.ClubMembers
                 .AnyAsync(m => m.ClubId == id && m.UserId == userId.Value && m.Role == "Admin" && m.IsActive);
 
-            if (!isAdmin)
+            if (!isAdmin && !isSiteAdmin)
                 return Forbid();
 
             var document = await _context.ClubDocuments
@@ -1846,11 +1853,12 @@ public class ClubsController : ControllerBase
             if (!userId.HasValue)
                 return Unauthorized(new ApiResponse<bool> { Success = false, Message = "User not authenticated" });
 
-            // Check if user is admin
+            // Check if user is site admin or club admin
+            var isSiteAdmin = await IsSiteAdminAsync();
             var isAdmin = await _context.ClubMembers
                 .AnyAsync(m => m.ClubId == id && m.UserId == userId.Value && m.Role == "Admin" && m.IsActive);
 
-            if (!isAdmin)
+            if (!isAdmin && !isSiteAdmin)
                 return Forbid();
 
             // Load all active documents for this club and filter in-memory to avoid OPENJSON issues
