@@ -863,6 +863,10 @@ public class EventsController : ControllerBase
             if (evt.OrganizedByUserId != userId.Value && !isAdmin)
                 return Forbid();
 
+            // Only allow deletion of draft (unpublished) events
+            if (evt.IsPublished)
+                return BadRequest(new ApiResponse<bool> { Success = false, Message = "Published events cannot be deleted. Unpublish the event first." });
+
             evt.IsActive = false;
             evt.UpdatedAt = DateTime.Now;
             await _context.SaveChangesAsync();

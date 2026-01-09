@@ -1423,6 +1423,35 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
   const [publishing, setPublishing] = useState(false);
   const toast = useToast();
 
+  // Delete event state
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
+  const [deleting, setDeleting] = useState(false);
+
+  // Handle delete event (draft only)
+  const handleDeleteEvent = async () => {
+    if (deleteConfirmText !== 'DELETE') return;
+
+    setDeleting(true);
+    try {
+      const response = await eventsApi.delete(event.id);
+      if (response.success) {
+        toast.success('Event deleted successfully');
+        onClose();
+        onUpdate(null); // Signal that event was deleted
+      } else {
+        toast.error(response.message || 'Failed to delete event');
+      }
+    } catch (err) {
+      console.error('Delete event error:', err);
+      toast.error('Failed to delete event');
+    } finally {
+      setDeleting(false);
+      setShowDeleteConfirm(false);
+      setDeleteConfirmText('');
+    }
+  };
+
   // Handle publish/unpublish event
   const handlePublishToggle = async (shouldPublish) => {
     setPublishing(true);
@@ -3988,6 +4017,75 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
                     )}
                   </div>
                 </>
+              )}
+
+              {/* Delete Event Section - Only for draft events */}
+              {!event.isPublished && (
+                <div className="mt-8 pt-6 border-t border-red-200">
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                    <h3 className="text-lg font-semibold text-red-800 mb-2 flex items-center gap-2">
+                      <Trash2 className="w-5 h-5" />
+                      Danger Zone
+                    </h3>
+                    <p className="text-sm text-red-700 mb-4">
+                      Delete this draft event permanently. This action cannot be undone.
+                    </p>
+                    {!showDeleteConfirm ? (
+                      <button
+                        onClick={() => setShowDeleteConfirm(true)}
+                        className="px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors"
+                      >
+                        Delete Event
+                      </button>
+                    ) : (
+                      <div className="space-y-3 bg-white p-4 rounded-lg border border-red-300">
+                        <p className="text-sm font-medium text-red-800">
+                          Are you absolutely sure? This will permanently delete:
+                        </p>
+                        <ul className="text-sm text-red-700 list-disc list-inside space-y-1">
+                          <li>The event and all its details</li>
+                          <li>All divisions and registrations</li>
+                          <li>All uploaded documents</li>
+                        </ul>
+                        <p className="text-sm text-gray-700">
+                          Type <strong>DELETE</strong> to confirm:
+                        </p>
+                        <input
+                          type="text"
+                          value={deleteConfirmText}
+                          onChange={(e) => setDeleteConfirmText(e.target.value)}
+                          placeholder="Type DELETE to confirm"
+                          className="w-full px-3 py-2 border border-red-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                        />
+                        <div className="flex gap-3">
+                          <button
+                            onClick={handleDeleteEvent}
+                            disabled={deleteConfirmText !== 'DELETE' || deleting}
+                            className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                          >
+                            {deleting ? (
+                              <>
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                                Deleting...
+                              </>
+                            ) : (
+                              'Permanently Delete Event'
+                            )}
+                          </button>
+                          <button
+                            onClick={() => {
+                              setShowDeleteConfirm(false);
+                              setDeleteConfirmText('');
+                            }}
+                            className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
               )}
             </div>
           )}
