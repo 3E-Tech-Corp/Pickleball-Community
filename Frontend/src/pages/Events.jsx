@@ -842,59 +842,23 @@ export default function Events() {
                       {/* Units/Divisions */}
                       <div className="space-y-2">
                         {reg.units?.map(unit => {
-                          const partners = unit.members?.filter(m => !m.isCurrentUser) || [];
+                          const allMembers = unit.members || [];
                           const isPairs = unit.requiredPlayers === 2;
+                          const isCaptain = allMembers.some(m => m.isCurrentUser && m.role === 'Captain');
 
                           return (
                             <div key={unit.unitId} className="bg-gray-50 rounded-lg p-3">
-                              <div className="flex items-center justify-between gap-2">
+                              <div className="flex items-center justify-between gap-2 mb-2">
                                 <div className="flex-1 min-w-0">
                                   <div className="flex items-center gap-2 flex-wrap">
                                     <span className="text-sm font-medium text-gray-900">{unit.divisionName}</span>
                                     {unit.teamUnitName && !isPairs && (
                                       <span className="text-xs text-gray-500">• {unit.teamUnitName}</span>
                                     )}
+                                    <span className="text-xs text-gray-400">
+                                      {unit.isComplete ? '• Team Complete' : `• ${allMembers.length}/${unit.requiredPlayers} players`}
+                                    </span>
                                   </div>
-
-                                  {/* Team Members */}
-                                  {partners.length > 0 && (
-                                    <div className="flex items-center gap-2 mt-1.5">
-                                      <span className="text-xs text-gray-500">with</span>
-                                      <div className="flex items-center gap-1.5">
-                                        {partners.map(partner => (
-                                          <button
-                                            key={partner.userId}
-                                            onClick={() => setSelectedProfileUserId(partner.userId)}
-                                            className="flex items-center gap-1 hover:opacity-80"
-                                          >
-                                            {partner.profileImageUrl ? (
-                                              <img
-                                                src={getSharedAssetUrl(partner.profileImageUrl)}
-                                                alt=""
-                                                className="w-6 h-6 rounded-full object-cover"
-                                              />
-                                            ) : (
-                                              <div className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center text-xs text-gray-600">
-                                                {partner.name?.charAt(0) || '?'}
-                                              </div>
-                                            )}
-                                            <span className="text-xs text-gray-700">{partner.name?.split(' ')[0]}</span>
-                                            {partner.inviteStatus === 'Pending' && (
-                                              <span className="text-xs text-yellow-600">(pending)</span>
-                                            )}
-                                          </button>
-                                        ))}
-                                      </div>
-                                    </div>
-                                  )}
-
-                                  {/* Looking for partner */}
-                                  {unit.needsPartner && (
-                                    <div className="text-xs text-orange-600 mt-1 flex items-center gap-1">
-                                      <UserPlus className="w-3 h-3" />
-                                      Looking for partner
-                                    </div>
-                                  )}
                                 </div>
 
                                 {/* Status & Payment */}
@@ -915,7 +879,7 @@ export default function Events() {
                                       onClick={() => {
                                         setSelectedPaymentReg({
                                           ...unit,
-                                          partners: partners.map(p => ({ ...p })),
+                                          partners: allMembers.filter(m => !m.isCurrentUser).map(p => ({ ...p })),
                                           paymentReference: null,
                                           paymentProofUrl: null
                                         });
@@ -941,6 +905,59 @@ export default function Events() {
                                   </span>
                                 </div>
                               </div>
+
+                              {/* Team Members - Stacked Avatars */}
+                              {allMembers.length > 0 && (
+                                <div className="flex items-center gap-3">
+                                  <div className="flex -space-x-2 overflow-hidden">
+                                    {allMembers.slice(0, 5).map(member => (
+                                      <button
+                                        key={member.userId}
+                                        onClick={() => !member.isCurrentUser && setSelectedProfileUserId(member.userId)}
+                                        className={`relative ${!member.isCurrentUser ? 'hover:z-10' : ''}`}
+                                        title={`${member.name}${member.role === 'Captain' ? ' (Captain)' : ''}${member.isCurrentUser ? ' (You)' : ''}`}
+                                      >
+                                        {member.profileImageUrl ? (
+                                          <img
+                                            src={getSharedAssetUrl(member.profileImageUrl)}
+                                            alt=""
+                                            className={`w-8 h-8 rounded-full border-2 object-cover ${
+                                              member.isCurrentUser ? 'border-orange-400' : 'border-white'
+                                            }`}
+                                          />
+                                        ) : (
+                                          <div className={`w-8 h-8 rounded-full border-2 flex items-center justify-center text-xs font-medium ${
+                                            member.isCurrentUser
+                                              ? 'border-orange-400 bg-orange-100 text-orange-600'
+                                              : 'border-white bg-gray-200 text-gray-600'
+                                          }`}>
+                                            {member.name?.charAt(0) || '?'}
+                                          </div>
+                                        )}
+                                        {member.inviteStatus === 'Pending' && (
+                                          <span className="absolute -bottom-1 -right-1 w-3 h-3 bg-yellow-400 rounded-full border border-white" />
+                                        )}
+                                      </button>
+                                    ))}
+                                    {allMembers.length > 5 && (
+                                      <div className="w-8 h-8 rounded-full border-2 border-white bg-gray-200 flex items-center justify-center text-gray-600 text-xs font-medium">
+                                        +{allMembers.length - 5}
+                                      </div>
+                                    )}
+                                  </div>
+                                  {allMembers.some(m => m.inviteStatus === 'Pending') && (
+                                    <span className="text-xs text-yellow-600">Pending invites</span>
+                                  )}
+                                </div>
+                              )}
+
+                              {/* Looking for partner / more players */}
+                              {unit.needsPartner && (
+                                <div className="text-xs text-orange-600 mt-2 flex items-center gap-1">
+                                  <UserPlus className="w-3 h-3" />
+                                  {isCaptain ? 'Looking for more players to complete the team' : 'Looking for partner'}
+                                </div>
+                              )}
                             </div>
                           );
                         })}
@@ -1064,76 +1081,8 @@ export default function Events() {
               </div>
             )}
 
-            {/* My Active Teams */}
-            {myUnits?.activeUnits?.length > 0 && (
-              <div>
-                <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                  <Users className="w-5 h-5 text-orange-500" />
-                  My Teams
-                </h2>
-                <div className="grid gap-4 md:grid-cols-2">
-                  {myUnits.activeUnits.map(unit => (
-                    <div key={unit.id} className="bg-white rounded-lg shadow-sm p-4">
-                      <div className="flex items-center justify-between mb-3">
-                        <div>
-                          <h3 className="font-medium text-gray-900">{unit.name}</h3>
-                          {(unit.eventName || unit.divisionName) && (
-                            <p className="text-xs text-blue-600 mb-1">
-                              {unit.eventName}{unit.divisionName && ` - ${unit.divisionName}`}
-                            </p>
-                          )}
-                          <p className="text-sm text-gray-500">
-                            {unit.isComplete ? 'Team Complete' : `${unit.members?.length || 0} / ${unit.requiredPlayers} players`}
-                          </p>
-                        </div>
-                        <span className={`px-2 py-1 text-xs rounded-full ${
-                          unit.status === 'Registered' ? 'bg-green-100 text-green-700' :
-                          unit.status === 'Waitlisted' ? 'bg-yellow-100 text-yellow-700' :
-                          unit.status === 'CheckedIn' ? 'bg-blue-100 text-blue-700' :
-                          'bg-gray-100 text-gray-700'
-                        }`}>
-                          {unit.status}
-                        </span>
-                      </div>
-                      <div className="flex -space-x-2 overflow-hidden">
-                        {unit.members?.slice(0, 5).map((member, i) => (
-                          member.profileImageUrl ? (
-                            <img
-                              key={member.id}
-                              src={getSharedAssetUrl(member.profileImageUrl)}
-                              alt={`${member.firstName} ${member.lastName}`}
-                              className="w-8 h-8 rounded-full border-2 border-white object-cover"
-                              title={`${member.firstName} ${member.lastName}`}
-                            />
-                          ) : (
-                            <div
-                              key={member.id}
-                              className="w-8 h-8 rounded-full border-2 border-white bg-orange-100 flex items-center justify-center text-orange-600 text-xs font-medium"
-                              title={`${member.firstName} ${member.lastName}`}
-                            >
-                              {member.firstName?.charAt(0)}{member.lastName?.charAt(0)}
-                            </div>
-                          )
-                        ))}
-                        {(unit.members?.length || 0) > 5 && (
-                          <div className="w-8 h-8 rounded-full border-2 border-white bg-gray-200 flex items-center justify-center text-gray-600 text-xs font-medium">
-                            +{unit.members.length - 5}
-                          </div>
-                        )}
-                      </div>
-                      {!unit.isComplete && unit.captainUserId === user?.id && (
-                        <p className="text-xs text-orange-600 mt-2">
-                          Looking for more players to complete the team
-                        </p>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
             {/* Empty State */}
-            {myEvents.eventsIOrganize.length === 0 && myEvents.eventsImRegisteredFor.length === 0 && (!myUnits || (myUnits.activeUnits?.length === 0 && myUnits.pendingInvitations?.length === 0)) && (
+            {myEvents.eventsIOrganize.length === 0 && myEvents.eventsImRegisteredFor.length === 0 && (!myUnits || myUnits.pendingInvitations?.length === 0) && (
               <div className="bg-white rounded-xl shadow-sm p-12 text-center">
                 <Calendar className="w-16 h-16 text-gray-300 mx-auto mb-4" />
                 <h3 className="text-xl font-semibold text-gray-900 mb-2">No Events Yet</h3>
