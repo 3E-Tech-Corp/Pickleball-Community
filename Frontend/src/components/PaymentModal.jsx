@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { X, DollarSign, Upload, CheckCircle, AlertCircle, Loader2, Image, ExternalLink, Copy, Check } from 'lucide-react';
 import { useToast } from '../contexts/ToastContext';
-import { tournamentApi, sharedAssetApi } from '../services/api';
+import { tournamentApi, sharedAssetApi, getSharedAssetUrl } from '../services/api';
 
 export default function PaymentModal({ isOpen, onClose, registration, event, onPaymentUpdated }) {
   const toast = useToast();
@@ -66,10 +66,13 @@ export default function PaymentModal({ isOpen, onClose, registration, event, onP
       // Determine asset type based on file MIME type
       const assetType = file.type === 'application/pdf' ? 'document' : 'image';
       const response = await sharedAssetApi.upload(file, assetType, 'payment-proof', true);
-      if (response.success && response.data?.url) {
-        setPaymentProofUrl(response.data.url);
+      // Response has url directly (not wrapped in data), and it's a relative path
+      if (response.success && response.url) {
+        // Convert relative URL to absolute URL using shared auth base
+        const fullUrl = getSharedAssetUrl(response.url);
+        setPaymentProofUrl(fullUrl);
         if (file.type.startsWith('image/')) {
-          setPreviewImage(response.data.url);
+          setPreviewImage(fullUrl);
         } else {
           setPreviewImage(null);
         }
