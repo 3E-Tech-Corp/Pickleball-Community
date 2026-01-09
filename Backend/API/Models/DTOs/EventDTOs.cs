@@ -47,6 +47,7 @@ public class EventDetailDto : EventDto
     public string? ContactName { get; set; }
     public string? ContactEmail { get; set; }
     public string? ContactPhone { get; set; }
+    public string? PaymentInstructions { get; set; }
 
     // User's relationship
     public bool IsOrganizer { get; set; }
@@ -247,6 +248,7 @@ public class CreateEventDto
     public string? ContactName { get; set; }
     public string? ContactEmail { get; set; }
     public string? ContactPhone { get; set; }
+    public string? PaymentInstructions { get; set; }
     public int? OrganizedByClubId { get; set; }
     public int? MaxParticipants { get; set; }
     public List<CreateEventDivisionDto> Divisions { get; set; } = new();

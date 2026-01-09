@@ -76,6 +76,12 @@ public class Event
     [MaxLength(20)]
     public string? ContactPhone { get; set; }
 
+    /// <summary>
+    /// Instructions for how to pay registration fees (e.g., Venmo, Zelle, PayPal info)
+    /// </summary>
+    [MaxLength(1000)]
+    public string? PaymentInstructions { get; set; }
+
     // Organizer
     public int OrganizedByUserId { get; set; }
     public int? OrganizedByClubId { get; set; }

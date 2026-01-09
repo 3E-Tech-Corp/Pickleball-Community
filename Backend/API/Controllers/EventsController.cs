@@ -394,6 +394,7 @@ public class EventsController : ControllerBase
                 ContactName = evt.ContactName,
                 ContactEmail = evt.ContactEmail,
                 ContactPhone = evt.ContactPhone,
+                PaymentInstructions = evt.PaymentInstructions,
                 MaxParticipants = evt.MaxParticipants,
                 RegisteredCount = evt.Divisions.Where(d => d.IsActive).SelectMany(d => d.Units).Count(u => u.Status != "Cancelled"),
                 DivisionCount = evt.Divisions.Count(d => d.IsActive),
@@ -541,6 +542,7 @@ public class EventsController : ControllerBase
                 ContactName = dto.ContactName,
                 ContactEmail = dto.ContactEmail,
                 ContactPhone = dto.ContactPhone,
+                PaymentInstructions = dto.PaymentInstructions,
                 OrganizedByUserId = userId.Value,
                 OrganizedByClubId = dto.OrganizedByClubId,
                 MaxParticipants = dto.MaxParticipants
@@ -661,6 +663,7 @@ public class EventsController : ControllerBase
             evt.ContactName = dto.ContactName;
             evt.ContactEmail = dto.ContactEmail;
             evt.ContactPhone = dto.ContactPhone;
+            evt.PaymentInstructions = dto.PaymentInstructions;
             evt.MaxParticipants = dto.MaxParticipants;
             evt.UpdatedAt = DateTime.Now;
 

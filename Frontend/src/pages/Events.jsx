@@ -1546,6 +1546,7 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
       contactName: event.contactName || '',
       contactEmail: event.contactEmail || '',
       contactPhone: event.contactPhone || '',
+      paymentInstructions: event.paymentInstructions || '',
       maxParticipants: event.maxParticipants || '',
       isPublished: event.isPublished,
       isPrivate: event.isPrivate,
@@ -3351,6 +3352,19 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
                     </div>
                   </div>
 
+                  {/* Payment Instructions */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Payment Instructions</label>
+                    <textarea
+                      value={editFormData?.paymentInstructions || ''}
+                      onChange={(e) => setEditFormData({ ...editFormData, paymentInstructions: e.target.value })}
+                      className="w-full border border-gray-300 rounded-lg p-2"
+                      rows={3}
+                      placeholder="e.g., Venmo: @username, Zelle: email@example.com, PayPal: link..."
+                    />
+                    <p className="text-xs text-gray-500 mt-1">Instructions shown to players when submitting payment</p>
+                  </div>
+
                   {/* Event Settings */}
                   <div className="border-t pt-4">
                     <label className="block text-sm font-medium text-gray-700 mb-3">Event Settings</label>
@@ -4324,6 +4338,7 @@ function CreateEventModal({ eventTypes, teamUnits = [], skillLevels = [], courtI
     contactName: '',
     contactEmail: '',
     contactPhone: '',
+    paymentInstructions: '',
     posterImageUrl: '',
     divisions: []
   });
@@ -4918,6 +4933,19 @@ function CreateEventModal({ eventTypes, teamUnits = [], skillLevels = [], courtI
                     className="w-full border border-gray-300 rounded-lg p-2"
                   />
                 </div>
+              </div>
+
+              {/* Payment Instructions */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Payment Instructions</label>
+                <textarea
+                  value={formData.paymentInstructions}
+                  onChange={(e) => setFormData({ ...formData, paymentInstructions: e.target.value })}
+                  className="w-full border border-gray-300 rounded-lg p-2"
+                  rows={3}
+                  placeholder="e.g., Venmo: @username, Zelle: email@example.com, PayPal: link..."
+                />
+                <p className="text-xs text-gray-500 mt-1">Instructions shown to players when submitting payment</p>
               </div>
             </>
           )}
