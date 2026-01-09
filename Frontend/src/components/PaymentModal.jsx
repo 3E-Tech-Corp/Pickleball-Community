@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, DollarSign, Upload, CheckCircle, AlertCircle, Loader2, Image, ExternalLink } from 'lucide-react';
+import { X, DollarSign, Upload, CheckCircle, AlertCircle, Loader2, Image, ExternalLink, Copy, Check } from 'lucide-react';
 import { useToast } from '../contexts/ToastContext';
 import { tournamentApi, sharedAssetApi } from '../services/api';
 
@@ -10,14 +10,32 @@ export default function PaymentModal({ isOpen, onClose, registration, event, onP
   const [paymentReference, setPaymentReference] = useState('');
   const [paymentProofUrl, setPaymentProofUrl] = useState('');
   const [previewImage, setPreviewImage] = useState(null);
+  const [paymentAmount, setPaymentAmount] = useState('');
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     if (registration) {
       setPaymentReference(registration.paymentReference || '');
       setPaymentProofUrl(registration.paymentProofUrl || '');
       setPreviewImage(registration.paymentProofUrl || null);
+      // Initialize payment amount to remaining balance
+      const remaining = (registration.amountDue || 0) - (registration.amountPaid || 0);
+      setPaymentAmount(remaining > 0 ? remaining.toFixed(2) : '');
     }
   }, [registration]);
+
+  const referenceId = event && registration ? `E${event.id}-U${registration.unitId}` : '';
+
+  const handleCopyReferenceId = async () => {
+    try {
+      await navigator.clipboard.writeText(referenceId);
+      setCopied(true);
+      toast.success('Reference ID copied to clipboard');
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      toast.error('Failed to copy');
+    }
+  };
 
   if (!isOpen || !registration) return null;
 
@@ -80,6 +98,7 @@ export default function PaymentModal({ isOpen, onClose, registration, event, onP
       const response = await tournamentApi.uploadPaymentProof(event.id, registration.unitId, {
         paymentProofUrl,
         paymentReference,
+        amountPaid: paymentAmount ? parseFloat(paymentAmount) : null,
       });
 
       if (response.success) {
@@ -195,6 +214,49 @@ export default function PaymentModal({ isOpen, onClose, registration, event, onP
                   <div className="text-sm text-blue-700 whitespace-pre-wrap">{event.paymentInstructions}</div>
                 </div>
               )}
+
+              {/* Reference ID for Payment */}
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                <div className="text-sm font-medium text-gray-700 mb-2">Your Reference ID</div>
+                <div className="flex items-center gap-2">
+                  <code className="flex-1 bg-white border border-gray-300 rounded px-3 py-2 font-mono text-sm">
+                    {referenceId}
+                  </code>
+                  <button
+                    type="button"
+                    onClick={handleCopyReferenceId}
+                    className="flex items-center gap-1 px-3 py-2 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 transition-colors text-sm font-medium"
+                  >
+                    {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                    {copied ? 'Copied!' : 'Copy'}
+                  </button>
+                </div>
+                <p className="text-xs text-gray-500 mt-2">
+                  Include this ID in your payment note/memo so the organizer can match your payment to your registration.
+                </p>
+              </div>
+
+              {/* Payment Amount */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Payment Amount
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={paymentAmount}
+                    onChange={(e) => setPaymentAmount(e.target.value)}
+                    className="w-full border border-gray-300 rounded-lg p-2.5 pl-7 focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                    placeholder={remainingAmount.toFixed(2)}
+                  />
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  Adjust if you have a discount or are making a partial payment
+                </p>
+              </div>
 
               {/* Upload Payment Proof */}
               <div>
