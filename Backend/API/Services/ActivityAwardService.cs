@@ -156,8 +156,10 @@ public class ActivityAwardService : IActivityAwardService
             await GrantFirstClubIfNotExistsAsync(userId, clubName);
 
             // Check if user already has an award for joining this specific club
+            // Cast to nullable to avoid EF Core CTE generation issues with nullable comparison
+            int? clubIdNullable = clubId;
             var hasAward = await _context.PlayerAwards
-                .AnyAsync(a => a.UserId == userId && a.Title == TitleJoinedClub && a.ClubId == clubId);
+                .AnyAsync(a => a.UserId == userId && a.Title == TitleJoinedClub && a.ClubId == clubIdNullable);
 
             if (hasAward) return;
 
@@ -222,8 +224,10 @@ public class ActivityAwardService : IActivityAwardService
             await GrantFirstClubIfNotExistsAsync(userId, clubName);
 
             // Check if user already has an award for creating this specific club
+            // Cast to nullable to avoid EF Core CTE generation issues with nullable comparison
+            int? clubIdNullable = clubId;
             var hasAward = await _context.PlayerAwards
-                .AnyAsync(a => a.UserId == userId && a.Title == TitleCreatedClub && a.ClubId == clubId);
+                .AnyAsync(a => a.UserId == userId && a.Title == TitleCreatedClub && a.ClubId == clubIdNullable);
 
             if (hasAward) return;
 
@@ -263,8 +267,10 @@ public class ActivityAwardService : IActivityAwardService
             await GrantFirstEventIfNotExistsAsync(userId, eventName);
 
             // Check if user already has an award for joining this specific event
+            // Cast to nullable to avoid EF Core CTE generation issues with nullable comparison
+            int? eventIdNullable = eventId;
             var hasAward = await _context.PlayerAwards
-                .AnyAsync(a => a.UserId == userId && a.Title == TitleJoinedEvent && a.EventId == eventId);
+                .AnyAsync(a => a.UserId == userId && a.Title == TitleJoinedEvent && a.EventId == eventIdNullable);
 
             if (hasAward) return;
 
@@ -329,8 +335,10 @@ public class ActivityAwardService : IActivityAwardService
             await GrantFirstEventIfNotExistsAsync(userId, eventName);
 
             // Check if user already has an award for creating this specific event
+            // Cast to nullable to avoid EF Core CTE generation issues with nullable comparison
+            int? eventIdNullable = eventId;
             var hasAward = await _context.PlayerAwards
-                .AnyAsync(a => a.UserId == userId && a.Title == TitleCreatedEvent && a.EventId == eventId);
+                .AnyAsync(a => a.UserId == userId && a.Title == TitleCreatedEvent && a.EventId == eventIdNullable);
 
             if (hasAward) return;
 
@@ -367,8 +375,10 @@ public class ActivityAwardService : IActivityAwardService
         try
         {
             // Check if user already has an award for publishing this specific event
+            // Cast to nullable to avoid EF Core CTE generation issues with nullable comparison
+            int? eventIdNullable = eventId;
             var hasAward = await _context.PlayerAwards
-                .AnyAsync(a => a.UserId == userId && a.Title == TitlePublishedEvent && a.EventId == eventId);
+                .AnyAsync(a => a.UserId == userId && a.Title == TitlePublishedEvent && a.EventId == eventIdNullable);
 
             if (hasAward) return;
 
