@@ -25,6 +25,14 @@ Store all database migration scripts in `/Backend/API/Scripts/` with naming conv
 - Frontend: `npm run dev` in `/Frontend`
 - Build Frontend: `npm run build` in `/Frontend`
 
+## Deployment
+- **Production URL**: https://pickleball.community
+- **Backend**: Deployed as IIS virtual application at `/api` path
+  - Controllers use `[Route("[controller]")]` without `/api` prefix
+  - IIS virtual application provides the `/api` prefix automatically
+  - Frontend calls `/api/agegroups` → IIS routes to virtual app → controller handles `/agegroups`
+- **Frontend**: Static files served from IIS root
+
 ## Mobile-First PWA Design
 This app is designed to be installed as a Progressive Web App (PWA) on mobile devices:
 
