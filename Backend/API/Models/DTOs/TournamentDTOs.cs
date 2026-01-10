@@ -55,6 +55,21 @@ public class ScoreFormatDto
     public bool IsDefault { get; set; }
 }
 
+public class CreateScoreFormatRequest
+{
+    public string Name { get; set; } = string.Empty;
+    public string? Description { get; set; }
+    public int? ScoreMethodId { get; set; }
+    public string? ScoringType { get; set; }
+    public int? MaxPoints { get; set; }
+    public int? WinByMargin { get; set; }
+    public int? CapAfter { get; set; }
+    public bool? SwitchEndsAtMidpoint { get; set; }
+    public int? MidpointScore { get; set; }
+    public int? TimeLimitMinutes { get; set; }
+    public bool? IsTiebreaker { get; set; }
+}
+
 // ============================================
 // Event Unit DTOs
 // ============================================
@@ -243,10 +258,20 @@ public class EventMatchDto
 public class CreateMatchScheduleRequest
 {
     public int DivisionId { get; set; }
-    public string ScheduleType { get; set; } = "RoundRobin"; // RoundRobin, SingleElimination, DoubleElimination
+    public string ScheduleType { get; set; } = "RoundRobin"; // RoundRobin, SingleElimination, DoubleElimination, RoundRobinPlayoff
     public int? TargetUnits { get; set; } // Target number of units/placeholders in schedule (can be > registered units)
     public int? PoolCount { get; set; }
     public int? PlayoffFromPools { get; set; }
+
+    // Pool phase configuration
+    public int? PoolGamesPerMatch { get; set; } // 1, 3, or 5 games per pool match
+    public int? PoolScoreFormatId { get; set; }
+
+    // Playoff phase configuration
+    public int? PlayoffGamesPerMatch { get; set; } // 1, 3, or 5 games per playoff match
+    public int? PlayoffScoreFormatId { get; set; }
+
+    // Legacy fields for backward compatibility
     public int BestOf { get; set; } = 1;
     public int? ScoreFormatId { get; set; }
 }

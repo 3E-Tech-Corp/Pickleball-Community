@@ -65,6 +65,76 @@ public class TournamentController : ControllerBase
         return Ok(new ApiResponse<List<ScoreFormatDto>> { Success = true, Data = formats });
     }
 
+    [HttpGet("score-methods")]
+    public async Task<ActionResult<ApiResponse<List<ScoreMethodDto>>>> GetScoreMethods()
+    {
+        var methods = await _context.ScoreMethods
+            .Where(m => m.IsActive)
+            .OrderBy(m => m.SortOrder)
+            .Select(m => new ScoreMethodDto
+            {
+                Id = m.Id,
+                Name = m.Name,
+                Description = m.Description,
+                BaseType = m.BaseType,
+                SortOrder = m.SortOrder,
+                IsActive = m.IsActive,
+                IsDefault = m.IsDefault
+            })
+            .ToListAsync();
+
+        return Ok(new ApiResponse<List<ScoreMethodDto>> { Success = true, Data = methods });
+    }
+
+    [Authorize]
+    [HttpPost("score-formats")]
+    public async Task<ActionResult<ApiResponse<ScoreFormatDto>>> CreateScoreFormat([FromBody] CreateScoreFormatRequest request)
+    {
+        var format = new ScoreFormat
+        {
+            Name = request.Name,
+            Description = request.Description,
+            ScoreMethodId = request.ScoreMethodId,
+            ScoringType = request.ScoringType ?? "Rally",
+            MaxPoints = request.MaxPoints ?? 11,
+            WinByMargin = request.WinByMargin ?? 2,
+            CapAfter = request.CapAfter ?? 0,
+            SwitchEndsAtMidpoint = request.SwitchEndsAtMidpoint ?? false,
+            MidpointScore = request.MidpointScore,
+            TimeLimitMinutes = request.TimeLimitMinutes,
+            IsTiebreaker = request.IsTiebreaker ?? false,
+            IsDefault = false,
+            IsActive = true,
+            SortOrder = 100,
+            CreatedAt = DateTime.Now,
+            UpdatedAt = DateTime.Now
+        };
+
+        _context.ScoreFormats.Add(format);
+        await _context.SaveChangesAsync();
+
+        return Ok(new ApiResponse<ScoreFormatDto>
+        {
+            Success = true,
+            Data = new ScoreFormatDto
+            {
+                Id = format.Id,
+                Name = format.Name,
+                Description = format.Description,
+                ScoreMethodId = format.ScoreMethodId,
+                ScoringType = format.ScoringType,
+                MaxPoints = format.MaxPoints,
+                WinByMargin = format.WinByMargin,
+                CapAfter = format.CapAfter,
+                SwitchEndsAtMidpoint = format.SwitchEndsAtMidpoint,
+                MidpointScore = format.MidpointScore,
+                TimeLimitMinutes = format.TimeLimitMinutes,
+                IsTiebreaker = format.IsTiebreaker,
+                IsDefault = format.IsDefault
+            }
+        });
+    }
+
     // ============================================
     // Event Registration with Divisions
     // ============================================
@@ -1162,9 +1232,19 @@ public class TournamentController : ControllerBase
 
         var matches = new List<EventMatch>();
 
-        if (request.ScheduleType == "RoundRobin" || request.ScheduleType == "Hybrid" || request.ScheduleType == "RoundRobinPlayoff")
+        if (request.ScheduleType == "RoundRobin" || request.ScheduleType == "Hybrid")
         {
             matches.AddRange(GenerateRoundRobinMatchesForTarget(division, targetUnitCount, request));
+        }
+        else if (request.ScheduleType == "RoundRobinPlayoff")
+        {
+            // Generate pool play matches
+            matches.AddRange(GenerateRoundRobinMatchesForTarget(division, targetUnitCount, request));
+
+            // Generate playoff bracket matches
+            var playoffUnits = (request.PlayoffFromPools ?? 2) * (request.PoolCount ?? 1);
+            var playoffMatches = GeneratePlayoffMatchesForTarget(division, playoffUnits, request);
+            matches.AddRange(playoffMatches);
         }
         else if (request.ScheduleType == "SingleElimination")
         {
@@ -1178,6 +1258,12 @@ public class TournamentController : ControllerBase
         _context.EventMatches.AddRange(matches);
         await _context.SaveChangesAsync();
 
+        // Determine phase-specific configurations
+        var poolGamesPerMatch = request.PoolGamesPerMatch ?? request.BestOf;
+        var playoffGamesPerMatch = request.PlayoffGamesPerMatch ?? request.BestOf;
+        var poolScoreFormatId = request.PoolScoreFormatId ?? request.ScoreFormatId;
+        var playoffScoreFormatId = request.PlayoffScoreFormatId ?? request.ScoreFormatId;
+
         // Update division settings
         division.PoolCount = request.PoolCount;
         division.BracketType = request.ScheduleType;
@@ -1187,16 +1273,25 @@ public class TournamentController : ControllerBase
         division.TargetUnitCount = targetUnitCount;
         await _context.SaveChangesAsync();
 
-        // Create games for each match
+        // Create games for each match based on phase
         foreach (var match in matches)
         {
-            for (int g = 1; g <= request.BestOf; g++)
+            // Determine if this is a pool match or playoff match
+            var isPoolMatch = match.RoundType == "Pool";
+            var gamesPerMatch = isPoolMatch ? poolGamesPerMatch : playoffGamesPerMatch;
+            var scoreFormatId = isPoolMatch ? poolScoreFormatId : playoffScoreFormatId;
+
+            // Update match with correct games per match
+            match.BestOf = gamesPerMatch;
+            match.ScoreFormatId = scoreFormatId;
+
+            for (int g = 1; g <= gamesPerMatch; g++)
             {
                 var game = new EventGame
                 {
                     MatchId = match.Id,
                     GameNumber = g,
-                    ScoreFormatId = request.ScoreFormatId,
+                    ScoreFormatId = scoreFormatId,
                     Status = "New",
                     CreatedAt = DateTime.Now,
                     UpdatedAt = DateTime.Now
@@ -2037,6 +2132,51 @@ public class TournamentController : ControllerBase
                 }
             }
         }
+
+        return matches;
+    }
+
+    private List<EventMatch> GeneratePlayoffMatchesForTarget(EventDivision division, int playoffUnits, CreateMatchScheduleRequest request)
+    {
+        var matches = new List<EventMatch>();
+
+        // Find next power of 2 for bracket size
+        var bracketSize = 1;
+        while (bracketSize < playoffUnits) bracketSize *= 2;
+
+        var rounds = (int)Math.Log2(bracketSize);
+        var matchNum = 1;
+
+        for (int round = 1; round <= rounds; round++)
+        {
+            var matchesInRound = bracketSize / (int)Math.Pow(2, round);
+            var roundName = round == rounds ? "Playoff Final" :
+                           round == rounds - 1 ? "Playoff Semifinal" :
+                           round == rounds - 2 ? "Playoff Quarterfinal" :
+                           $"Playoff Round {round}";
+
+            for (int m = 1; m <= matchesInRound; m++)
+            {
+                matches.Add(new EventMatch
+                {
+                    EventId = division.EventId,
+                    DivisionId = division.Id,
+                    RoundType = "Bracket",
+                    RoundNumber = round,
+                    RoundName = roundName,
+                    MatchNumber = matchNum++,
+                    BracketPosition = m,
+                    BestOf = request.PlayoffGamesPerMatch ?? request.BestOf,
+                    ScoreFormatId = request.PlayoffScoreFormatId ?? request.ScoreFormatId,
+                    Status = "Scheduled",
+                    CreatedAt = DateTime.Now,
+                    UpdatedAt = DateTime.Now
+                });
+            }
+        }
+
+        // Note: Playoff bracket positions are determined after pool play completes
+        // The unit assignments will be filled in based on pool standings
 
         return matches;
     }

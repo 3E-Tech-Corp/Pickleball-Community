@@ -1273,8 +1273,10 @@ export const ageGroupsApi = {
 
 // Tournament API
 export const tournamentApi = {
-  // Score Formats
+  // Score Formats and Methods
   getScoreFormats: () => api.get('/tournament/score-formats'),
+  getScoreMethods: () => api.get('/tournament/score-methods'),
+  createScoreFormat: (data) => api.post('/tournament/score-formats', data),
 
   // Event Details with Divisions
   getEventDetails: (eventId) => api.get(`/tournament/events/${eventId}/details`),
