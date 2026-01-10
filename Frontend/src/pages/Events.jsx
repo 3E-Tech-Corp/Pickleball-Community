@@ -63,6 +63,10 @@ export default function Events() {
   // For map view hover
   const [hoveredEventId, setHoveredEventId] = useState(null);
 
+  // Payment modal state (for My Events tab)
+  const [selectedPaymentReg, setSelectedPaymentReg] = useState(null);
+  const [selectedPaymentEvent, setSelectedPaymentEvent] = useState(null);
+
   // Get user's location on mount with improved two-stage approach
   const getLocation = useCallback(async () => {
     if (!navigator.geolocation) {
@@ -1350,6 +1354,22 @@ export default function Events() {
           }}
         />
       )}
+
+      {/* Payment Modal for My Events tab */}
+      <PaymentModal
+        isOpen={!!selectedPaymentReg}
+        onClose={() => {
+          setSelectedPaymentReg(null);
+          setSelectedPaymentEvent(null);
+        }}
+        registration={selectedPaymentReg}
+        event={selectedPaymentEvent}
+        onPaymentUpdated={() => {
+          setSelectedPaymentReg(null);
+          setSelectedPaymentEvent(null);
+          loadMyEvents();
+        }}
+      />
     </div>
   );
 }
