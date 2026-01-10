@@ -3,10 +3,12 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
   ArrowLeft, Users, Trophy, Calendar, Clock, MapPin, Play, Check, X,
   ChevronDown, ChevronUp, RefreshCw, Shuffle, Settings, Target,
-  AlertCircle, Loader2, Plus, Edit2, DollarSign
+  AlertCircle, Loader2, Plus, Edit2, DollarSign, Eye, Share2
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { tournamentApi, eventsApi, getSharedAssetUrl } from '../services/api';
+import ScheduleConfigModal from '../components/ScheduleConfigModal';
+import DrawingModal from '../components/DrawingModal';
 
 export default function TournamentManage() {
   const { eventId } = useParams();
@@ -27,6 +29,11 @@ export default function TournamentManage() {
   // Schedule display state
   const [schedule, setSchedule] = useState(null);
   const [loadingSchedule, setLoadingSchedule] = useState(false);
+
+  // Modal states
+  const [scheduleConfigModal, setScheduleConfigModal] = useState({ isOpen: false, division: null });
+  const [drawingModal, setDrawingModal] = useState({ isOpen: false, division: null });
+  const [divisionUnits, setDivisionUnits] = useState([]);
 
   // Status update state
   const [updatingStatus, setUpdatingStatus] = useState(false);
@@ -107,18 +114,32 @@ export default function TournamentManage() {
     }
   };
 
-  const handleGenerateSchedule = async (divisionId, scheduleType = 'RoundRobin') => {
-    if (!confirm(`Generate ${scheduleType} schedule for this division? This will create all matches.`)) return;
+  const handleOpenScheduleConfig = (division) => {
+    setScheduleConfigModal({ isOpen: true, division });
+  };
+
+  const handleGenerateSchedule = async (config) => {
+    const division = scheduleConfigModal.division;
+    if (!division) return;
 
     setGeneratingSchedule(true);
     try {
-      const response = await tournamentApi.generateSchedule(divisionId, {
-        divisionId,
-        scheduleType,
-        bestOf: 1
+      const response = await tournamentApi.generateSchedule(division.id, {
+        divisionId: division.id,
+        scheduleType: config.scheduleType,
+        targetUnits: config.targetUnits,
+        poolCount: config.poolCount,
+        bestOf: config.bestOf,
+        playoffFromPools: config.playoffFromPools
       });
       if (response.success) {
         loadDashboard();
+        setScheduleConfigModal({ isOpen: false, division: null });
+        // Update selected division if this is the one
+        if (selectedDivision?.id === division.id) {
+          setSelectedDivision({ ...selectedDivision, scheduleReady: true });
+          loadSchedule(division.id);
+        }
       } else {
         alert(response.message || 'Failed to generate schedule');
       }
@@ -127,6 +148,50 @@ export default function TournamentManage() {
       alert('Failed to generate schedule');
     } finally {
       setGeneratingSchedule(false);
+    }
+  };
+
+  const handleOpenDrawing = async (division) => {
+    // Load units for this division
+    try {
+      const response = await tournamentApi.getEventUnits(eventId, division.id);
+      if (response.success) {
+        setDivisionUnits(response.data || []);
+      }
+    } catch (err) {
+      console.error('Error loading units:', err);
+    }
+
+    // Load schedule if not already loaded
+    if (!schedule || selectedDivision?.id !== division.id) {
+      await loadSchedule(division.id);
+    }
+
+    setDrawingModal({ isOpen: true, division });
+  };
+
+  const handleDraw = async (assignments) => {
+    const division = drawingModal.division;
+    if (!division) return;
+
+    setAssigningNumbers(true);
+    try {
+      const response = await tournamentApi.assignUnitNumbersWithDrawing(division.id, assignments);
+      if (response.success) {
+        loadDashboard();
+        setDrawingModal({ isOpen: false, division: null });
+        // Reload schedule to show updated assignments
+        if (selectedDivision?.id === division.id) {
+          loadSchedule(division.id);
+        }
+      } else {
+        alert(response.message || 'Failed to save drawing results');
+      }
+    } catch (err) {
+      console.error('Error saving drawing:', err);
+      alert('Failed to save drawing results');
+    } finally {
+      setAssigningNumbers(false);
     }
   };
 
@@ -445,46 +510,122 @@ export default function TournamentManage() {
                     <h2 className="text-lg font-semibold text-gray-900">{div.name}</h2>
                     <p className="text-sm text-gray-500">
                       {div.registeredUnits} teams registered
+                      {div.scheduleReady && div.totalMatches > 0 && (
+                        <span className="ml-2">• {div.totalMatches} matches scheduled</span>
+                      )}
                     </p>
                   </div>
                   {isOrganizer && (
-                    <div className="flex items-center gap-2">
-                      {!div.unitsAssigned && (
+                    <div className="flex items-center gap-2 flex-wrap justify-end">
+                      {/* Generate/Re-generate Schedule */}
+                      <button
+                        onClick={() => handleOpenScheduleConfig(div)}
+                        disabled={generatingSchedule}
+                        className={`px-3 py-2 text-sm font-medium rounded-lg flex items-center gap-2 disabled:opacity-50 ${
+                          div.scheduleReady
+                            ? 'text-gray-700 border border-gray-300 hover:bg-gray-50'
+                            : 'text-white bg-orange-600 hover:bg-orange-700'
+                        }`}
+                      >
+                        {generatingSchedule ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Calendar className="w-4 h-4" />
+                        )}
+                        {div.scheduleReady ? 'Re-configure' : 'Configure Schedule'}
+                      </button>
+
+                      {/* Drawing button - only show if schedule exists */}
+                      {div.scheduleReady && (
                         <button
-                          onClick={() => handleAssignUnitNumbers(div.id)}
+                          onClick={() => handleOpenDrawing(div)}
                           disabled={assigningNumbers}
-                          className="px-3 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-2 disabled:opacity-50"
+                          className={`px-3 py-2 text-sm font-medium rounded-lg flex items-center gap-2 disabled:opacity-50 ${
+                            div.unitsAssigned
+                              ? 'text-gray-700 border border-gray-300 hover:bg-gray-50'
+                              : 'text-white bg-green-600 hover:bg-green-700'
+                          }`}
                         >
-                          <Shuffle className="w-4 h-4" />
-                          Assign Numbers
-                        </button>
-                      )}
-                      {!div.scheduleReady && div.registeredUnits >= 2 && (
-                        <button
-                          onClick={() => handleGenerateSchedule(div.id)}
-                          disabled={generatingSchedule}
-                          className="px-3 py-2 text-sm font-medium text-white bg-orange-600 rounded-lg hover:bg-orange-700 flex items-center gap-2 disabled:opacity-50"
-                        >
-                          {generatingSchedule ? (
+                          {assigningNumbers ? (
                             <Loader2 className="w-4 h-4 animate-spin" />
                           ) : (
-                            <Play className="w-4 h-4" />
+                            <Shuffle className="w-4 h-4" />
                           )}
-                          Generate Schedule
+                          {div.unitsAssigned ? 'Re-Draw' : 'Draw Units'}
+                        </button>
+                      )}
+
+                      {/* View Schedule */}
+                      {div.scheduleReady && (
+                        <button
+                          onClick={() => {
+                            setSelectedDivision(div);
+                            setActiveTab('schedule');
+                          }}
+                          className="px-3 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-2"
+                        >
+                          <Eye className="w-4 h-4" />
+                          View
                         </button>
                       )}
                     </div>
                   )}
                 </div>
 
+                {/* Status indicators */}
+                <div className="flex flex-wrap gap-2 mt-3">
+                  {div.scheduleReady ? (
+                    <span className="px-2 py-1 text-xs font-medium bg-green-100 text-green-700 rounded-full flex items-center gap-1">
+                      <Check className="w-3 h-3" />
+                      Schedule Ready
+                    </span>
+                  ) : (
+                    <span className="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-600 rounded-full">
+                      No Schedule
+                    </span>
+                  )}
+
+                  {div.unitsAssigned ? (
+                    <span className="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-700 rounded-full flex items-center gap-1">
+                      <Shuffle className="w-3 h-3" />
+                      Units Assigned
+                    </span>
+                  ) : div.scheduleReady && (
+                    <span className="px-2 py-1 text-xs font-medium bg-yellow-100 text-yellow-700 rounded-full">
+                      Awaiting Draw
+                    </span>
+                  )}
+
+                  {div.registeredUnits > 0 && (
+                    <span className="px-2 py-1 text-xs font-medium bg-orange-100 text-orange-700 rounded-full flex items-center gap-1">
+                      <Users className="w-3 h-3" />
+                      {div.registeredUnits} units
+                    </span>
+                  )}
+                </div>
+
+                {/* Progress or status message */}
                 {div.registeredUnits === 0 ? (
-                  <p className="text-gray-500 text-center py-8">No teams registered yet</p>
-                ) : (
-                  <div className="text-sm text-gray-500">
-                    {div.scheduleReady
-                      ? `${div.completedMatches} of ${div.totalMatches} matches completed`
-                      : 'Schedule not yet generated'}
+                  <p className="text-gray-500 text-center py-4 mt-4 bg-gray-50 rounded-lg">
+                    No teams registered yet
+                  </p>
+                ) : div.scheduleReady ? (
+                  <div className="mt-4">
+                    <div className="flex justify-between text-sm text-gray-600 mb-1">
+                      <span>Match Progress</span>
+                      <span>{div.completedMatches} / {div.totalMatches}</span>
+                    </div>
+                    <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-orange-500 transition-all"
+                        style={{ width: `${div.totalMatches > 0 ? (div.completedMatches / div.totalMatches) * 100 : 0}%` }}
+                      />
+                    </div>
                   </div>
+                ) : (
+                  <p className="text-sm text-gray-500 mt-4">
+                    Configure and generate a schedule to begin tournament play
+                  </p>
                 )}
               </div>
             ))}
@@ -862,6 +1003,26 @@ export default function TournamentManage() {
           </div>
         )}
       </div>
+
+      {/* Schedule Configuration Modal */}
+      <ScheduleConfigModal
+        isOpen={scheduleConfigModal.isOpen}
+        onClose={() => setScheduleConfigModal({ isOpen: false, division: null })}
+        division={scheduleConfigModal.division}
+        onGenerate={handleGenerateSchedule}
+        isGenerating={generatingSchedule}
+      />
+
+      {/* Drawing Modal */}
+      <DrawingModal
+        isOpen={drawingModal.isOpen}
+        onClose={() => setDrawingModal({ isOpen: false, division: null })}
+        division={drawingModal.division}
+        units={divisionUnits}
+        schedule={schedule}
+        onDraw={handleDraw}
+        isDrawing={assigningNumbers}
+      />
     </div>
   );
 }

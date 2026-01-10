@@ -200,6 +200,7 @@ public class EventDivision
     public string? BracketType { get; set; } // SingleElimination, DoubleElimination, RoundRobin, Hybrid
     public int? PlayoffFromPools { get; set; } // How many from each pool advance to playoffs
     public int GamesPerMatch { get; set; } = 1; // Best of X
+    public int? TargetUnitCount { get; set; } // Target number of units/placeholders for schedule generation
 
     public int SortOrder { get; set; } = 0;
     public bool IsActive { get; set; } = true;

@@ -1319,6 +1319,8 @@ export const tournamentApi = {
   // Match Scheduling
   generateSchedule: (divisionId, data) => api.post(`/tournament/divisions/${divisionId}/generate-schedule`, data),
   assignUnitNumbers: (divisionId) => api.post(`/tournament/divisions/${divisionId}/assign-unit-numbers`),
+  assignUnitNumbersWithDrawing: (divisionId, assignments) =>
+    api.post(`/tournament/divisions/${divisionId}/assign-unit-numbers`, { assignments }),
   getSchedule: (divisionId) => api.get(`/tournament/divisions/${divisionId}/schedule`),
 
   // Game Management

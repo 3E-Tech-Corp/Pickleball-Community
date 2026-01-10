@@ -1115,8 +1115,11 @@ public class TournamentController : ControllerBase
             .ThenBy(u => u.Id)
             .ToListAsync();
 
-        if (units.Count < 2)
-            return BadRequest(new ApiResponse<List<EventMatchDto>> { Success = false, Message = "Need at least 2 units to generate schedule" });
+        // Use targetUnits if provided, otherwise use actual unit count
+        var targetUnitCount = request.TargetUnits ?? units.Count;
+
+        if (targetUnitCount < 2)
+            return BadRequest(new ApiResponse<List<EventMatchDto>> { Success = false, Message = "Need at least 2 units/placeholders to generate schedule" });
 
         // Clear existing matches for this division
         var existingMatches = await _context.EventMatches
@@ -1124,15 +1127,27 @@ public class TournamentController : ControllerBase
             .ToListAsync();
         _context.EventMatches.RemoveRange(existingMatches);
 
+        // Also clear unit number assignments since schedule is being regenerated
+        foreach (var unit in units)
+        {
+            unit.UnitNumber = null;
+            unit.PoolNumber = null;
+            unit.PoolName = null;
+        }
+
         var matches = new List<EventMatch>();
 
-        if (request.ScheduleType == "RoundRobin" || request.ScheduleType == "Hybrid")
+        if (request.ScheduleType == "RoundRobin" || request.ScheduleType == "Hybrid" || request.ScheduleType == "RoundRobinPlayoff")
         {
-            matches.AddRange(GenerateRoundRobinMatches(division, units, request));
+            matches.AddRange(GenerateRoundRobinMatchesForTarget(division, targetUnitCount, request));
         }
         else if (request.ScheduleType == "SingleElimination")
         {
-            matches.AddRange(GenerateSingleEliminationMatches(division, units, request));
+            matches.AddRange(GenerateSingleEliminationMatchesForTarget(division, targetUnitCount, request));
+        }
+        else if (request.ScheduleType == "DoubleElimination")
+        {
+            matches.AddRange(GenerateDoubleEliminationMatchesForTarget(division, targetUnitCount, request));
         }
 
         _context.EventMatches.AddRange(matches);
@@ -1144,6 +1159,7 @@ public class TournamentController : ControllerBase
         division.PlayoffFromPools = request.PlayoffFromPools;
         division.GamesPerMatch = request.BestOf;
         division.DefaultScoreFormatId = request.ScoreFormatId;
+        division.TargetUnitCount = targetUnitCount;
         await _context.SaveChangesAsync();
 
         // Create games for each match
@@ -1182,7 +1198,7 @@ public class TournamentController : ControllerBase
 
     [Authorize]
     [HttpPost("divisions/{divisionId}/assign-unit-numbers")]
-    public async Task<ActionResult<ApiResponse<List<EventUnitDto>>>> AssignRandomUnitNumbers(int divisionId)
+    public async Task<ActionResult<ApiResponse<List<EventUnitDto>>>> AssignUnitNumbers(int divisionId, [FromBody] AssignUnitNumbersRequest? request = null)
     {
         var units = await _context.EventUnits
             .Where(u => u.DivisionId == divisionId && u.Status != "Cancelled" && u.Status != "Waitlisted")
@@ -1191,26 +1207,57 @@ public class TournamentController : ControllerBase
         if (!units.Any())
             return BadRequest(new ApiResponse<List<EventUnitDto>> { Success = false, Message = "No units to assign" });
 
-        // Randomize and assign numbers
-        var random = new Random();
-        var shuffled = units.OrderBy(x => random.Next()).ToList();
-
-        for (int i = 0; i < shuffled.Count; i++)
+        // If specific assignments provided (from drawing), use them
+        if (request?.Assignments != null && request.Assignments.Any())
         {
-            shuffled[i].UnitNumber = i + 1;
-            shuffled[i].UpdatedAt = DateTime.Now;
+            foreach (var assignment in request.Assignments)
+            {
+                var unit = units.FirstOrDefault(u => u.Id == assignment.UnitId);
+                if (unit != null)
+                {
+                    unit.UnitNumber = assignment.UnitNumber;
+                    unit.UpdatedAt = DateTime.Now;
+                }
+            }
+        }
+        else
+        {
+            // Fallback to random assignment
+            var random = new Random();
+            var shuffled = units.OrderBy(x => random.Next()).ToList();
+
+            for (int i = 0; i < shuffled.Count; i++)
+            {
+                shuffled[i].UnitNumber = i + 1;
+                shuffled[i].UpdatedAt = DateTime.Now;
+            }
         }
 
-        // Update matches with actual unit IDs
+        // Update matches with actual unit IDs based on assigned numbers
         var matches = await _context.EventMatches
             .Where(m => m.DivisionId == divisionId)
             .ToListAsync();
 
         foreach (var match in matches)
         {
+            // Find unit by their assigned number
             match.Unit1Id = units.FirstOrDefault(u => u.UnitNumber == match.Unit1Number)?.Id;
             match.Unit2Id = units.FirstOrDefault(u => u.UnitNumber == match.Unit2Number)?.Id;
             match.UpdatedAt = DateTime.Now;
+
+            // Handle byes - if one unit is null (empty slot), mark match appropriately
+            if (match.Unit1Id == null && match.Unit2Id != null)
+            {
+                // Unit 2 gets a bye - auto-advance
+                match.WinnerUnitId = match.Unit2Id;
+                match.Status = "Bye";
+            }
+            else if (match.Unit2Id == null && match.Unit1Id != null)
+            {
+                // Unit 1 gets a bye - auto-advance
+                match.WinnerUnitId = match.Unit1Id;
+                match.Status = "Bye";
+            }
         }
 
         await _context.SaveChangesAsync();
@@ -1916,6 +1963,212 @@ public class TournamentController : ControllerBase
                 firstRoundMatches[i].Unit1Number = unit1Idx + 1;
             if (unit2Idx < units.Count)
                 firstRoundMatches[i].Unit2Number = unit2Idx + 1;
+        }
+
+        return matches;
+    }
+
+    // New methods for generating schedules based on target unit count (with placeholders)
+    private List<EventMatch> GenerateRoundRobinMatchesForTarget(EventDivision division, int targetUnitCount, CreateMatchScheduleRequest request)
+    {
+        var matches = new List<EventMatch>();
+        var poolCount = request.PoolCount ?? 1;
+
+        // Generate round robin within each pool using placeholder numbers
+        for (int pool = 1; pool <= poolCount; pool++)
+        {
+            // Determine which unit numbers belong to this pool
+            var poolUnitNumbers = new List<int>();
+            for (int i = 0; i < targetUnitCount; i++)
+            {
+                if ((i % poolCount) + 1 == pool)
+                {
+                    poolUnitNumbers.Add(i + 1);
+                }
+            }
+
+            var matchNum = 1;
+
+            for (int i = 0; i < poolUnitNumbers.Count; i++)
+            {
+                for (int j = i + 1; j < poolUnitNumbers.Count; j++)
+                {
+                    matches.Add(new EventMatch
+                    {
+                        EventId = division.EventId,
+                        DivisionId = division.Id,
+                        RoundType = "Pool",
+                        RoundNumber = pool,
+                        RoundName = $"Pool {(char)('A' + pool - 1)}",
+                        MatchNumber = matchNum++,
+                        Unit1Number = poolUnitNumbers[i],
+                        Unit2Number = poolUnitNumbers[j],
+                        BestOf = request.BestOf,
+                        ScoreFormatId = request.ScoreFormatId,
+                        Status = "Scheduled",
+                        CreatedAt = DateTime.Now,
+                        UpdatedAt = DateTime.Now
+                    });
+                }
+            }
+        }
+
+        return matches;
+    }
+
+    private List<EventMatch> GenerateSingleEliminationMatchesForTarget(EventDivision division, int targetUnitCount, CreateMatchScheduleRequest request)
+    {
+        var matches = new List<EventMatch>();
+
+        // Find next power of 2
+        var bracketSize = 1;
+        while (bracketSize < targetUnitCount) bracketSize *= 2;
+
+        var rounds = (int)Math.Log2(bracketSize);
+        var matchNum = 1;
+
+        for (int round = 1; round <= rounds; round++)
+        {
+            var matchesInRound = bracketSize / (int)Math.Pow(2, round);
+            var roundName = round == rounds ? "Final" :
+                           round == rounds - 1 ? "Semifinal" :
+                           round == rounds - 2 ? "Quarterfinal" :
+                           $"Round {round}";
+
+            for (int m = 1; m <= matchesInRound; m++)
+            {
+                matches.Add(new EventMatch
+                {
+                    EventId = division.EventId,
+                    DivisionId = division.Id,
+                    RoundType = "Bracket",
+                    RoundNumber = round,
+                    RoundName = roundName,
+                    MatchNumber = matchNum++,
+                    BracketPosition = m,
+                    BestOf = request.BestOf,
+                    ScoreFormatId = request.ScoreFormatId,
+                    Status = "Scheduled",
+                    CreatedAt = DateTime.Now,
+                    UpdatedAt = DateTime.Now
+                });
+            }
+        }
+
+        // Assign first round matchups using target unit numbers
+        var firstRoundMatches = matches.Where(m => m.RoundNumber == 1).OrderBy(m => m.BracketPosition).ToList();
+
+        for (int i = 0; i < firstRoundMatches.Count; i++)
+        {
+            var unit1Num = i * 2 + 1;
+            var unit2Num = i * 2 + 2;
+
+            if (unit1Num <= targetUnitCount)
+                firstRoundMatches[i].Unit1Number = unit1Num;
+            if (unit2Num <= targetUnitCount)
+                firstRoundMatches[i].Unit2Number = unit2Num;
+        }
+
+        return matches;
+    }
+
+    private List<EventMatch> GenerateDoubleEliminationMatchesForTarget(EventDivision division, int targetUnitCount, CreateMatchScheduleRequest request)
+    {
+        var matches = new List<EventMatch>();
+
+        // Find next power of 2
+        var bracketSize = 1;
+        while (bracketSize < targetUnitCount) bracketSize *= 2;
+
+        var winnersRounds = (int)Math.Log2(bracketSize);
+        var matchNum = 1;
+
+        // Winners bracket
+        for (int round = 1; round <= winnersRounds; round++)
+        {
+            var matchesInRound = bracketSize / (int)Math.Pow(2, round);
+            var roundName = round == winnersRounds ? "Winners Final" :
+                           round == winnersRounds - 1 ? "Winners Semifinal" :
+                           $"Winners Round {round}";
+
+            for (int m = 1; m <= matchesInRound; m++)
+            {
+                matches.Add(new EventMatch
+                {
+                    EventId = division.EventId,
+                    DivisionId = division.Id,
+                    RoundType = "Winners",
+                    RoundNumber = round,
+                    RoundName = roundName,
+                    MatchNumber = matchNum++,
+                    BracketPosition = m,
+                    BestOf = request.BestOf,
+                    ScoreFormatId = request.ScoreFormatId,
+                    Status = "Scheduled",
+                    CreatedAt = DateTime.Now,
+                    UpdatedAt = DateTime.Now
+                });
+            }
+        }
+
+        // Losers bracket (simplified)
+        var losersRounds = (winnersRounds - 1) * 2;
+        for (int round = 1; round <= losersRounds; round++)
+        {
+            var matchesInRound = bracketSize / (int)Math.Pow(2, (round + 1) / 2 + 1);
+            if (matchesInRound < 1) matchesInRound = 1;
+
+            var roundName = round == losersRounds ? "Losers Final" : $"Losers Round {round}";
+
+            for (int m = 1; m <= matchesInRound; m++)
+            {
+                matches.Add(new EventMatch
+                {
+                    EventId = division.EventId,
+                    DivisionId = division.Id,
+                    RoundType = "Losers",
+                    RoundNumber = round,
+                    RoundName = roundName,
+                    MatchNumber = matchNum++,
+                    BracketPosition = m,
+                    BestOf = request.BestOf,
+                    ScoreFormatId = request.ScoreFormatId,
+                    Status = "Scheduled",
+                    CreatedAt = DateTime.Now,
+                    UpdatedAt = DateTime.Now
+                });
+            }
+        }
+
+        // Grand Final
+        matches.Add(new EventMatch
+        {
+            EventId = division.EventId,
+            DivisionId = division.Id,
+            RoundType = "GrandFinal",
+            RoundNumber = 1,
+            RoundName = "Grand Final",
+            MatchNumber = matchNum++,
+            BracketPosition = 1,
+            BestOf = request.BestOf,
+            ScoreFormatId = request.ScoreFormatId,
+            Status = "Scheduled",
+            CreatedAt = DateTime.Now,
+            UpdatedAt = DateTime.Now
+        });
+
+        // Assign first round matchups
+        var firstRoundMatches = matches.Where(m => m.RoundType == "Winners" && m.RoundNumber == 1).OrderBy(m => m.BracketPosition).ToList();
+
+        for (int i = 0; i < firstRoundMatches.Count; i++)
+        {
+            var unit1Num = i * 2 + 1;
+            var unit2Num = i * 2 + 2;
+
+            if (unit1Num <= targetUnitCount)
+                firstRoundMatches[i].Unit1Number = unit1Num;
+            if (unit2Num <= targetUnitCount)
+                firstRoundMatches[i].Unit2Number = unit2Num;
         }
 
         return matches;

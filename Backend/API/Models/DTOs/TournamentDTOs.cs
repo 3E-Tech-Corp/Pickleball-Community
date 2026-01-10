@@ -244,10 +244,22 @@ public class CreateMatchScheduleRequest
 {
     public int DivisionId { get; set; }
     public string ScheduleType { get; set; } = "RoundRobin"; // RoundRobin, SingleElimination, DoubleElimination
+    public int? TargetUnits { get; set; } // Target number of units/placeholders in schedule (can be > registered units)
     public int? PoolCount { get; set; }
     public int? PlayoffFromPools { get; set; }
     public int BestOf { get; set; } = 1;
     public int? ScoreFormatId { get; set; }
+}
+
+public class AssignUnitNumbersRequest
+{
+    public List<UnitAssignment>? Assignments { get; set; }
+}
+
+public class UnitAssignment
+{
+    public int UnitId { get; set; }
+    public int UnitNumber { get; set; }
 }
 
 // ============================================
