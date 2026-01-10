@@ -2845,7 +2845,15 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
                 )}
 
                 {/* Show register button if not registered or can register for more */}
-                {!isRegistered && (
+                {isRegistered ? (
+                  <button
+                    onClick={() => setActiveTab('divisions')}
+                    className="px-8 py-3 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition-colors flex items-center gap-2"
+                  >
+                    <CheckCircle className="w-5 h-5" />
+                    View My Registrations
+                  </button>
+                ) : (
                   canRegister() ? (
                     isAuthenticated ? (
                       <div className="text-center">
@@ -2883,11 +2891,20 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
                       </div>
                     )
                   ) : (
-                    <div className={`px-6 py-3 rounded-lg font-medium flex items-center gap-2 ${
-                      status.color === 'yellow' ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'
-                    }`}>
-                      <AlertCircle className="w-5 h-5" />
-                      Registration {status.text}
+                    <div className="flex flex-col items-center gap-3">
+                      <div className={`px-6 py-3 rounded-lg font-medium flex items-center gap-2 ${
+                        status.color === 'yellow' ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'
+                      }`}>
+                        <AlertCircle className="w-5 h-5" />
+                        Registration {status.text}
+                      </div>
+                      <button
+                        onClick={() => setActiveTab('divisions')}
+                        className="px-6 py-2 text-gray-600 border border-gray-300 rounded-lg font-medium hover:bg-gray-50 transition-colors flex items-center gap-2"
+                      >
+                        <Users className="w-4 h-4" />
+                        View Registrations
+                      </button>
                     </div>
                   )
                 )}
