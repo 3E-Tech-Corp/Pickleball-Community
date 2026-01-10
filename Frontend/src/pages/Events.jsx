@@ -67,6 +67,9 @@ export default function Events() {
   const [selectedPaymentReg, setSelectedPaymentReg] = useState(null);
   const [selectedPaymentEvent, setSelectedPaymentEvent] = useState(null);
 
+  // Profile modal state (for My Events tab)
+  const [selectedProfileUserId, setSelectedProfileUserId] = useState(null);
+
   // Get user's location on mount with improved two-stage approach
   const getLocation = useCallback(async () => {
     if (!navigator.geolocation) {
@@ -1370,6 +1373,14 @@ export default function Events() {
           loadMyEvents();
         }}
       />
+
+      {/* Profile Modal for My Events tab */}
+      {selectedProfileUserId && (
+        <PublicProfileModal
+          userId={selectedProfileUserId}
+          onClose={() => setSelectedProfileUserId(null)}
+        />
+      )}
     </div>
   );
 }
