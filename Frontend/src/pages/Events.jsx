@@ -1705,6 +1705,8 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
               divisionId: unit.divisionId,
               divisionName: divisionName,
               userId: member.userId,
+              firstName: member.firstName,
+              lastName: member.lastName,
               userName: member.firstName && member.lastName
                 ? `${member.firstName} ${member.lastName}`
                 : member.firstName || 'Player',
@@ -1721,6 +1723,7 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
               amountDue: unit.amountDue || 0,
               paymentProofUrl: unit.paymentProofUrl,
               paymentReference: unit.paymentReference,
+              referenceId: unit.referenceId,
               paidAt: unit.paidAt,
               // Store full members for modal
               members: unit.members
