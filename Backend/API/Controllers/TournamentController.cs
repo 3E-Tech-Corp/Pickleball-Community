@@ -1268,20 +1268,22 @@ public class TournamentController : ControllerBase
             .ToListAsync();
         _context.EventUnitJoinRequests.RemoveRange(sourceJoinRequests);
 
-        // Also delete any pending join requests TO the target unit from users who are now members
-        var mergedUserIds = targetUnit.Members.Select(m => m.UserId).ToList();
-        var targetJoinRequestsFromMembers = await _context.EventUnitJoinRequests
-            .Where(r => r.UnitId == targetUnit.Id && mergedUserIds.Contains(r.UserId))
+        // Get all merged user IDs as a HashSet for efficient lookup
+        var mergedUserIds = targetUnit.Members.Select(m => m.UserId).ToHashSet();
+
+        // Delete any pending join requests TO the target unit from users who are now members
+        var targetJoinRequests = await _context.EventUnitJoinRequests
+            .Where(r => r.UnitId == targetUnit.Id)
             .ToListAsync();
+        var targetJoinRequestsFromMembers = targetJoinRequests.Where(r => mergedUserIds.Contains(r.UserId)).ToList();
         _context.EventUnitJoinRequests.RemoveRange(targetJoinRequestsFromMembers);
 
-        // Also delete any pending join requests FROM the merged users to other units in this division
-        var otherJoinRequests = await _context.EventUnitJoinRequests
+        // Delete any pending join requests FROM the merged users to other units in this division
+        var divisionJoinRequests = await _context.EventUnitJoinRequests
             .Include(r => r.Unit)
-            .Where(r => mergedUserIds.Contains(r.UserId) &&
-                r.Unit!.DivisionId == targetUnit.DivisionId &&
-                r.Status == "Pending")
+            .Where(r => r.Unit!.DivisionId == targetUnit.DivisionId && r.Status == "Pending")
             .ToListAsync();
+        var otherJoinRequests = divisionJoinRequests.Where(r => mergedUserIds.Contains(r.UserId)).ToList();
         _context.EventUnitJoinRequests.RemoveRange(otherJoinRequests);
 
         // Remove the source unit
