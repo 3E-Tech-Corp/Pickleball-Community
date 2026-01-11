@@ -2496,10 +2496,21 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
     try {
       const response = await tournamentApi.requestToJoinUnit(unitId, 'I would like to join your team');
       if (response.success) {
-        toast.success('Join request sent!');
+        // Check if units were auto-merged due to mutual request
+        if (response.data?.status === 'Merged') {
+          toast.success(response.message || 'Teams merged automatically! You are now registered together.');
+        } else {
+          toast.success('Join request sent!');
+        }
         setShowTeamRegistration(false);
         setSelectedDivisionForRegistration(null);
-        onUpdate();
+        // Refetch event data to update the view
+        const updatedEventResponse = await eventsApi.getEvent(event.id);
+        if (updatedEventResponse.success) {
+          onUpdate(updatedEventResponse.data);
+        } else {
+          onUpdate();
+        }
       } else {
         toast.error(response.message || 'Failed to send join request');
       }
@@ -2560,7 +2571,12 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
     try {
       const response = await tournamentApi.requestToJoinUnit(unitId, 'I would like to join your team');
       if (response.success) {
-        toast.success('Join request sent!');
+        // Check if units were auto-merged due to mutual request
+        if (response.data?.status === 'Merged') {
+          toast.success(response.message || 'Teams merged automatically! You are now registered together.');
+        } else {
+          toast.success('Join request sent!');
+        }
         setFindingPartnerForReg(null);
         setAvailableUnits([]);
         // Refetch event data to update the view

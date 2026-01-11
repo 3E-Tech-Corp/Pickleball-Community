@@ -505,7 +505,7 @@ public class TournamentController : ControllerBase
         if (existingInDivision != null)
             return BadRequest(new ApiResponse<UnitJoinRequestDto> { Success = false, Message = "You already have a pending request in this division. Cancel it first before requesting to join another team." });
 
-        // Check if already registered in this division
+        // Check if already registered in this division (as accepted member)
         var alreadyRegistered = await _context.EventUnitMembers
             .Include(m => m.Unit)
             .AnyAsync(m => m.UserId == userId.Value &&
@@ -515,6 +515,96 @@ public class TournamentController : ControllerBase
 
         if (alreadyRegistered)
             return BadRequest(new ApiResponse<UnitJoinRequestDto> { Success = false, Message = "You are already registered in this division" });
+
+        // Check for MUTUAL REQUEST scenario:
+        // If the requesting user is captain of their own unit, and the target unit's captain
+        // has a pending join request to the requester's unit, auto-merge instead of creating another request
+        var requesterUnit = await _context.EventUnits
+            .Include(u => u.Members)
+            .Include(u => u.JoinRequests)
+            .FirstOrDefaultAsync(u => u.DivisionId == unit.DivisionId &&
+                u.CaptainUserId == userId.Value &&
+                u.Status != "Cancelled");
+
+        if (requesterUnit != null)
+        {
+            // Check if the target unit's captain has requested to join the requester's unit
+            var mutualRequest = await _context.EventUnitJoinRequests
+                .FirstOrDefaultAsync(r => r.UnitId == requesterUnit.Id &&
+                    r.UserId == unit.CaptainUserId &&
+                    r.Status == "Pending");
+
+            if (mutualRequest != null)
+            {
+                // MUTUAL REQUEST DETECTED - Auto-merge the units
+                // Keep the requester's unit (requesterUnit), move target captain as member, delete target unit
+
+                // Add target unit's captain as member of requester's unit
+                var newMember = new EventUnitMember
+                {
+                    UnitId = requesterUnit.Id,
+                    UserId = unit.CaptainUserId,
+                    Role = "Player",
+                    InviteStatus = "Accepted",
+                    CreatedAt = DateTime.Now
+                };
+                _context.EventUnitMembers.Add(newMember);
+
+                // Move any other members from target unit to requester's unit
+                var targetMembers = await _context.EventUnitMembers
+                    .Where(m => m.UnitId == unit.Id && m.UserId != unit.CaptainUserId)
+                    .ToListAsync();
+                foreach (var member in targetMembers)
+                {
+                    member.UnitId = requesterUnit.Id;
+                }
+
+                // Combine payments if any
+                if (unit.AmountPaid > 0)
+                {
+                    requesterUnit.AmountPaid += unit.AmountPaid;
+                }
+
+                // Delete the mutual request and any other join requests to the target unit
+                var targetJoinRequests = await _context.EventUnitJoinRequests
+                    .Where(r => r.UnitId == unit.Id)
+                    .ToListAsync();
+                _context.EventUnitJoinRequests.RemoveRange(targetJoinRequests);
+
+                // Delete the mutual request (from requester's unit)
+                _context.EventUnitJoinRequests.Remove(mutualRequest);
+
+                // Delete the target unit
+                _context.EventUnits.Remove(unit);
+
+                // Update requester's unit completeness check
+                var updatedMemberCount = requesterUnit.Members.Count(m => m.InviteStatus == "Accepted") + 1; // +1 for newly added captain
+
+                await _context.SaveChangesAsync();
+
+                // Return success with merged unit info
+                var requesterUser = await _context.Users.FindAsync(userId.Value);
+                var targetUser = await _context.Users.FindAsync(unit.CaptainUserId);
+
+                return Ok(new ApiResponse<UnitJoinRequestDto>
+                {
+                    Success = true,
+                    Message = $"Mutual request detected! Your team has been automatically merged with {targetUser?.FirstName} {targetUser?.LastName}'s registration.",
+                    Data = new UnitJoinRequestDto
+                    {
+                        Id = 0, // No join request created - units were merged
+                        UnitId = requesterUnit.Id,
+                        UnitName = requesterUnit.Name,
+                        UserId = userId.Value,
+                        UserName = $"{requesterUser?.FirstName} {requesterUser?.LastName}",
+                        ProfileImageUrl = requesterUser?.ProfileImageUrl,
+                        Message = "Units merged automatically",
+                        Status = "Merged",
+                        CreatedAt = DateTime.Now
+                    }
+                });
+            }
+        }
 
         var joinRequest = new EventUnitJoinRequest
         {
