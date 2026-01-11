@@ -1305,6 +1305,8 @@ export const tournamentApi = {
     api.delete(`/tournament/events/${eventId}/registrations/${unitId}/members/${userId}`),
   moveRegistration: (eventId, unitId, newDivisionId) =>
     api.post(`/tournament/events/${eventId}/registrations/${unitId}/move`, { newDivisionId }),
+  mergeRegistrations: (eventId, targetUnitId, sourceUnitId) =>
+    api.post(`/tournament/events/${eventId}/registrations/merge`, { targetUnitId, sourceUnitId }),
 
   // Payment
   uploadPaymentProof: (eventId, unitId, data) =>

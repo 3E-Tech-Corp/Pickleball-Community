@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
-import { Calendar, MapPin, Clock, Users, Filter, Search, Plus, DollarSign, ChevronLeft, ChevronRight, X, UserPlus, Trophy, Layers, Check, AlertCircle, Navigation, Building2, Loader2, MessageCircle, CheckCircle, Edit3, ChevronDown, ChevronUp, Trash2, List, Map as MapIcon, Image, Upload, Play, Link2, QrCode, Download, ArrowRightLeft, FileText, Eye, EyeOff, ExternalLink, User } from 'lucide-react';
+import { Calendar, MapPin, Clock, Users, Filter, Search, Plus, DollarSign, ChevronLeft, ChevronRight, X, UserPlus, Trophy, Layers, Check, AlertCircle, Navigation, Building2, Loader2, MessageCircle, CheckCircle, Edit3, ChevronDown, ChevronUp, Trash2, List, Map as MapIcon, Image, Upload, Play, Link2, QrCode, Download, ArrowRightLeft, FileText, Eye, EyeOff, ExternalLink, User, GitMerge, ArrowRight } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import { eventsApi, eventTypesApi, courtsApi, teamUnitsApi, skillLevelsApi, ageGroupsApi, tournamentApi, sharedAssetApi, getSharedAssetUrl } from '../services/api';
@@ -1578,6 +1578,13 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
   const [divisionRegistrations, setDivisionRegistrations] = useState([]);
   const [loadingRegistrations, setLoadingRegistrations] = useState(false);
 
+  // Admin merge/move state
+  const [selectedUnitsForMerge, setSelectedUnitsForMerge] = useState([]);
+  const [showMoveModal, setShowMoveModal] = useState(false);
+  const [unitToMove, setUnitToMove] = useState(null);
+  const [movingUnit, setMovingUnit] = useState(false);
+  const [mergingUnits, setMergingUnits] = useState(false);
+
   // Share link state
   const [linkCopied, setLinkCopied] = useState(false);
   const [showEventQrModal, setShowEventQrModal] = useState(false);
@@ -2618,6 +2625,97 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
     }
   };
 
+  // Admin: Toggle unit selection for merge
+  const toggleUnitSelection = (unit) => {
+    setSelectedUnitsForMerge(prev => {
+      const exists = prev.find(u => u.id === unit.id);
+      if (exists) {
+        return prev.filter(u => u.id !== unit.id);
+      }
+      // Only allow selecting incomplete units from same division
+      if (prev.length > 0 && prev[0].divisionId !== unit.divisionId) {
+        toast.error('Can only merge units from the same division');
+        return prev;
+      }
+      // Max 2 units for merge
+      if (prev.length >= 2) {
+        toast.error('Can only merge 2 units at a time');
+        return prev;
+      }
+      return [...prev, unit];
+    });
+  };
+
+  // Admin: Merge selected units
+  const handleMergeUnits = async () => {
+    if (selectedUnitsForMerge.length !== 2) {
+      toast.error('Select exactly 2 registrations to merge');
+      return;
+    }
+    if (!confirm('Merge these registrations? Members will be combined into one team.')) return;
+
+    setMergingUnits(true);
+    try {
+      const [target, source] = selectedUnitsForMerge;
+      const response = await tournamentApi.mergeRegistrations(event.id, target.id, source.id);
+      if (response.success) {
+        toast.success('Registrations merged successfully');
+        setSelectedUnitsForMerge([]);
+        // Refresh division registrations
+        if (selectedRegDivisionId) {
+          loadDivisionRegistrations(selectedRegDivisionId);
+        }
+        // Refresh event data
+        const updatedEventResponse = await eventsApi.getEvent(event.id);
+        if (updatedEventResponse.success) {
+          onUpdate(updatedEventResponse.data);
+        }
+      } else {
+        toast.error(response.message || 'Failed to merge registrations');
+      }
+    } catch (err) {
+      console.error('Error merging registrations:', err);
+      toast.error(err?.message || 'Failed to merge registrations');
+    } finally {
+      setMergingUnits(false);
+    }
+  };
+
+  // Admin: Move unit to different division
+  const handleMoveUnit = async (newDivisionId) => {
+    if (!unitToMove || !newDivisionId) return;
+    if (unitToMove.divisionId === newDivisionId) {
+      toast.error('Unit is already in this division');
+      return;
+    }
+
+    setMovingUnit(true);
+    try {
+      const response = await tournamentApi.moveRegistration(event.id, unitToMove.id, newDivisionId);
+      if (response.success) {
+        toast.success('Registration moved successfully');
+        setShowMoveModal(false);
+        setUnitToMove(null);
+        // Refresh division registrations
+        if (selectedRegDivisionId) {
+          loadDivisionRegistrations(selectedRegDivisionId);
+        }
+        // Refresh event data
+        const updatedEventResponse = await eventsApi.getEvent(event.id);
+        if (updatedEventResponse.success) {
+          onUpdate(updatedEventResponse.data);
+        }
+      } else {
+        toast.error(response.message || 'Failed to move registration');
+      }
+    } catch (err) {
+      console.error('Error moving registration:', err);
+      toast.error(err?.message || 'Failed to move registration');
+    } finally {
+      setMovingUnit(false);
+    }
+  };
+
   const canRegister = () => {
     const now = new Date();
     if (event.registrationOpenDate && new Date(event.registrationOpenDate) > now) return false;
@@ -3231,12 +3329,33 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
 
                     {/* Registered Units List - Horizontal Cards */}
                     <div className="bg-white">
-                      <div className="px-4 py-3 border-b bg-gray-50/50">
+                      <div className="px-4 py-3 border-b bg-gray-50/50 flex items-center justify-between">
                         <h5 className="text-sm font-medium text-gray-700 flex items-center gap-2">
                           <Users className="w-4 h-4" />
                           {division.registeredCount || 0} {teamSize > 2 ? 'Teams' : teamSize === 2 ? 'Pairs' : 'Players'} Registered
                           {division.waitlistedCount > 0 && <span className="text-yellow-600">(+{division.waitlistedCount} waitlisted)</span>}
                         </h5>
+
+                        {/* Admin merge toolbar */}
+                        {isOrganizer && selectedUnitsForMerge.length > 0 && (
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-gray-500">{selectedUnitsForMerge.length} selected</span>
+                            <button
+                              onClick={handleMergeUnits}
+                              disabled={selectedUnitsForMerge.length !== 2 || mergingUnits}
+                              className="px-3 py-1 text-xs font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-1"
+                            >
+                              {mergingUnits ? <Loader2 className="w-3 h-3 animate-spin" /> : <GitMerge className="w-3 h-3" />}
+                              Merge
+                            </button>
+                            <button
+                              onClick={() => setSelectedUnitsForMerge([])}
+                              className="px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100 rounded-lg"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        )}
                       </div>
 
                       {loadingDivisionId === division.id ? (
@@ -3255,6 +3374,8 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
                             const isComplete = unit.isComplete;
                             const acceptedMembers = unit.members?.filter(m => m.inviteStatus === 'Accepted') || [];
 
+                            const isSelected = selectedUnitsForMerge.some(u => u.id === unit.id);
+
                             return (
                               <div
                                 key={unit.id || index}
@@ -3262,8 +3383,18 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
                                   isComplete
                                     ? 'bg-white'
                                     : 'bg-amber-50/50'
-                                } ${index % 2 === 1 && isComplete ? 'bg-gray-50/50' : ''}`}
+                                } ${index % 2 === 1 && isComplete ? 'bg-gray-50/50' : ''} ${isSelected ? 'ring-2 ring-blue-500 ring-inset' : ''}`}
                               >
+                                {/* Admin: Checkbox for merge selection (only for incomplete units) */}
+                                {isOrganizer && !isComplete && (
+                                  <input
+                                    type="checkbox"
+                                    checked={isSelected}
+                                    onChange={() => toggleUnitSelection({ ...unit, divisionId: division.id })}
+                                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 shrink-0"
+                                  />
+                                )}
+
                                 {/* Unit Number/Index */}
                                 <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-medium shrink-0 ${
                                   isComplete
@@ -3309,7 +3440,7 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
                                 </div>
 
                                 {/* Status Badge */}
-                                <div className="shrink-0">
+                                <div className="shrink-0 flex items-center gap-2">
                                   {isComplete ? (
                                     <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium text-green-700 bg-green-100 rounded-full">
                                       <Check className="w-3 h-3" />
@@ -3320,6 +3451,20 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
                                       <UserPlus className="w-3 h-3" />
                                       Looking
                                     </span>
+                                  )}
+
+                                  {/* Admin: Move to different division */}
+                                  {isOrganizer && event.divisions?.length > 1 && (
+                                    <button
+                                      onClick={() => {
+                                        setUnitToMove({ ...unit, divisionId: division.id, divisionName: division.name });
+                                        setShowMoveModal(true);
+                                      }}
+                                      className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded"
+                                      title="Move to different division"
+                                    >
+                                      <ArrowRight className="w-4 h-4" />
+                                    </button>
                                   )}
                                 </div>
                               </div>
@@ -4954,6 +5099,49 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
           userId={selectedProfileUserId}
           onClose={() => setSelectedProfileUserId(null)}
         />
+      )}
+
+      {/* Move Registration Modal */}
+      {showMoveModal && unitToMove && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-[1100]">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Move Registration</h3>
+            <p className="text-sm text-gray-600 mb-4">
+              Move <span className="font-medium">{unitToMove.name || 'this registration'}</span> from{' '}
+              <span className="font-medium">{unitToMove.divisionName}</span> to:
+            </p>
+            <div className="space-y-2 mb-6">
+              {event.divisions?.filter(d => d.id !== unitToMove.divisionId && d.isActive !== false).map(div => (
+                <button
+                  key={div.id}
+                  onClick={() => handleMoveUnit(div.id)}
+                  disabled={movingUnit}
+                  className="w-full px-4 py-3 text-left border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-gray-300 disabled:opacity-50 flex items-center justify-between"
+                >
+                  <span className="font-medium text-gray-900">{div.name}</span>
+                  <span className="text-sm text-gray-500">{div.registeredCount || 0} registered</span>
+                </button>
+              ))}
+            </div>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => {
+                  setShowMoveModal(false);
+                  setUnitToMove(null);
+                }}
+                disabled={movingUnit}
+                className="px-4 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+            </div>
+            {movingUnit && (
+              <div className="absolute inset-0 bg-white/80 flex items-center justify-center rounded-xl">
+                <Loader2 className="w-6 h-6 animate-spin text-orange-600" />
+              </div>
+            )}
+          </div>
+        </div>
       )}
     </div>
   );

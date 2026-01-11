@@ -1081,6 +1081,124 @@ public class TournamentController : ControllerBase
         return Ok(new ApiResponse<bool> { Success = true, Data = true, Message = "Registration moved to new division" });
     }
 
+    /// <summary>
+    /// Merge two registrations in the same division (organizer only)
+    /// Moves members from source unit to target unit, then removes source unit
+    /// </summary>
+    [Authorize]
+    [HttpPost("events/{eventId}/registrations/merge")]
+    public async Task<ActionResult<ApiResponse<EventUnitDto>>> MergeRegistrations(int eventId, [FromBody] MergeRegistrationsRequest request)
+    {
+        var currentUserId = GetUserId();
+        if (!currentUserId.HasValue)
+            return Unauthorized(new ApiResponse<EventUnitDto> { Success = false, Message = "Unauthorized" });
+
+        // Check if user is organizer or site admin
+        var evt = await _context.Events
+            .Include(e => e.Divisions)
+                .ThenInclude(d => d.TeamUnit)
+            .FirstOrDefaultAsync(e => e.Id == eventId && e.IsActive);
+        if (evt == null)
+            return NotFound(new ApiResponse<EventUnitDto> { Success = false, Message = "Event not found" });
+
+        var isAdmin = await IsAdminAsync();
+        if (evt.OrganizedByUserId != currentUserId.Value && !isAdmin)
+            return Forbid();
+
+        // Get both units with their members
+        var targetUnit = await _context.EventUnits
+            .Include(u => u.Members)
+                .ThenInclude(m => m.User)
+            .Include(u => u.Division)
+                .ThenInclude(d => d!.TeamUnit)
+            .FirstOrDefaultAsync(u => u.Id == request.TargetUnitId && u.EventId == eventId);
+
+        var sourceUnit = await _context.EventUnits
+            .Include(u => u.Members)
+                .ThenInclude(m => m.User)
+            .FirstOrDefaultAsync(u => u.Id == request.SourceUnitId && u.EventId == eventId);
+
+        if (targetUnit == null)
+            return NotFound(new ApiResponse<EventUnitDto> { Success = false, Message = "Target registration not found" });
+
+        if (sourceUnit == null)
+            return NotFound(new ApiResponse<EventUnitDto> { Success = false, Message = "Source registration not found" });
+
+        // Verify both units are in the same division
+        if (targetUnit.DivisionId != sourceUnit.DivisionId)
+            return BadRequest(new ApiResponse<EventUnitDto> { Success = false, Message = "Both registrations must be in the same division" });
+
+        // Calculate capacity
+        var teamSize = targetUnit.Division?.TeamUnit?.TotalPlayers ?? targetUnit.Division?.TeamSize ?? 2;
+        var targetMemberCount = targetUnit.Members.Count(m => m.InviteStatus == "Accepted");
+        var sourceMemberCount = sourceUnit.Members.Count(m => m.InviteStatus == "Accepted");
+
+        if (targetMemberCount + sourceMemberCount > teamSize)
+            return BadRequest(new ApiResponse<EventUnitDto> { Success = false, Message = $"Combined members ({targetMemberCount + sourceMemberCount}) would exceed team size ({teamSize})" });
+
+        // Move members from source to target
+        foreach (var member in sourceUnit.Members.ToList())
+        {
+            // Check if this user is already in target unit
+            if (targetUnit.Members.Any(m => m.UserId == member.UserId))
+            {
+                // Remove duplicate from source
+                _context.EventUnitMembers.Remove(member);
+                continue;
+            }
+
+            // Move member to target unit
+            member.UnitId = targetUnit.Id;
+            member.InviteStatus = "Accepted"; // Auto-accept when admin merges
+            member.Role = "Member"; // Demote to member (target captain stays captain)
+        }
+
+        // Combine payment info - keep higher amount paid
+        if (sourceUnit.AmountPaid > 0)
+        {
+            targetUnit.AmountPaid += sourceUnit.AmountPaid;
+            // Update payment status if now fully paid
+            var amountDue = (evt.RegistrationFee) + (targetUnit.Division?.DivisionFee ?? 0m);
+            if (targetUnit.AmountPaid >= amountDue)
+            {
+                targetUnit.PaymentStatus = "Paid";
+                targetUnit.PaidAt ??= DateTime.Now;
+            }
+            else if (targetUnit.AmountPaid > 0)
+            {
+                targetUnit.PaymentStatus = "Partial";
+            }
+        }
+
+        // Delete any pending join requests for the source unit
+        var sourceJoinRequests = await _context.EventUnitJoinRequests
+            .Where(r => r.UnitId == sourceUnit.Id)
+            .ToListAsync();
+        _context.EventUnitJoinRequests.RemoveRange(sourceJoinRequests);
+
+        // Remove the source unit
+        _context.EventUnits.Remove(sourceUnit);
+
+        targetUnit.UpdatedAt = DateTime.Now;
+        await _context.SaveChangesAsync();
+
+        // Reload target unit to get updated data
+        var updatedUnit = await _context.EventUnits
+            .Include(u => u.Members)
+                .ThenInclude(m => m.User)
+            .Include(u => u.Division)
+                .ThenInclude(d => d!.TeamUnit)
+            .Include(u => u.Event)
+            .FirstOrDefaultAsync(u => u.Id == targetUnit.Id);
+
+        return Ok(new ApiResponse<EventUnitDto>
+        {
+            Success = true,
+            Data = MapToEventUnitDto(updatedUnit!),
+            Message = "Registrations merged successfully"
+        });
+    }
+
     private EventUnitDto MapToEventUnitDto(EventUnit unit)
     {
         var teamUnit = unit.Division?.TeamUnit;

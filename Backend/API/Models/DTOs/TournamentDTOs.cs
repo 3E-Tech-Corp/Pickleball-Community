@@ -154,6 +154,12 @@ public class MoveRegistrationRequest
     public int NewDivisionId { get; set; }
 }
 
+public class MergeRegistrationsRequest
+{
+    public int TargetUnitId { get; set; }
+    public int SourceUnitId { get; set; }
+}
+
 public class RespondToJoinRequest
 {
     public int RequestId { get; set; }
