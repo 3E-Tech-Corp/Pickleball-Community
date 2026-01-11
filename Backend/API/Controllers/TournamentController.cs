@@ -2072,6 +2072,7 @@ public class TournamentController : ControllerBase
             ReferenceId = u.ReferenceId,
             PaidAt = u.PaidAt,
             CreatedAt = u.CreatedAt,
+            // UNION: Combine members with pending join requests into single Members list
             Members = u.Members.Select(m => new EventUnitMemberDto
             {
                 Id = m.Id,
@@ -2082,20 +2083,25 @@ public class TournamentController : ControllerBase
                 Role = m.Role,
                 InviteStatus = m.InviteStatus,
                 IsCheckedIn = m.IsCheckedIn,
-                CheckedInAt = m.CheckedInAt
-            }).ToList(),
-            JoinRequests = u.JoinRequests?.Where(jr => jr.Status == "Pending").Select(jr => new UnitJoinRequestDto
-            {
-                Id = jr.Id,
-                UnitId = jr.UnitId,
-                UnitName = u.Name,
-                UserId = jr.UserId,
-                UserName = jr.User != null ? $"{jr.User.FirstName} {jr.User.LastName}".Trim() : null,
-                ProfileImageUrl = jr.User?.ProfileImageUrl,
-                Message = jr.Message,
-                Status = jr.Status,
-                CreatedAt = jr.CreatedAt
-            }).ToList() ?? new List<UnitJoinRequestDto>()
+                CheckedInAt = m.CheckedInAt,
+                JoinRequestId = null
+            }).Concat(
+                (u.JoinRequests ?? new List<EventUnitJoinRequest>())
+                    .Where(jr => jr.Status == "Pending")
+                    .Select(jr => new EventUnitMemberDto
+                    {
+                        Id = 0, // No member ID for join requests
+                        UserId = jr.UserId,
+                        FirstName = jr.User?.FirstName,
+                        LastName = jr.User?.LastName,
+                        ProfileImageUrl = jr.User?.ProfileImageUrl,
+                        Role = "Player",
+                        InviteStatus = "Requested", // Special status for join requests
+                        IsCheckedIn = false,
+                        CheckedInAt = null,
+                        JoinRequestId = jr.Id // Store join request ID for accept/reject actions
+                    })
+            ).ToList()
         };
     }
 

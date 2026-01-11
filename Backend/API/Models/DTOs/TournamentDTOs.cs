@@ -101,11 +101,8 @@ public class EventUnitDto
     public int PointsAgainst { get; set; }
     public int PointDifferential => PointsScored - PointsAgainst;
 
-    // Members
+    // Members (includes accepted members, pending invites, and pending join requests via UNION)
     public List<EventUnitMemberDto> Members { get; set; } = new();
-
-    // Pending join requests (users who requested to join this unit)
-    public List<UnitJoinRequestDto> JoinRequests { get; set; } = new();
 
     // Team unit info
     public int? TeamUnitId { get; set; }
@@ -133,9 +130,12 @@ public class EventUnitMemberDto
     public string? LastName { get; set; }
     public string? ProfileImageUrl { get; set; }
     public string Role { get; set; } = "Player";
+    // InviteStatus: "Accepted", "Pending" (invited), or "Requested" (join request)
     public string InviteStatus { get; set; } = "Accepted";
     public bool IsCheckedIn { get; set; }
     public DateTime? CheckedInAt { get; set; }
+    // For join requests - the request ID (null for regular members)
+    public int? JoinRequestId { get; set; }
 }
 
 public class CreateUnitRequest

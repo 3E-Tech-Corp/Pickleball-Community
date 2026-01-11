@@ -3305,21 +3305,15 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
                     if (regTabStatusFilter === 'complete' && !unit.isComplete) return false;
                     if (regTabStatusFilter === 'looking' && unit.isComplete) return false;
 
-                    // Search filter - check if any member or join request name matches
+                    // Search filter - check if any member name matches (includes join requests via UNION)
                     if (regTabSearchQuery) {
                       const query = regTabSearchQuery.toLowerCase();
-                      // Check members
-                      const memberMatch = unit.members?.some(member => {
+                      const hasMatch = unit.members?.some(member => {
                         const fullName = `${member.firstName || ''} ${member.lastName || ''}`.toLowerCase();
                         const reverseName = `${member.lastName || ''}, ${member.firstName || ''}`.toLowerCase();
                         return fullName.includes(query) || reverseName.includes(query);
                       });
-                      // Check pending join requests
-                      const joinRequestMatch = unit.joinRequests?.some(jr => {
-                        const userName = (jr.userName || '').toLowerCase();
-                        return userName.includes(query);
-                      });
-                      if (!memberMatch && !joinRequestMatch) return false;
+                      if (!hasMatch) return false;
                     }
                     return true;
                   });
@@ -3460,56 +3454,50 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
                                     {originalIndex + 1}
                                   </div>
 
-                                  {/* Members - Horizontal Layout */}
+                                  {/* Members - Horizontal Layout (includes accepted, pending invites, and join requests via UNION) */}
                                   <div className="flex-1 flex items-center gap-2 min-w-0 overflow-x-auto">
-                                    {unit.members?.map((member, mIdx) => (
-                                      <button
-                                        key={mIdx}
-                                        onClick={() => member.userId && setSelectedProfileUserId(member.userId)}
-                                        className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-white border border-gray-200 hover:border-orange-300 hover:bg-orange-50 transition-colors shrink-0"
-                                      >
-                                        {member.profileImageUrl ? (
-                                          <img src={getSharedAssetUrl(member.profileImageUrl)} alt="" className="w-5 h-5 rounded-full object-cover" />
-                                        ) : (
-                                          <div className="w-5 h-5 bg-orange-100 rounded-full flex items-center justify-center text-orange-700 text-xs font-medium">
-                                            {(member.firstName || 'P')[0].toUpperCase()}
-                                          </div>
-                                        )}
-                                        <span className="text-sm text-gray-700 max-w-[150px] truncate">
-                                          {member.lastName && member.firstName
-                                            ? `${member.lastName}, ${member.firstName}`
-                                            : member.lastName || member.firstName || 'Player'}
-                                        </span>
-                                        {member.inviteStatus === 'Pending' && (
-                                          <span className="text-xs text-amber-600">(pending)</span>
-                                        )}
-                                      </button>
-                                    ))}
+                                    {unit.members?.map((member, mIdx) => {
+                                      // Different styling for join requests (InviteStatus = "Requested")
+                                      const isJoinRequest = member.inviteStatus === 'Requested';
+                                      const isPendingInvite = member.inviteStatus === 'Pending';
 
-                                    {/* Pending join requests - users who requested to join this unit */}
-                                    {unit.joinRequests?.map((jr, jrIdx) => (
-                                      <button
-                                        key={`jr-${jrIdx}`}
-                                        onClick={() => jr.userId && setSelectedProfileUserId(jr.userId)}
-                                        className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-blue-50 border border-dashed border-blue-300 hover:border-blue-400 hover:bg-blue-100 transition-colors shrink-0"
-                                        title="Requested to join"
-                                      >
-                                        {jr.profileImageUrl ? (
-                                          <img src={getSharedAssetUrl(jr.profileImageUrl)} alt="" className="w-5 h-5 rounded-full object-cover" />
-                                        ) : (
-                                          <div className="w-5 h-5 bg-blue-100 rounded-full flex items-center justify-center text-blue-700 text-xs font-medium">
-                                            {(jr.userName?.split(' ')[0] || 'P')[0].toUpperCase()}
-                                          </div>
-                                        )}
-                                        <span className="text-sm text-blue-700 max-w-[150px] truncate">
-                                          {jr.userName || 'Player'}
-                                        </span>
-                                        <span className="text-xs text-blue-600">(requested)</span>
-                                      </button>
-                                    ))}
+                                      return (
+                                        <button
+                                          key={mIdx}
+                                          onClick={() => member.userId && setSelectedProfileUserId(member.userId)}
+                                          className={`flex items-center gap-1.5 px-2 py-1 rounded-full transition-colors shrink-0 ${
+                                            isJoinRequest
+                                              ? 'bg-blue-50 border border-dashed border-blue-300 hover:border-blue-400 hover:bg-blue-100'
+                                              : 'bg-white border border-gray-200 hover:border-orange-300 hover:bg-orange-50'
+                                          }`}
+                                          title={isJoinRequest ? 'Requested to join' : undefined}
+                                        >
+                                          {member.profileImageUrl ? (
+                                            <img src={getSharedAssetUrl(member.profileImageUrl)} alt="" className="w-5 h-5 rounded-full object-cover" />
+                                          ) : (
+                                            <div className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-medium ${
+                                              isJoinRequest ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700'
+                                            }`}>
+                                              {(member.firstName || 'P')[0].toUpperCase()}
+                                            </div>
+                                          )}
+                                          <span className={`text-sm max-w-[150px] truncate ${isJoinRequest ? 'text-blue-700' : 'text-gray-700'}`}>
+                                            {member.lastName && member.firstName
+                                              ? `${member.lastName}, ${member.firstName}`
+                                              : member.lastName || member.firstName || 'Player'}
+                                          </span>
+                                          {isPendingInvite && (
+                                            <span className="text-xs text-amber-600">(pending)</span>
+                                          )}
+                                          {isJoinRequest && (
+                                            <span className="text-xs text-blue-600">(requested)</span>
+                                          )}
+                                        </button>
+                                      );
+                                    })}
 
                                     {/* Empty slots for incomplete units */}
-                                    {!isComplete && Array.from({ length: Math.max(0, requiredPlayers - (unit.members?.length || 0) - (unit.joinRequests?.length || 0)) }).map((_, i) => (
+                                    {!isComplete && Array.from({ length: Math.max(0, requiredPlayers - (unit.members?.length || 0)) }).map((_, i) => (
                                       <div key={`empty-${i}`} className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-gray-100 border border-dashed border-gray-300 shrink-0">
                                         <div className="w-5 h-5 bg-gray-200 rounded-full flex items-center justify-center text-gray-400 text-xs">?</div>
                                         <span className="text-sm text-gray-400">Needed</span>
