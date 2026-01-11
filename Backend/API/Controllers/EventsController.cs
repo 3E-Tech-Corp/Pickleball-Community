@@ -73,6 +73,10 @@ public class EventsController : ControllerBase
                 .Include(e => e.OrganizedByClub)
                 .Include(e => e.Divisions)
                     .ThenInclude(d => d.Units)
+                        .ThenInclude(u => u.Members)
+                .Include(e => e.Divisions)
+                    .ThenInclude(d => d.Units)
+                        .ThenInclude(u => u.JoinRequests)
                 .Include(e => e.Venue) // Include venue for GPS-based distance calculation
                 .Where(e => e.IsActive && e.IsPublished)
                 // Filter out private events unless user is organizer, registered, or club member
@@ -294,6 +298,10 @@ public class EventsController : ControllerBase
                 .Include(e => e.OrganizedBy)
                 .Include(e => e.Divisions)
                     .ThenInclude(d => d.Units)
+                        .ThenInclude(u => u.Members)
+                .Include(e => e.Divisions)
+                    .ThenInclude(d => d.Units)
+                        .ThenInclude(u => u.JoinRequests)
                 .Where(e => e.IsActive && e.IsPublished && e.StartDate >= now)
                 .OrderBy(e => e.StartDate)
                 .Take(limit)
@@ -306,6 +314,10 @@ public class EventsController : ControllerBase
                 .Include(e => e.OrganizedBy)
                 .Include(e => e.Divisions)
                     .ThenInclude(d => d.Units)
+                        .ThenInclude(u => u.Members)
+                .Include(e => e.Divisions)
+                    .ThenInclude(d => d.Units)
+                        .ThenInclude(u => u.JoinRequests)
                 .Where(e => e.IsActive && e.IsPublished && e.StartDate >= now)
                 .OrderByDescending(e => e.Divisions.SelectMany(d => d.Units).Count(u => u.Status != "Cancelled"))
                 .Take(limit)
@@ -318,6 +330,10 @@ public class EventsController : ControllerBase
                 .Include(e => e.OrganizedBy)
                 .Include(e => e.Divisions)
                     .ThenInclude(d => d.Units)
+                        .ThenInclude(u => u.Members)
+                .Include(e => e.Divisions)
+                    .ThenInclude(d => d.Units)
+                        .ThenInclude(u => u.JoinRequests)
                 .Where(e => e.IsActive && e.IsPublished && e.StartDate < now && e.StartDate >= pastCutoff)
                 .OrderByDescending(e => e.StartDate)
                 .Take(limit)
@@ -369,6 +385,9 @@ public class EventsController : ControllerBase
                     .ThenInclude(d => d.Units)
                         .ThenInclude(u => u.Members)
                             .ThenInclude(m => m.User)
+                .Include(e => e.Divisions)
+                    .ThenInclude(d => d.Units)
+                        .ThenInclude(u => u.JoinRequests)
                 .Include(e => e.Divisions)
                     .ThenInclude(d => d.PartnerRequests)
                 .Include(e => e.Divisions)
@@ -450,7 +469,9 @@ public class EventsController : ControllerBase
                 PaymentInstructions = evt.PaymentInstructions,
                 MaxParticipants = evt.MaxParticipants,
                 RegisteredCount = evt.Divisions.Where(d => d.IsActive).SelectMany(d => d.Units).Count(u => u.Status != "Cancelled"),
-                RegisteredPlayerCount = evt.Divisions.Where(d => d.IsActive).SelectMany(d => d.Units).Where(u => u.Status != "Cancelled").SelectMany(u => u.Members).Count(m => m.InviteStatus == "Accepted"),
+                // Player count includes accepted members + pending join requests (UNION)
+                RegisteredPlayerCount = evt.Divisions.Where(d => d.IsActive).SelectMany(d => d.Units).Where(u => u.Status != "Cancelled").SelectMany(u => u.Members).Count(m => m.InviteStatus == "Accepted")
+                    + evt.Divisions.Where(d => d.IsActive).SelectMany(d => d.Units).Where(u => u.Status != "Cancelled").SelectMany(u => u.JoinRequests).Count(jr => jr.Status == "Pending"),
                 DivisionCount = evt.Divisions.Count(d => d.IsActive),
                 PrimaryTeamSize = evt.Divisions.Where(d => d.IsActive).GroupBy(d => d.TeamSize).OrderByDescending(g => g.Count()).Select(g => g.Key).FirstOrDefault(),
                 OrganizedByUserId = evt.OrganizedByUserId,
@@ -1244,6 +1265,10 @@ public class EventsController : ControllerBase
                 .Include(e => e.EventType)
                 .Include(e => e.Divisions)
                     .ThenInclude(d => d.Units)
+                        .ThenInclude(u => u.Members)
+                .Include(e => e.Divisions)
+                    .ThenInclude(d => d.Units)
+                        .ThenInclude(u => u.JoinRequests)
                 .Where(e => e.OrganizedByUserId == userId.Value && e.IsActive)
                 .OrderByDescending(e => e.StartDate)
                 .ToListAsync();
@@ -2007,7 +2032,9 @@ public class EventsController : ControllerBase
             PaymentModel = evt.PaymentModel,
             MaxParticipants = evt.MaxParticipants,
             RegisteredCount = evt.Divisions?.Where(d => d.IsActive).SelectMany(d => d.Units ?? Enumerable.Empty<EventUnit>()).Count(u => u.Status != "Cancelled") ?? 0,
-            RegisteredPlayerCount = evt.Divisions?.Where(d => d.IsActive).SelectMany(d => d.Units ?? Enumerable.Empty<EventUnit>()).Where(u => u.Status != "Cancelled").SelectMany(u => u.Members ?? Enumerable.Empty<EventUnitMember>()).Count(m => m.InviteStatus == "Accepted") ?? 0,
+            // Player count includes accepted members + pending join requests (UNION)
+            RegisteredPlayerCount = (evt.Divisions?.Where(d => d.IsActive).SelectMany(d => d.Units ?? Enumerable.Empty<EventUnit>()).Where(u => u.Status != "Cancelled").SelectMany(u => u.Members ?? Enumerable.Empty<EventUnitMember>()).Count(m => m.InviteStatus == "Accepted") ?? 0)
+                + (evt.Divisions?.Where(d => d.IsActive).SelectMany(d => d.Units ?? Enumerable.Empty<EventUnit>()).Where(u => u.Status != "Cancelled").SelectMany(u => u.JoinRequests ?? Enumerable.Empty<EventUnitJoinRequest>()).Count(jr => jr.Status == "Pending") ?? 0),
             DivisionCount = evt.Divisions?.Count(d => d.IsActive) ?? 0,
             PrimaryTeamSize = evt.Divisions?.Where(d => d.IsActive).GroupBy(d => d.TeamSize).OrderByDescending(g => g.Count()).Select(g => g.Key).FirstOrDefault() ?? 2,
             Distance = distance,
