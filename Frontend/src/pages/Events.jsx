@@ -1507,8 +1507,6 @@ function EventCard({ event, formatDate, formatTime, onViewDetails, showManage = 
 
 function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatDate, formatTime, formatPrice, teamUnits = [], skillLevels = [], ageGroups = [], onClose, onUpdate }) {
   const [activeTab, setActiveTab] = useState('details');
-  const [registrations, setRegistrations] = useState({});
-  const [partnerRequests, setPartnerRequests] = useState({});
   const [loading, setLoading] = useState(false);
   const [registeringDivision, setRegisteringDivision] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
@@ -1572,6 +1570,8 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
   const [divisionRegistrationsCache, setDivisionRegistrationsCache] = useState({});
   const [loadingDivisionId, setLoadingDivisionId] = useState(null);
   const [selectedRegDivisionId, setSelectedRegDivisionId] = useState(null);
+  const [regTabSearchQuery, setRegTabSearchQuery] = useState('');
+  const [regTabStatusFilter, setRegTabStatusFilter] = useState('');
   // Legacy modal state (kept for organizer manage tab)
   const [showRegistrationViewer, setShowRegistrationViewer] = useState(false);
   const [selectedDivisionForViewing, setSelectedDivisionForViewing] = useState(null);
@@ -2340,27 +2340,6 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
     link.download = `${event.name || 'event'}-registrations.csv`;
     link.click();
     URL.revokeObjectURL(link.href);
-  };
-
-  const loadDivisionData = async (divisionId) => {
-    setLoading(true);
-    try {
-      const [regsResponse, partnersResponse] = await Promise.all([
-        eventsApi.getRegistrations(event.id, divisionId),
-        eventsApi.getPartnerRequests(event.id, divisionId)
-      ]);
-
-      if (regsResponse.success) {
-        setRegistrations(prev => ({ ...prev, [divisionId]: regsResponse.data }));
-      }
-      if (partnersResponse.success) {
-        setPartnerRequests(prev => ({ ...prev, [divisionId]: partnersResponse.data }));
-      }
-    } catch (err) {
-      console.error('Error loading division data:', err);
-    } finally {
-      setLoading(false);
-    }
   };
 
   // Check if user can register for another division
@@ -3252,246 +3231,333 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
                 </div>
               )}
 
-              {/* Division Dropdown Selector */}
+              {/* Division Dropdown Selector with Search/Filters */}
               {event.divisions?.length > 0 && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Select Division</label>
-                  <select
-                    value={selectedRegDivisionId || ''}
-                    onChange={(e) => {
-                      const divId = parseInt(e.target.value);
-                      setSelectedRegDivisionId(divId || null);
-                      if (divId) {
-                        const div = event.divisions.find(d => d.id === divId);
-                        if (div && !divisionRegistrationsCache[divId]) {
-                          toggleDivisionExpand(div);
+                <div className="space-y-3">
+                  <div className="flex flex-wrap gap-2">
+                    {/* Division Dropdown */}
+                    <select
+                      value={selectedRegDivisionId === 'all' ? 'all' : (selectedRegDivisionId || '')}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val === 'all') {
+                          setSelectedRegDivisionId('all');
+                          // Load all division registrations
+                          event.divisions.forEach(div => {
+                            if (!divisionRegistrationsCache[div.id]) {
+                              toggleDivisionExpand(div);
+                            }
+                          });
+                        } else if (val) {
+                          const divId = parseInt(val);
+                          setSelectedRegDivisionId(divId);
+                          const div = event.divisions.find(d => d.id === divId);
+                          if (div && !divisionRegistrationsCache[divId]) {
+                            toggleDivisionExpand(div);
+                          }
+                        } else {
+                          setSelectedRegDivisionId(null);
                         }
-                      }
-                    }}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-                  >
-                    <option value="">-- Choose a division --</option>
-                    {event.divisions.map(div => (
-                      <option key={div.id} value={div.id}>
-                        {div.name} ({div.registeredCount || 0} registered{div.maxUnits ? ` / ${div.maxUnits}` : ''})
-                      </option>
-                    ))}
-                  </select>
+                      }}
+                      className="flex-1 min-w-[150px] px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-sm"
+                    >
+                      <option value="">-- Choose a division --</option>
+                      <option value="all">All Divisions</option>
+                      {event.divisions.map(div => (
+                        <option key={div.id} value={div.id}>
+                          {div.name} ({div.registeredCount || 0} registered{div.maxUnits ? ` / ${div.maxUnits}` : ''})
+                        </option>
+                      ))}
+                    </select>
+
+                    {/* Search Input */}
+                    <div className="relative flex-1 min-w-[150px]">
+                      <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                      <input
+                        type="text"
+                        value={regTabSearchQuery}
+                        onChange={(e) => setRegTabSearchQuery(e.target.value)}
+                        placeholder="Search by name..."
+                        className="w-full pl-8 pr-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                      />
+                    </div>
+
+                    {/* Status Filter */}
+                    <select
+                      value={regTabStatusFilter}
+                      onChange={(e) => setRegTabStatusFilter(e.target.value)}
+                      className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                    >
+                      <option value="">All Statuses</option>
+                      <option value="complete">Complete</option>
+                      <option value="looking">Looking for Partner</option>
+                    </select>
+                  </div>
                 </div>
               )}
 
-              {/* Selected Division Details */}
+              {/* Selected Division Details - Single Division or All Divisions */}
               {selectedRegDivisionId && (() => {
-                const division = event.divisions?.find(d => d.id === selectedRegDivisionId);
-                if (!division) return null;
+                // Helper function to filter units based on search and status
+                const filterUnits = (units) => {
+                  return units.filter(unit => {
+                    // Status filter
+                    if (regTabStatusFilter === 'complete' && !unit.isComplete) return false;
+                    if (regTabStatusFilter === 'looking' && unit.isComplete) return false;
 
-                const teamUnit = division.teamUnitId ? teamUnits.find(t => t.id === division.teamUnitId) : null;
-                const teamSize = teamUnit?.totalPlayers || division.teamSize || 1;
-                const isFull = division.maxUnits && division.registeredCount >= division.maxUnits;
-                const canRegisterForThisDivision = canRegisterForDivision(division.id) && isAuthenticated && canRegister();
+                    // Search filter - check if any member name matches
+                    if (regTabSearchQuery) {
+                      const query = regTabSearchQuery.toLowerCase();
+                      const hasMatch = unit.members?.some(member => {
+                        const fullName = `${member.firstName || ''} ${member.lastName || ''}`.toLowerCase();
+                        const reverseName = `${member.lastName || ''}, ${member.firstName || ''}`.toLowerCase();
+                        return fullName.includes(query) || reverseName.includes(query);
+                      });
+                      if (!hasMatch) return false;
+                    }
+                    return true;
+                  });
+                };
 
-                // Sort units: completed first, then incomplete
-                const sortedUnits = [...(divisionRegistrationsCache[division.id] || [])].sort((a, b) => {
-                  const aComplete = a.isComplete ? 1 : 0;
-                  const bComplete = b.isComplete ? 1 : 0;
-                  return bComplete - aComplete;
-                });
+                // Helper function to render a single division's registrations
+                const renderDivisionSection = (division, showDivisionHeader = false) => {
+                  const teamUnit = division.teamUnitId ? teamUnits.find(t => t.id === division.teamUnitId) : null;
+                  const teamSize = teamUnit?.totalPlayers || division.teamSize || 1;
+                  const isFull = division.maxUnits && division.registeredCount >= division.maxUnits;
+                  const canRegisterForThisDivision = canRegisterForDivision(division.id) && isAuthenticated && canRegister();
 
-                return (
-                  <div className="border rounded-lg overflow-hidden">
-                    {/* Simplified Division Header */}
-                    <div className="p-4 bg-gray-50 border-b">
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex-1">
-                          <h4 className="font-semibold text-gray-900 text-lg">{division.name}</h4>
-                          {division.description && (
-                            <p className="mt-1 text-sm text-gray-600">{division.description}</p>
+                  // Get all units, then filter, then sort
+                  const allUnits = divisionRegistrationsCache[division.id] || [];
+                  const filteredUnits = filterUnits(allUnits);
+
+                  // Sort units: completed first, then incomplete
+                  const sortedUnits = [...filteredUnits].sort((a, b) => {
+                    const aComplete = a.isComplete ? 1 : 0;
+                    const bComplete = b.isComplete ? 1 : 0;
+                    return bComplete - aComplete;
+                  });
+
+                  // Get original indices for numbering (before filtering)
+                  const allSortedUnits = [...allUnits].sort((a, b) => {
+                    const aComplete = a.isComplete ? 1 : 0;
+                    const bComplete = b.isComplete ? 1 : 0;
+                    return bComplete - aComplete;
+                  });
+                  const getOriginalIndex = (unit) => allSortedUnits.findIndex(u => u.id === unit.id);
+
+                  return (
+                    <div key={division.id} className="border rounded-lg overflow-hidden">
+                      {/* Division Header */}
+                      <div className="p-4 bg-gray-50 border-b">
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex-1">
+                            <h4 className="font-semibold text-gray-900 text-lg">{division.name}</h4>
+                            {division.description && (
+                              <p className="mt-1 text-sm text-gray-600">{division.description}</p>
+                            )}
+                          </div>
+
+                          {/* Registration Button */}
+                          {canRegisterForThisDivision ? (
+                            <button
+                              onClick={() => handleRegister(division.id)}
+                              disabled={registeringDivision === division.id}
+                              className="px-4 py-2 bg-orange-600 text-white rounded-lg text-sm font-medium hover:bg-orange-700 disabled:opacity-50 whitespace-nowrap"
+                            >
+                              {registeringDivision === division.id ? 'Registering...' : (isFull ? 'Join Waitlist' : 'Register')}
+                            </button>
+                          ) : event.registeredDivisionIds?.includes(division.id) ? (
+                            <span className="px-3 py-2 bg-green-100 text-green-700 rounded-lg text-sm font-medium whitespace-nowrap flex items-center gap-1.5">
+                              <CheckCircle className="w-4 h-4" />
+                              Registered
+                            </span>
+                          ) : null}
+                        </div>
+                      </div>
+
+                      {/* Registered Units List - Horizontal Cards */}
+                      <div className="bg-white">
+                        <div className="px-4 py-3 border-b bg-gray-50/50 flex items-center justify-between">
+                          <h5 className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                            <Users className="w-4 h-4" />
+                            {division.registeredCount || 0} {teamSize > 2 ? 'Teams' : teamSize === 2 ? 'Pairs' : 'Players'} Registered
+                            {division.waitlistedCount > 0 && <span className="text-yellow-600">(+{division.waitlistedCount} waitlisted)</span>}
+                            {(regTabSearchQuery || regTabStatusFilter) && sortedUnits.length !== allUnits.length && (
+                              <span className="text-gray-500">({sortedUnits.length} shown)</span>
+                            )}
+                          </h5>
+
+                          {/* Admin merge toolbar */}
+                          {isOrganizer && selectedUnitsForMerge.length > 0 && selectedUnitsForMerge[0]?.divisionId === division.id && (
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-gray-500">{selectedUnitsForMerge.length} selected</span>
+                              <button
+                                onClick={handleMergeUnits}
+                                disabled={selectedUnitsForMerge.length !== 2 || mergingUnits}
+                                className="px-3 py-1 text-xs font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-1"
+                              >
+                                {mergingUnits ? <Loader2 className="w-3 h-3 animate-spin" /> : <GitMerge className="w-3 h-3" />}
+                                Merge
+                              </button>
+                              <button
+                                onClick={() => setSelectedUnitsForMerge([])}
+                                className="px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100 rounded-lg"
+                              >
+                                Cancel
+                              </button>
+                            </div>
                           )}
                         </div>
 
-                        {/* Registration Button */}
-                        {canRegisterForThisDivision ? (
-                          <button
-                            onClick={() => handleRegister(division.id)}
-                            disabled={registeringDivision === division.id}
-                            className="px-4 py-2 bg-orange-600 text-white rounded-lg text-sm font-medium hover:bg-orange-700 disabled:opacity-50 whitespace-nowrap"
-                          >
-                            {registeringDivision === division.id ? 'Registering...' : (isFull ? 'Join Waitlist' : 'Register')}
-                          </button>
-                        ) : event.registeredDivisionIds?.includes(division.id) ? (
-                          <span className="px-3 py-2 bg-green-100 text-green-700 rounded-lg text-sm font-medium whitespace-nowrap flex items-center gap-1.5">
-                            <CheckCircle className="w-4 h-4" />
-                            Registered
-                          </span>
-                        ) : null}
-                      </div>
-                    </div>
+                        {loadingDivisionId === division.id ? (
+                          <div className="p-6 text-center text-gray-500">
+                            <Loader2 className="w-5 h-5 animate-spin mx-auto mb-2" />
+                            Loading registrations...
+                          </div>
+                        ) : sortedUnits.length === 0 ? (
+                          <div className="p-6 text-center text-gray-500">
+                            {(regTabSearchQuery || regTabStatusFilter) ? 'No registrations match your filters' : 'No registrations yet. Be the first to register!'}
+                          </div>
+                        ) : (
+                          <div className="divide-y divide-gray-100">
+                            {sortedUnits.map((unit, visibleIndex) => {
+                              const requiredPlayers = unit.requiredPlayers || teamSize;
+                              const isComplete = unit.isComplete;
+                              const originalIndex = getOriginalIndex(unit);
+                              const isSelected = selectedUnitsForMerge.some(u => u.id === unit.id);
 
-                    {/* Registered Units List - Horizontal Cards */}
-                    <div className="bg-white">
-                      <div className="px-4 py-3 border-b bg-gray-50/50 flex items-center justify-between">
-                        <h5 className="text-sm font-medium text-gray-700 flex items-center gap-2">
-                          <Users className="w-4 h-4" />
-                          {division.registeredCount || 0} {teamSize > 2 ? 'Teams' : teamSize === 2 ? 'Pairs' : 'Players'} Registered
-                          {division.waitlistedCount > 0 && <span className="text-yellow-600">(+{division.waitlistedCount} waitlisted)</span>}
-                        </h5>
+                              return (
+                                <div
+                                  key={unit.id || visibleIndex}
+                                  className={`px-4 py-3 flex items-center gap-3 ${
+                                    isComplete
+                                      ? 'bg-white'
+                                      : 'bg-amber-50/50'
+                                  } ${visibleIndex % 2 === 1 && isComplete ? 'bg-gray-50/50' : ''} ${isSelected ? 'ring-2 ring-blue-500 ring-inset' : ''}`}
+                                >
+                                  {/* Admin: Checkbox for merge selection (only for incomplete units) */}
+                                  {isOrganizer && !isComplete && (
+                                    <input
+                                      type="checkbox"
+                                      checked={isSelected}
+                                      onChange={() => toggleUnitSelection({ ...unit, divisionId: division.id })}
+                                      className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 shrink-0"
+                                    />
+                                  )}
 
-                        {/* Admin merge toolbar */}
-                        {isOrganizer && selectedUnitsForMerge.length > 0 && (
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs text-gray-500">{selectedUnitsForMerge.length} selected</span>
+                                  {/* Unit Number/Index - Uses original index to maintain consistent numbering */}
+                                  <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-medium shrink-0 ${
+                                    isComplete
+                                      ? 'bg-green-100 text-green-700'
+                                      : 'bg-amber-100 text-amber-700'
+                                  }`}>
+                                    {originalIndex + 1}
+                                  </div>
+
+                                  {/* Members - Horizontal Layout */}
+                                  <div className="flex-1 flex items-center gap-2 min-w-0 overflow-x-auto">
+                                    {unit.members?.map((member, mIdx) => (
+                                      <button
+                                        key={mIdx}
+                                        onClick={() => member.userId && setSelectedProfileUserId(member.userId)}
+                                        className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-white border border-gray-200 hover:border-orange-300 hover:bg-orange-50 transition-colors shrink-0"
+                                      >
+                                        {member.profileImageUrl ? (
+                                          <img src={getSharedAssetUrl(member.profileImageUrl)} alt="" className="w-5 h-5 rounded-full object-cover" />
+                                        ) : (
+                                          <div className="w-5 h-5 bg-orange-100 rounded-full flex items-center justify-center text-orange-700 text-xs font-medium">
+                                            {(member.firstName || 'P')[0].toUpperCase()}
+                                          </div>
+                                        )}
+                                        <span className="text-sm text-gray-700 max-w-[150px] truncate">
+                                          {member.lastName && member.firstName
+                                            ? `${member.lastName}, ${member.firstName}`
+                                            : member.lastName || member.firstName || 'Player'}
+                                        </span>
+                                        {member.inviteStatus === 'Pending' && (
+                                          <span className="text-xs text-amber-600">(pending)</span>
+                                        )}
+                                      </button>
+                                    ))}
+
+                                    {/* Empty slots for incomplete units */}
+                                    {!isComplete && Array.from({ length: requiredPlayers - (unit.members?.length || 0) }).map((_, i) => (
+                                      <div key={`empty-${i}`} className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-gray-100 border border-dashed border-gray-300 shrink-0">
+                                        <div className="w-5 h-5 bg-gray-200 rounded-full flex items-center justify-center text-gray-400 text-xs">?</div>
+                                        <span className="text-sm text-gray-400">Needed</span>
+                                      </div>
+                                    ))}
+                                  </div>
+
+                                  {/* Status Badge */}
+                                  <div className="shrink-0 flex items-center gap-2">
+                                    {isComplete ? (
+                                      <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium text-green-700 bg-green-100 rounded-full">
+                                        <Check className="w-3 h-3" />
+                                        Complete
+                                      </span>
+                                    ) : (
+                                      <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium text-amber-700 bg-amber-100 rounded-full">
+                                        <UserPlus className="w-3 h-3" />
+                                        Looking
+                                      </span>
+                                    )}
+
+                                    {/* Admin: Move to different division */}
+                                    {isOrganizer && event.divisions?.length > 1 && (
+                                      <button
+                                        onClick={() => {
+                                          setUnitToMove({ ...unit, divisionId: division.id, divisionName: division.name });
+                                          setShowMoveModal(true);
+                                        }}
+                                        className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded"
+                                        title="Move to different division"
+                                      >
+                                        <ArrowRight className="w-4 h-4" />
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+
+                        {/* Looking for Partner Option */}
+                        {teamSize > 1 && division.lookingForPartnerCount > 0 && canRegisterForThisDivision && (
+                          <div className="p-3 border-t bg-blue-50">
                             <button
-                              onClick={handleMergeUnits}
-                              disabled={selectedUnitsForMerge.length !== 2 || mergingUnits}
-                              className="px-3 py-1 text-xs font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-1"
+                              onClick={() => {
+                                setSelectedDivisionForRegistration(division);
+                                setShowTeamRegistration(true);
+                                loadUnitsLookingForPartners(division.id);
+                              }}
+                              className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg flex items-center justify-center gap-2 text-sm font-medium hover:bg-blue-700 transition-colors"
                             >
-                              {mergingUnits ? <Loader2 className="w-3 h-3 animate-spin" /> : <GitMerge className="w-3 h-3" />}
-                              Merge
-                            </button>
-                            <button
-                              onClick={() => setSelectedUnitsForMerge([])}
-                              className="px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100 rounded-lg"
-                            >
-                              Cancel
+                              <UserPlus className="w-4 h-4" />
+                              Join an existing {teamSize > 2 ? 'team' : 'pair'} ({division.lookingForPartnerCount} looking)
                             </button>
                           </div>
                         )}
                       </div>
-
-                      {loadingDivisionId === division.id ? (
-                        <div className="p-6 text-center text-gray-500">
-                          <Loader2 className="w-5 h-5 animate-spin mx-auto mb-2" />
-                          Loading registrations...
-                        </div>
-                      ) : sortedUnits.length === 0 ? (
-                        <div className="p-6 text-center text-gray-500">
-                          No registrations yet. Be the first to register!
-                        </div>
-                      ) : (
-                        <div className="divide-y divide-gray-100">
-                          {sortedUnits.map((unit, index) => {
-                            const requiredPlayers = unit.requiredPlayers || teamSize;
-                            const isComplete = unit.isComplete;
-                            const acceptedMembers = unit.members?.filter(m => m.inviteStatus === 'Accepted') || [];
-
-                            const isSelected = selectedUnitsForMerge.some(u => u.id === unit.id);
-
-                            return (
-                              <div
-                                key={unit.id || index}
-                                className={`px-4 py-3 flex items-center gap-3 ${
-                                  isComplete
-                                    ? 'bg-white'
-                                    : 'bg-amber-50/50'
-                                } ${index % 2 === 1 && isComplete ? 'bg-gray-50/50' : ''} ${isSelected ? 'ring-2 ring-blue-500 ring-inset' : ''}`}
-                              >
-                                {/* Admin: Checkbox for merge selection (only for incomplete units) */}
-                                {isOrganizer && !isComplete && (
-                                  <input
-                                    type="checkbox"
-                                    checked={isSelected}
-                                    onChange={() => toggleUnitSelection({ ...unit, divisionId: division.id })}
-                                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 shrink-0"
-                                  />
-                                )}
-
-                                {/* Unit Number/Index */}
-                                <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-medium shrink-0 ${
-                                  isComplete
-                                    ? 'bg-green-100 text-green-700'
-                                    : 'bg-amber-100 text-amber-700'
-                                }`}>
-                                  {index + 1}
-                                </div>
-
-                                {/* Members - Horizontal Layout */}
-                                <div className="flex-1 flex items-center gap-2 min-w-0 overflow-x-auto">
-                                  {unit.members?.map((member, mIdx) => (
-                                    <button
-                                      key={mIdx}
-                                      onClick={() => member.userId && setSelectedProfileUserId(member.userId)}
-                                      className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-white border border-gray-200 hover:border-orange-300 hover:bg-orange-50 transition-colors shrink-0"
-                                    >
-                                      {member.profileImageUrl ? (
-                                        <img src={getSharedAssetUrl(member.profileImageUrl)} alt="" className="w-5 h-5 rounded-full object-cover" />
-                                      ) : (
-                                        <div className="w-5 h-5 bg-orange-100 rounded-full flex items-center justify-center text-orange-700 text-xs font-medium">
-                                          {(member.firstName || 'P')[0].toUpperCase()}
-                                        </div>
-                                      )}
-                                      <span className="text-sm text-gray-700 max-w-[150px] truncate">
-                                        {member.lastName && member.firstName
-                                          ? `${member.lastName}, ${member.firstName}`
-                                          : member.lastName || member.firstName || 'Player'}
-                                      </span>
-                                      {member.inviteStatus === 'Pending' && (
-                                        <span className="text-xs text-amber-600">(pending)</span>
-                                      )}
-                                    </button>
-                                  ))}
-
-                                  {/* Empty slots for incomplete units */}
-                                  {!isComplete && Array.from({ length: requiredPlayers - (unit.members?.length || 0) }).map((_, i) => (
-                                    <div key={`empty-${i}`} className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-gray-100 border border-dashed border-gray-300 shrink-0">
-                                      <div className="w-5 h-5 bg-gray-200 rounded-full flex items-center justify-center text-gray-400 text-xs">?</div>
-                                      <span className="text-sm text-gray-400">Needed</span>
-                                    </div>
-                                  ))}
-                                </div>
-
-                                {/* Status Badge */}
-                                <div className="shrink-0 flex items-center gap-2">
-                                  {isComplete ? (
-                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium text-green-700 bg-green-100 rounded-full">
-                                      <Check className="w-3 h-3" />
-                                      Complete
-                                    </span>
-                                  ) : (
-                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium text-amber-700 bg-amber-100 rounded-full">
-                                      <UserPlus className="w-3 h-3" />
-                                      Looking
-                                    </span>
-                                  )}
-
-                                  {/* Admin: Move to different division */}
-                                  {isOrganizer && event.divisions?.length > 1 && (
-                                    <button
-                                      onClick={() => {
-                                        setUnitToMove({ ...unit, divisionId: division.id, divisionName: division.name });
-                                        setShowMoveModal(true);
-                                      }}
-                                      className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded"
-                                      title="Move to different division"
-                                    >
-                                      <ArrowRight className="w-4 h-4" />
-                                    </button>
-                                  )}
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-
-                      {/* Looking for Partner Option */}
-                      {teamSize > 1 && division.lookingForPartnerCount > 0 && canRegisterForThisDivision && (
-                        <div className="p-3 border-t bg-blue-50">
-                          <button
-                            onClick={() => {
-                              setSelectedDivisionForRegistration(division);
-                              setShowTeamRegistration(true);
-                              loadUnitsLookingForPartners(division.id);
-                            }}
-                            className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg flex items-center justify-center gap-2 text-sm font-medium hover:bg-blue-700 transition-colors"
-                          >
-                            <UserPlus className="w-4 h-4" />
-                            Join an existing {teamSize > 2 ? 'team' : 'pair'} ({division.lookingForPartnerCount} looking)
-                          </button>
-                        </div>
-                      )}
                     </div>
-                  </div>
-                );
+                  );
+                };
+
+                // Render based on mode: single division or all divisions
+                if (selectedRegDivisionId === 'all') {
+                  // All Divisions mode
+                  return (
+                    <div className="space-y-4">
+                      {event.divisions.map(division => renderDivisionSection(division, true))}
+                    </div>
+                  );
+                } else {
+                  // Single Division mode
+                  const division = event.divisions?.find(d => d.id === selectedRegDivisionId);
+                  if (!division) return null;
+                  return renderDivisionSection(division, false);
+                }
               })()}
 
               {/* No division selected prompt */}

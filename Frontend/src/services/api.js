@@ -816,15 +816,8 @@ export const eventsApi = {
   getRegistrations: (eventId, divisionId) =>
     api.get(`/events/${eventId}/divisions/${divisionId}/registrations`),
 
-  // Partner requests
-  createPartnerRequest: (eventId, data) =>
-    api.post(`/events/${eventId}/partner-request`, data),
-
-  getPartnerRequests: (eventId, divisionId) =>
-    api.get(`/events/${eventId}/divisions/${divisionId}/partner-requests`),
-
-  cancelPartnerRequest: (requestId) =>
-    api.delete(`/events/partner-request/${requestId}`),
+  // Note: Partner requests moved to tournamentApi (EventUnitJoinRequests)
+  // Use tournamentApi.requestToJoinUnit, tournamentApi.respondToJoinRequest, etc.
 
   // Get my events
   getMyEvents: () => api.get('/events/my'),

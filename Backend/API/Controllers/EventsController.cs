@@ -1091,6 +1091,8 @@ public class EventsController : ControllerBase
     }
 
     // POST: /events/{id}/partner-request - Create looking for partner request
+    // DEPRECATED: Use TournamentController.RegisterForEvent or RequestToJoinUnit instead
+    [Obsolete("Use TournamentController endpoints for registration and join requests")]
     [HttpPost("{id}/partner-request")]
     [Authorize]
     public async Task<ActionResult<ApiResponse<PartnerRequestDto>>> CreatePartnerRequest(int id, [FromBody] CreatePartnerRequestDto dto)
@@ -1155,6 +1157,8 @@ public class EventsController : ControllerBase
     }
 
     // GET: /events/{id}/divisions/{divisionId}/partner-requests - Get partner requests
+    // DEPRECATED: Use TournamentController.GetEventUnits to get units looking for partners
+    [Obsolete("Use TournamentController.GetEventUnits for units looking for partners")]
     [HttpGet("{id}/divisions/{divisionId}/partner-requests")]
     public async Task<ActionResult<ApiResponse<List<PartnerRequestDto>>>> GetPartnerRequests(int id, int divisionId)
     {
@@ -1192,6 +1196,8 @@ public class EventsController : ControllerBase
     }
 
     // DELETE: /events/partner-request/{requestId} - Cancel partner request
+    // DEPRECATED: Use TournamentController.CancelJoinRequest instead
+    [Obsolete("Use TournamentController.CancelJoinRequest instead")]
     [HttpDelete("partner-request/{requestId}")]
     [Authorize]
     public async Task<ActionResult<ApiResponse<bool>>> CancelPartnerRequest(int requestId)
