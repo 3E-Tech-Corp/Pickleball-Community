@@ -616,6 +616,19 @@ public class TournamentController : ControllerBase
         };
 
         _context.EventUnitJoinRequests.Add(joinRequest);
+
+        // Also create a membership record with PendingJoinRequest status
+        // This allows the user to pay early and shows up in their registrations
+        var membership = new EventUnitMember
+        {
+            UnitId = unitId,
+            UserId = userId.Value,
+            Role = "Player",
+            InviteStatus = "PendingJoinRequest",
+            CreatedAt = DateTime.Now
+        };
+        _context.EventUnitMembers.Add(membership);
+
         await _context.SaveChangesAsync();
 
         var user = await _context.Users.FindAsync(userId.Value);
@@ -660,17 +673,41 @@ public class TournamentController : ControllerBase
         joinRequest.ResponseMessage = request.Message;
         joinRequest.RespondedAt = DateTime.Now;
 
+        // Find and update the existing membership (created when join request was submitted)
+        var membership = await _context.EventUnitMembers
+            .FirstOrDefaultAsync(m => m.UnitId == joinRequest.UnitId &&
+                m.UserId == joinRequest.UserId &&
+                m.InviteStatus == "PendingJoinRequest");
+
         if (request.Accept)
         {
-            var member = new EventUnitMember
+            if (membership != null)
             {
-                UnitId = joinRequest.UnitId,
-                UserId = joinRequest.UserId,
-                Role = "Player",
-                InviteStatus = "Accepted",
-                CreatedAt = DateTime.Now
-            };
-            _context.EventUnitMembers.Add(member);
+                // Update existing membership to Accepted
+                membership.InviteStatus = "Accepted";
+                membership.RespondedAt = DateTime.Now;
+            }
+            else
+            {
+                // Fallback: create new membership if not found (for legacy requests)
+                var member = new EventUnitMember
+                {
+                    UnitId = joinRequest.UnitId,
+                    UserId = joinRequest.UserId,
+                    Role = "Player",
+                    InviteStatus = "Accepted",
+                    CreatedAt = DateTime.Now
+                };
+                _context.EventUnitMembers.Add(member);
+            }
+        }
+        else
+        {
+            // Declined - remove the pending membership
+            if (membership != null)
+            {
+                _context.EventUnitMembers.Remove(membership);
+            }
         }
 
         await _context.SaveChangesAsync();
@@ -700,6 +737,17 @@ public class TournamentController : ControllerBase
 
         if (joinRequest.Status != "Pending")
             return BadRequest(new ApiResponse<bool> { Success = false, Message = "Can only cancel pending requests" });
+
+        // Also remove the associated membership record
+        var membership = await _context.EventUnitMembers
+            .FirstOrDefaultAsync(m => m.UnitId == joinRequest.UnitId &&
+                m.UserId == joinRequest.UserId &&
+                m.InviteStatus == "PendingJoinRequest");
+
+        if (membership != null)
+        {
+            _context.EventUnitMembers.Remove(membership);
+        }
 
         _context.EventUnitJoinRequests.Remove(joinRequest);
         await _context.SaveChangesAsync();

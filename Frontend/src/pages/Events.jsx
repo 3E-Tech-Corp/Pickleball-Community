@@ -1279,10 +1279,12 @@ export default function Events() {
                             const isPairs = unit.requiredPlayers === 2;
                             const isCaptain = allMembers.some(m => m.isCurrentUser && m.role === 'Captain');
                             const currentUserMember = allMembers.find(m => m.isCurrentUser);
-                            const isCurrentUserPending = currentUserMember?.inviteStatus === 'Pending';
+                            const isInvitePending = currentUserMember?.inviteStatus === 'Pending';
+                            const isJoinRequestPending = currentUserMember?.inviteStatus === 'PendingJoinRequest';
+                            const hasAnyPendingStatus = isInvitePending || isJoinRequestPending;
 
                             return (
-                              <div key={unit.unitId} className={`rounded-lg p-3 ${isCurrentUserPending ? 'bg-yellow-50 border border-yellow-200' : 'bg-gray-50'}`}>
+                              <div key={unit.unitId} className={`rounded-lg p-3 ${hasAnyPendingStatus ? 'bg-yellow-50 border border-yellow-200' : 'bg-gray-50'}`}>
                                 <div className="flex items-center justify-between gap-2 mb-2">
                                   <div className="flex-1 min-w-0">
                                     <div className="flex items-center gap-2 flex-wrap">
@@ -1291,11 +1293,17 @@ export default function Events() {
                                         <span className="text-xs text-gray-500">• {unit.teamUnitName}</span>
                                       )}
                                       <span className="text-xs text-gray-400">
-                                        {unit.isComplete ? '• Team Complete' : `• ${allMembers.length}/${unit.requiredPlayers} players`}
+                                        {unit.isComplete ? '• Team Complete' : `• ${allMembers.filter(m => m.inviteStatus === 'Accepted').length}/${unit.requiredPlayers} players`}
                                       </span>
                                     </div>
-                                    {/* Show pending invite status for current user */}
-                                    {isCurrentUserPending && (
+                                    {/* Show pending status message for current user */}
+                                    {isJoinRequestPending && (
+                                      <div className="text-xs text-yellow-700 flex items-center gap-1 mt-1">
+                                        <Clock className="w-3 h-3" />
+                                        Awaiting captain approval
+                                      </div>
+                                    )}
+                                    {isInvitePending && (
                                       <div className="text-xs text-yellow-700 flex items-center gap-1 mt-1">
                                         <Clock className="w-3 h-3" />
                                         Awaiting your response to team invite
@@ -1305,8 +1313,12 @@ export default function Events() {
 
                                   {/* Status & Payment */}
                                   <div className="flex items-center gap-2 flex-shrink-0">
-                                    {/* Membership Status - show if current user has pending invite */}
-                                    {isCurrentUserPending ? (
+                                    {/* Membership Status - show if current user has pending status */}
+                                    {isJoinRequestPending ? (
+                                      <span className="px-2 py-0.5 text-xs rounded-full bg-yellow-100 text-yellow-700">
+                                        Awaiting Approval
+                                      </span>
+                                    ) : isInvitePending ? (
                                       <span className="px-2 py-0.5 text-xs rounded-full bg-yellow-100 text-yellow-700">
                                         Invite Pending
                                       </span>
@@ -1322,8 +1334,8 @@ export default function Events() {
                                         {unit.status === 'CheckedIn' ? 'Checked In' : unit.status || 'Registered'}
                                       </span>
                                     )}
-                                    {/* Pay Button */}
-                                    {unit.isComplete && unit.paymentStatus !== 'Paid' && (
+                                    {/* Pay Button - allow early payment even before team is complete or approval */}
+                                    {unit.paymentStatus !== 'Paid' && (
                                       <button
                                         onClick={(e) => {
                                           e.stopPropagation();
