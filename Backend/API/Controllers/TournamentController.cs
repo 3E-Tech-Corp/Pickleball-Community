@@ -1014,7 +1014,7 @@ public class TournamentController : ControllerBase
         // Generate reference ID if not already set (for matching payments)
         if (string.IsNullOrEmpty(unit.ReferenceId))
         {
-            unit.ReferenceId = $"E{eventId}-U{unitId}";
+            unit.ReferenceId = $"E{eventId}-U{unitId}-P{userId.Value}";
         }
 
         // Calculate amount due

@@ -77,7 +77,7 @@ public class EventUnit
     public string? PaymentReference { get; set; }
 
     /// <summary>
-    /// System-generated reference ID in format E{eventId}-U{unitId} for matching payments
+    /// System-generated reference ID in format E{eventId}-U{unitId}-P{userId} for matching payments
     /// </summary>
     [MaxLength(50)]
     public string? ReferenceId { get; set; }
