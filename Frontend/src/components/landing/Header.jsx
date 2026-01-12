@@ -231,8 +231,14 @@ const Header = () => {
               <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white leading-tight">
                 {isEnglish && theme?.heroTitle ? theme.heroTitle : t('defaultTitle')}
               </h1>
-              <p className="text-xl md:text-2xl text-white/90 mt-2">
+              <p className="text-xl md:text-2xl text-white/90 mt-2 font-semibold">
                 {isEnglish && theme?.heroSubtitle ? theme.heroSubtitle : t('defaultSubtitle')}
+              </p>
+              <p className="text-sm md:text-base text-green-300/90 mt-2 flex items-center gap-2">
+                <span className="inline-flex items-center px-2 py-0.5 bg-green-500/30 rounded-full text-xs font-bold uppercase tracking-wide">
+                  🤖 AI-Powered
+                </span>
+                {t('heroTagline', { defaultValue: '' })}
               </p>
             </div>
           </div>
