@@ -188,6 +188,28 @@ public class MyUnitsDto
     public List<EventUnitDto> ActiveUnits { get; set; } = new();
     public List<EventUnitDto> PendingInvitations { get; set; } = new();
     public List<UnitJoinRequestDto> PendingJoinRequestsAsCaption { get; set; } = new();
+    /// <summary>
+    /// Join requests the user has submitted to join other teams (awaiting captain approval)
+    /// </summary>
+    public List<MyPendingJoinRequestSummaryDto> MyPendingJoinRequests { get; set; } = new();
+}
+
+/// <summary>
+/// Summary of a pending join request the user has submitted
+/// </summary>
+public class MyPendingJoinRequestSummaryDto
+{
+    public int RequestId { get; set; }
+    public int EventId { get; set; }
+    public string EventName { get; set; } = string.Empty;
+    public int UnitId { get; set; }
+    public int DivisionId { get; set; }
+    public string DivisionName { get; set; } = string.Empty;
+    public string? TeamUnitName { get; set; }
+    public string? CaptainName { get; set; }
+    public string? CaptainProfileImageUrl { get; set; }
+    public string Status { get; set; } = "Pending";
+    public DateTime CreatedAt { get; set; }
 }
 
 public class RespondToInvitationRequest

@@ -332,6 +332,27 @@ export default function Events() {
     }
   };
 
+  // Handle canceling a pending join request from My Events tab
+  const [cancelingJoinRequest, setCancelingJoinRequest] = useState(null);
+  const handleCancelJoinRequest = async (requestId) => {
+    if (!confirm('Are you sure you want to cancel this join request?')) return;
+    setCancelingJoinRequest(requestId);
+    try {
+      const response = await tournamentApi.cancelJoinRequest(requestId);
+      if (response.success) {
+        toast.success('Join request cancelled');
+        loadMyUnits(); // Refresh to update the list
+      } else {
+        toast.error(response.message || 'Failed to cancel join request');
+      }
+    } catch (err) {
+      console.error('Error canceling join request:', err);
+      toast.error(err?.message || 'Failed to cancel join request');
+    } finally {
+      setCancelingJoinRequest(null);
+    }
+  };
+
   // Load events
   const loadEvents = useCallback(async () => {
     setLoading(true);
@@ -1160,6 +1181,60 @@ export default function Events() {
                   </div>
                 )}
 
+                {/* My Pending Join Requests */}
+                {myUnits?.myPendingJoinRequests?.length > 0 && (
+                  <div>
+                    <h2 className="text-lg font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                      <Clock className="w-5 h-5 text-yellow-500" />
+                      Pending Team Requests
+                    </h2>
+                    <div className="space-y-3">
+                      {myUnits.myPendingJoinRequests.map(request => (
+                        <div key={request.requestId} className="bg-yellow-50 rounded-lg border border-yellow-200 p-4">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              {request.captainProfileImageUrl ? (
+                                <img
+                                  src={getSharedAssetUrl(request.captainProfileImageUrl)}
+                                  alt=""
+                                  className="w-12 h-12 rounded-full object-cover"
+                                />
+                              ) : (
+                                <div className="w-12 h-12 rounded-full bg-yellow-100 flex items-center justify-center text-yellow-700 font-medium text-lg">
+                                  {request.captainName?.charAt(0) || '?'}
+                                </div>
+                              )}
+                              <div>
+                                <div className="font-medium text-gray-900">{request.eventName}</div>
+                                <div className="text-sm text-gray-700">{request.divisionName}</div>
+                                <div className="text-sm text-yellow-700 flex items-center gap-1 mt-1">
+                                  <Clock className="w-3 h-3" />
+                                  Awaiting approval from {request.captainName || 'team captain'}
+                                </div>
+                              </div>
+                            </div>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleCancelJoinRequest(request.requestId);
+                              }}
+                              disabled={cancelingJoinRequest === request.requestId}
+                              className="px-3 py-1.5 text-sm text-red-600 border border-red-200 rounded-lg hover:bg-red-50 disabled:opacity-50 flex items-center gap-1"
+                            >
+                              {cancelingJoinRequest === request.requestId ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <X className="w-4 h-4" />
+                              )}
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {/* Registered Events */}
                 {myEvents.eventsImRegisteredFor.length > 0 ? (
                   <div className="space-y-3">
@@ -1203,9 +1278,11 @@ export default function Events() {
                             const allMembers = unit.members || [];
                             const isPairs = unit.requiredPlayers === 2;
                             const isCaptain = allMembers.some(m => m.isCurrentUser && m.role === 'Captain');
+                            const currentUserMember = allMembers.find(m => m.isCurrentUser);
+                            const isCurrentUserPending = currentUserMember?.inviteStatus === 'Pending';
 
                             return (
-                              <div key={unit.unitId} className="bg-gray-50 rounded-lg p-3">
+                              <div key={unit.unitId} className={`rounded-lg p-3 ${isCurrentUserPending ? 'bg-yellow-50 border border-yellow-200' : 'bg-gray-50'}`}>
                                 <div className="flex items-center justify-between gap-2 mb-2">
                                   <div className="flex-1 min-w-0">
                                     <div className="flex items-center gap-2 flex-wrap">
@@ -1217,20 +1294,34 @@ export default function Events() {
                                         {unit.isComplete ? '• Team Complete' : `• ${allMembers.length}/${unit.requiredPlayers} players`}
                                       </span>
                                     </div>
+                                    {/* Show pending invite status for current user */}
+                                    {isCurrentUserPending && (
+                                      <div className="text-xs text-yellow-700 flex items-center gap-1 mt-1">
+                                        <Clock className="w-3 h-3" />
+                                        Awaiting your response to team invite
+                                      </div>
+                                    )}
                                   </div>
 
                                   {/* Status & Payment */}
                                   <div className="flex items-center gap-2 flex-shrink-0">
-                                    {/* Unit Status */}
-                                    <span className={`px-2 py-0.5 text-xs rounded-full ${
-                                      unit.status === 'CheckedIn' ? 'bg-purple-100 text-purple-700' :
-                                      unit.status === 'Confirmed' ? 'bg-blue-100 text-blue-700' :
-                                      unit.status === 'Waitlisted' ? 'bg-yellow-100 text-yellow-700' :
-                                      unit.status === 'Cancelled' ? 'bg-red-100 text-red-700' :
-                                      'bg-green-100 text-green-700'
-                                    }`}>
-                                      {unit.status === 'CheckedIn' ? 'Checked In' : unit.status || 'Registered'}
-                                    </span>
+                                    {/* Membership Status - show if current user has pending invite */}
+                                    {isCurrentUserPending ? (
+                                      <span className="px-2 py-0.5 text-xs rounded-full bg-yellow-100 text-yellow-700">
+                                        Invite Pending
+                                      </span>
+                                    ) : (
+                                      /* Unit Status */
+                                      <span className={`px-2 py-0.5 text-xs rounded-full ${
+                                        unit.status === 'CheckedIn' ? 'bg-purple-100 text-purple-700' :
+                                        unit.status === 'Confirmed' ? 'bg-blue-100 text-blue-700' :
+                                        unit.status === 'Waitlisted' ? 'bg-yellow-100 text-yellow-700' :
+                                        unit.status === 'Cancelled' ? 'bg-red-100 text-red-700' :
+                                        'bg-green-100 text-green-700'
+                                      }`}>
+                                        {unit.status === 'CheckedIn' ? 'Checked In' : unit.status || 'Registered'}
+                                      </span>
+                                    )}
                                     {/* Pay Button */}
                                     {unit.isComplete && unit.paymentStatus !== 'Paid' && (
                                       <button

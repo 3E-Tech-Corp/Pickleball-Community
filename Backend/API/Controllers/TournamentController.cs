@@ -770,6 +770,32 @@ public class TournamentController : ControllerBase
             .Select(m => MapToEventUnitDto(m.Unit!))
             .ToList();
 
+        // Get user's own pending join requests (requests they submitted to join other teams)
+        var myPendingJoinRequests = await _context.EventUnitJoinRequests
+            .Include(r => r.Unit)
+                .ThenInclude(u => u!.Division)
+                    .ThenInclude(d => d!.TeamUnit)
+            .Include(r => r.Unit)
+                .ThenInclude(u => u!.Event)
+            .Include(r => r.Unit)
+                .ThenInclude(u => u!.Captain)
+            .Where(r => r.UserId == userId.Value && r.Status == "Pending")
+            .Select(r => new MyPendingJoinRequestSummaryDto
+            {
+                RequestId = r.Id,
+                EventId = r.Unit!.EventId,
+                EventName = r.Unit.Event != null ? r.Unit.Event.Name : "",
+                UnitId = r.UnitId,
+                DivisionId = r.Unit.DivisionId,
+                DivisionName = r.Unit.Division != null ? r.Unit.Division.Name : "",
+                TeamUnitName = r.Unit.Division != null && r.Unit.Division.TeamUnit != null ? r.Unit.Division.TeamUnit.Name : null,
+                CaptainName = r.Unit.Captain != null ? $"{r.Unit.Captain.FirstName} {r.Unit.Captain.LastName}".Trim() : null,
+                CaptainProfileImageUrl = r.Unit.Captain != null ? r.Unit.Captain.ProfileImageUrl : null,
+                Status = r.Status,
+                CreatedAt = r.CreatedAt
+            })
+            .ToListAsync();
+
         return Ok(new ApiResponse<MyUnitsDto>
         {
             Success = true,
@@ -777,7 +803,8 @@ public class TournamentController : ControllerBase
             {
                 ActiveUnits = activeUnits,
                 PendingInvitations = pendingInvitations,
-                PendingJoinRequestsAsCaption = pendingJoinRequests
+                PendingJoinRequestsAsCaption = pendingJoinRequests,
+                MyPendingJoinRequests = myPendingJoinRequests
             }
         });
     }
