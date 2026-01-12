@@ -91,6 +91,12 @@ public class EventUnitDto
     public string? CaptainName { get; set; }
     public string? CaptainProfileImageUrl { get; set; }
 
+    /// <summary>
+    /// High-level registration status: "Waiting for Captain Accept", "Looking for Partner", "Team Complete"
+    /// Computed from unit completeness and member statuses
+    /// </summary>
+    public string RegistrationStatus { get; set; } = "Team Complete";
+
     // Stats
     public int MatchesPlayed { get; set; }
     public int MatchesWon { get; set; }
@@ -101,7 +107,7 @@ public class EventUnitDto
     public int PointsAgainst { get; set; }
     public int PointDifferential => PointsScored - PointsAgainst;
 
-    // Members (includes accepted members, pending invites, and pending join requests via UNION)
+    // Members (includes accepted members, pending invites, and pending join requests - no duplicates)
     public List<EventUnitMemberDto> Members { get; set; } = new();
 
     // Team unit info

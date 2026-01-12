@@ -429,6 +429,12 @@ public class MyRegistrationUnitDto
     public bool NeedsPartner { get; set; }
     public string Status { get; set; } = "Registered";
 
+    /// <summary>
+    /// High-level registration status: "Waiting for Captain Accept", "Looking for Partner", "Team Complete"
+    /// Computed from unit completeness and member statuses
+    /// </summary>
+    public string RegistrationStatus { get; set; } = "Team Complete";
+
     // Payment info
     public string PaymentStatus { get; set; } = "Pending";
     public decimal AmountDue { get; set; }

@@ -1318,6 +1318,25 @@ public class EventsController : ControllerBase
                         var isComplete = acceptedMembers >= requiredPlayers;
                         var amountDue = evt.RegistrationFee + (division?.DivisionFee ?? 0m);
 
+                        // Check for pending invites or join requests
+                        var hasPendingInvites = unit.Members.Any(mem => mem.InviteStatus == "Pending");
+                        var hasPendingJoinRequests = unit.Members.Any(mem => mem.InviteStatus == "PendingJoinRequest");
+
+                        // Compute registration status
+                        string registrationStatus;
+                        if (isComplete)
+                        {
+                            registrationStatus = "Team Complete";
+                        }
+                        else if (hasPendingInvites || hasPendingJoinRequests)
+                        {
+                            registrationStatus = "Waiting for Captain Accept";
+                        }
+                        else
+                        {
+                            registrationStatus = "Looking for Partner";
+                        }
+
                         return new MyRegistrationUnitDto
                         {
                             UnitId = unit.Id,
@@ -1328,18 +1347,24 @@ public class EventsController : ControllerBase
                             IsComplete = isComplete,
                             NeedsPartner = !isComplete && requiredPlayers > 1,
                             Status = unit.Status,
+                            RegistrationStatus = registrationStatus,
                             PaymentStatus = unit.PaymentStatus,
                             AmountDue = amountDue,
                             AmountPaid = unit.AmountPaid,
-                            Members = unit.Members.Select(mem => new TeamMemberDto
-                            {
-                                UserId = mem.UserId,
-                                Name = mem.User != null ? $"{mem.User.FirstName} {mem.User.LastName}".Trim() : "Unknown",
-                                ProfileImageUrl = mem.User?.ProfileImageUrl,
-                                Role = mem.Role,
-                                InviteStatus = mem.InviteStatus,
-                                IsCurrentUser = mem.UserId == userId.Value
-                            }).ToList()
+                            // Filter out duplicate members (those with PendingJoinRequest status that also appear as join requests)
+                            Members = unit.Members
+                                .GroupBy(mem => mem.UserId)
+                                .Select(grp => grp.First()) // Keep only one entry per user
+                                .Select(mem => new TeamMemberDto
+                                {
+                                    UserId = mem.UserId,
+                                    // Name format: "Last, First"
+                                    Name = FormatName(mem.User?.LastName, mem.User?.FirstName),
+                                    ProfileImageUrl = mem.User?.ProfileImageUrl,
+                                    Role = mem.Role,
+                                    InviteStatus = mem.InviteStatus,
+                                    IsCurrentUser = mem.UserId == userId.Value
+                                }).ToList()
                         };
                     }).ToList();
 
@@ -2087,5 +2112,19 @@ public class EventsController : ControllerBase
         if (!string.IsNullOrEmpty(state))
             return state;
         return null;
+    }
+
+    /// <summary>
+    /// Format name as "Last, First" when both are available
+    /// </summary>
+    private static string FormatName(string? lastName, string? firstName)
+    {
+        if (!string.IsNullOrWhiteSpace(lastName) && !string.IsNullOrWhiteSpace(firstName))
+            return $"{lastName}, {firstName}";
+        if (!string.IsNullOrWhiteSpace(lastName))
+            return lastName;
+        if (!string.IsNullOrWhiteSpace(firstName))
+            return firstName;
+        return "Unknown";
     }
 }

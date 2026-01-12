@@ -2219,6 +2219,29 @@ public class TournamentController : ControllerBase
     {
         var teamSize = u.Division?.TeamUnit?.TotalPlayers ?? 1;
         var acceptedMembers = u.Members.Where(m => m.InviteStatus == "Accepted").ToList();
+        var isComplete = acceptedMembers.Count >= teamSize;
+
+        // Get pending join requests
+        var pendingJoinRequests = (u.JoinRequests ?? new List<EventUnitJoinRequest>())
+            .Where(jr => jr.Status == "Pending")
+            .ToList();
+        var pendingJoinRequestUserIds = pendingJoinRequests.Select(jr => jr.UserId).ToHashSet();
+
+        // Compute registration status
+        string registrationStatus;
+        if (isComplete)
+        {
+            registrationStatus = "Team Complete";
+        }
+        else if (u.Members.Any(m => m.InviteStatus == "Pending") || pendingJoinRequests.Any())
+        {
+            // Has pending invites or join requests awaiting captain response
+            registrationStatus = "Waiting for Captain Accept";
+        }
+        else
+        {
+            registrationStatus = "Looking for Partner";
+        }
 
         return new EventUnitDto
         {
@@ -2233,8 +2256,10 @@ public class TournamentController : ControllerBase
             Status = u.Status,
             WaitlistPosition = u.WaitlistPosition,
             CaptainUserId = u.CaptainUserId,
-            CaptainName = u.Captain != null ? $"{u.Captain.FirstName} {u.Captain.LastName}" : null,
+            // Name format: "Last, First"
+            CaptainName = u.Captain != null ? FormatName(u.Captain.LastName, u.Captain.FirstName) : null,
             CaptainProfileImageUrl = u.Captain?.ProfileImageUrl,
+            RegistrationStatus = registrationStatus,
             MatchesPlayed = u.MatchesPlayed,
             MatchesWon = u.MatchesWon,
             MatchesLost = u.MatchesLost,
@@ -2244,7 +2269,7 @@ public class TournamentController : ControllerBase
             PointsAgainst = u.PointsAgainst,
             TeamUnitId = u.Division?.TeamUnitId,
             RequiredPlayers = teamSize,
-            IsComplete = acceptedMembers.Count >= teamSize,
+            IsComplete = isComplete,
             AllCheckedIn = acceptedMembers.All(m => m.IsCheckedIn),
             // Payment info
             PaymentStatus = u.PaymentStatus ?? "Pending",
@@ -2255,23 +2280,24 @@ public class TournamentController : ControllerBase
             ReferenceId = u.ReferenceId,
             PaidAt = u.PaidAt,
             CreatedAt = u.CreatedAt,
-            // UNION: Combine members with pending join requests into single Members list
-            Members = u.Members.Select(m => new EventUnitMemberDto
-            {
-                Id = m.Id,
-                UserId = m.UserId,
-                FirstName = m.User?.FirstName,
-                LastName = m.User?.LastName,
-                ProfileImageUrl = m.User?.ProfileImageUrl,
-                Role = m.Role,
-                InviteStatus = m.InviteStatus,
-                IsCheckedIn = m.IsCheckedIn,
-                CheckedInAt = m.CheckedInAt,
-                JoinRequestId = null
-            }).Concat(
-                (u.JoinRequests ?? new List<EventUnitJoinRequest>())
-                    .Where(jr => jr.Status == "Pending")
-                    .Select(jr => new EventUnitMemberDto
+            // Combine members with pending join requests into single Members list
+            // Exclude members with PendingJoinRequest status to avoid duplicates (they appear in JoinRequests)
+            Members = u.Members
+                .Where(m => m.InviteStatus != "PendingJoinRequest" || !pendingJoinRequestUserIds.Contains(m.UserId))
+                .Select(m => new EventUnitMemberDto
+                {
+                    Id = m.Id,
+                    UserId = m.UserId,
+                    FirstName = m.User?.FirstName,
+                    LastName = m.User?.LastName,
+                    ProfileImageUrl = m.User?.ProfileImageUrl,
+                    Role = m.Role,
+                    InviteStatus = m.InviteStatus,
+                    IsCheckedIn = m.IsCheckedIn,
+                    CheckedInAt = m.CheckedInAt,
+                    JoinRequestId = null
+                }).Concat(
+                    pendingJoinRequests.Select(jr => new EventUnitMemberDto
                     {
                         Id = 0, // No member ID for join requests
                         UserId = jr.UserId,
@@ -2284,8 +2310,22 @@ public class TournamentController : ControllerBase
                         CheckedInAt = null,
                         JoinRequestId = jr.Id // Store join request ID for accept/reject actions
                     })
-            ).ToList()
+                ).ToList()
         };
+    }
+
+    /// <summary>
+    /// Format name as "Last, First" when both are available
+    /// </summary>
+    private static string FormatName(string? lastName, string? firstName)
+    {
+        if (!string.IsNullOrWhiteSpace(lastName) && !string.IsNullOrWhiteSpace(firstName))
+            return $"{lastName}, {firstName}";
+        if (!string.IsNullOrWhiteSpace(lastName))
+            return lastName;
+        if (!string.IsNullOrWhiteSpace(firstName))
+            return firstName;
+        return "Unknown";
     }
 
     private EventMatchDto MapToMatchDto(EventMatch m)

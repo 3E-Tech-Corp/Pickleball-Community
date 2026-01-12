@@ -1283,6 +1283,9 @@ export default function Events() {
                             const isJoinRequestPending = currentUserMember?.inviteStatus === 'PendingJoinRequest';
                             const hasAnyPendingStatus = isInvitePending || isJoinRequestPending;
 
+                            // Use registrationStatus from backend
+                            const registrationStatus = unit.registrationStatus || (unit.isComplete ? 'Team Complete' : 'Looking for Partner');
+
                             return (
                               <div key={unit.unitId} className={`rounded-lg p-3 ${hasAnyPendingStatus ? 'bg-yellow-50 border border-yellow-200' : 'bg-gray-50'}`}>
                                 <div className="flex items-center justify-between gap-2 mb-2">
@@ -1293,10 +1296,10 @@ export default function Events() {
                                         <span className="text-xs text-gray-500">• {unit.teamUnitName}</span>
                                       )}
                                       <span className="text-xs text-gray-400">
-                                        {unit.isComplete ? '• Team Complete' : `• ${allMembers.filter(m => m.inviteStatus === 'Accepted').length}/${unit.requiredPlayers} players`}
+                                        • {allMembers.filter(m => m.inviteStatus === 'Accepted').length}/{unit.requiredPlayers} players
                                       </span>
                                     </div>
-                                    {/* Show pending status message for current user */}
+                                    {/* Show user-specific pending message */}
                                     {isJoinRequestPending && (
                                       <div className="text-xs text-yellow-700 flex items-center gap-1 mt-1">
                                         <Clock className="w-3 h-3" />
@@ -1313,25 +1316,25 @@ export default function Events() {
 
                                   {/* Status & Payment */}
                                   <div className="flex items-center gap-2 flex-shrink-0">
-                                    {/* Membership Status - show if current user has pending status */}
-                                    {isJoinRequestPending ? (
-                                      <span className="px-2 py-0.5 text-xs rounded-full bg-yellow-100 text-yellow-700">
-                                        Awaiting Approval
-                                      </span>
-                                    ) : isInvitePending ? (
-                                      <span className="px-2 py-0.5 text-xs rounded-full bg-yellow-100 text-yellow-700">
-                                        Invite Pending
-                                      </span>
-                                    ) : (
-                                      /* Unit Status */
+                                    {/* Registration Status Badge */}
+                                    <span className={`px-2 py-0.5 text-xs rounded-full ${
+                                      registrationStatus === 'Team Complete' ? 'bg-green-100 text-green-700' :
+                                      registrationStatus === 'Looking for Partner' ? 'bg-amber-100 text-amber-700' :
+                                      registrationStatus === 'Waiting for Captain Accept' ? 'bg-yellow-100 text-yellow-700' :
+                                      'bg-gray-100 text-gray-600'
+                                    }`}>
+                                      {registrationStatus}
+                                    </span>
+                                    {/* Unit Status Badge - only show if different from default */}
+                                    {unit.status && unit.status !== 'Registered' && (
                                       <span className={`px-2 py-0.5 text-xs rounded-full ${
                                         unit.status === 'CheckedIn' ? 'bg-purple-100 text-purple-700' :
                                         unit.status === 'Confirmed' ? 'bg-blue-100 text-blue-700' :
                                         unit.status === 'Waitlisted' ? 'bg-yellow-100 text-yellow-700' :
                                         unit.status === 'Cancelled' ? 'bg-red-100 text-red-700' :
-                                        'bg-green-100 text-green-700'
+                                        'bg-gray-100 text-gray-600'
                                       }`}>
-                                        {unit.status === 'CheckedIn' ? 'Checked In' : unit.status || 'Registered'}
+                                        {unit.status === 'CheckedIn' ? 'Checked In' : unit.status}
                                       </span>
                                     )}
                                     {/* Pay Button - allow early payment even before team is complete or approval */}
@@ -3499,8 +3502,9 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
                       className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                     >
                       <option value="">All Statuses</option>
-                      <option value="complete">Complete</option>
+                      <option value="complete">Team Complete</option>
                       <option value="looking">Looking for Partner</option>
+                      <option value="waiting">Waiting for Captain Accept</option>
                     </select>
                   </div>
                 </div>
@@ -3511,9 +3515,11 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
                 // Helper function to filter units based on search and status
                 const filterUnits = (units) => {
                   return units.filter(unit => {
-                    // Status filter
-                    if (regTabStatusFilter === 'complete' && !unit.isComplete) return false;
-                    if (regTabStatusFilter === 'looking' && unit.isComplete) return false;
+                    // Status filter using registrationStatus
+                    const regStatus = unit.registrationStatus || (unit.isComplete ? 'Team Complete' : 'Looking for Partner');
+                    if (regTabStatusFilter === 'complete' && regStatus !== 'Team Complete') return false;
+                    if (regTabStatusFilter === 'looking' && regStatus !== 'Looking for Partner') return false;
+                    if (regTabStatusFilter === 'waiting' && regStatus !== 'Waiting for Captain Accept') return false;
 
                     // Search filter - check if any member name matches (includes join requests via UNION)
                     if (regTabSearchQuery) {
@@ -3715,19 +3721,33 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
                                     ))}
                                   </div>
 
-                                  {/* Status Badge */}
+                                  {/* Registration Status Badge */}
                                   <div className="shrink-0 flex items-center gap-2">
-                                    {isComplete ? (
-                                      <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium text-green-700 bg-green-100 rounded-full">
-                                        <Check className="w-3 h-3" />
-                                        Complete
-                                      </span>
-                                    ) : (
-                                      <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium text-amber-700 bg-amber-100 rounded-full">
-                                        <UserPlus className="w-3 h-3" />
-                                        Looking
-                                      </span>
-                                    )}
+                                    {(() => {
+                                      const regStatus = unit.registrationStatus || (isComplete ? 'Team Complete' : 'Looking for Partner');
+                                      if (regStatus === 'Team Complete') {
+                                        return (
+                                          <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium text-green-700 bg-green-100 rounded-full">
+                                            <Check className="w-3 h-3" />
+                                            Team Complete
+                                          </span>
+                                        );
+                                      } else if (regStatus === 'Waiting for Captain Accept') {
+                                        return (
+                                          <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium text-yellow-700 bg-yellow-100 rounded-full">
+                                            <Clock className="w-3 h-3" />
+                                            Waiting for Captain Accept
+                                          </span>
+                                        );
+                                      } else {
+                                        return (
+                                          <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium text-amber-700 bg-amber-100 rounded-full">
+                                            <UserPlus className="w-3 h-3" />
+                                            Looking for Partner
+                                          </span>
+                                        );
+                                      }
+                                    })()}
 
                                     {/* Admin: Move to different division */}
                                     {isOrganizer && event.divisions?.length > 1 && (
