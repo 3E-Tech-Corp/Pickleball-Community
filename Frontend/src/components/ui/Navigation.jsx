@@ -104,7 +104,6 @@ const Navigation = () => {
   // Primary navigation - most used (Home removed since logo links to dashboard)
   const primaryNav = [
     { name: t('events'), href: '/events', icon: Calendar },
-    { name: t('instaGame'), href: '/instagame', icon: Zap },
     { name: t('venues'), href: '/venues', icon: MapPin },
     { name: t('clubs'), href: '/clubs', icon: Users },
   ];
@@ -162,6 +161,13 @@ const Navigation = () => {
       name: t('adminDashboard'),
       href: '/admin/dashboard',
       icon: School2Icon,
+      isAdmin: true
+    }] : []),
+    // InstaGame - admin only for testing
+    ...(isAdmin ? [{
+      name: t('instaGame'),
+      href: '/instagame',
+      icon: Zap,
       isAdmin: true
     }] : []),
     // League Admin links - only shown for non-admin league managers
@@ -522,16 +528,26 @@ const Navigation = () => {
                   </Link>
                 </div>
 
-                {/* Admin link if admin */}
+                {/* Admin links if admin */}
                 {isAdmin && (
-                  <Link
-                    to="/admin/dashboard"
-                    className="flex items-center space-x-2 px-3 py-2 mb-3 text-purple-600 bg-purple-50 hover:bg-purple-100 rounded-lg transition-colors font-medium text-sm"
-                    onClick={() => setIsOpen(false)}
-                  >
-                    <School2Icon className="w-4 h-4" />
-                    <span>{t('adminDashboard')}</span>
-                  </Link>
+                  <div className="space-y-2 mb-3">
+                    <Link
+                      to="/admin/dashboard"
+                      className="flex items-center space-x-2 px-3 py-2 text-purple-600 bg-purple-50 hover:bg-purple-100 rounded-lg transition-colors font-medium text-sm"
+                      onClick={() => setIsOpen(false)}
+                    >
+                      <School2Icon className="w-4 h-4" />
+                      <span>{t('adminDashboard')}</span>
+                    </Link>
+                    <Link
+                      to="/instagame"
+                      className="flex items-center space-x-2 px-3 py-2 text-purple-600 bg-purple-50 hover:bg-purple-100 rounded-lg transition-colors font-medium text-sm"
+                      onClick={() => setIsOpen(false)}
+                    >
+                      <Zap className="w-4 h-4" />
+                      <span>{t('instaGame')}</span>
+                    </Link>
+                  </div>
                 )}
 
                 {/* League Admin links for non-admin league managers */}
