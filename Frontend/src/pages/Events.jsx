@@ -3581,6 +3581,8 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
                               const isComplete = unit.isComplete;
                               const originalIndex = getOriginalIndex(unit);
                               const isSelected = selectedUnitsForMerge.some(u => u.id === unit.id);
+                              const hasPendingInvite = unit.members?.some(m => m.inviteStatus === 'Pending');
+                              const hasJoinRequest = unit.members?.some(m => m.inviteStatus === 'Requested');
 
                               return (
                                 <div
@@ -3602,10 +3604,15 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
                                   )}
 
                                   {/* Unit Number/Index - Uses original index to maintain consistent numbering */}
+                                  {/* Color matches member status: green=complete, yellow=pending invite, blue=join request, amber=looking */}
                                   <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-medium shrink-0 ${
                                     isComplete
                                       ? 'bg-green-100 text-green-700'
-                                      : 'bg-amber-100 text-amber-700'
+                                      : hasPendingInvite
+                                        ? 'bg-yellow-100 text-yellow-700'
+                                        : hasJoinRequest
+                                          ? 'bg-blue-100 text-blue-700'
+                                          : 'bg-amber-100 text-amber-700'
                                   }`}>
                                     {originalIndex + 1}
                                   </div>
@@ -3661,7 +3668,7 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
                                     ))}
                                   </div>
 
-                                  {/* Registration Status Badge */}
+                                  {/* Registration Status Badge - color matches unit number */}
                                   <div className="shrink-0 flex items-center gap-2">
                                     {(() => {
                                       const regStatus = unit.registrationStatus || (isComplete ? 'Team Complete' : 'Looking for Partner');
@@ -3672,11 +3679,18 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
                                             Team Complete
                                           </span>
                                         );
-                                      } else if (regStatus === 'Waiting for Captain Accept') {
+                                      } else if (regStatus === 'Waiting for Captain Accept' || hasJoinRequest) {
+                                        return (
+                                          <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium text-blue-700 bg-blue-100 rounded-full">
+                                            <Clock className="w-3 h-3" />
+                                            Waiting for Captain Accept
+                                          </span>
+                                        );
+                                      } else if (hasPendingInvite) {
                                         return (
                                           <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium text-yellow-700 bg-yellow-100 rounded-full">
                                             <Clock className="w-3 h-3" />
-                                            Waiting for Captain Accept
+                                            Pending Acceptance
                                           </span>
                                         );
                                       } else {
