@@ -2336,6 +2336,49 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
     }
   };
 
+  // Remove a player from a unit (from registration tab)
+  const handleRemovePlayerFromUnit = async (unit, member, division) => {
+    const memberName = member.lastName && member.firstName
+      ? `${member.lastName}, ${member.firstName}`
+      : member.lastName || member.firstName || 'Player';
+    if (!confirm(`Remove ${memberName} from ${division.name}?`)) return;
+
+    try {
+      const response = await tournamentApi.removeRegistration(event.id, unit.id, member.userId);
+      if (response.success) {
+        // Update the divisionRegistrationsCache to remove this member
+        setDivisionRegistrationsCache(prev => {
+          const updated = { ...prev };
+          if (updated[division.id]) {
+            updated[division.id] = updated[division.id].map(u => {
+              if (u.id === unit.id) {
+                const newMembers = u.members.filter(m => m.userId !== member.userId);
+                // If no members left, remove the unit entirely
+                if (newMembers.length === 0) {
+                  return null;
+                }
+                return { ...u, members: newMembers };
+              }
+              return u;
+            }).filter(Boolean);
+          }
+          return updated;
+        });
+        toast.success('Player removed');
+        // Refresh event data
+        const updatedEventResponse = await eventsApi.getEvent(event.id);
+        if (updatedEventResponse.success) {
+          onUpdate(updatedEventResponse.data);
+        }
+      } else {
+        toast.error(response.message || 'Failed to remove player');
+      }
+    } catch (err) {
+      console.error('Error removing player:', err);
+      toast.error(err?.message || 'Failed to remove player');
+    }
+  };
+
   // Handle accepting/declining join requests
   const handleRespondToJoinRequest = async (requestId, accept) => {
     try {
@@ -2404,6 +2447,77 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
         player2,
         unit.paymentStatus || 'Pending',
         unit.registeredAt ? new Date(unit.registeredAt).toLocaleDateString() : ''
+      ];
+    });
+
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.map(cell => `"${(cell || '').replace(/"/g, '""')}"`).join(','))
+    ].join('\n');
+
+    // Add UTF-8 BOM for Excel unicode support
+    const BOM = '\uFEFF';
+    const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `${event.name || 'event'}-registrations.csv`;
+    link.click();
+    URL.revokeObjectURL(link.href);
+  };
+
+  // Download registrations from registration tab (uses divisionRegistrationsCache)
+  const downloadRegistrationTabCSV = () => {
+    // Collect all units from all divisions in the cache
+    const allUnits = [];
+    Object.entries(divisionRegistrationsCache).forEach(([divisionId, units]) => {
+      const division = event.divisions?.find(d => d.id === parseInt(divisionId));
+      const divisionName = division?.name || `Division ${divisionId}`;
+      units.forEach(unit => {
+        allUnits.push({
+          ...unit,
+          divisionId: parseInt(divisionId),
+          divisionName
+        });
+      });
+    });
+
+    if (allUnits.length === 0) {
+      toast.error('No registrations to download. Select a division first.');
+      return;
+    }
+
+    // Sort by division name, then by registration date
+    allUnits.sort((a, b) => {
+      if (a.divisionName !== b.divisionName) {
+        return (a.divisionName || '').localeCompare(b.divisionName || '');
+      }
+      return new Date(a.createdAt || 0) - new Date(b.createdAt || 0);
+    });
+
+    // Track unit number per division
+    const divisionUnitCounts = {};
+
+    const headers = ['Division', 'Unit #', 'Player 1', 'Player 2', 'Payment Status', 'Registered At'];
+    const rows = allUnits.map(unit => {
+      divisionUnitCounts[unit.divisionId] = (divisionUnitCounts[unit.divisionId] || 0) + 1;
+      const unitNumber = divisionUnitCounts[unit.divisionId];
+      const player1 = unit.members?.[0]
+        ? (unit.members[0].lastName && unit.members[0].firstName
+            ? `${unit.members[0].lastName}, ${unit.members[0].firstName}`
+            : unit.members[0].lastName || unit.members[0].firstName || '')
+        : '';
+      const player2 = unit.members?.[1]
+        ? (unit.members[1].lastName && unit.members[1].firstName
+            ? `${unit.members[1].lastName}, ${unit.members[1].firstName}`
+            : unit.members[1].lastName || unit.members[1].firstName || '')
+        : '';
+      return [
+        unit.divisionName || '',
+        unitNumber.toString(),
+        player1,
+        player2,
+        unit.paymentStatus || 'Pending',
+        unit.createdAt ? new Date(unit.createdAt).toLocaleDateString() : ''
       ];
     });
 
@@ -3447,6 +3561,18 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
                       <option value="looking">Looking for Partner</option>
                       <option value="waiting">Waiting for Captain Accept</option>
                     </select>
+
+                    {/* Download CSV - Organizers only */}
+                    {isOrganizer && Object.keys(divisionRegistrationsCache).length > 0 && (
+                      <button
+                        onClick={downloadRegistrationTabCSV}
+                        className="px-3 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors flex items-center gap-1.5"
+                        title="Download registrations as Excel/CSV"
+                      >
+                        <Download className="w-4 h-4" />
+                        <span className="hidden sm:inline">Export</span>
+                      </button>
+                    )}
                   </div>
                 </div>
               )}
@@ -3624,39 +3750,80 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
                                       // Different styling for join requests (InviteStatus = "Requested")
                                       const isJoinRequest = member.inviteStatus === 'Requested';
                                       const isPendingInvite = member.inviteStatus === 'Pending';
+                                      // Payment status at unit level
+                                      const unitPaymentStatus = unit.paymentStatus;
+                                      const hasPaymentSubmitted = unitPaymentStatus === 'PendingVerification' || unitPaymentStatus === 'Paid' || unitPaymentStatus === 'Partial';
+                                      const isPaymentVerified = unitPaymentStatus === 'Paid';
+                                      // Can remove only if no payment has been submitted
+                                      const canRemove = isOrganizer && !hasPaymentSubmitted;
 
                                       return (
-                                        <button
-                                          key={mIdx}
-                                          onClick={() => member.userId && setSelectedProfileUserId(member.userId)}
-                                          className={`flex items-center gap-1.5 px-2 py-1 rounded-full transition-colors shrink-0 ${
-                                            isJoinRequest
-                                              ? 'bg-blue-50 border border-dashed border-blue-300 hover:border-blue-400 hover:bg-blue-100'
-                                              : 'bg-white border border-gray-200 hover:border-orange-300 hover:bg-orange-50'
-                                          }`}
-                                          title={isJoinRequest ? 'Requested to join' : undefined}
-                                        >
-                                          {member.profileImageUrl ? (
-                                            <img src={getSharedAssetUrl(member.profileImageUrl)} alt="" className="w-5 h-5 rounded-full object-cover" />
-                                          ) : (
-                                            <div className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-medium ${
-                                              isJoinRequest ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700'
-                                            }`}>
-                                              {(member.firstName || 'P')[0].toUpperCase()}
-                                            </div>
+                                        <div key={mIdx} className="flex items-center gap-1 shrink-0">
+                                          <button
+                                            onClick={() => member.userId && setSelectedProfileUserId(member.userId)}
+                                            className={`flex items-center gap-1.5 px-2 py-1 rounded-full transition-colors ${
+                                              isJoinRequest
+                                                ? 'bg-blue-50 border border-dashed border-blue-300 hover:border-blue-400 hover:bg-blue-100'
+                                                : 'bg-white border border-gray-200 hover:border-orange-300 hover:bg-orange-50'
+                                            }`}
+                                            title={isJoinRequest ? 'Requested to join' : undefined}
+                                          >
+                                            {member.profileImageUrl ? (
+                                              <img src={getSharedAssetUrl(member.profileImageUrl)} alt="" className="w-5 h-5 rounded-full object-cover" />
+                                            ) : (
+                                              <div className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-medium ${
+                                                isJoinRequest ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700'
+                                              }`}>
+                                                {(member.firstName || 'P')[0].toUpperCase()}
+                                              </div>
+                                            )}
+                                            <span className={`text-sm max-w-[150px] truncate ${isJoinRequest ? 'text-blue-700' : 'text-gray-700'}`}>
+                                              {member.lastName && member.firstName
+                                                ? `${member.lastName}, ${member.firstName}`
+                                                : member.lastName || member.firstName || 'Player'}
+                                            </span>
+                                            {isPendingInvite && (
+                                              <span className="text-xs text-amber-600">(pending)</span>
+                                            )}
+                                            {isJoinRequest && (
+                                              <span className="text-xs text-blue-600">(requested)</span>
+                                            )}
+                                          </button>
+                                          {/* Payment status indicator - $ icon */}
+                                          {hasPaymentSubmitted && (
+                                            <button
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                if (isOrganizer) {
+                                                  setSelectedAdminPaymentUnit({
+                                                    ...unit,
+                                                    unitId: unit.id,
+                                                    divisionName: division.name
+                                                  });
+                                                }
+                                              }}
+                                              className={`p-0.5 rounded transition-colors ${
+                                                isOrganizer ? 'hover:bg-gray-100 cursor-pointer' : 'cursor-default'
+                                              }`}
+                                              title={isPaymentVerified ? 'Payment verified' : 'Payment submitted - click to verify'}
+                                            >
+                                              <DollarSign className={`w-4 h-4 ${isPaymentVerified ? 'text-green-600' : 'text-orange-500'}`} />
+                                            </button>
                                           )}
-                                          <span className={`text-sm max-w-[150px] truncate ${isJoinRequest ? 'text-blue-700' : 'text-gray-700'}`}>
-                                            {member.lastName && member.firstName
-                                              ? `${member.lastName}, ${member.firstName}`
-                                              : member.lastName || member.firstName || 'Player'}
-                                          </span>
-                                          {isPendingInvite && (
-                                            <span className="text-xs text-amber-600">(pending)</span>
+                                          {/* Trash icon - only if no payment submitted */}
+                                          {canRemove && (
+                                            <button
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleRemovePlayerFromUnit(unit, member, division);
+                                              }}
+                                              className="p-0.5 rounded text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                                              title="Remove player"
+                                            >
+                                              <Trash2 className="w-4 h-4" />
+                                            </button>
                                           )}
-                                          {isJoinRequest && (
-                                            <span className="text-xs text-blue-600">(requested)</span>
-                                          )}
-                                        </button>
+                                        </div>
                                       );
                                     })}
 
@@ -4442,233 +4609,6 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
                         <div className="text-sm text-gray-500">Est. Revenue</div>
                       </div>
                     </div>
-                  </div>
-
-                  {/* Registrations Management */}
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => setShowRegistrations(!showRegistrations)}
-                        className="flex-1 flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
-                      >
-                        <div className="flex items-center gap-2">
-                          <Users className="w-5 h-5 text-gray-600" />
-                          <span className="font-medium text-gray-900">Manage Registrations ({allRegistrations.length})</span>
-                        </div>
-                        {showRegistrations ? <ChevronUp className="w-5 h-5 text-gray-500" /> : <ChevronDown className="w-5 h-5 text-gray-500" />}
-                      </button>
-                      {allRegistrations.length > 0 && (
-                        <button
-                          onClick={downloadRegistrationsCSV}
-                          className="p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
-                          title="Download CSV"
-                        >
-                          <Download className="w-5 h-5 text-gray-600" />
-                        </button>
-                      )}
-                    </div>
-
-                    {showRegistrations && (
-                      <div className="mt-3 border rounded-lg overflow-hidden">
-                        {/* Filters */}
-                        <div className="p-3 bg-white border-b space-y-2">
-                          <div className="flex flex-wrap gap-2">
-                            {/* Search */}
-                            <div className="relative flex-1 min-w-[150px]">
-                              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                              <input
-                                type="text"
-                                value={regSearchQuery}
-                                onChange={(e) => setRegSearchQuery(e.target.value)}
-                                placeholder="Search by name..."
-                                className="w-full pl-8 pr-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-                              />
-                            </div>
-                            {/* Division filter */}
-                            <select
-                              value={regFilterDivision}
-                              onChange={(e) => setRegFilterDivision(e.target.value)}
-                              className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-                            >
-                              <option value="">All Divisions</option>
-                              {event.divisions?.map(d => (
-                                <option key={d.id} value={d.id}>{d.name}</option>
-                              ))}
-                            </select>
-                            {/* Status filter */}
-                            <select
-                              value={regFilterStatus}
-                              onChange={(e) => setRegFilterStatus(e.target.value)}
-                              className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-                            >
-                              <option value="">All Statuses</option>
-                              <option value="complete">Complete Teams</option>
-                              <option value="needPartner">Need Partner</option>
-                              <option value="Pending">Payment Pending</option>
-                              <option value="PendingVerification">Payment Submitted</option>
-                              <option value="Paid">Paid</option>
-                            </select>
-                          </div>
-                        </div>
-
-                        {registrationsLoading ? (
-                          <div className="flex justify-center py-8">
-                            <Loader2 className="w-6 h-6 animate-spin text-orange-600" />
-                          </div>
-                        ) : allRegistrations.length === 0 ? (
-                          <div className="p-8 text-center text-gray-500">No registrations yet</div>
-                        ) : (
-                          <div className="divide-y">
-                            {/* Group by division, then by unit */}
-                            {(() => {
-                              // Filter registrations
-                              const filteredRegs = allRegistrations.filter(reg => {
-                                // Division filter
-                                if (regFilterDivision && reg.divisionId !== parseInt(regFilterDivision)) return false;
-                                // Status filter
-                                if (regFilterStatus) {
-                                  if (regFilterStatus === 'complete' && !reg.isComplete) return false;
-                                  if (regFilterStatus === 'needPartner' && reg.isComplete) return false;
-                                  if (['Pending', 'PendingVerification', 'Paid'].includes(regFilterStatus) && reg.paymentStatus !== regFilterStatus) return false;
-                                }
-                                // Search filter
-                                if (regSearchQuery) {
-                                  const query = regSearchQuery.toLowerCase();
-                                  if (!reg.userName?.toLowerCase().includes(query)) return false;
-                                }
-                                return true;
-                              });
-
-                              // Group registrations by unitId
-                              const unitMap = new Map();
-                              filteredRegs.forEach(reg => {
-                                if (!unitMap.has(reg.unitId)) {
-                                  unitMap.set(reg.unitId, {
-                                    unitId: reg.unitId,
-                                    divisionId: reg.divisionId,
-                                    divisionName: reg.divisionName,
-                                    teamName: reg.teamName,
-                                    paymentStatus: reg.paymentStatus,
-                                    registeredAt: reg.registeredAt,
-                                    isComplete: reg.isComplete,
-                                    amountPaid: reg.amountPaid,
-                                    amountDue: reg.amountDue,
-                                    paymentProofUrl: reg.paymentProofUrl,
-                                    paymentReference: reg.paymentReference,
-                                    referenceId: reg.referenceId,
-                                    paidAt: reg.paidAt,
-                                    members: []
-                                  });
-                                }
-                                unitMap.get(reg.unitId).members.push(reg);
-                              });
-
-                              // Convert to array and sort by division name, then by registration date
-                              const units = Array.from(unitMap.values()).sort((a, b) => {
-                                if (a.divisionName !== b.divisionName) {
-                                  return (a.divisionName || '').localeCompare(b.divisionName || '');
-                                }
-                                return new Date(a.registeredAt) - new Date(b.registeredAt);
-                              });
-
-                              if (units.length === 0) {
-                                return <div className="p-8 text-center text-gray-500">No registrations match filters</div>;
-                              }
-
-                              // Track unit number per division
-                              const divisionUnitCounts = {};
-
-                              return units.map(unit => {
-                                // Increment unit number for this division
-                                divisionUnitCounts[unit.divisionId] = (divisionUnitCounts[unit.divisionId] || 0) + 1;
-                                const unitNumber = divisionUnitCounts[unit.divisionId];
-                                const firstMember = unit.members[0];
-
-                                return (
-                                  <div key={unit.unitId} className="p-4 bg-gray-50 border-b last:border-b-0">
-                                    {/* Unit header with division and unit number */}
-                                    <div className="flex items-center justify-between mb-2">
-                                      <div className="flex items-center gap-2">
-                                        <span className="text-xs font-medium text-gray-500 bg-gray-200 px-2 py-0.5 rounded">
-                                          {unit.divisionName}
-                                        </span>
-                                        <span className="text-xs text-gray-400">
-                                          Unit {unitNumber}
-                                        </span>
-                                      </div>
-                                      <div className="flex items-center gap-1">
-                                        <span className={`px-2 py-0.5 text-xs rounded-full ${
-                                          unit.paymentStatus === 'Paid' ? 'bg-green-100 text-green-700' :
-                                          unit.paymentStatus === 'PendingVerification' ? 'bg-blue-100 text-blue-700' :
-                                          'bg-yellow-100 text-yellow-700'
-                                        }`}>
-                                          {unit.paymentStatus === 'PendingVerification' ? 'Submitted' : unit.paymentStatus}
-                                        </span>
-                                        <button
-                                          onClick={() => setSelectedAdminPaymentUnit(unit)}
-                                          className="p-1.5 text-green-600 hover:bg-green-50 rounded transition-colors"
-                                          title="View Payment Details"
-                                        >
-                                          <DollarSign className="w-4 h-4" />
-                                        </button>
-                                        <button
-                                          onClick={() => handleChangeDivision(firstMember)}
-                                          disabled={updatingRegistration === firstMember?.id}
-                                          className="p-1.5 text-orange-600 hover:bg-orange-50 rounded transition-colors disabled:opacity-50"
-                                          title="Change Division"
-                                        >
-                                          <ArrowRightLeft className="w-4 h-4" />
-                                        </button>
-                                        <button
-                                          onClick={() => handleRemoveRegistration(firstMember)}
-                                          disabled={updatingRegistration === firstMember?.id}
-                                          className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors disabled:opacity-50"
-                                          title="Remove Registration"
-                                        >
-                                          <Trash2 className="w-4 h-4" />
-                                        </button>
-                                      </div>
-                                    </div>
-
-                                    {/* Members (pair) */}
-                                    <div className="flex items-center gap-4">
-                                      {unit.members.map((member, idx) => (
-                                        <button
-                                          key={member.id}
-                                          onClick={() => member.userId && setSelectedProfileUserId(member.userId)}
-                                          className="flex items-center gap-2 hover:opacity-80 transition-opacity"
-                                        >
-                                          <div className="w-10 h-10 rounded-full bg-gray-200 overflow-hidden flex-shrink-0">
-                                            {member.userProfileImageUrl ? (
-                                              <img src={getSharedAssetUrl(member.userProfileImageUrl)} alt="" className="w-full h-full object-cover" />
-                                            ) : (
-                                              <div className="w-full h-full flex items-center justify-center text-gray-500 text-sm font-medium">
-                                                {member.userName?.charAt(0) || '?'}
-                                              </div>
-                                            )}
-                                          </div>
-                                          <span className="text-sm font-medium text-gray-900">{member.userName}</span>
-                                        </button>
-                                      ))}
-                                      {unit.members.length === 1 && (
-                                        <div className="flex items-center gap-2 text-gray-400">
-                                          <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-sm">?</div>
-                                        </div>
-                                      )}
-                                    </div>
-
-                                    {/* Registration date */}
-                                    <div className="text-xs text-gray-400 mt-2">
-                                      Registered {new Date(unit.registeredAt).toLocaleDateString()}
-                                    </div>
-                                  </div>
-                                );
-                              });
-                            })()}
-                          </div>
-                        )}
-                      </div>
-                    )}
                   </div>
                 </>
               )}
