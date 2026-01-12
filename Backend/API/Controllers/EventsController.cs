@@ -78,7 +78,7 @@ public class EventsController : ControllerBase
                     .ThenInclude(d => d.Units)
                         .ThenInclude(u => u.JoinRequests)
                 .Include(e => e.Venue) // Include venue for GPS-based distance calculation
-                .Where(e => e.IsActive && e.IsPublished)
+                .Where(e => e.IsActive && e.IsPublished && e.TournamentStatus != "Draft")
                 // Filter out private events unless user is organizer, registered, or club member
                 .Where(e => !e.IsPrivate ||
                     (userId.HasValue && (
@@ -220,7 +220,7 @@ public class EventsController : ControllerBase
         try
         {
             var countries = await _context.Events
-                .Where(e => e.IsActive && e.IsPublished && !string.IsNullOrEmpty(e.Country))
+                .Where(e => e.IsActive && e.IsPublished && e.TournamentStatus != "Draft" && !string.IsNullOrEmpty(e.Country))
                 .GroupBy(e => e.Country!)
                 .Select(g => new LocationCountDto { Name = g.Key, Count = g.Count() })
                 .OrderByDescending(x => x.Count)
@@ -243,7 +243,7 @@ public class EventsController : ControllerBase
         try
         {
             var states = await _context.Events
-                .Where(e => e.IsActive && e.IsPublished && e.Country == country && !string.IsNullOrEmpty(e.State))
+                .Where(e => e.IsActive && e.IsPublished && e.TournamentStatus != "Draft" && e.Country == country && !string.IsNullOrEmpty(e.State))
                 .GroupBy(e => e.State!)
                 .Select(g => new LocationCountDto { Name = g.Key, Count = g.Count() })
                 .OrderByDescending(x => x.Count)
@@ -266,7 +266,7 @@ public class EventsController : ControllerBase
         try
         {
             var cities = await _context.Events
-                .Where(e => e.IsActive && e.IsPublished && e.Country == country && e.State == state && !string.IsNullOrEmpty(e.City))
+                .Where(e => e.IsActive && e.IsPublished && e.TournamentStatus != "Draft" && e.Country == country && e.State == state && !string.IsNullOrEmpty(e.City))
                 .GroupBy(e => e.City!)
                 .Select(g => new LocationCountDto { Name = g.Key, Count = g.Count() })
                 .OrderByDescending(x => x.Count)
@@ -302,7 +302,7 @@ public class EventsController : ControllerBase
                 .Include(e => e.Divisions)
                     .ThenInclude(d => d.Units)
                         .ThenInclude(u => u.JoinRequests)
-                .Where(e => e.IsActive && e.IsPublished && e.StartDate >= now)
+                .Where(e => e.IsActive && e.IsPublished && e.TournamentStatus != "Draft" && e.StartDate >= now)
                 .OrderBy(e => e.StartDate)
                 .Take(limit)
                 .ToListAsync();
@@ -318,7 +318,7 @@ public class EventsController : ControllerBase
                 .Include(e => e.Divisions)
                     .ThenInclude(d => d.Units)
                         .ThenInclude(u => u.JoinRequests)
-                .Where(e => e.IsActive && e.IsPublished && e.StartDate >= now)
+                .Where(e => e.IsActive && e.IsPublished && e.TournamentStatus != "Draft" && e.StartDate >= now)
                 .OrderByDescending(e => e.Divisions.SelectMany(d => d.Units).Count(u => u.Status != "Cancelled"))
                 .Take(limit)
                 .ToListAsync();
@@ -334,7 +334,7 @@ public class EventsController : ControllerBase
                 .Include(e => e.Divisions)
                     .ThenInclude(d => d.Units)
                         .ThenInclude(u => u.JoinRequests)
-                .Where(e => e.IsActive && e.IsPublished && e.StartDate < now && e.StartDate >= pastCutoff)
+                .Where(e => e.IsActive && e.IsPublished && e.TournamentStatus != "Draft" && e.StartDate < now && e.StartDate >= pastCutoff)
                 .OrderByDescending(e => e.StartDate)
                 .Take(limit)
                 .ToListAsync();
@@ -948,7 +948,7 @@ public class EventsController : ControllerBase
                 return Unauthorized(new ApiResponse<EventRegistrationDto> { Success = false, Message = "User not authenticated" });
 
             var evt = await _context.Events.FindAsync(id);
-            if (evt == null || !evt.IsActive || !evt.IsPublished)
+            if (evt == null || !evt.IsActive || !evt.IsPublished || evt.TournamentStatus == "Draft")
                 return NotFound(new ApiResponse<EventRegistrationDto> { Success = false, Message = "Event not found" });
 
             // Check registration period
