@@ -179,7 +179,7 @@ public class InstaGameService : IInstaGameService
                 .Where(g => g.Status == InstaGameStatus.Lobby ||
                            g.Status == InstaGameStatus.Active ||
                            g.Status == InstaGameStatus.Paused)
-                .Where(g => g.Latitude != null || g.Venue!.Latitude != null)
+                .Where(g => g.Latitude != null || g.Venue!.GpsLat != null)
                 .OrderByDescending(g => g.CreatedAt)
                 .Take(limit)
                 .ToListAsync();
@@ -828,6 +828,19 @@ public class InstaGameService : IInstaGameService
         return player?.IsOrganizer ?? false;
     }
 
+    private static string? GetDisplayName(User? user)
+    {
+        if (user == null) return null;
+        var name = $"{user.FirstName} {user.LastName}".Trim();
+        return string.IsNullOrEmpty(name) ? user.Email : name;
+    }
+
+    private static decimal? ParseDecimal(string? value)
+    {
+        if (string.IsNullOrEmpty(value)) return null;
+        return decimal.TryParse(value, out var result) ? result : null;
+    }
+
     private async Task UpdatePlayersStatusForMatch(int instaGameId, List<int> playerIds, string status)
     {
         var players = await _context.InstaGamePlayers
@@ -867,7 +880,7 @@ public class InstaGameService : IInstaGameService
         var payload = new NotificationPayload
         {
             Type = "InstaGamePlayerJoined",
-            Title = $"{user?.DisplayName ?? "A player"} joined the game",
+            Title = $"{GetDisplayName(user) ?? "A player"} joined the game",
             ActionUrl = $"/instagame/{instaGameId}",
             ReferenceType = "InstaGame",
             ReferenceId = instaGameId,
@@ -883,7 +896,7 @@ public class InstaGameService : IInstaGameService
         var payload = new NotificationPayload
         {
             Type = "InstaGamePlayerLeft",
-            Title = $"{user?.DisplayName ?? "A player"} left the game",
+            Title = $"{GetDisplayName(user) ?? "A player"} left the game",
             ActionUrl = $"/instagame/{instaGameId}",
             ReferenceType = "InstaGame",
             ReferenceId = instaGameId,
@@ -899,7 +912,7 @@ public class InstaGameService : IInstaGameService
         var payload = new NotificationPayload
         {
             Type = "InstaGamePlayerStatus",
-            Title = $"{user?.DisplayName ?? "A player"} is now {status.ToLower()}",
+            Title = $"{GetDisplayName(user) ?? "A player"} is now {status.ToLower()}",
             ActionUrl = $"/instagame/{instaGameId}",
             ReferenceType = "InstaGame",
             ReferenceId = instaGameId,
@@ -986,11 +999,11 @@ public class InstaGameService : IInstaGameService
             VenueCity = instaGame.Venue?.City,
             VenueState = instaGame.Venue?.State,
             CustomLocationName = instaGame.CustomLocationName,
-            Latitude = instaGame.Latitude ?? instaGame.Venue?.Latitude,
-            Longitude = instaGame.Longitude ?? instaGame.Venue?.Longitude,
+            Latitude = instaGame.Latitude ?? ParseDecimal(instaGame.Venue?.GpsLat),
+            Longitude = instaGame.Longitude ?? ParseDecimal(instaGame.Venue?.GpsLng),
             CreatorId = instaGame.CreatorId,
-            CreatorName = instaGame.Creator?.DisplayName,
-            CreatorAvatarUrl = instaGame.Creator?.AvatarUrl,
+            CreatorName = GetDisplayName(instaGame.Creator),
+            CreatorAvatarUrl = instaGame.Creator?.ProfileImageUrl,
             PlayerCount = instaGame.Players?.Count(p => p.Status != InstaGamePlayerStatus.Left) ?? 0,
             GamesPlayed = instaGame.Matches?.Count(m => m.Status == InstaGameMatchStatus.Completed) ?? 0,
             ScoreFormatId = instaGame.ScoreFormatId,
@@ -1016,11 +1029,11 @@ public class InstaGameService : IInstaGameService
             VenueCity = instaGame.Venue?.City,
             VenueState = instaGame.Venue?.State,
             CustomLocationName = instaGame.CustomLocationName,
-            Latitude = instaGame.Latitude ?? instaGame.Venue?.Latitude,
-            Longitude = instaGame.Longitude ?? instaGame.Venue?.Longitude,
+            Latitude = instaGame.Latitude ?? ParseDecimal(instaGame.Venue?.GpsLat),
+            Longitude = instaGame.Longitude ?? ParseDecimal(instaGame.Venue?.GpsLng),
             CreatorId = instaGame.CreatorId,
-            CreatorName = instaGame.Creator?.DisplayName,
-            CreatorAvatarUrl = instaGame.Creator?.AvatarUrl,
+            CreatorName = GetDisplayName(instaGame.Creator),
+            CreatorAvatarUrl = instaGame.Creator?.ProfileImageUrl,
             PlayerCount = instaGame.Players?.Count(p => p.Status != InstaGamePlayerStatus.Left) ?? 0,
             GamesPlayed = instaGame.Matches?.Count(m => m.Status == InstaGameMatchStatus.Completed) ?? 0,
             ScoreFormatId = instaGame.ScoreFormatId,
@@ -1076,8 +1089,8 @@ public class InstaGameService : IInstaGameService
         {
             Id = player.Id,
             UserId = player.UserId,
-            DisplayName = player.User?.DisplayName,
-            AvatarUrl = player.User?.AvatarUrl,
+            DisplayName = GetDisplayName(player.User),
+            AvatarUrl = player.User?.ProfileImageUrl,
             Status = player.Status,
             IsOrganizer = player.IsOrganizer,
             GamesPlayed = player.GamesPlayed,
@@ -1108,14 +1121,14 @@ public class InstaGameService : IInstaGameService
             Team1 = match.Team1Players.Select(id => new InstaGameMatchPlayerDto
             {
                 UserId = id,
-                DisplayName = playerLookup.GetValueOrDefault(id)?.DisplayName,
-                AvatarUrl = playerLookup.GetValueOrDefault(id)?.AvatarUrl
+                DisplayName = GetDisplayName(playerLookup.GetValueOrDefault(id)),
+                AvatarUrl = playerLookup.GetValueOrDefault(id)?.ProfileImageUrl
             }).ToList(),
             Team2 = match.Team2Players.Select(id => new InstaGameMatchPlayerDto
             {
                 UserId = id,
-                DisplayName = playerLookup.GetValueOrDefault(id)?.DisplayName,
-                AvatarUrl = playerLookup.GetValueOrDefault(id)?.AvatarUrl
+                DisplayName = GetDisplayName(playerLookup.GetValueOrDefault(id)),
+                AvatarUrl = playerLookup.GetValueOrDefault(id)?.ProfileImageUrl
             }).ToList(),
             Team1Score = match.Team1Score,
             Team2Score = match.Team2Score,
@@ -1155,14 +1168,14 @@ public class InstaGameService : IInstaGameService
             Team1 = team1Ids.Select(id => new InstaGameMatchPlayerDto
             {
                 UserId = id,
-                DisplayName = playerLookup.GetValueOrDefault(id)?.DisplayName,
-                AvatarUrl = playerLookup.GetValueOrDefault(id)?.AvatarUrl
+                DisplayName = GetDisplayName(playerLookup.GetValueOrDefault(id)),
+                AvatarUrl = playerLookup.GetValueOrDefault(id)?.ProfileImageUrl
             }).ToList(),
             Team2 = team2Ids?.Select(id => new InstaGameMatchPlayerDto
             {
                 UserId = id,
-                DisplayName = playerLookup.GetValueOrDefault(id)?.DisplayName,
-                AvatarUrl = playerLookup.GetValueOrDefault(id)?.AvatarUrl
+                DisplayName = GetDisplayName(playerLookup.GetValueOrDefault(id)),
+                AvatarUrl = playerLookup.GetValueOrDefault(id)?.ProfileImageUrl
             }).ToList(),
             QueueType = queueItem.QueueType,
             CreatedAt = queueItem.CreatedAt

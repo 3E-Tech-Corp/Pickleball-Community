@@ -40,7 +40,7 @@ BEGIN
         EndedAt DATETIME2 NULL,
 
         CONSTRAINT FK_InstaGames_Creator FOREIGN KEY (CreatorId) REFERENCES Users(Id) ON DELETE NO ACTION,
-        CONSTRAINT FK_InstaGames_Venue FOREIGN KEY (VenueId) REFERENCES Venues(VenueId) ON DELETE SET NULL,
+        CONSTRAINT FK_InstaGames_Venue FOREIGN KEY (VenueId) REFERENCES Venues(Id) ON DELETE SET NULL,
         CONSTRAINT FK_InstaGames_ScoreFormat FOREIGN KEY (ScoreFormatId) REFERENCES ScoreFormats(Id) ON DELETE SET NULL
     )
     CREATE UNIQUE INDEX IX_InstaGames_JoinCode ON InstaGames(JoinCode)
@@ -245,21 +245,28 @@ BEGIN
         IF @WinningTeam IS NOT NULL AND @TeamSize = 2
         BEGIN
             -- Popcorn rotation: W1+L1 vs W2+L2 (winners split up)
-            -- Parse JSON arrays and swap partners
+            -- Parse JSON arrays using OPENJSON
             DECLARE @W1 INT, @W2 INT, @L1 INT, @L2 INT
+            DECLARE @WinnersJson NVARCHAR(200), @LosersJson NVARCHAR(200)
 
             IF @WinningTeam = 1
             BEGIN
-                -- Team1 won, Team2 lost
-                SELECT @W1 = JSON_VALUE(@Team1PlayerIds, '$[0]'), @W2 = JSON_VALUE(@Team1PlayerIds, '$[1]')
-                SELECT @L1 = JSON_VALUE(@Team2PlayerIds, '$[0]'), @L2 = JSON_VALUE(@Team2PlayerIds, '$[1]')
+                SET @WinnersJson = @Team1PlayerIds
+                SET @LosersJson = @Team2PlayerIds
             END
             ELSE
             BEGIN
-                -- Team2 won, Team1 lost
-                SELECT @W1 = JSON_VALUE(@Team2PlayerIds, '$[0]'), @W2 = JSON_VALUE(@Team2PlayerIds, '$[1]')
-                SELECT @L1 = JSON_VALUE(@Team1PlayerIds, '$[0]'), @L2 = JSON_VALUE(@Team1PlayerIds, '$[1]')
+                SET @WinnersJson = @Team2PlayerIds
+                SET @LosersJson = @Team1PlayerIds
             END
+
+            -- Get first and second player from winners
+            SELECT @W1 = CAST(value AS INT) FROM OPENJSON(@WinnersJson) WHERE [key] = '0'
+            SELECT @W2 = CAST(value AS INT) FROM OPENJSON(@WinnersJson) WHERE [key] = '1'
+
+            -- Get first and second player from losers
+            SELECT @L1 = CAST(value AS INT) FROM OPENJSON(@LosersJson) WHERE [key] = '0'
+            SELECT @L2 = CAST(value AS INT) FROM OPENJSON(@LosersJson) WHERE [key] = '1'
 
             -- New teams: W1+L1 vs W2+L2
             SET @Team1Json = '[' + CAST(@W1 AS NVARCHAR(20)) + ',' + CAST(@L1 AS NVARCHAR(20)) + ']'
@@ -483,8 +490,8 @@ BEGIN
     -- Haversine formula for distance calculation
     SELECT TOP (@MaxResults)
         ig.*,
-        u.DisplayName AS CreatorName,
-        u.AvatarUrl AS CreatorAvatarUrl,
+        LTRIM(RTRIM(COALESCE(u.FirstName, '') + ' ' + COALESCE(u.LastName, ''))) AS CreatorName,
+        u.ProfileImageUrl AS CreatorAvatarUrl,
         v.Name AS VenueName,
         v.City AS VenueCity,
         v.State AS VenueState,
@@ -492,19 +499,19 @@ BEGIN
         (SELECT COUNT(*) FROM InstaGameMatches WHERE InstaGameId = ig.Id AND Status = 'Completed') AS GamesPlayed,
         -- Distance in miles using Haversine formula
         3959 * ACOS(
-            COS(RADIANS(@Latitude)) * COS(RADIANS(COALESCE(ig.Latitude, v.Latitude))) *
-            COS(RADIANS(COALESCE(ig.Longitude, v.Longitude)) - RADIANS(@Longitude)) +
-            SIN(RADIANS(@Latitude)) * SIN(RADIANS(COALESCE(ig.Latitude, v.Latitude)))
+            COS(RADIANS(@Latitude)) * COS(RADIANS(COALESCE(ig.Latitude, TRY_CAST(v.GPSLat AS DECIMAL(9,6))))) *
+            COS(RADIANS(COALESCE(ig.Longitude, TRY_CAST(v.GPSLng AS DECIMAL(9,6)))) - RADIANS(@Longitude)) +
+            SIN(RADIANS(@Latitude)) * SIN(RADIANS(COALESCE(ig.Latitude, TRY_CAST(v.GPSLat AS DECIMAL(9,6)))))
         ) AS DistanceMiles
     FROM InstaGames ig
     LEFT JOIN Users u ON ig.CreatorId = u.Id
-    LEFT JOIN Venues v ON ig.VenueId = v.VenueId
+    LEFT JOIN Venues v ON ig.VenueId = v.Id
     WHERE ig.Status IN ('Lobby', 'Active', 'Paused')
-        AND (ig.Latitude IS NOT NULL OR v.Latitude IS NOT NULL)
+        AND (ig.Latitude IS NOT NULL OR v.GPSLat IS NOT NULL)
         AND 3959 * ACOS(
-            COS(RADIANS(@Latitude)) * COS(RADIANS(COALESCE(ig.Latitude, v.Latitude))) *
-            COS(RADIANS(COALESCE(ig.Longitude, v.Longitude)) - RADIANS(@Longitude)) +
-            SIN(RADIANS(@Latitude)) * SIN(RADIANS(COALESCE(ig.Latitude, v.Latitude)))
+            COS(RADIANS(@Latitude)) * COS(RADIANS(COALESCE(ig.Latitude, TRY_CAST(v.GPSLat AS DECIMAL(9,6))))) *
+            COS(RADIANS(COALESCE(ig.Longitude, TRY_CAST(v.GPSLng AS DECIMAL(9,6)))) - RADIANS(@Longitude)) +
+            SIN(RADIANS(@Latitude)) * SIN(RADIANS(COALESCE(ig.Latitude, TRY_CAST(v.GPSLat AS DECIMAL(9,6)))))
         ) <= @RadiusMiles
     ORDER BY DistanceMiles
 END
