@@ -8,6 +8,7 @@ import { ToastProvider } from './contexts/ToastContext'
 import { LanguageProvider } from './contexts/LanguageContext'
 import Navigation from './components/ui/Navigation' // Import here
 import PWAInstallPrompt from './components/ui/PWAInstallPrompt'
+import RunningEventPopup from './components/RunningEventPopup'
 
 import Footer from './components/landing/Footer'; // Make sure this is imported
 import App from './App'
@@ -50,6 +51,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
                   <App /> {/* App doesn't need to have Navigation */}
                   <Footer /> {/* Footer added here */}
                   <PWAInstallPrompt />
+                  <RunningEventPopup />
                 </ToastProvider>
               </AuthProvider>
             </LanguageProvider>

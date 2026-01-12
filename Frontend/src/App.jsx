@@ -24,6 +24,8 @@ import FeedbackAdmin from './pages/FeedbackAdmin'
 import Events from './pages/Events'
 import TournamentManage from './pages/TournamentManage'
 import GameDayManage from './pages/GameDayManage'
+import EventDashboard from './pages/EventDashboard'
+import EventRunningAdmin from './pages/EventRunningAdmin'
 import Venues from './pages/Venues'
 import Clubs from './pages/Clubs'
 import Leagues from './pages/Leagues'
@@ -71,6 +73,16 @@ function App() {
       <Route path="/gameday/:eventId/manage" element={
         <ProtectedRoute>
           <GameDayManage />
+        </ProtectedRoute>
+      } />
+      <Route path="/event-dashboard/:eventId" element={
+        <ProtectedRoute>
+          <EventDashboard />
+        </ProtectedRoute>
+      } />
+      <Route path="/event-running/:eventId/admin" element={
+        <ProtectedRoute>
+          <EventRunningAdmin />
         </ProtectedRoute>
       } />
       <Route path="/venues" element={<Venues />} />

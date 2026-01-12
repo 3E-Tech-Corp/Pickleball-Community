@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Menu, X, LogOut, HomeIcon, School2Icon, User, Bell, FileText, Calendar, MapPin, Users, MessageCircle, HelpCircle, MessageSquarePlus, Network, Zap } from 'lucide-react';
+import { Menu, X, LogOut, HomeIcon, School2Icon, User, Bell, FileText, Calendar, MapPin, Users, MessageCircle, HelpCircle, MessageSquarePlus, Network, Zap, Trophy } from 'lucide-react';
+import api from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { getAssetUrl, getSharedAssetUrl, notificationsApi, leaguesApi } from '../../services/api';
 import { useSharedAuth } from '../../hooks/useSharedAuth';
@@ -20,6 +21,7 @@ const Navigation = () => {
   const [logoHtml, setLogoHtml] = useState(null);
   const [newNotification, setNewNotification] = useState(null);
   const [managedLeagues, setManagedLeagues] = useState([]);
+  const [runningEvents, setRunningEvents] = useState([]);
   const location = useLocation();
 
   const { user, logout, isAuthenticated } = useAuth();
@@ -61,6 +63,28 @@ const Navigation = () => {
         .catch(err => console.error('Failed to get managed leagues:', err));
     } else {
       setManagedLeagues([]);
+    }
+  }, [isAuthenticated, user]);
+
+  // Fetch running events for the user
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      api.get('/event-running/my-running-events')
+        .then(res => {
+          if (res?.success && res?.data) {
+            // Deduplicate by eventId
+            const uniqueEvents = res.data.reduce((acc, event) => {
+              if (!acc.find(e => e.eventId === event.eventId)) {
+                acc.push(event);
+              }
+              return acc;
+            }, []);
+            setRunningEvents(uniqueEvents);
+          }
+        })
+        .catch(err => console.error('Failed to get running events:', err));
+    } else {
+      setRunningEvents([]);
     }
   }, [isAuthenticated, user]);
 
@@ -176,6 +200,14 @@ const Navigation = () => {
       href: `/leagues/${league.leagueId}`,
       icon: Network,
       isLeagueAdmin: true
+    })) : []),
+    // Running Events - shown when user has active events
+    ...(runningEvents.length > 0 ? runningEvents.map(event => ({
+      name: event.eventName,
+      href: `/event-dashboard/${event.eventId}`,
+      icon: Trophy,
+      isRunningEvent: true,
+      badge: !event.isCheckedIn ? 'Check In' : 'Live'
     })) : []),
     {
       name: t('dashboard'),
@@ -371,21 +403,37 @@ const Navigation = () => {
                             <Link
                               key={item.name}
                               to={item.href}
-                              className="flex items-center px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                              className={`flex items-center px-4 py-3 text-sm transition-colors ${
+                                item.isRunningEvent
+                                  ? 'text-blue-700 bg-blue-50 hover:bg-blue-100'
+                                  : 'text-gray-700 hover:bg-gray-50'
+                              }`}
                               onClick={() => setShowUserDropdown(false)}
                             >
                               <div className="relative mr-3">
-                                <item.icon className="w-4 h-4" />
+                                <item.icon className={`w-4 h-4 ${item.isRunningEvent ? 'text-blue-600' : ''}`} />
                                 {item.name === t('notifications') && unreadCount > 0 && (
                                   <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-3.5 h-3.5 flex items-center justify-center font-medium text-[10px]">
                                     {unreadCount > 9 ? '9+' : unreadCount}
                                   </span>
                                 )}
+                                {item.isRunningEvent && (
+                                  <span className="absolute -top-1 -right-1 w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                                )}
                               </div>
-                              {item.name}
+                              <span className="flex-1 truncate">{item.name}</span>
                               {item.name === t('notifications') && unreadCount > 0 && (
                                 <span className="ml-auto bg-red-100 text-red-600 text-xs px-2 py-0.5 rounded-full">
                                   {t('newNotifications', { count: unreadCount })}
+                                </span>
+                              )}
+                              {item.badge && (
+                                <span className={`ml-auto text-xs px-2 py-0.5 rounded-full ${
+                                  item.badge === 'Live'
+                                    ? 'bg-green-100 text-green-700'
+                                    : 'bg-yellow-100 text-yellow-700'
+                                }`}>
+                                  {item.badge}
                                 </span>
                               )}
                             </Link>
@@ -562,6 +610,36 @@ const Navigation = () => {
                       >
                         <Network className="w-4 h-4" />
                         <span>{t('leagueAdmin', { name: league.rootLeagueName })}</span>
+                      </Link>
+                    ))}
+                  </div>
+                )}
+
+                {/* Running Events - shown when user has active events */}
+                {runningEvents.length > 0 && (
+                  <div className="space-y-2 mb-3 pb-3 border-b border-gray-200">
+                    <div className="flex items-center gap-2 px-1 mb-1">
+                      <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                      <span className="text-xs font-medium text-gray-500 uppercase">Active Events</span>
+                    </div>
+                    {runningEvents.map(event => (
+                      <Link
+                        key={event.eventId}
+                        to={`/event-dashboard/${event.eventId}`}
+                        className="flex items-center justify-between px-3 py-2 text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors font-medium text-sm"
+                        onClick={() => setIsOpen(false)}
+                      >
+                        <div className="flex items-center space-x-2 min-w-0">
+                          <Trophy className="w-4 h-4 flex-shrink-0" />
+                          <span className="truncate">{event.eventName}</span>
+                        </div>
+                        <span className={`ml-2 text-xs px-2 py-0.5 rounded-full flex-shrink-0 ${
+                          !event.isCheckedIn
+                            ? 'bg-yellow-100 text-yellow-700'
+                            : 'bg-green-100 text-green-700'
+                        }`}>
+                          {!event.isCheckedIn ? 'Check In' : 'Live'}
+                        </span>
                       </Link>
                     ))}
                   </div>
