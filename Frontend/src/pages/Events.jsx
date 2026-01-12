@@ -306,9 +306,18 @@ export default function Events() {
       const response = await tournamentApi.respondToJoinRequest(requestId, accept);
       if (response.success) {
         loadMyUnits();
+        // Also reload the current event to update myRegistrations
+        if (event?.id) {
+          const updatedEventResponse = await eventsApi.getEvent(event.id);
+          if (updatedEventResponse.success) {
+            setEvent(updatedEventResponse.data);
+          }
+        }
+        toast.success(accept ? 'Player added to your team!' : 'Request declined');
       }
     } catch (err) {
       console.error('Error responding to join request:', err);
+      toast.error('Failed to respond to join request');
     }
   };
 
@@ -2287,6 +2296,26 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
     }
   };
 
+  // Handle accepting/declining join requests
+  const handleRespondToJoinRequest = async (requestId, accept) => {
+    try {
+      const response = await tournamentApi.respondToJoinRequest(requestId, accept);
+      if (response.success) {
+        // Reload the event to update myRegistrations
+        const updatedEventResponse = await eventsApi.getEvent(event.id);
+        if (updatedEventResponse.success) {
+          onUpdate(updatedEventResponse.data);
+        }
+        toast.success(accept ? 'Player added to your team!' : 'Request declined');
+      } else {
+        toast.error(response.message || 'Failed to respond to join request');
+      }
+    } catch (err) {
+      console.error('Error responding to join request:', err);
+      toast.error('Failed to respond to join request');
+    }
+  };
+
   // Download registrations as CSV
   const downloadRegistrationsCSV = () => {
     if (allRegistrations.length === 0) {
@@ -3215,26 +3244,18 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
                             )}
                           </div>
                           <div className="flex items-center gap-2">
-                            {/* Payment status/button */}
+                            {/* Payment status/button - now allowed even before team is complete */}
                             {reg.amountDue > 0 && (
                               <button
-                                onClick={() => {
-                                  if (reg.needsPartner) {
-                                    toast.info('Payment is only available after your team is complete. Find a partner first!');
-                                  } else {
-                                    setSelectedPaymentReg(reg);
-                                  }
-                                }}
+                                onClick={() => setSelectedPaymentReg(reg)}
                                 className={`px-2 py-1 text-sm rounded-lg flex items-center gap-1 ${
                                   reg.paymentStatus === 'Paid'
                                     ? 'bg-green-100 text-green-700'
                                     : reg.paymentStatus === 'Partial' || reg.paymentStatus === 'PendingVerification'
                                     ? 'bg-yellow-100 text-yellow-700'
-                                    : reg.needsPartner
-                                    ? 'bg-gray-100 text-gray-500'
                                     : 'bg-orange-100 text-orange-700 hover:bg-orange-200'
                                 }`}
-                                title={reg.paymentStatus === 'Paid' ? 'Payment complete' : reg.needsPartner ? 'Find a partner first' : `$${reg.amountDue - reg.amountPaid} remaining`}
+                                title={reg.paymentStatus === 'Paid' ? 'Payment complete' : `$${reg.amountDue - reg.amountPaid} remaining`}
                               >
                                 <DollarSign className="w-4 h-4" />
                                 {reg.paymentStatus === 'Paid' ? 'Paid' :
@@ -3254,6 +3275,56 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
                             )}
                           </div>
                         </div>
+
+                        {/* Pending Join Requests - Only for captains */}
+                        {reg.isCaptain && reg.pendingJoinRequests?.length > 0 && (
+                          <div className="mt-3 pt-3 border-t border-green-100">
+                            <div className="text-sm font-medium text-purple-700 mb-2 flex items-center gap-1">
+                              <Users className="w-4 h-4" />
+                              Join Requests ({reg.pendingJoinRequests.length})
+                            </div>
+                            <div className="space-y-2">
+                              {reg.pendingJoinRequests.map(request => (
+                                <div key={request.requestId} className="flex items-center justify-between bg-purple-50 rounded-lg p-2">
+                                  <button
+                                    onClick={() => setSelectedProfileUserId(request.userId)}
+                                    className="flex items-center gap-2 hover:opacity-80"
+                                  >
+                                    {request.profileImageUrl ? (
+                                      <img src={getSharedAssetUrl(request.profileImageUrl)} alt="" className="w-8 h-8 rounded-full object-cover" />
+                                    ) : (
+                                      <div className="w-8 h-8 rounded-full bg-purple-200 flex items-center justify-center text-purple-700 text-sm font-medium">
+                                        {request.userName?.charAt(0) || '?'}
+                                      </div>
+                                    )}
+                                    <div className="text-left">
+                                      <div className="text-sm font-medium text-gray-900">{request.userName}</div>
+                                      {request.message && (
+                                        <div className="text-xs text-gray-500 italic">"{request.message}"</div>
+                                      )}
+                                    </div>
+                                  </button>
+                                  <div className="flex items-center gap-1">
+                                    <button
+                                      onClick={() => handleRespondToJoinRequest(request.requestId, false)}
+                                      className="p-1.5 text-red-600 hover:bg-red-100 rounded-lg transition-colors"
+                                      title="Decline"
+                                    >
+                                      <X className="w-4 h-4" />
+                                    </button>
+                                    <button
+                                      onClick={() => handleRespondToJoinRequest(request.requestId, true)}
+                                      className="p-1.5 text-green-600 hover:bg-green-100 rounded-lg transition-colors"
+                                      title="Accept"
+                                    >
+                                      <Check className="w-4 h-4" />
+                                    </button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>

@@ -388,6 +388,7 @@ public class EventsController : ControllerBase
                 .Include(e => e.Divisions)
                     .ThenInclude(d => d.Units)
                         .ThenInclude(u => u.JoinRequests)
+                            .ThenInclude(jr => jr.User)
                 .Include(e => e.Divisions)
                     .ThenInclude(d => d.PartnerRequests)
                 .Include(e => e.Divisions)
@@ -522,7 +523,22 @@ public class EventsController : ControllerBase
                                             ProfileImageUrl = m.User?.ProfileImageUrl,
                                             Role = m.Role,
                                             InviteStatus = m.InviteStatus
-                                        }).ToList()
+                                        }).ToList(),
+                                    // Captain info for managing join requests
+                                    IsCaptain = u.CaptainUserId == userId.Value,
+                                    PendingJoinRequests = u.CaptainUserId == userId.Value
+                                        ? (u.JoinRequests ?? new List<EventUnitJoinRequest>())
+                                            .Where(jr => jr.Status == "Pending")
+                                            .Select(jr => new UnitJoinRequestInfoDto
+                                            {
+                                                RequestId = jr.Id,
+                                                UserId = jr.UserId,
+                                                UserName = jr.User != null ? $"{jr.User.FirstName} {jr.User.LastName}".Trim() : "Unknown",
+                                                ProfileImageUrl = jr.User?.ProfileImageUrl,
+                                                Message = jr.Message,
+                                                CreatedAt = jr.CreatedAt
+                                            }).ToList()
+                                        : new List<UnitJoinRequestInfoDto>()
                                 };
                             }))
                         .ToList()

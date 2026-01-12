@@ -108,6 +108,23 @@ public class UserRegistrationInfoDto
     public bool IsComplete { get; set; } = true;
     public bool NeedsPartner { get; set; } = false;
     public List<PartnerInfoDto> Partners { get; set; } = new();
+
+    // Captain info - for managing join requests
+    public bool IsCaptain { get; set; } = false;
+    public List<UnitJoinRequestInfoDto> PendingJoinRequests { get; set; } = new();
+}
+
+/// <summary>
+/// Info about a pending join request to the captain's unit
+/// </summary>
+public class UnitJoinRequestInfoDto
+{
+    public int RequestId { get; set; }
+    public int UserId { get; set; }
+    public string UserName { get; set; } = string.Empty;
+    public string? ProfileImageUrl { get; set; }
+    public string? Message { get; set; }
+    public DateTime CreatedAt { get; set; }
 }
 
 /// <summary>
