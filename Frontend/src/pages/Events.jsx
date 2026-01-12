@@ -783,12 +783,13 @@ export default function Events() {
                   /* List View - Full Row Cards */
                   <div className="space-y-3">
                     {events.map((event, index) => (
-                      <div key={event.id} className={`bg-white rounded-lg shadow-sm p-4 border-l-4 ${index % 2 === 0 ? 'border-l-orange-400' : 'border-l-blue-400'}`}>
+                      <div
+                        key={event.id}
+                        onClick={() => handleViewDetails(event)}
+                        className={`bg-white rounded-lg shadow-sm p-4 border-l-4 cursor-pointer hover:shadow-md transition-all group ${index % 2 === 0 ? 'border-l-orange-400' : 'border-l-blue-400'}`}
+                      >
                         <div className="flex items-start gap-3">
-                          <button
-                            onClick={() => handleViewDetails(event)}
-                            className="flex-shrink-0 hover:opacity-80 transition-opacity"
-                          >
+                          <div className="flex-shrink-0">
                             {event.posterImageUrl ? (
                               <img
                                 src={getSharedAssetUrl(event.posterImageUrl)}
@@ -800,20 +801,20 @@ export default function Events() {
                                 <Calendar className="w-6 h-6 text-orange-600" />
                               </div>
                             )}
-                          </button>
+                          </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-start justify-between gap-2">
-                              <button
-                                onClick={() => handleViewDetails(event)}
-                                className="font-medium text-gray-900 hover:text-orange-600 text-left block"
-                              >
+                              <span className="font-medium text-gray-900 group-hover:text-orange-600 transition-colors text-left">
                                 {event.name}
-                              </button>
-                              {event.registrationFee > 0 && (
-                                <span className="text-sm font-medium text-gray-700 flex-shrink-0">
-                                  {formatPrice(event.registrationFee, event.priceUnit, event.paymentModel)}
-                                </span>
-                              )}
+                              </span>
+                              <div className="flex items-center gap-2 flex-shrink-0">
+                                {event.registrationFee > 0 && (
+                                  <span className="text-sm font-medium text-gray-700">
+                                    {formatPrice(event.registrationFee, event.priceUnit, event.paymentModel)}
+                                  </span>
+                                )}
+                                <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-orange-600 transition-colors" />
+                              </div>
                             </div>
                             <p className="text-sm text-gray-500">
                               {formatDate(event.startDate)} • {event.venueName || `${event.city}, ${event.state}`}
@@ -952,13 +953,14 @@ export default function Events() {
                 {myEvents.eventsIOrganize.length > 0 ? (
                   <div className="space-y-3">
                     {myEvents.eventsIOrganize.map((event, index) => (
-                      <div key={event.id} className={`bg-white rounded-lg shadow-sm p-4 border-l-4 ${index % 2 === 0 ? 'border-l-orange-400' : 'border-l-blue-400'}`}>
+                      <div
+                        key={event.id}
+                        onClick={() => handleViewDetails(event)}
+                        className={`bg-white rounded-lg shadow-sm p-4 border-l-4 cursor-pointer hover:shadow-md transition-all group ${index % 2 === 0 ? 'border-l-orange-400' : 'border-l-blue-400'}`}
+                      >
                         {/* Event Header - Clickable */}
                         <div className="flex items-start gap-3">
-                          <button
-                            onClick={() => handleViewDetails(event)}
-                            className="flex-shrink-0 hover:opacity-80 transition-opacity"
-                          >
+                          <div className="flex-shrink-0">
                             {event.posterImageUrl ? (
                               <img
                                 src={getSharedAssetUrl(event.posterImageUrl)}
@@ -970,15 +972,12 @@ export default function Events() {
                                 <Trophy className="w-6 h-6 text-orange-600" />
                               </div>
                             )}
-                          </button>
+                          </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-start justify-between gap-2">
-                              <button
-                                onClick={() => handleViewDetails(event)}
-                                className="font-medium text-gray-900 hover:text-orange-600 text-left block"
-                              >
+                              <span className="font-medium text-gray-900 group-hover:text-orange-600 transition-colors text-left">
                                 {event.name}
-                              </button>
+                              </span>
                               <div className="flex items-center gap-2 flex-shrink-0">
                                 {!event.isPublished && (
                                   <span className="px-2 py-0.5 text-xs bg-yellow-100 text-yellow-700 rounded-full">
@@ -990,6 +989,7 @@ export default function Events() {
                                     Published
                                   </span>
                                 )}
+                                <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-orange-600 transition-colors" />
                               </div>
                             </div>
                             <p className="text-sm text-gray-500">
@@ -1155,13 +1155,14 @@ export default function Events() {
                 {myEvents.eventsImRegisteredFor.length > 0 ? (
                   <div className="space-y-3">
                     {myEvents.eventsImRegisteredFor.map((reg, index) => (
-                      <div key={reg.eventId} className={`bg-white rounded-lg shadow-sm p-4 border-l-4 ${index % 2 === 0 ? 'border-l-orange-400' : 'border-l-blue-400'}`}>
+                      <div
+                        key={reg.eventId}
+                        onClick={() => handleViewDetails({ id: reg.eventId })}
+                        className={`bg-white rounded-lg shadow-sm p-4 border-l-4 cursor-pointer hover:shadow-md transition-all group ${index % 2 === 0 ? 'border-l-orange-400' : 'border-l-blue-400'}`}
+                      >
                         {/* Event Header - Clickable */}
                         <div className="flex items-start gap-3 mb-3">
-                          <button
-                            onClick={() => handleViewDetails({ id: reg.eventId })}
-                            className="flex-shrink-0 hover:opacity-80 transition-opacity"
-                          >
+                          <div className="flex-shrink-0">
                             {reg.posterImageUrl ? (
                               <img
                                 src={getSharedAssetUrl(reg.posterImageUrl)}
@@ -1173,14 +1174,14 @@ export default function Events() {
                                 <Calendar className="w-6 h-6 text-orange-600" />
                               </div>
                             )}
-                          </button>
+                          </div>
                           <div className="flex-1 min-w-0">
-                            <button
-                              onClick={() => handleViewDetails({ id: reg.eventId })}
-                              className="font-medium text-gray-900 hover:text-orange-600 text-left block"
-                            >
-                              {reg.eventName}
-                            </button>
+                            <div className="flex items-start justify-between gap-2">
+                              <span className="font-medium text-gray-900 group-hover:text-orange-600 transition-colors text-left">
+                                {reg.eventName}
+                              </span>
+                              <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-orange-600 transition-colors flex-shrink-0" />
+                            </div>
                             <p className="text-sm text-gray-500">
                               {formatDate(reg.startDate)} • {reg.venueName || `${reg.city}, ${reg.state}`}
                             </p>
@@ -1224,7 +1225,8 @@ export default function Events() {
                                     {/* Pay Button */}
                                     {unit.isComplete && unit.paymentStatus !== 'Paid' && (
                                       <button
-                                        onClick={() => {
+                                        onClick={(e) => {
+                                          e.stopPropagation();
                                           setSelectedPaymentReg({
                                             ...unit,
                                             partners: allMembers.filter(m => !m.isCurrentUser).map(p => ({ ...p })),
@@ -1261,7 +1263,10 @@ export default function Events() {
                                       {allMembers.slice(0, 5).map(member => (
                                         <button
                                           key={member.userId}
-                                          onClick={() => !member.isCurrentUser && setSelectedProfileUserId(member.userId)}
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            if (!member.isCurrentUser) setSelectedProfileUserId(member.userId);
+                                          }}
                                           className={`relative ${!member.isCurrentUser ? 'hover:z-10' : ''}`}
                                           title={`${member.name}${member.role === 'Captain' ? ' (Captain)' : ''}${member.isCurrentUser ? ' (You)' : ''}`}
                                         >
