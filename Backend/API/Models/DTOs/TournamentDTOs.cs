@@ -142,6 +142,14 @@ public class EventUnitMemberDto
     public DateTime? CheckedInAt { get; set; }
     // For join requests - the request ID (null for regular members)
     public int? JoinRequestId { get; set; }
+
+    // Member-level payment info
+    public bool HasPaid { get; set; }
+    public DateTime? PaidAt { get; set; }
+    public decimal AmountPaid { get; set; }
+    public string? PaymentProofUrl { get; set; }
+    public string? PaymentReference { get; set; }
+    public string? ReferenceId { get; set; }
 }
 
 public class CreateUnitRequest

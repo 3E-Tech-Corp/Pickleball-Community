@@ -2428,7 +2428,14 @@ public class TournamentController : ControllerBase
                     InviteStatus = m.InviteStatus,
                     IsCheckedIn = m.IsCheckedIn,
                     CheckedInAt = m.CheckedInAt,
-                    JoinRequestId = null
+                    JoinRequestId = null,
+                    // Member-level payment info
+                    HasPaid = m.HasPaid,
+                    PaidAt = m.PaidAt,
+                    AmountPaid = m.AmountPaid,
+                    PaymentProofUrl = m.PaymentProofUrl,
+                    PaymentReference = m.PaymentReference,
+                    ReferenceId = m.ReferenceId
                 }).Concat(
                     pendingJoinRequests.Select(jr => new EventUnitMemberDto
                     {
