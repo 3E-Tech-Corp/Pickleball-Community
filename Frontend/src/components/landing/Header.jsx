@@ -246,21 +246,17 @@ const Header = () => {
           {/* CTA Buttons */}
           <div className="flex flex-wrap gap-4 mb-12">
             <Link
-              to={theme?.heroCtaLink || '/courts'}
+              to="/login"
               className="inline-flex items-center gap-2 px-8 py-4 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-xl transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
             >
-              <MapPin className="w-5 h-5" />
-              {isEnglish && theme?.heroCtaText ? theme.heroCtaText : t('findCourts')}
+              {t('signIn')}
             </Link>
-            {(isEnglish ? theme?.heroSecondaryCtaText : true) && (
-              <Link
-                to={theme?.heroSecondaryCtaLink || '/clubs'}
-                className="inline-flex items-center gap-2 px-8 py-4 bg-white/20 hover:bg-white/30 text-white font-semibold rounded-xl backdrop-blur-sm transition-all border border-white/30"
-              >
-                <Users className="w-5 h-5" />
-                {isEnglish && theme?.heroSecondaryCtaText ? theme.heroSecondaryCtaText : t('joinClub')}
-              </Link>
-            )}
+            <Link
+              to="/register"
+              className="inline-flex items-center gap-2 px-8 py-4 bg-white/20 hover:bg-white/30 text-white font-semibold rounded-xl backdrop-blur-sm transition-all border border-white/30"
+            >
+              {t('enrollNow')}
+            </Link>
           </div>
 
           {/* Quick Stats */}
