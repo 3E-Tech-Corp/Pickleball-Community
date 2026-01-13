@@ -141,7 +141,6 @@ BEGIN
         h.IsAdminOverride,
         h.IpAddress,
         h.CreatedAt,
-        u.Username AS ChangedByUsername,
         u.FirstName AS ChangedByFirstName,
         u.LastName AS ChangedByLastName
     FROM EventGameScoreHistory h
