@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
-import { userApi, materialApi, themeApi, notificationTemplateApi, getAssetUrl, sharedAssetApi, getSharedAssetUrl, SHARED_AUTH_URL, notificationsApi } from '../services/api'
+import { userApi, themeApi, notificationTemplateApi, getAssetUrl, sharedAssetApi, getSharedAssetUrl, SHARED_AUTH_URL, notificationsApi } from '../services/api'
 import {
   Users, BookOpen, Calendar, DollarSign, Search, Edit2, Trash2,
   ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Filter, MoreVertical, Eye, X,
