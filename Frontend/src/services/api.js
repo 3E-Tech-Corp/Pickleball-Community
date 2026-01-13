@@ -1359,6 +1359,10 @@ export const tournamentApi = {
     api.post(`/tournament/events/${eventId}/units/${unitId}/mark-paid`),
   unmarkPaid: (eventId, unitId) =>
     api.post(`/tournament/events/${eventId}/units/${unitId}/unmark-paid`),
+  markMemberAsPaid: (eventId, unitId, memberId) =>
+    api.post(`/tournament/events/${eventId}/units/${unitId}/members/${memberId}/mark-paid`),
+  unmarkMemberPaid: (eventId, unitId, memberId) =>
+    api.post(`/tournament/events/${eventId}/units/${unitId}/members/${memberId}/unmark-paid`),
 
   // Tournament Courts
   getTournamentCourts: (eventId) => api.get(`/tournament/events/${eventId}/courts`),

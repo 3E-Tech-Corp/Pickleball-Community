@@ -609,3 +609,17 @@ public class PaymentInfoDto
     public string? ReferenceId { get; set; }
     public DateTime? PaidAt { get; set; }
 }
+
+public class MemberPaymentDto
+{
+    public int UserId { get; set; }
+    public string? FirstName { get; set; }
+    public string? LastName { get; set; }
+    public bool HasPaid { get; set; }
+    public DateTime? PaidAt { get; set; }
+    public decimal AmountPaid { get; set; }
+    public string? PaymentProofUrl { get; set; }
+    public string? PaymentReference { get; set; }
+    public string? ReferenceId { get; set; }
+    public string? UnitPaymentStatus { get; set; }
+}

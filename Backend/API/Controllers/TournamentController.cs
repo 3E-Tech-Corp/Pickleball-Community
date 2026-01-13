@@ -1197,6 +1197,178 @@ public class TournamentController : ControllerBase
     }
 
     /// <summary>
+    /// Mark a specific member as paid (organizer/admin only)
+    /// </summary>
+    [Authorize]
+    [HttpPost("events/{eventId}/units/{unitId}/members/{memberId}/mark-paid")]
+    public async Task<ActionResult<ApiResponse<MemberPaymentDto>>> MarkMemberAsPaid(int eventId, int unitId, int memberId)
+    {
+        var userId = GetUserId();
+        if (!userId.HasValue)
+            return Unauthorized(new ApiResponse<MemberPaymentDto> { Success = false, Message = "Unauthorized" });
+
+        var unit = await _context.EventUnits
+            .Include(u => u.Event)
+            .Include(u => u.Division)
+            .Include(u => u.Members)
+            .FirstOrDefaultAsync(u => u.Id == unitId && u.EventId == eventId);
+
+        if (unit == null)
+            return NotFound(new ApiResponse<MemberPaymentDto> { Success = false, Message = "Registration not found" });
+
+        // Only organizer or site admin can mark as paid
+        var isAdmin = await IsAdminAsync();
+        if (unit.Event?.OrganizedByUserId != userId.Value && !isAdmin)
+            return Forbid();
+
+        var member = unit.Members.FirstOrDefault(m => m.UserId == memberId);
+        if (member == null)
+            return NotFound(new ApiResponse<MemberPaymentDto> { Success = false, Message = "Member not found in unit" });
+
+        var memberCount = unit.Members.Count;
+        var amountDue = (unit.Event?.RegistrationFee ?? 0m) + (unit.Division?.DivisionFee ?? 0m);
+        var perMemberAmount = memberCount > 0 ? amountDue / memberCount : amountDue;
+
+        // Mark this specific member as paid
+        member.HasPaid = true;
+        member.PaidAt = DateTime.Now;
+        member.AmountPaid = perMemberAmount;
+        if (string.IsNullOrEmpty(member.ReferenceId))
+        {
+            member.ReferenceId = $"E{eventId}-U{unitId}-P{memberId}";
+        }
+
+        // Update unit-level payment status based on all members
+        var allMembersPaid = unit.Members.All(m => m.HasPaid);
+        var anyMemberPaid = unit.Members.Any(m => m.HasPaid);
+
+        if (allMembersPaid)
+        {
+            unit.PaymentStatus = "Paid";
+            unit.AmountPaid = amountDue;
+            unit.PaidAt = DateTime.Now;
+        }
+        else if (anyMemberPaid)
+        {
+            unit.PaymentStatus = "Partial";
+            unit.AmountPaid = unit.Members.Where(m => m.HasPaid).Sum(m => m.AmountPaid);
+        }
+        unit.UpdatedAt = DateTime.Now;
+
+        await _context.SaveChangesAsync();
+
+        // Get member user info
+        var memberUser = await _context.Users.FirstOrDefaultAsync(u => u.Id == memberId);
+
+        return Ok(new ApiResponse<MemberPaymentDto>
+        {
+            Success = true,
+            Data = new MemberPaymentDto
+            {
+                UserId = member.UserId,
+                FirstName = memberUser?.FirstName,
+                LastName = memberUser?.LastName,
+                HasPaid = member.HasPaid,
+                PaidAt = member.PaidAt,
+                AmountPaid = member.AmountPaid,
+                PaymentProofUrl = member.PaymentProofUrl,
+                PaymentReference = member.PaymentReference,
+                ReferenceId = member.ReferenceId,
+                UnitPaymentStatus = unit.PaymentStatus
+            },
+            Message = "Member marked as paid"
+        });
+    }
+
+    /// <summary>
+    /// Unmark a specific member's payment (organizer/admin only)
+    /// </summary>
+    [Authorize]
+    [HttpPost("events/{eventId}/units/{unitId}/members/{memberId}/unmark-paid")]
+    public async Task<ActionResult<ApiResponse<MemberPaymentDto>>> UnmarkMemberPaid(int eventId, int unitId, int memberId)
+    {
+        var userId = GetUserId();
+        if (!userId.HasValue)
+            return Unauthorized(new ApiResponse<MemberPaymentDto> { Success = false, Message = "Unauthorized" });
+
+        var unit = await _context.EventUnits
+            .Include(u => u.Event)
+            .Include(u => u.Division)
+            .Include(u => u.Members)
+            .FirstOrDefaultAsync(u => u.Id == unitId && u.EventId == eventId);
+
+        if (unit == null)
+            return NotFound(new ApiResponse<MemberPaymentDto> { Success = false, Message = "Registration not found" });
+
+        // Only organizer or site admin can unmark payment
+        var isAdmin = await IsAdminAsync();
+        if (unit.Event?.OrganizedByUserId != userId.Value && !isAdmin)
+            return Forbid();
+
+        var member = unit.Members.FirstOrDefault(m => m.UserId == memberId);
+        if (member == null)
+            return NotFound(new ApiResponse<MemberPaymentDto> { Success = false, Message = "Member not found in unit" });
+
+        // Reset this member's payment
+        member.HasPaid = false;
+        member.PaidAt = null;
+        member.AmountPaid = 0;
+        // Keep ReferenceId, PaymentProofUrl, PaymentReference for records
+
+        // Update unit-level payment status based on all members
+        var allMembersPaid = unit.Members.All(m => m.HasPaid);
+        var anyMemberPaid = unit.Members.Any(m => m.HasPaid);
+        var amountDue = (unit.Event?.RegistrationFee ?? 0m) + (unit.Division?.DivisionFee ?? 0m);
+
+        if (allMembersPaid)
+        {
+            unit.PaymentStatus = "Paid";
+            unit.AmountPaid = amountDue;
+        }
+        else if (anyMemberPaid)
+        {
+            unit.PaymentStatus = "Partial";
+            unit.AmountPaid = unit.Members.Where(m => m.HasPaid).Sum(m => m.AmountPaid);
+        }
+        else if (!string.IsNullOrEmpty(unit.PaymentProofUrl))
+        {
+            unit.PaymentStatus = "PendingVerification";
+            unit.AmountPaid = 0;
+        }
+        else
+        {
+            unit.PaymentStatus = "Pending";
+            unit.AmountPaid = 0;
+        }
+        unit.PaidAt = allMembersPaid ? unit.PaidAt : null;
+        unit.UpdatedAt = DateTime.Now;
+
+        await _context.SaveChangesAsync();
+
+        // Get member user info
+        var memberUser = await _context.Users.FirstOrDefaultAsync(u => u.Id == memberId);
+
+        return Ok(new ApiResponse<MemberPaymentDto>
+        {
+            Success = true,
+            Data = new MemberPaymentDto
+            {
+                UserId = member.UserId,
+                FirstName = memberUser?.FirstName,
+                LastName = memberUser?.LastName,
+                HasPaid = member.HasPaid,
+                PaidAt = member.PaidAt,
+                AmountPaid = member.AmountPaid,
+                PaymentProofUrl = member.PaymentProofUrl,
+                PaymentReference = member.PaymentReference,
+                ReferenceId = member.ReferenceId,
+                UnitPaymentStatus = unit.PaymentStatus
+            },
+            Message = "Member payment unmarked"
+        });
+    }
+
+    /// <summary>
     /// Remove a registration (organizer only) - removes member from unit, deletes unit if empty
     /// </summary>
     [Authorize]
