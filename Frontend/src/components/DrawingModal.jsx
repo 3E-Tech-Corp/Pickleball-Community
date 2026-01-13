@@ -1,5 +1,13 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { X, Shuffle, Users, Check, Play, AlertCircle, Loader2, Eye, EyeOff, ArrowRight, RotateCcw, Sparkles } from 'lucide-react';
+import { X, Shuffle, Users, Check, Play, AlertCircle, Loader2, Eye, EyeOff, ArrowRight, RotateCcw, Sparkles, CircleDot, Layers, Mail, Dices } from 'lucide-react';
+
+// Draw style options
+const DRAW_STYLES = [
+  { id: 'wheel', name: 'Spin Wheel', icon: CircleDot, description: 'Classic spinning wheel' },
+  { id: 'cards', name: 'Card Flip', icon: Layers, description: 'Reveal cards one by one' },
+  { id: 'slots', name: 'Slot Machine', icon: Dices, description: 'Vegas-style reels' },
+  { id: 'lottery', name: 'Ball Drop', icon: CircleDot, description: 'Lottery drum draw' },
+];
 
 // Spinning wheel component
 function SpinningWheel({
@@ -228,6 +236,316 @@ function SlotNumber({ number, isAnimating, isFinal }) {
   );
 }
 
+// Card Flip animation component
+function CardFlipDraw({ items, currentIndex, revealedIndices, assignedNumbers, onAnimationEnd }) {
+  const colors = [
+    'from-orange-400 to-red-500', 'from-blue-400 to-indigo-500', 'from-green-400 to-emerald-500',
+    'from-purple-400 to-pink-500', 'from-yellow-400 to-orange-500', 'from-cyan-400 to-blue-500',
+    'from-pink-400 to-rose-500', 'from-indigo-400 to-purple-500'
+  ];
+
+  return (
+    <div className="grid grid-cols-4 sm:grid-cols-5 gap-3 max-w-xl mx-auto">
+      {items.map((item, idx) => {
+        const isRevealed = revealedIndices.includes(idx);
+        const isFlipping = currentIndex === idx;
+        const assignedNum = assignedNumbers[idx];
+        const colorClass = colors[idx % colors.length];
+
+        return (
+          <div
+            key={item.id || idx}
+            className="perspective-1000"
+            style={{ perspective: '1000px' }}
+          >
+            <div
+              className={`relative w-14 h-20 sm:w-16 sm:h-24 transition-all duration-700 transform-style-preserve-3d ${
+                isRevealed || isFlipping ? 'rotate-y-180' : ''
+              }`}
+              style={{
+                transformStyle: 'preserve-3d',
+                transform: isRevealed || isFlipping ? 'rotateY(180deg)' : 'rotateY(0deg)'
+              }}
+            >
+              {/* Card Back */}
+              <div
+                className={`absolute inset-0 rounded-xl bg-gradient-to-br ${colorClass} flex items-center justify-center shadow-lg backface-hidden`}
+                style={{ backfaceVisibility: 'hidden' }}
+              >
+                <div className="text-white/30 text-2xl font-bold">?</div>
+                <div className="absolute inset-1 border-2 border-white/20 rounded-lg" />
+              </div>
+              {/* Card Front */}
+              <div
+                className="absolute inset-0 rounded-xl bg-white flex flex-col items-center justify-center shadow-lg backface-hidden"
+                style={{ backfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}
+              >
+                <div className={`text-2xl font-bold bg-gradient-to-br ${colorClass} bg-clip-text text-transparent`}>
+                  {assignedNum || '?'}
+                </div>
+                <div className="text-xs text-gray-500 mt-1 px-1 text-center truncate max-w-full">
+                  {(item.displayName || item.name || '').substring(0, 8)}
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// Slot Machine animation component
+function SlotMachineDraw({ currentUnit, assignedNumber, isSpinning, onSpinEnd }) {
+  const [displayName, setDisplayName] = useState('???');
+  const [displayNumber, setDisplayNumber] = useState('??');
+  const names = ['Player A', 'Team X', 'Squad 1', 'Unit Z', 'Group B', 'Team Y'];
+
+  useEffect(() => {
+    if (isSpinning) {
+      // Spin names
+      const nameInterval = setInterval(() => {
+        setDisplayName(names[Math.floor(Math.random() * names.length)]);
+      }, 80);
+
+      // Spin numbers
+      const numInterval = setInterval(() => {
+        setDisplayNumber(Math.floor(Math.random() * 32) + 1);
+      }, 50);
+
+      // Stop after delay
+      const timeout = setTimeout(() => {
+        clearInterval(nameInterval);
+        clearInterval(numInterval);
+        setDisplayName(currentUnit?.displayName || currentUnit?.name || 'Team');
+        setDisplayNumber(assignedNumber);
+        setTimeout(() => onSpinEnd?.(), 300);
+      }, 2000);
+
+      return () => {
+        clearInterval(nameInterval);
+        clearInterval(numInterval);
+        clearTimeout(timeout);
+      };
+    }
+  }, [isSpinning, currentUnit, assignedNumber, onSpinEnd]);
+
+  return (
+    <div className="flex flex-col items-center gap-6">
+      {/* Slot Machine Frame */}
+      <div className="bg-gradient-to-b from-yellow-600 to-yellow-800 p-2 rounded-2xl shadow-2xl">
+        <div className="bg-gray-900 p-4 rounded-xl">
+          <div className="flex gap-4">
+            {/* Name Reel */}
+            <div className="bg-white rounded-lg p-3 min-w-[140px] overflow-hidden shadow-inner">
+              <div className={`text-center font-bold text-lg ${isSpinning ? 'animate-pulse' : ''}`}>
+                <span className="bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
+                  {displayName}
+                </span>
+              </div>
+            </div>
+            {/* Arrow */}
+            <div className="flex items-center text-yellow-400">
+              <ArrowRight className="w-6 h-6" />
+            </div>
+            {/* Number Reel */}
+            <div className="bg-white rounded-lg p-3 min-w-[60px] overflow-hidden shadow-inner">
+              <div className={`text-center font-bold text-2xl ${isSpinning ? 'animate-pulse' : ''}`}>
+                <span className="bg-gradient-to-r from-orange-500 to-red-500 bg-clip-text text-transparent">
+                  {displayNumber}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      {/* Decorative lights */}
+      <div className="flex gap-2">
+        {[...Array(7)].map((_, i) => (
+          <div
+            key={i}
+            className={`w-3 h-3 rounded-full ${isSpinning ? 'animate-pulse' : ''}`}
+            style={{
+              backgroundColor: ['#ef4444', '#f59e0b', '#22c55e', '#3b82f6', '#8b5cf6', '#ec4899', '#14b8a6'][i],
+              animationDelay: `${i * 0.1}s`
+            }}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// Ball Drop / Lottery animation component
+function LotteryDraw({ items, currentIndex, revealedItems, assignedNumbers, onBallDrop }) {
+  const canvasRef = useRef(null);
+  const ballsRef = useRef([]);
+  const animationRef = useRef(null);
+  const [droppedBall, setDroppedBall] = useState(null);
+
+  const colors = ['#F97316', '#EF4444', '#8B5CF6', '#3B82F6', '#10B981', '#F59E0B', '#EC4899', '#6366F1'];
+
+  // Initialize balls
+  useEffect(() => {
+    if (items.length > 0 && ballsRef.current.length === 0) {
+      ballsRef.current = items.map((item, idx) => ({
+        id: item.id || idx,
+        x: 80 + Math.random() * 140,
+        y: 60 + Math.random() * 80,
+        vx: (Math.random() - 0.5) * 4,
+        vy: (Math.random() - 0.5) * 4,
+        radius: 18,
+        color: colors[idx % colors.length],
+        name: (item.displayName || item.name || `#${idx + 1}`).substring(0, 6),
+        revealed: false
+      }));
+    }
+  }, [items]);
+
+  // Animation loop
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    const drumWidth = 300;
+    const drumHeight = 180;
+    const drumX = 0;
+    const drumY = 0;
+
+    const animate = () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Draw drum background
+      ctx.fillStyle = 'rgba(31, 41, 55, 0.8)';
+      ctx.strokeStyle = '#6B7280';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.roundRect(drumX, drumY, drumWidth, drumHeight, 20);
+      ctx.fill();
+      ctx.stroke();
+
+      // Draw drum grid pattern
+      ctx.strokeStyle = 'rgba(107, 114, 128, 0.3)';
+      ctx.lineWidth = 1;
+      for (let i = 0; i < drumWidth; i += 20) {
+        ctx.beginPath();
+        ctx.moveTo(drumX + i, drumY);
+        ctx.lineTo(drumX + i, drumY + drumHeight);
+        ctx.stroke();
+      }
+
+      // Update and draw balls
+      ballsRef.current.forEach((ball, idx) => {
+        if (ball.revealed) return;
+
+        // Update position
+        ball.x += ball.vx;
+        ball.y += ball.vy;
+
+        // Bounce off walls
+        if (ball.x - ball.radius < drumX + 10 || ball.x + ball.radius > drumX + drumWidth - 10) {
+          ball.vx *= -0.9;
+          ball.x = Math.max(drumX + ball.radius + 10, Math.min(drumX + drumWidth - ball.radius - 10, ball.x));
+        }
+        if (ball.y - ball.radius < drumY + 10 || ball.y + ball.radius > drumY + drumHeight - 10) {
+          ball.vy *= -0.9;
+          ball.y = Math.max(drumY + ball.radius + 10, Math.min(drumY + drumHeight - ball.radius - 10, ball.y));
+        }
+
+        // Add slight randomness
+        ball.vx += (Math.random() - 0.5) * 0.5;
+        ball.vy += (Math.random() - 0.5) * 0.5;
+
+        // Limit speed
+        const speed = Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy);
+        if (speed > 5) {
+          ball.vx = (ball.vx / speed) * 5;
+          ball.vy = (ball.vy / speed) * 5;
+        }
+
+        // Draw ball
+        ctx.beginPath();
+        ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+        ctx.fillStyle = ball.color;
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // Draw text
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 9px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(ball.name, ball.x, ball.y);
+      });
+
+      // Draw chute
+      ctx.fillStyle = '#374151';
+      ctx.beginPath();
+      ctx.moveTo(drumWidth - 30, drumHeight);
+      ctx.lineTo(drumWidth + 20, drumHeight + 50);
+      ctx.lineTo(drumWidth + 60, drumHeight + 50);
+      ctx.lineTo(drumWidth - 10, drumHeight);
+      ctx.fill();
+
+      animationRef.current = requestAnimationFrame(animate);
+    };
+
+    animate();
+
+    return () => {
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+      }
+    };
+  }, [items]);
+
+  // Handle ball drop
+  useEffect(() => {
+    if (currentIndex >= 0 && currentIndex < items.length) {
+      const ball = ballsRef.current[currentIndex];
+      if (ball && !ball.revealed) {
+        ball.revealed = true;
+        setDroppedBall({
+          ...ball,
+          number: assignedNumbers[currentIndex]
+        });
+        setTimeout(() => {
+          setDroppedBall(null);
+        }, 2000);
+      }
+    }
+  }, [currentIndex, items, assignedNumbers]);
+
+  return (
+    <div className="flex flex-col items-center">
+      <canvas
+        ref={canvasRef}
+        width={360}
+        height={230}
+        className="rounded-xl"
+      />
+      {/* Dropped ball display */}
+      {droppedBall && (
+        <div className="mt-4 flex items-center gap-4 bg-gray-800 rounded-xl p-4 animate-bounce-in">
+          <div
+            className="w-12 h-12 rounded-full flex items-center justify-center text-white font-bold shadow-lg"
+            style={{ backgroundColor: droppedBall.color }}
+          >
+            {droppedBall.name}
+          </div>
+          <ArrowRight className="w-5 h-5 text-gray-400" />
+          <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center text-white text-xl font-bold">
+            {droppedBall.number}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // Helper function to get display name for a unit
 function getUnitDisplayName(unit, unitSize) {
   // For doubles (unit size 2), use player names
@@ -263,6 +581,12 @@ export default function DrawingModal({
   const [wheelUnits, setWheelUnits] = useState([]);
   const [selectedWheelIndex, setSelectedWheelIndex] = useState(0);
   const [showConfetti, setShowConfetti] = useState(false);
+  const [drawStyle, setDrawStyle] = useState('wheel');
+  const [revealedCardIndices, setRevealedCardIndices] = useState([]);
+  const [cardAssignments, setCardAssignments] = useState({});
+  const [slotSpinning, setSlotSpinning] = useState(false);
+  const [currentSlotUnit, setCurrentSlotUnit] = useState(null);
+  const [currentSlotNumber, setCurrentSlotNumber] = useState(null);
 
   // Get unit size from division
   const unitSize = division?.unitSize || 1;
@@ -275,6 +599,11 @@ export default function DrawingModal({
       setCurrentDrawIndex(-1);
       setShowPreview(false);
       setShowConfetti(false);
+      setRevealedCardIndices([]);
+      setCardAssignments({});
+      setSlotSpinning(false);
+      setCurrentSlotUnit(null);
+      setCurrentSlotNumber(null);
     }
   }, [isOpen]);
 
@@ -303,7 +632,7 @@ export default function DrawingModal({
       assignedNumber: shuffledSlots[idx]
     }));
 
-    // Set up wheel with remaining units (include display names)
+    // Set up units with display names
     const unitsWithDisplayNames = registeredUnits.map(u => ({
       ...u,
       displayName: getUnitDisplayName(u, unitSize)
@@ -312,29 +641,72 @@ export default function DrawingModal({
     setPhase('spinning');
     setCurrentDrawIndex(0);
 
-    // Animate through each unit
-    for (let i = 0; i < assignments.length; i++) {
-      setCurrentDrawIndex(i);
+    // Different animation timing based on style
+    if (drawStyle === 'wheel') {
+      // Wheel animation - existing logic
+      for (let i = 0; i < assignments.length; i++) {
+        setCurrentDrawIndex(i);
 
-      // Set wheel for current draw
-      const remainingUnits = registeredUnits.filter((_, idx) =>
-        !assignments.slice(0, i).some(a => a.unit.id === registeredUnits[idx].id)
-      ).map(u => ({
-        ...u,
-        displayName: getUnitDisplayName(u, unitSize)
-      }));
-      setWheelUnits(remainingUnits);
+        const remainingUnits = registeredUnits.filter((_, idx) =>
+          !assignments.slice(0, i).some(a => a.unit.id === registeredUnits[idx].id)
+        ).map(u => ({
+          ...u,
+          displayName: getUnitDisplayName(u, unitSize)
+        }));
+        setWheelUnits(remainingUnits);
 
-      // Find index in remaining units
-      const currentUnit = assignments[i].unit;
-      const wheelIndex = remainingUnits.findIndex(u => u.id === currentUnit.id);
-      setSelectedWheelIndex(wheelIndex);
+        const currentUnit = assignments[i].unit;
+        const wheelIndex = remainingUnits.findIndex(u => u.id === currentUnit.id);
+        setSelectedWheelIndex(wheelIndex);
 
-      // Wait for wheel spin
-      await new Promise(resolve => setTimeout(resolve, i === 0 ? 4500 : 2500));
+        await new Promise(resolve => setTimeout(resolve, i === 0 ? 4500 : 2500));
+        setDrawnAssignments(prev => [...prev, assignments[i]]);
+      }
+    } else if (drawStyle === 'cards') {
+      // Card flip animation
+      const assignmentMap = {};
+      assignments.forEach((a, idx) => {
+        assignmentMap[idx] = a.assignedNumber;
+      });
+      setCardAssignments(assignmentMap);
 
-      // Add to drawn assignments
-      setDrawnAssignments(prev => [...prev, assignments[i]]);
+      for (let i = 0; i < assignments.length; i++) {
+        setCurrentDrawIndex(i);
+        await new Promise(resolve => setTimeout(resolve, 800));
+        setRevealedCardIndices(prev => [...prev, i]);
+        setDrawnAssignments(prev => [...prev, assignments[i]]);
+        await new Promise(resolve => setTimeout(resolve, 400));
+      }
+    } else if (drawStyle === 'slots') {
+      // Slot machine animation
+      for (let i = 0; i < assignments.length; i++) {
+        setCurrentDrawIndex(i);
+        const currentUnit = {
+          ...assignments[i].unit,
+          displayName: getUnitDisplayName(assignments[i].unit, unitSize)
+        };
+        setCurrentSlotUnit(currentUnit);
+        setCurrentSlotNumber(assignments[i].assignedNumber);
+        setSlotSpinning(true);
+
+        await new Promise(resolve => setTimeout(resolve, 2500));
+        setSlotSpinning(false);
+        setDrawnAssignments(prev => [...prev, assignments[i]]);
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+    } else if (drawStyle === 'lottery') {
+      // Lottery ball drop animation
+      const assignmentMap = {};
+      assignments.forEach((a, idx) => {
+        assignmentMap[idx] = a.assignedNumber;
+      });
+      setCardAssignments(assignmentMap);
+
+      for (let i = 0; i < assignments.length; i++) {
+        setCurrentDrawIndex(i);
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        setDrawnAssignments(prev => [...prev, assignments[i]]);
+      }
     }
 
     // Sort final assignments by number
@@ -358,6 +730,11 @@ export default function DrawingModal({
     setDrawnAssignments([]);
     setCurrentDrawIndex(-1);
     setShowConfetti(false);
+    setRevealedCardIndices([]);
+    setCardAssignments({});
+    setSlotSpinning(false);
+    setCurrentSlotUnit(null);
+    setCurrentSlotNumber(null);
   };
 
   // Get matches that would be byes
@@ -462,9 +839,37 @@ export default function DrawingModal({
               </div>
               <h3 className="text-2xl font-bold text-white mb-3">Ready to Draw!</h3>
               <p className="text-gray-400 mb-6 max-w-md mx-auto">
-                Spin the wheel to randomly assign {registeredUnits.length} {unitSize === 2 ? 'doubles teams' : unitSize === 1 ? 'players' : 'teams'} to their bracket positions.
+                Randomly assign {registeredUnits.length} {unitSize === 2 ? 'doubles teams' : unitSize === 1 ? 'players' : 'teams'} to their bracket positions.
                 {emptySlots > 0 && ` ${emptySlots} slot${emptySlots !== 1 ? 's' : ''} will be byes.`}
               </p>
+
+              {/* Draw Style Selector */}
+              <div className="mb-6 max-w-lg mx-auto">
+                <h4 className="text-sm font-medium text-gray-400 mb-3">Choose Draw Style</h4>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {DRAW_STYLES.map((style) => {
+                    const Icon = style.icon;
+                    const isSelected = drawStyle === style.id;
+                    return (
+                      <button
+                        key={style.id}
+                        onClick={() => setDrawStyle(style.id)}
+                        className={`p-3 rounded-xl border-2 transition-all ${
+                          isSelected
+                            ? 'border-orange-500 bg-orange-500/20 text-orange-400'
+                            : 'border-gray-700 bg-gray-800/50 text-gray-400 hover:border-gray-600 hover:text-gray-300'
+                        }`}
+                      >
+                        <Icon className={`w-6 h-6 mx-auto mb-1 ${isSelected ? 'text-orange-400' : ''}`} />
+                        <div className="text-xs font-medium">{style.name}</div>
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="text-xs text-gray-500 mt-2">
+                  {DRAW_STYLES.find(s => s.id === drawStyle)?.description}
+                </p>
+              </div>
 
               {/* Instructions */}
               <div className="bg-gray-800/70 border border-gray-700 rounded-xl p-4 mb-6 max-w-lg mx-auto text-left">
@@ -479,7 +884,7 @@ export default function DrawingModal({
                   </li>
                   <li className="flex gap-2">
                     <span className="text-orange-400 font-bold">2.</span>
-                    <span>The wheel will spin and randomly select each {unitSize === 2 ? 'team' : unitSize === 1 ? 'player' : 'unit'}'s bracket position.</span>
+                    <span>Watch as each {unitSize === 2 ? 'team' : unitSize === 1 ? 'player' : 'unit'}'s bracket position is revealed.</span>
                   </li>
                   <li className="flex gap-2">
                     <span className="text-orange-400 font-bold">3.</span>
@@ -513,19 +918,57 @@ export default function DrawingModal({
           )}
 
           {/* Spinning state */}
-          {phase === 'spinning' && wheelUnits.length > 0 && (
+          {phase === 'spinning' && (
             <div className="text-center py-4">
-              <div className="flex justify-center mb-4">
-                <SpinningWheel
-                  items={wheelUnits}
-                  isSpinning={true}
-                  selectedIndex={selectedWheelIndex}
-                  size={280}
-                />
-              </div>
+              {/* Wheel Animation */}
+              {drawStyle === 'wheel' && wheelUnits.length > 0 && (
+                <div className="flex justify-center mb-4">
+                  <SpinningWheel
+                    items={wheelUnits}
+                    isSpinning={true}
+                    selectedIndex={selectedWheelIndex}
+                    size={280}
+                  />
+                </div>
+              )}
+
+              {/* Card Flip Animation */}
+              {drawStyle === 'cards' && (
+                <div className="mb-4">
+                  <CardFlipDraw
+                    items={wheelUnits}
+                    currentIndex={currentDrawIndex}
+                    revealedIndices={revealedCardIndices}
+                    assignedNumbers={cardAssignments}
+                  />
+                </div>
+              )}
+
+              {/* Slot Machine Animation */}
+              {drawStyle === 'slots' && (
+                <div className="flex justify-center mb-4">
+                  <SlotMachineDraw
+                    currentUnit={currentSlotUnit}
+                    assignedNumber={currentSlotNumber}
+                    isSpinning={slotSpinning}
+                  />
+                </div>
+              )}
+
+              {/* Lottery Ball Drop Animation */}
+              {drawStyle === 'lottery' && (
+                <div className="flex justify-center mb-4">
+                  <LotteryDraw
+                    items={wheelUnits}
+                    currentIndex={currentDrawIndex}
+                    revealedItems={drawnAssignments}
+                    assignedNumbers={cardAssignments}
+                  />
+                </div>
+              )}
 
               <div className="bg-gray-800 rounded-xl p-4 max-w-sm mx-auto">
-                <div className="text-sm text-gray-400 mb-2">Drawing team {currentDrawIndex + 1} of {registeredUnits.length}</div>
+                <div className="text-sm text-gray-400 mb-2">Drawing {unitSize === 2 ? 'team' : unitSize === 1 ? 'player' : 'unit'} {currentDrawIndex + 1} of {registeredUnits.length}</div>
                 <div className="w-full bg-gray-700 rounded-full h-2">
                   <div
                     className="bg-gradient-to-r from-orange-400 to-red-500 h-2 rounded-full transition-all duration-300"
