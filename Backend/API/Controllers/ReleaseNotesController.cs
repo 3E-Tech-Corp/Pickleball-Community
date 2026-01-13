@@ -113,6 +113,9 @@ public class ReleaseNotesController : ControllerBase
             if (!userId.HasValue)
                 return Unauthorized(new ApiResponse<List<UserReleaseNoteDto>> { Success = false, Message = "Not authenticated" });
 
+            // Check if user is admin (can see test releases)
+            var isAdmin = await IsUserAdmin();
+
             // Get dismissed release IDs for this user
             var dismissedIds = await _context.UserDismissedReleases
                 .Where(d => d.UserId == userId.Value)
@@ -120,8 +123,9 @@ public class ReleaseNotesController : ControllerBase
                 .ToListAsync();
 
             // Get active releases that haven't been dismissed
+            // Test releases only shown to admins
             var unread = await _context.ReleaseNotes
-                .Where(r => r.IsActive && !dismissedIds.Contains(r.Id))
+                .Where(r => r.IsActive && !dismissedIds.Contains(r.Id) && (isAdmin || !r.IsTest))
                 .OrderByDescending(r => r.ReleaseDate)
                 .Select(r => new UserReleaseNoteDto
                 {
@@ -131,6 +135,7 @@ public class ReleaseNotesController : ControllerBase
                     Content = r.Content,
                     ReleaseDate = r.ReleaseDate,
                     IsMajor = r.IsMajor,
+                    IsTest = r.IsTest,
                     IsDismissed = false
                 })
                 .ToListAsync();
@@ -260,6 +265,7 @@ public class ReleaseNotesController : ControllerBase
                     ReleaseDate = r.ReleaseDate,
                     IsActive = r.IsActive,
                     IsMajor = r.IsMajor,
+                    IsTest = r.IsTest,
                     CreatedAt = r.CreatedAt,
                     CreatedByName = r.CreatedBy != null ? $"{r.CreatedBy.FirstName} {r.CreatedBy.LastName}" : null,
                     UpdatedAt = r.UpdatedAt,
@@ -300,6 +306,7 @@ public class ReleaseNotesController : ControllerBase
                 Content = dto.Content.Trim(),
                 ReleaseDate = dto.ReleaseDate ?? DateTime.UtcNow,
                 IsMajor = dto.IsMajor,
+                IsTest = dto.IsTest,
                 IsActive = true,
                 CreatedAt = DateTime.UtcNow,
                 CreatedByUserId = userId.Value
@@ -322,6 +329,7 @@ public class ReleaseNotesController : ControllerBase
                     ReleaseDate = release.ReleaseDate,
                     IsActive = release.IsActive,
                     IsMajor = release.IsMajor,
+                    IsTest = release.IsTest,
                     CreatedAt = release.CreatedAt,
                     CreatedByName = user != null ? $"{user.FirstName} {user.LastName}" : null
                 },
@@ -363,6 +371,7 @@ public class ReleaseNotesController : ControllerBase
             if (dto.ReleaseDate.HasValue) release.ReleaseDate = dto.ReleaseDate.Value;
             if (dto.IsActive.HasValue) release.IsActive = dto.IsActive.Value;
             if (dto.IsMajor.HasValue) release.IsMajor = dto.IsMajor.Value;
+            if (dto.IsTest.HasValue) release.IsTest = dto.IsTest.Value;
 
             release.UpdatedAt = DateTime.UtcNow;
             release.UpdatedByUserId = userId.Value;
@@ -383,6 +392,7 @@ public class ReleaseNotesController : ControllerBase
                     ReleaseDate = release.ReleaseDate,
                     IsActive = release.IsActive,
                     IsMajor = release.IsMajor,
+                    IsTest = release.IsTest,
                     CreatedAt = release.CreatedAt,
                     CreatedByName = release.CreatedBy != null ? $"{release.CreatedBy.FirstName} {release.CreatedBy.LastName}" : null,
                     UpdatedAt = release.UpdatedAt,

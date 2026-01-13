@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { releaseNotesApi } from '../services/api';
-import { X, Megaphone, Star, ChevronLeft, ChevronRight, Check, Bell, BellOff } from 'lucide-react';
+import { X, Megaphone, Star, ChevronLeft, ChevronRight, Check, Bell, BellOff, FlaskConical } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 
 export default function ReleaseAnnouncementModal({ isAuthenticated }) {
@@ -112,11 +112,17 @@ export default function ReleaseAnnouncementModal({ isAuthenticated }) {
         {/* Content */}
         <div className="p-6 overflow-y-auto max-h-[calc(85vh-200px)]">
           {/* Version & Date */}
-          <div className="flex items-center gap-3 mb-4">
+          <div className="flex items-center gap-3 mb-4 flex-wrap">
             <span className="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm font-semibold">
               v{currentRelease.version}
               {currentRelease.isMajor && <Star className="w-3 h-3 fill-blue-500" />}
             </span>
+            {currentRelease.isTest && (
+              <span className="inline-flex items-center gap-1 px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-sm font-semibold">
+                <FlaskConical className="w-3 h-3" />
+                Test Preview
+              </span>
+            )}
             <span className="text-sm text-gray-500">
               {formatDate(currentRelease.releaseDate)}
             </span>

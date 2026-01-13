@@ -3,7 +3,7 @@ import { releaseNotesApi } from '../services/api';
 import { toast } from 'react-hot-toast';
 import {
   Plus, Edit2, Trash2, X, Save, Loader2, Check, Eye, EyeOff,
-  Calendar, Tag, FileText, Star, Clock
+  Calendar, Tag, FileText, Star, Clock, FlaskConical
 } from 'lucide-react';
 
 export default function ReleaseNotesAdmin({ embedded = false }) {
@@ -20,7 +20,8 @@ export default function ReleaseNotesAdmin({ embedded = false }) {
     title: '',
     content: '',
     releaseDate: new Date().toISOString().split('T')[0],
-    isMajor: false
+    isMajor: false,
+    isTest: false
   });
 
   useEffect(() => {
@@ -51,7 +52,8 @@ export default function ReleaseNotesAdmin({ embedded = false }) {
       title: '',
       content: '',
       releaseDate: new Date().toISOString().split('T')[0],
-      isMajor: false
+      isMajor: false,
+      isTest: false
     });
     setShowModal(true);
   };
@@ -63,7 +65,8 @@ export default function ReleaseNotesAdmin({ embedded = false }) {
       title: release.title,
       content: release.content,
       releaseDate: release.releaseDate?.split('T')[0] || new Date().toISOString().split('T')[0],
-      isMajor: release.isMajor
+      isMajor: release.isMajor,
+      isTest: release.isTest || false
     });
     setShowModal(true);
   };
@@ -81,7 +84,8 @@ export default function ReleaseNotesAdmin({ embedded = false }) {
         title: formData.title.trim(),
         content: formData.content.trim(),
         releaseDate: new Date(formData.releaseDate).toISOString(),
-        isMajor: formData.isMajor
+        isMajor: formData.isMajor,
+        isTest: formData.isTest
       };
 
       let response;
@@ -111,6 +115,18 @@ export default function ReleaseNotesAdmin({ embedded = false }) {
       const response = await releaseNotesApi.update(release.id, { isActive: !release.isActive });
       if (response.success) {
         toast.success(release.isActive ? 'Release hidden' : 'Release published');
+        loadReleases();
+      }
+    } catch (err) {
+      toast.error('Failed to update release');
+    }
+  };
+
+  const handleToggleTest = async (release) => {
+    try {
+      const response = await releaseNotesApi.update(release.id, { isTest: !release.isTest });
+      if (response.success) {
+        toast.success(release.isTest ? 'Test mode disabled - visible to all users' : 'Test mode enabled - only visible to admins');
         loadReleases();
       }
     } catch (err) {
@@ -209,7 +225,13 @@ export default function ReleaseNotesAdmin({ embedded = false }) {
                         {release.version}
                       </span>
                       {release.isMajor && (
-                        <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
+                        <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" title="Major release" />
+                      )}
+                      {release.isTest && (
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-700" title="Test mode - only visible to admins">
+                          <FlaskConical className="w-3 h-3" />
+                          Test
+                        </span>
                       )}
                     </div>
                   </td>
@@ -248,6 +270,13 @@ export default function ReleaseNotesAdmin({ embedded = false }) {
                   </td>
                   <td className="px-4 py-4 whitespace-nowrap text-right">
                     <div className="flex items-center justify-end gap-2">
+                      <button
+                        onClick={() => handleToggleTest(release)}
+                        className={`p-1 rounded ${release.isTest ? 'text-purple-600 hover:bg-purple-50' : 'text-gray-400 hover:text-purple-600 hover:bg-purple-50'}`}
+                        title={release.isTest ? 'Disable test mode' : 'Enable test mode (only visible to admins)'}
+                      >
+                        <FlaskConical className="w-4 h-4" />
+                      </button>
                       <button
                         onClick={() => handleOpenEdit(release)}
                         className="p-1 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded"
@@ -340,17 +369,32 @@ export default function ReleaseNotesAdmin({ embedded = false }) {
                 />
               </div>
 
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="isMajor"
-                  checked={formData.isMajor}
-                  onChange={(e) => setFormData({ ...formData, isMajor: e.target.checked })}
-                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                />
-                <label htmlFor="isMajor" className="text-sm text-gray-700">
-                  Mark as major release (highlighted with star)
-                </label>
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="isMajor"
+                    checked={formData.isMajor}
+                    onChange={(e) => setFormData({ ...formData, isMajor: e.target.checked })}
+                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <label htmlFor="isMajor" className="text-sm text-gray-700">
+                    Mark as major release (highlighted with star)
+                  </label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="isTest"
+                    checked={formData.isTest}
+                    onChange={(e) => setFormData({ ...formData, isTest: e.target.checked })}
+                    className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                  />
+                  <label htmlFor="isTest" className="text-sm text-gray-700 flex items-center gap-1">
+                    <FlaskConical className="w-4 h-4 text-purple-500" />
+                    Test mode (only visible to admin users for preview)
+                  </label>
+                </div>
               </div>
             </div>
 

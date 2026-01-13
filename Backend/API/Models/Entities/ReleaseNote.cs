@@ -9,6 +9,7 @@ public class ReleaseNote
     public DateTime ReleaseDate { get; set; } = DateTime.UtcNow;
     public bool IsActive { get; set; } = true;
     public bool IsMajor { get; set; } = false;
+    public bool IsTest { get; set; } = false; // Test mode - only visible to admins
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public int CreatedByUserId { get; set; }
     public DateTime? UpdatedAt { get; set; }

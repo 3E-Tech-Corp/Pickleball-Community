@@ -10,6 +10,7 @@ public class ReleaseNoteDto
     public DateTime ReleaseDate { get; set; }
     public bool IsActive { get; set; }
     public bool IsMajor { get; set; }
+    public bool IsTest { get; set; } // Test mode - only visible to admins
     public DateTime CreatedAt { get; set; }
     public string? CreatedByName { get; set; }
     public DateTime? UpdatedAt { get; set; }
@@ -24,6 +25,7 @@ public class CreateReleaseNoteDto
     public string Content { get; set; } = string.Empty;
     public DateTime? ReleaseDate { get; set; }
     public bool IsMajor { get; set; } = false;
+    public bool IsTest { get; set; } = false; // Create in test mode
 }
 
 // DTO for updating a release note
@@ -35,6 +37,7 @@ public class UpdateReleaseNoteDto
     public DateTime? ReleaseDate { get; set; }
     public bool? IsActive { get; set; }
     public bool? IsMajor { get; set; }
+    public bool? IsTest { get; set; } // Toggle test mode
 }
 
 // DTO for user-facing release notes (includes dismiss status)
@@ -46,5 +49,6 @@ public class UserReleaseNoteDto
     public string Content { get; set; } = string.Empty;
     public DateTime ReleaseDate { get; set; }
     public bool IsMajor { get; set; }
+    public bool IsTest { get; set; } // Indicates test mode (only shown to admins)
     public bool IsDismissed { get; set; }
 }
