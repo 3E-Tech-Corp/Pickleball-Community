@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, DollarSign, Upload, CheckCircle, AlertCircle, Loader2, Image, ExternalLink, Copy, Check } from 'lucide-react';
+import { X, DollarSign, Upload, CheckCircle, AlertCircle, Loader2, Image, ExternalLink, Copy, Check, FileText } from 'lucide-react';
 import { useToast } from '../contexts/ToastContext';
 import { tournamentApi, sharedAssetApi, getSharedAssetUrl } from '../services/api';
 
@@ -13,11 +13,20 @@ export default function PaymentModal({ isOpen, onClose, registration, event, onP
   const [paymentAmount, setPaymentAmount] = useState('');
   const [copied, setCopied] = useState(false);
 
+  // Helper to check if URL is a PDF
+  const isPdfUrl = (url) => {
+    if (!url) return false;
+    const lowercaseUrl = url.toLowerCase();
+    return lowercaseUrl.endsWith('.pdf') || lowercaseUrl.includes('.pdf?');
+  };
+
   useEffect(() => {
     if (registration) {
       setPaymentReference(registration.paymentReference || '');
       setPaymentProofUrl(registration.paymentProofUrl || '');
-      setPreviewImage(registration.paymentProofUrl || null);
+      // Only set preview image for non-PDF files
+      const proofUrl = registration.paymentProofUrl || '';
+      setPreviewImage(proofUrl && !isPdfUrl(proofUrl) ? proofUrl : null);
       // Initialize payment amount to remaining balance
       const remaining = (registration.amountDue || 0) - (registration.amountPaid || 0);
       setPaymentAmount(remaining > 0 ? remaining.toFixed(2) : '');
@@ -272,6 +281,11 @@ export default function PaymentModal({ isOpen, onClose, registration, event, onP
                     </div>
                   ) : paymentProofUrl ? (
                     <div className="space-y-2">
+                      {isPdfUrl(paymentProofUrl) && (
+                        <div className="flex justify-center">
+                          <FileText className="w-12 h-12 text-red-500" />
+                        </div>
+                      )}
                       <a
                         href={paymentProofUrl}
                         target="_blank"
@@ -279,7 +293,7 @@ export default function PaymentModal({ isOpen, onClose, registration, event, onP
                         className="text-orange-600 hover:text-orange-700 flex items-center justify-center gap-1"
                       >
                         <ExternalLink className="w-4 h-4" />
-                        View Uploaded File
+                        {isPdfUrl(paymentProofUrl) ? 'View PDF' : 'View Uploaded File'}
                       </a>
                       <button
                         type="button"
