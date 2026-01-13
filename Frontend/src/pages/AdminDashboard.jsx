@@ -2,16 +2,14 @@ import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
-import { userApi, materialApi, themeApi, notificationTemplateApi, getAssetUrl } from '../services/api'
-import { userApi, themeApi, sharedAssetApi, getAssetUrl, getSharedAssetUrl, SHARED_AUTH_URL, notificationsApi } from '../services/api'
+import { userApi, materialApi, themeApi, notificationTemplateApi, getAssetUrl, sharedAssetApi, getSharedAssetUrl, SHARED_AUTH_URL, notificationsApi } from '../services/api'
 import {
   Users, BookOpen, Calendar, DollarSign, Search, Edit2, Trash2,
   ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Filter, MoreVertical, Eye, X,
   Shield, GraduationCap, User, CheckCircle, XCircle, Save,
-  Palette, Upload, RefreshCw, Image, Layers, Check, Award, Tags, UserCog, Video, Building2, HelpCircle, MessageSquare, MapPin, Network, Plus, Play, ArrowUp, ArrowDown, Bell, Send, Megaphone
-  Palette, Upload, RefreshCw, Image, Layers, Check, Award, Bell,
-  Mail, Plus, RotateCcw, ToggleLeft, ToggleRight, Copy, AlertCircle
-  Palette, Upload, RefreshCw, Image, Layers, Check, Award, Tags, UserCog, Video, Building2, HelpCircle, MessageSquare, MapPin, Network, Plus, Play, ArrowUp, ArrowDown, Bell, Send
+  Palette, Upload, RefreshCw, Image, Layers, Check, Award, Tags, UserCog, Video,
+  Building2, HelpCircle, MessageSquare, MapPin, Network, Plus, Play, ArrowUp, ArrowDown,
+  Bell, Send, Megaphone, Mail, RotateCcw, ToggleLeft, ToggleRight, Copy, AlertCircle
 } from 'lucide-react'
 import VideoUploadModal from '../components/ui/VideoUploadModal'
 import PublicProfileModal from '../components/ui/PublicProfileModal'
