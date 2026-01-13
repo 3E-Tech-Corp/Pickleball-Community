@@ -53,6 +53,15 @@ public class ScoreFormatDto
     public int? TimeLimitMinutes { get; set; }
     public bool IsTiebreaker { get; set; }
     public bool IsDefault { get; set; }
+    public bool IsPreset { get; set; }
+    public bool IsActive { get; set; }
+    public int SortOrder { get; set; }
+    public int? EventId { get; set; }
+
+    /// <summary>
+    /// Short display string like "Rally 11-2" or "Rally 15-2 cap 19"
+    /// </summary>
+    public string ShortDisplay { get; set; } = string.Empty;
 }
 
 public class CreateScoreFormatRequest
@@ -68,6 +77,43 @@ public class CreateScoreFormatRequest
     public int? MidpointScore { get; set; }
     public int? TimeLimitMinutes { get; set; }
     public bool? IsTiebreaker { get; set; }
+    public bool? IsPreset { get; set; }
+    public int? EventId { get; set; }
+    public int? SortOrder { get; set; }
+}
+
+public class UpdateScoreFormatRequest
+{
+    public string? Name { get; set; }
+    public string? Description { get; set; }
+    public int? ScoreMethodId { get; set; }
+    public string? ScoringType { get; set; }
+    public int? MaxPoints { get; set; }
+    public int? WinByMargin { get; set; }
+    public int? CapAfter { get; set; }
+    public bool? SwitchEndsAtMidpoint { get; set; }
+    public int? MidpointScore { get; set; }
+    public int? TimeLimitMinutes { get; set; }
+    public bool? IsTiebreaker { get; set; }
+    public bool? IsActive { get; set; }
+    public bool? IsDefault { get; set; }
+    public int? SortOrder { get; set; }
+}
+
+/// <summary>
+/// Request to find an existing format or create a new one if not found
+/// </summary>
+public class FindOrCreateScoreFormatRequest
+{
+    public int? ScoreMethodId { get; set; }
+    public int MaxPoints { get; set; } = 11;
+    public int WinByMargin { get; set; } = 2;
+    public int CapAfter { get; set; } = 0;
+    public bool SwitchEndsAtMidpoint { get; set; } = false;
+    public int? MidpointScore { get; set; }
+    public int? TimeLimitMinutes { get; set; }
+    public bool IsTiebreaker { get; set; } = false;
+    public int? EventId { get; set; } // For event-specific formats
 }
 
 // ============================================

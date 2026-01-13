@@ -27,6 +27,7 @@ import SkillLevelsAdmin from './SkillLevelsAdmin'
 import LeagueAdmin from './LeagueAdmin'
 import LeagueRolesAdmin from './LeagueRolesAdmin'
 import ReleaseNotesAdmin from './ReleaseNotesAdmin'
+import GameFormatsAdmin from './GameFormatsAdmin'
 
 const AdminDashboard = () => {
   const { user } = useAuth()
@@ -778,7 +779,8 @@ const AdminDashboard = () => {
         { id: 'venueTypes', label: 'Venue Types', icon: Building2 },
         { id: 'clubRoles', label: 'Club Roles', icon: UserCog },
         { id: 'teamUnits', label: 'Team Units', icon: Users },
-        { id: 'skillLevels', label: 'Skill Levels', icon: Award }
+        { id: 'skillLevels', label: 'Skill Levels', icon: Award },
+        { id: 'gameFormats', label: 'Game Formats', icon: Settings }
       ]
     },
     {
@@ -2354,6 +2356,9 @@ const AdminDashboard = () => {
 
           {/* Skill Levels Admin */}
           {activeTab === 'skillLevels' && <SkillLevelsAdmin embedded />}
+
+          {/* Game Formats Admin */}
+          {activeTab === 'gameFormats' && <GameFormatsAdmin embedded />}
 
           {/* League Admin */}
           {activeTab === 'leagues' && <LeagueAdmin embedded />}

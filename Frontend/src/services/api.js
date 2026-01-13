@@ -1071,6 +1071,33 @@ export const scoreMethodsApi = {
   delete: (id) => api.delete(`/scoremethods/${id}`)
 }
 
+// Score Formats API (Game format presets)
+export const scoreFormatsApi = {
+  // Get all score formats (presets by default)
+  getAll: ({ includeInactive = false, presetsOnly = true, eventId = null } = {}) => {
+    const params = new URLSearchParams();
+    if (includeInactive) params.append('includeInactive', 'true');
+    if (!presetsOnly) params.append('presetsOnly', 'false');
+    if (eventId) params.append('eventId', eventId);
+    return api.get(`/scoreformats?${params.toString()}`);
+  },
+
+  // Get single score format
+  getById: (id) => api.get(`/scoreformats/${id}`),
+
+  // Create new score format (Admin only for presets)
+  create: (data) => api.post('/scoreformats', data),
+
+  // Update score format (Admin only for presets)
+  update: (id, data) => api.put(`/scoreformats/${id}`, data),
+
+  // Delete score format (Admin only for presets)
+  delete: (id) => api.delete(`/scoreformats/${id}`),
+
+  // Find existing format or create new one
+  findOrCreate: (data) => api.post('/scoreformats/find-or-create', data)
+}
+
 // Blog API
 export const blogApi = {
   // Categories (public for active only, admin for all)
