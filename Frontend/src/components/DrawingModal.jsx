@@ -60,7 +60,7 @@ function SpinningWheel({
       ctx.shadowColor = 'rgba(0,0,0,0.5)';
       ctx.shadowBlur = 2;
 
-      const text = item.name?.substring(0, 15) || `Unit ${index + 1}`;
+      const text = (item.displayName || item.name || `Unit ${index + 1}`).substring(0, 18);
       ctx.fillText(text, radius - 20, 4);
       ctx.restore();
     });
@@ -228,6 +228,25 @@ function SlotNumber({ number, isAnimating, isFinal }) {
   );
 }
 
+// Helper function to get display name for a unit
+function getUnitDisplayName(unit, unitSize) {
+  // For doubles (unit size 2), use player names
+  if (unitSize === 2 && unit.members && unit.members.length > 0) {
+    const playerNames = unit.members.map(m => {
+      if (m.firstName && m.lastName) {
+        return `${m.firstName} ${m.lastName.charAt(0)}.`;
+      }
+      return m.firstName || m.lastName || 'Player';
+    });
+    if (playerNames.length >= 2) {
+      return `${playerNames[0]} / ${playerNames[1]}`;
+    }
+    return playerNames[0] || unit.name || `Unit ${unit.id}`;
+  }
+  // For singles or teams, use unit name
+  return unit.name || `Unit ${unit.id}`;
+}
+
 export default function DrawingModal({
   isOpen,
   onClose,
@@ -244,6 +263,9 @@ export default function DrawingModal({
   const [wheelUnits, setWheelUnits] = useState([]);
   const [selectedWheelIndex, setSelectedWheelIndex] = useState(0);
   const [showConfetti, setShowConfetti] = useState(false);
+
+  // Get unit size from division
+  const unitSize = division?.unitSize || 1;
 
   // Reset state when modal opens
   useEffect(() => {
@@ -281,8 +303,12 @@ export default function DrawingModal({
       assignedNumber: shuffledSlots[idx]
     }));
 
-    // Set up wheel with remaining units
-    setWheelUnits([...registeredUnits]);
+    // Set up wheel with remaining units (include display names)
+    const unitsWithDisplayNames = registeredUnits.map(u => ({
+      ...u,
+      displayName: getUnitDisplayName(u, unitSize)
+    }));
+    setWheelUnits(unitsWithDisplayNames);
     setPhase('spinning');
     setCurrentDrawIndex(0);
 
@@ -293,7 +319,10 @@ export default function DrawingModal({
       // Set wheel for current draw
       const remainingUnits = registeredUnits.filter((_, idx) =>
         !assignments.slice(0, i).some(a => a.unit.id === registeredUnits[idx].id)
-      );
+      ).map(u => ({
+        ...u,
+        displayName: getUnitDisplayName(u, unitSize)
+      }));
       setWheelUnits(remainingUnits);
 
       // Find index in remaining units
@@ -432,10 +461,36 @@ export default function DrawingModal({
                 </div>
               </div>
               <h3 className="text-2xl font-bold text-white mb-3">Ready to Draw!</h3>
-              <p className="text-gray-400 mb-8 max-w-md mx-auto">
-                Spin the wheel to randomly assign {registeredUnits.length} teams to their bracket positions.
+              <p className="text-gray-400 mb-6 max-w-md mx-auto">
+                Spin the wheel to randomly assign {registeredUnits.length} {unitSize === 2 ? 'doubles teams' : unitSize === 1 ? 'players' : 'teams'} to their bracket positions.
                 {emptySlots > 0 && ` ${emptySlots} slot${emptySlots !== 1 ? 's' : ''} will be byes.`}
               </p>
+
+              {/* Instructions */}
+              <div className="bg-gray-800/70 border border-gray-700 rounded-xl p-4 mb-6 max-w-lg mx-auto text-left">
+                <h4 className="text-sm font-semibold text-orange-400 mb-3 flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4" />
+                  How It Works
+                </h4>
+                <ol className="text-sm text-gray-300 space-y-2">
+                  <li className="flex gap-2">
+                    <span className="text-orange-400 font-bold">1.</span>
+                    <span>Click "Start Drawing" to begin the random draw process.</span>
+                  </li>
+                  <li className="flex gap-2">
+                    <span className="text-orange-400 font-bold">2.</span>
+                    <span>The wheel will spin and randomly select each {unitSize === 2 ? 'team' : unitSize === 1 ? 'player' : 'unit'}'s bracket position.</span>
+                  </li>
+                  <li className="flex gap-2">
+                    <span className="text-orange-400 font-bold">3.</span>
+                    <span>Once complete, review the assignments and click "Confirm & Save" to finalize.</span>
+                  </li>
+                  <li className="flex gap-2">
+                    <span className="text-orange-400 font-bold">4.</span>
+                    <span>Not happy? Click "Re-Draw" to start over with a fresh random draw.</span>
+                  </li>
+                </ol>
+              </div>
 
               {alreadyAssigned && (
                 <div className="bg-yellow-500/20 border border-yellow-500/50 rounded-lg p-4 mb-6 max-w-md mx-auto">
@@ -491,7 +546,7 @@ export default function DrawingModal({
                         <span className="w-7 h-7 rounded-full bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center text-white text-sm font-bold">
                           {a.assignedNumber}
                         </span>
-                        <span className="text-white text-sm">{a.unit.name?.substring(0, 12) || `Unit ${a.unit.id}`}</span>
+                        <span className="text-white text-sm">{getUnitDisplayName(a.unit, unitSize).substring(0, 15)}</span>
                       </div>
                     ))}
                   </div>
@@ -543,13 +598,15 @@ export default function DrawingModal({
                         {assignment ? (
                           <div>
                             <div className="font-medium text-white">
-                              {assignment.unit.name || `Unit ${assignment.unit.id}`}
+                              {getUnitDisplayName(assignment.unit, unitSize)}
                             </div>
-                            <div className="text-sm text-gray-400">
-                              {assignment.unit.members?.map(m =>
-                                m.lastName && m.firstName ? `${m.lastName}, ${m.firstName}` : (m.lastName || m.firstName || 'Player')
-                              ).join(' & ') || 'No members'}
-                            </div>
+                            {unitSize !== 2 && assignment.unit.members && assignment.unit.members.length > 0 && (
+                              <div className="text-sm text-gray-400">
+                                {assignment.unit.members.map(m =>
+                                  m.lastName && m.firstName ? `${m.lastName}, ${m.firstName}` : (m.lastName || m.firstName || 'Player')
+                                ).join(' & ')}
+                              </div>
+                            )}
                           </div>
                         ) : (
                           <div className="text-gray-500 italic">Empty slot (bye)</div>
@@ -570,7 +627,7 @@ export default function DrawingModal({
                   <div className="space-y-1 text-sm text-yellow-300/80">
                     {byeMatches.slice(0, 3).map((bye, idx) => (
                       <div key={idx} className="flex items-center gap-2">
-                        <span className="font-medium">{bye.unit.name}</span>
+                        <span className="font-medium">{getUnitDisplayName(bye.unit, unitSize)}</span>
                         <ArrowRight className="w-3 h-3" />
                         <span>advances in {bye.round}</span>
                       </div>
@@ -602,11 +659,11 @@ export default function DrawingModal({
                             return (
                               <div key={matchIdx} className="flex items-center justify-between text-sm bg-gray-700/50 rounded px-3 py-2">
                                 <span className={unit1 ? 'text-white' : 'text-gray-500 italic'}>
-                                  {unit1 ? (unit1.name || `Unit ${unit1.id}`) : 'BYE'}
+                                  {unit1 ? getUnitDisplayName(unit1, unitSize) : 'BYE'}
                                 </span>
                                 <span className="text-gray-500 text-xs">vs</span>
                                 <span className={unit2 ? 'text-white' : 'text-gray-500 italic'}>
-                                  {unit2 ? (unit2.name || `Unit ${unit2.id}`) : 'BYE'}
+                                  {unit2 ? getUnitDisplayName(unit2, unitSize) : 'BYE'}
                                 </span>
                               </div>
                             );
