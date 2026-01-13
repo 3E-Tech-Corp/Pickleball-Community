@@ -25,7 +25,7 @@ const ResetPassword = () => {
     const callbackUrl = `${window.location.origin}/auth/callback`
 
     // Build redirect URL with token if present and language preference
-    let authUrl = `${SHARED_AUTH_UI_URL}/reset-password?site=${SITE_KEY}&returnUrl=${encodeURIComponent(callbackUrl)}&lang=${getCurrentLang()}`
+    let authUrl = `${SHARED_AUTH_UI_URL}/reset-password?site=${SITE_KEY}&returnUrl=${encodeURIComponent(callbackUrl)}&Langcode=${getCurrentLang()}`
     if (token) {
       authUrl += `&token=${encodeURIComponent(token)}`
     }

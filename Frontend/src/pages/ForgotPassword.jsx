@@ -21,7 +21,7 @@ const ForgotPassword = () => {
     const callbackUrl = `${window.location.origin}/auth/callback`
 
     // Redirect to shared auth UI forgot password page with language preference
-    const authUrl = `${SHARED_AUTH_UI_URL}/forgot-password?site=${SITE_KEY}&returnUrl=${encodeURIComponent(callbackUrl)}&lang=${getCurrentLang()}`
+    const authUrl = `${SHARED_AUTH_UI_URL}/forgot-password?site=${SITE_KEY}&returnUrl=${encodeURIComponent(callbackUrl)}&Langcode=${getCurrentLang()}`
     window.location.href = authUrl
   }, [])
 

@@ -34,7 +34,7 @@ export const useSharedAuth = () => {
     const redirectUrl = `${currentUrl}/auth/callback`
     const returnPath = returnTo || location.state?.from?.pathname || location.pathname
 
-    window.location.href = `${SHARED_AUTH_UI_URL}/login?redirect=${encodeURIComponent(redirectUrl)}&returnTo=${encodeURIComponent(returnPath)}&site=community&lang=${getCurrentLang()}`
+    window.location.href = `${SHARED_AUTH_UI_URL}/login?redirect=${encodeURIComponent(redirectUrl)}&returnTo=${encodeURIComponent(returnPath)}&site=community&Langcode=${getCurrentLang()}`
   }, [location])
 
   /**
@@ -50,7 +50,7 @@ export const useSharedAuth = () => {
     const currentUrl = window.location.origin
     const redirectUrl = `${currentUrl}/auth/callback`
 
-    window.location.href = `${SHARED_AUTH_UI_URL}/register?redirect=${encodeURIComponent(redirectUrl)}&site=community&lang=${getCurrentLang()}`
+    window.location.href = `${SHARED_AUTH_UI_URL}/register?redirect=${encodeURIComponent(redirectUrl)}&site=community&Langcode=${getCurrentLang()}`
   }, [])
 
   /**
@@ -66,7 +66,7 @@ export const useSharedAuth = () => {
     const currentUrl = window.location.origin
     const redirectUrl = `${currentUrl}/auth/callback`
 
-    window.location.href = `${SHARED_AUTH_UI_URL}/forgot-password?redirect=${encodeURIComponent(redirectUrl)}&site=community&lang=${getCurrentLang()}`
+    window.location.href = `${SHARED_AUTH_UI_URL}/forgot-password?redirect=${encodeURIComponent(redirectUrl)}&site=community&Langcode=${getCurrentLang()}`
   }, [])
 
   /**
@@ -80,7 +80,7 @@ export const useSharedAuth = () => {
     const redirectUrl = `${currentUrl}/auth/callback`
     const returnPath = returnTo || '/'
 
-    return `${SHARED_AUTH_UI_URL}/login?redirect=${encodeURIComponent(redirectUrl)}&returnTo=${encodeURIComponent(returnPath)}&site=community&lang=${getCurrentLang()}`
+    return `${SHARED_AUTH_UI_URL}/login?redirect=${encodeURIComponent(redirectUrl)}&returnTo=${encodeURIComponent(returnPath)}&site=community&Langcode=${getCurrentLang()}`
   }, [])
 
   /**
@@ -92,7 +92,7 @@ export const useSharedAuth = () => {
     const currentUrl = window.location.origin
     const redirectUrl = `${currentUrl}/auth/callback`
 
-    return `${SHARED_AUTH_UI_URL}/register?redirect=${encodeURIComponent(redirectUrl)}&site=community&lang=${getCurrentLang()}`
+    return `${SHARED_AUTH_UI_URL}/register?redirect=${encodeURIComponent(redirectUrl)}&site=community&Langcode=${getCurrentLang()}`
   }, [])
 
   return {

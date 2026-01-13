@@ -25,7 +25,7 @@ const Login = () => {
     const callbackUrl = `${window.location.origin}/auth/callback?returnTo=${encodeURIComponent(returnTo)}`
 
     // Redirect to shared auth UI with language preference
-    const authUrl = `${SHARED_AUTH_UI_URL}/login?site=${SITE_KEY}&returnUrl=${encodeURIComponent(callbackUrl)}&lang=${getCurrentLang()}`
+    const authUrl = `${SHARED_AUTH_UI_URL}/login?site=${SITE_KEY}&returnUrl=${encodeURIComponent(callbackUrl)}&Langcode=${getCurrentLang()}`
     window.location.href = authUrl
   }, [location])
 
