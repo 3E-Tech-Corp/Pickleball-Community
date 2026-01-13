@@ -5395,18 +5395,33 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
         unit={selectedAdminPaymentUnit}
         event={event}
         onPaymentUpdated={(unitId, paymentInfo) => {
-          // Update the registration in allRegistrations with new payment info
+          // Update the member's payment status in allRegistrations
           setAllRegistrations(prev =>
-            prev.map(r => r.unitId === unitId ? {
-              ...r,
-              paymentStatus: paymentInfo.paymentStatus,
-              amountPaid: paymentInfo.amountPaid,
-              amountDue: paymentInfo.amountDue,
-              paymentProofUrl: paymentInfo.paymentProofUrl,
-              paymentReference: paymentInfo.paymentReference,
-              paidAt: paymentInfo.paidAt
-            } : r)
+            prev.map(r => {
+              if (r.id !== unitId && r.unitId !== unitId) return r;
+              // Update the specific member's payment data
+              const updatedMembers = r.members?.map(m =>
+                m.userId === paymentInfo.userId
+                  ? {
+                      ...m,
+                      hasPaid: paymentInfo.hasPaid,
+                      paidAt: paymentInfo.paidAt,
+                      amountPaid: paymentInfo.amountPaid,
+                      paymentProofUrl: paymentInfo.paymentProofUrl,
+                      paymentReference: paymentInfo.paymentReference,
+                      referenceId: paymentInfo.referenceId
+                    }
+                  : m
+              );
+              return {
+                ...r,
+                members: updatedMembers,
+                paymentStatus: paymentInfo.unitPaymentStatus || r.paymentStatus
+              };
+            })
           );
+          // Refresh from server to ensure consistency
+          onUpdate();
         }}
       />
 
