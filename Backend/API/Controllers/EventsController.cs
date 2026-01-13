@@ -581,6 +581,7 @@ public class EventsController : ControllerBase
                         MinSkillRating = d.MinSkillRating,
                         MaxSkillRating = d.MaxSkillRating,
                         MaxUnits = d.MaxUnits,
+                        MaxPlayers = d.MaxPlayers,
                         // Legacy fields
                         TeamSize = d.TeamSize,
                         SkillLevelMin = d.SkillLevelMin,
@@ -685,6 +686,7 @@ public class EventsController : ControllerBase
                     MinSkillRating = divDto.MinSkillRating,
                     MaxSkillRating = divDto.MaxSkillRating,
                     MaxUnits = divDto.MaxUnits,
+                    MaxPlayers = divDto.MaxPlayers,
                     // Legacy fields
                     TeamSize = divDto.TeamSize,
                     SkillLevelMin = divDto.SkillLevelMin,
@@ -827,6 +829,7 @@ public class EventsController : ControllerBase
                             existingDiv.MinSkillRating = divDto.MinSkillRating;
                             existingDiv.MaxSkillRating = divDto.MaxSkillRating;
                             existingDiv.MaxUnits = divDto.MaxUnits;
+                            existingDiv.MaxPlayers = divDto.MaxPlayers;
                         }
                     }
                     else
@@ -846,6 +849,7 @@ public class EventsController : ControllerBase
                             MinSkillRating = divDto.MinSkillRating,
                             MaxSkillRating = divDto.MaxSkillRating,
                             MaxUnits = divDto.MaxUnits,
+                            MaxPlayers = divDto.MaxPlayers,
                             SortOrder = divDto.SortOrder
                         };
                         evt.Divisions.Add(newDivision);
@@ -1468,6 +1472,7 @@ public class EventsController : ControllerBase
                 MinSkillRating = dto.MinSkillRating,
                 MaxSkillRating = dto.MaxSkillRating,
                 MaxUnits = dto.MaxUnits,
+                MaxPlayers = dto.MaxPlayers,
                 // Legacy fields
                 TeamSize = dto.TeamSize,
                 SkillLevelMin = dto.SkillLevelMin,
@@ -1523,6 +1528,7 @@ public class EventsController : ControllerBase
                     MinSkillRating = division.MinSkillRating,
                     MaxSkillRating = division.MaxSkillRating,
                     MaxUnits = division.MaxUnits,
+                    MaxPlayers = division.MaxPlayers,
                     // Legacy fields
                     TeamSize = division.TeamSize,
                     SkillLevelMin = division.SkillLevelMin,
@@ -1593,6 +1599,7 @@ public class EventsController : ControllerBase
             if (dto.AgeGroupId.HasValue) division.AgeGroupId = dto.AgeGroupId;
             if (dto.SkillLevelId.HasValue) division.SkillLevelId = dto.SkillLevelId;
             if (dto.MaxUnits.HasValue) division.MaxUnits = dto.MaxUnits;
+            if (dto.MaxPlayers.HasValue) division.MaxPlayers = dto.MaxPlayers;
             if (dto.DivisionFee.HasValue) division.DivisionFee = dto.DivisionFee;
 
             // Tournament structure fields
@@ -1630,6 +1637,7 @@ public class EventsController : ControllerBase
                     SkillLevelId = division.SkillLevelId,
                     SkillLevelName = division.SkillLevel?.Name,
                     MaxUnits = division.MaxUnits,
+                    MaxPlayers = division.MaxPlayers,
                     DivisionFee = division.DivisionFee,
                     SortOrder = division.SortOrder,
                     RegisteredCount = registeredCount,

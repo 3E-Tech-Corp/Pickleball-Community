@@ -2149,6 +2149,7 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
         skillLevelId: editingDivision.skillLevelId || null,
         ageGroupId: editingDivision.ageGroupId || null,
         maxUnits: editingDivision.maxUnits ? parseInt(editingDivision.maxUnits) : null,
+        maxPlayers: editingDivision.maxPlayers ? parseInt(editingDivision.maxPlayers) : null,
         divisionFee: editingDivision.divisionFee ? parseFloat(editingDivision.divisionFee) : null,
         scheduleType: editingDivision.scheduleType || null,
         poolCount: editingDivision.poolCount ? parseInt(editingDivision.poolCount) : null,
@@ -5244,7 +5245,7 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-3 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Max Teams</label>
                   <input
@@ -5252,6 +5253,17 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
                     min="1"
                     value={editingDivision.maxUnits || ''}
                     onChange={(e) => setEditingDivision({ ...editingDivision, maxUnits: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg p-2"
+                    placeholder="Unlimited"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Max Players</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={editingDivision.maxPlayers || ''}
+                    onChange={(e) => setEditingDivision({ ...editingDivision, maxPlayers: e.target.value })}
                     className="w-full border border-gray-300 rounded-lg p-2"
                     placeholder="Unlimited"
                   />

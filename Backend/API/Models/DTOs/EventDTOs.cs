@@ -161,6 +161,7 @@ public class EventDivisionDto
     public decimal? MinSkillRating { get; set; }
     public decimal? MaxSkillRating { get; set; }
     public int? MaxUnits { get; set; }
+    public int? MaxPlayers { get; set; }
 
     // Legacy fields (for backward compatibility)
     public int TeamSize { get; set; } = 1;
@@ -199,6 +200,7 @@ public class UpdateDivisionDto
     public int? AgeGroupId { get; set; }
     public int? SkillLevelId { get; set; }
     public int? MaxUnits { get; set; }
+    public int? MaxPlayers { get; set; }
     public decimal? DivisionFee { get; set; }
 
     // Tournament structure
@@ -316,6 +318,7 @@ public class CreateEventDivisionDto
     public decimal? MinSkillRating { get; set; }
     public decimal? MaxSkillRating { get; set; }
     public int? MaxUnits { get; set; }
+    public int? MaxPlayers { get; set; }
 
     // Legacy fields (for backward compatibility)
     public int TeamSize { get; set; } = 1;

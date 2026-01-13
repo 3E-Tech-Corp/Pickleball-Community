@@ -185,6 +185,11 @@ public class EventDivision
     /// </summary>
     public int? MaxUnits { get; set; }
 
+    /// <summary>
+    /// Maximum number of players allowed in this division (more accurate than MaxUnits for incomplete teams)
+    /// </summary>
+    public int? MaxPlayers { get; set; }
+
     [Column(TypeName = "decimal(10,2)")]
     public decimal? DivisionFee { get; set; } // Override event's per-division fee
 
