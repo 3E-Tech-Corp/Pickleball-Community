@@ -35,8 +35,15 @@ export default function AdminPaymentModal({ isOpen, onClose, unit, event, onPaym
     return url.startsWith('http') ? url : getSharedAssetUrl(url);
   };
 
+  const isPdfUrl = (url) => {
+    if (!url) return false;
+    const lowercaseUrl = url.toLowerCase();
+    return lowercaseUrl.endsWith('.pdf') || lowercaseUrl.includes('.pdf?');
+  };
+
   const isImageUrl = (url) => {
     if (!url) return false;
+    if (isPdfUrl(url)) return false;
     return url.includes('/asset/') || /\.(jpg|jpeg|png|gif|webp)$/i.test(url);
   };
 
@@ -171,6 +178,7 @@ export default function AdminPaymentModal({ isOpen, onClose, unit, event, onPaym
 
             {members.map((member) => {
               const memberProofUrl = getProofUrl(member.paymentProofUrl);
+              const isPdf = isPdfUrl(member.paymentProofUrl);
               const isImage = isImageUrl(memberProofUrl);
               const memberName = member.lastName && member.firstName
                 ? `${member.lastName}, ${member.firstName}`
@@ -234,7 +242,20 @@ export default function AdminPaymentModal({ isOpen, onClose, unit, event, onPaym
                     <div className="ml-6 space-y-1">
                       <div className="text-xs font-medium text-gray-600">Payment Proof</div>
                       <div className="border rounded overflow-hidden">
-                        {isImage ? (
+                        {isPdf ? (
+                          <a
+                            href={memberProofUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex flex-col items-center gap-2 p-3 hover:bg-gray-50 transition-colors"
+                          >
+                            <FileText className="w-10 h-10 text-red-500" />
+                            <span className="text-orange-600 hover:text-orange-700 flex items-center gap-1 text-sm">
+                              <ExternalLink className="w-3 h-3" />
+                              View PDF
+                            </span>
+                          </a>
+                        ) : isImage ? (
                           <a href={memberProofUrl} target="_blank" rel="noopener noreferrer">
                             <img
                               src={memberProofUrl}
@@ -249,7 +270,7 @@ export default function AdminPaymentModal({ isOpen, onClose, unit, event, onPaym
                             rel="noopener noreferrer"
                             className="flex items-center gap-2 p-2 hover:bg-gray-50 transition-colors text-sm"
                           >
-                            <FileText className="w-5 h-5 text-red-500" />
+                            <FileText className="w-5 h-5 text-gray-400" />
                             <span className="text-orange-600 hover:text-orange-700">View Document</span>
                             <ExternalLink className="w-3 h-3 text-gray-400" />
                           </a>
