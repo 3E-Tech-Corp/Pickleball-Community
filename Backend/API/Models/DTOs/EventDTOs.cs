@@ -458,7 +458,10 @@ public class TeamMemberDto
     public bool IsCurrentUser { get; set; }
     public bool HasPaid { get; set; } = false;
     public DateTime? PaidAt { get; set; }
+    public decimal AmountPaid { get; set; } = 0;
     public string? PaymentProofUrl { get; set; }
+    public string? PaymentReference { get; set; }
+    public string? ReferenceId { get; set; }
 }
 
 // Featured events for home page

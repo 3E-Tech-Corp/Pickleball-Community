@@ -1036,13 +1036,16 @@ public class TournamentController : ControllerBase
             unit.PaymentStatus = "PendingVerification";
         }
 
-        // Mark the submitting user's member record as paid
+        // Mark the submitting user's member record as paid and copy payment details
         var memberRecord = unit.Members.FirstOrDefault(m => m.UserId == userId.Value);
         if (memberRecord != null)
         {
             memberRecord.HasPaid = true;
             memberRecord.PaidAt = DateTime.Now;
+            memberRecord.AmountPaid = request.AmountPaid ?? 0;
             memberRecord.PaymentProofUrl = unit.PaymentProofUrl;
+            memberRecord.PaymentReference = unit.PaymentReference;
+            memberRecord.ReferenceId = unit.ReferenceId;
         }
 
         unit.UpdatedAt = DateTime.Now;

@@ -1367,7 +1367,10 @@ public class EventsController : ControllerBase
                                     IsCurrentUser = mem.UserId == userId.Value,
                                     HasPaid = mem.HasPaid,
                                     PaidAt = mem.PaidAt,
-                                    PaymentProofUrl = mem.PaymentProofUrl
+                                    AmountPaid = mem.AmountPaid,
+                                    PaymentProofUrl = mem.PaymentProofUrl,
+                                    PaymentReference = mem.PaymentReference,
+                                    ReferenceId = mem.ReferenceId
                                 }).ToList()
                         };
                     }).ToList();
