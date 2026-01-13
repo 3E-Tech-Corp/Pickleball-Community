@@ -668,7 +668,6 @@ export const notificationTemplateApi = {
     api.post(`/notificationtemplates/${id}/reset`)
 }
 
-export default api
 // Venues API (formerly Courts - places with pickleball courts)
 export const venuesApi = {
   // Search venues with filters
