@@ -2999,6 +2999,8 @@ const AdminDashboard = () => {
             </div>
           </div>
         </div>
+      )}
+
       {/* Hero Video Upload Modal (Legacy single video) */}
       <VideoUploadModal
         isOpen={isHeroVideoModalOpen}
