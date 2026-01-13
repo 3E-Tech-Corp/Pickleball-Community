@@ -4090,16 +4090,16 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
                     <ChevronRight className="w-5 h-5" />
                   </Link>
                 ) : (
-                  // Non-tournament events get a simpler Event Dashboard
+                  // Non-tournament events get a simpler Event Management Dashboard
                   <Link
-                    to={`/gameday/${event.id}/manage`}
+                    to={`/event/${event.id}/manage`}
                     className="flex items-center justify-between p-4 bg-blue-50 border border-blue-200 rounded-lg text-blue-700 hover:bg-blue-100 transition-colors"
                   >
                     <div className="flex items-center gap-3">
                       <Play className="w-5 h-5" />
                       <div>
                         <div className="font-medium">{event.eventTypeName || 'Event'} Dashboard</div>
-                        <div className="text-sm text-blue-600">Quick games, courts, and scoring</div>
+                        <div className="text-sm text-blue-600">Manage games, courts, and scoring</div>
                       </div>
                     </div>
                     <ChevronRight className="w-5 h-5" />
