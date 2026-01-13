@@ -110,6 +110,9 @@ public class UserRegistrationInfoDto
     public bool NeedsPartner { get; set; } = false;
     public List<PartnerInfoDto> Partners { get; set; } = new();
 
+    // All members with payment data
+    public List<TeamMemberDto> Members { get; set; } = new();
+
     // Captain info - for managing join requests
     public bool IsCaptain { get; set; } = false;
     public List<UnitJoinRequestInfoDto> PendingJoinRequests { get; set; } = new();

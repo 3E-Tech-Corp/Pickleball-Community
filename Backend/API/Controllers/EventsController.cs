@@ -525,6 +525,23 @@ public class EventsController : ControllerBase
                                             Role = m.Role,
                                             InviteStatus = m.InviteStatus
                                         }).ToList(),
+                                    // All members with payment data
+                                    Members = u.Members
+                                        .Select(m => new TeamMemberDto
+                                        {
+                                            UserId = m.UserId,
+                                            Name = m.User != null ? Utility.FormatName(m.User.LastName, m.User.FirstName) : "Unknown",
+                                            ProfileImageUrl = m.User?.ProfileImageUrl,
+                                            Role = m.Role,
+                                            InviteStatus = m.InviteStatus,
+                                            IsCurrentUser = m.UserId == userId.Value,
+                                            HasPaid = m.HasPaid,
+                                            PaidAt = m.PaidAt,
+                                            AmountPaid = m.AmountPaid,
+                                            PaymentProofUrl = m.PaymentProofUrl,
+                                            PaymentReference = m.PaymentReference,
+                                            ReferenceId = m.ReferenceId
+                                        }).ToList(),
                                     // Captain info for managing join requests
                                     IsCaptain = u.CaptainUserId == userId.Value,
                                     PendingJoinRequests = u.CaptainUserId == userId.Value
