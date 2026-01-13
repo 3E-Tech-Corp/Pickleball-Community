@@ -111,11 +111,11 @@ export default function AdminPaymentModal({ isOpen, onClose, unit, event, onPaym
       const response = await tournamentApi.unmarkMemberPaid(event.id, unit.unitId, member.userId);
       if (response.success) {
         toast.success('Payment unmarked');
+        // Use response data which preserves payment info (proofUrl, reference, etc.)
+        // Only hasPaid, paidAt, amountPaid are reset; other fields are preserved
         const updatedMember = {
           ...member,
-          hasPaid: false,
-          paidAt: null,
-          amountPaid: 0
+          ...response.data
         };
         setLocalMember(updatedMember);
         onPaymentUpdated?.(unit.unitId, response.data);

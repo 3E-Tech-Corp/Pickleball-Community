@@ -3892,44 +3892,50 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
                                             )}
                                           </button>
                                           {/* Payment status indicator - $ icon (per-member) */}
-                                          {/* Show for: 1) members who paid, 2) admin can click gray $ to add payment for any member */}
-                                          {(member.hasPaid || isOrganizer) && (
-                                            <button
-                                              onClick={(e) => {
-                                                e.stopPropagation();
-                                                if (isOrganizer) {
-                                                  // Admin: open AdminPaymentModal to review/verify or add payment for specific member
-                                                  setSelectedAdminPaymentUnit({
-                                                    ...unit,
-                                                    unitId: unit.id,
-                                                    divisionName: division.name,
-                                                    selectedMember: member
-                                                  });
-                                                } else {
-                                                  // Non-admin: show member payment details
-                                                  setSelectedMemberPayment({
-                                                    member,
-                                                    unit,
-                                                    division,
-                                                    event
-                                                  });
+                                          {/* Show for: 1) members with payment info, 2) admin can click gray $ to add payment for any member */}
+                                          {(() => {
+                                            // Has payment info if hasPaid OR has proof/reference (even if unmarked)
+                                            const hasPaymentInfo = member.hasPaid || member.paymentProofUrl || member.paymentReference;
+                                            const showIcon = hasPaymentInfo || isOrganizer;
+                                            if (!showIcon) return null;
+                                            return (
+                                              <button
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  if (isOrganizer) {
+                                                    // Admin: open AdminPaymentModal to review/verify or add payment for specific member
+                                                    setSelectedAdminPaymentUnit({
+                                                      ...unit,
+                                                      unitId: unit.id,
+                                                      divisionName: division.name,
+                                                      selectedMember: member
+                                                    });
+                                                  } else {
+                                                    // Non-admin: show member payment details
+                                                    setSelectedMemberPayment({
+                                                      member,
+                                                      unit,
+                                                      division,
+                                                      event
+                                                    });
+                                                  }
+                                                }}
+                                                className="p-0.5 rounded transition-colors hover:bg-gray-100 cursor-pointer"
+                                                title={hasPaymentInfo
+                                                  ? `${member.firstName || 'Member'} ${member.hasPaid ? 'paid' : 'has payment info'}${member.paidAt ? ` on ${new Date(member.paidAt).toLocaleDateString()}` : ''}`
+                                                  : 'Add payment info'
                                                 }
-                                              }}
-                                              className="p-0.5 rounded transition-colors hover:bg-gray-100 cursor-pointer"
-                                              title={member.hasPaid
-                                                ? `${member.firstName || 'Member'} paid${member.paidAt ? ` on ${new Date(member.paidAt).toLocaleDateString()}` : ''}`
-                                                : 'Add payment info'
-                                              }
-                                            >
-                                              <DollarSign className={`w-4 h-4 ${
-                                                isPaymentVerified
-                                                  ? 'text-green-600'
-                                                  : member.hasPaid
-                                                    ? 'text-orange-500'
-                                                    : 'text-gray-400'
-                                              }`} />
-                                            </button>
-                                          )}
+                                              >
+                                                <DollarSign className={`w-4 h-4 ${
+                                                  isPaymentVerified
+                                                    ? 'text-green-600'
+                                                    : hasPaymentInfo
+                                                      ? 'text-orange-500'
+                                                      : 'text-gray-400'
+                                                }`} />
+                                              </button>
+                                            );
+                                          })()}
                                           {/* Trash icon - only if no payment submitted */}
                                           {canRemove && (
                                             <button
