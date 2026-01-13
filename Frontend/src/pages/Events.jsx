@@ -4072,37 +4072,39 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
           {/* Manage Tab */}
           {activeTab === 'manage' && isOrganizer && (
             <div className="space-y-6">
-              {/* Management Dashboard Links */}
-              <div className="grid gap-3 sm:grid-cols-2">
-                {/* Tournament Dashboard */}
-                <Link
-                  to={`/tournament/${event.id}/manage`}
-                  className="flex items-center justify-between p-4 bg-orange-50 border border-orange-200 rounded-lg text-orange-700 hover:bg-orange-100 transition-colors"
-                >
-                  <div className="flex items-center gap-3">
-                    <Trophy className="w-5 h-5" />
-                    <div>
-                      <div className="font-medium">Tournament Dashboard</div>
-                      <div className="text-sm text-orange-600">Brackets, pools, and tournament play</div>
+              {/* Management Dashboard Link - conditional based on event type */}
+              <div className="grid gap-3">
+                {event.eventTypeName?.toLowerCase() === 'tournament' ? (
+                  // Tournament events get the full Tournament Dashboard
+                  <Link
+                    to={`/tournament/${event.id}/manage`}
+                    className="flex items-center justify-between p-4 bg-orange-50 border border-orange-200 rounded-lg text-orange-700 hover:bg-orange-100 transition-colors"
+                  >
+                    <div className="flex items-center gap-3">
+                      <Trophy className="w-5 h-5" />
+                      <div>
+                        <div className="font-medium">Tournament Dashboard</div>
+                        <div className="text-sm text-orange-600">Brackets, pools, game day manager, and tournament play</div>
+                      </div>
                     </div>
-                  </div>
-                  <ChevronRight className="w-5 h-5" />
-                </Link>
-
-                {/* Game Day Dashboard */}
-                <Link
-                  to={`/gameday/${event.id}/manage`}
-                  className="flex items-center justify-between p-4 bg-blue-50 border border-blue-200 rounded-lg text-blue-700 hover:bg-blue-100 transition-colors"
-                >
-                  <div className="flex items-center gap-3">
-                    <Play className="w-5 h-5" />
-                    <div>
-                      <div className="font-medium">Game Day Manager</div>
-                      <div className="text-sm text-blue-600">Quick games, courts, and scoring</div>
+                    <ChevronRight className="w-5 h-5" />
+                  </Link>
+                ) : (
+                  // Non-tournament events get a simpler Event Dashboard
+                  <Link
+                    to={`/gameday/${event.id}/manage`}
+                    className="flex items-center justify-between p-4 bg-blue-50 border border-blue-200 rounded-lg text-blue-700 hover:bg-blue-100 transition-colors"
+                  >
+                    <div className="flex items-center gap-3">
+                      <Play className="w-5 h-5" />
+                      <div>
+                        <div className="font-medium">{event.eventTypeName || 'Event'} Dashboard</div>
+                        <div className="text-sm text-blue-600">Quick games, courts, and scoring</div>
+                      </div>
                     </div>
-                  </div>
-                  <ChevronRight className="w-5 h-5" />
-                </Link>
+                    <ChevronRight className="w-5 h-5" />
+                  </Link>
+                )}
               </div>
 
               {/* Event Documents Section */}
