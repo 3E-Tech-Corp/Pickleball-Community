@@ -1,12 +1,16 @@
 import { useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Loader2 } from 'lucide-react'
+import i18n from '../i18n'
 
 // Shared Auth UI URL from environment
 const SHARED_AUTH_UI_URL = import.meta.env.VITE_SHARED_AUTH_UI_URL || 'https://shared.funtimepb.com'
 
 // Global site key for cross-site auth
 const SITE_KEY = 'community'
+
+// Get current language code for shared auth
+const getCurrentLang = () => i18n.language?.split('-')[0] || 'en'
 
 /**
  * ResetPassword page - redirects to shared auth UI
@@ -20,8 +24,8 @@ const ResetPassword = () => {
     const token = searchParams.get('token')
     const callbackUrl = `${window.location.origin}/auth/callback`
 
-    // Build redirect URL with token if present
-    let authUrl = `${SHARED_AUTH_UI_URL}/reset-password?site=${SITE_KEY}&returnUrl=${encodeURIComponent(callbackUrl)}`
+    // Build redirect URL with token if present and language preference
+    let authUrl = `${SHARED_AUTH_UI_URL}/reset-password?site=${SITE_KEY}&returnUrl=${encodeURIComponent(callbackUrl)}&lang=${getCurrentLang()}`
     if (token) {
       authUrl += `&token=${encodeURIComponent(token)}`
     }
