@@ -3896,11 +3896,12 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
                                               onClick={(e) => {
                                                 e.stopPropagation();
                                                 if (isOrganizer) {
-                                                  // Admin: open AdminPaymentModal to review/verify
+                                                  // Admin: open AdminPaymentModal to review/verify specific member
                                                   setSelectedAdminPaymentUnit({
                                                     ...unit,
                                                     unitId: unit.id,
-                                                    divisionName: division.name
+                                                    divisionName: division.name,
+                                                    selectedMember: member
                                                   });
                                                 } else {
                                                   // Non-admin: show member payment details
