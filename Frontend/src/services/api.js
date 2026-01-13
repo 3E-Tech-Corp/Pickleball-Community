@@ -1719,4 +1719,34 @@ export const playerHistoryApi = {
   getRatingTypes: () => api.get('/api/player-history/rating-types')
 }
 
+// Release Notes API
+export const releaseNotesApi = {
+  // Public - Get all active release notes
+  getAll: () => api.get('/releasenotes'),
+
+  // Public - Get latest release
+  getLatest: () => api.get('/releasenotes/latest'),
+
+  // User - Get unread releases for current user
+  getUnread: () => api.get('/releasenotes/unread'),
+
+  // User - Dismiss a single release (never show again)
+  dismiss: (id) => api.post(`/releasenotes/${id}/dismiss`),
+
+  // User - Dismiss all current releases
+  dismissAll: () => api.post('/releasenotes/dismiss-all'),
+
+  // Admin - Get all releases including inactive
+  getAllAdmin: () => api.get('/releasenotes/admin'),
+
+  // Admin - Create a new release note
+  create: (data) => api.post('/releasenotes', data),
+
+  // Admin - Update a release note
+  update: (id, data) => api.put(`/releasenotes/${id}`, data),
+
+  // Admin - Delete a release note
+  delete: (id) => api.delete(`/releasenotes/${id}`)
+}
+
 export default api

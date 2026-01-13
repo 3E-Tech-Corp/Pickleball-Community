@@ -139,6 +139,10 @@ public class ApplicationDbContext : DbContext
     public DbSet<InstaGameMatch> InstaGameMatches { get; set; }
     public DbSet<InstaGameQueue> InstaGameQueues { get; set; }
 
+    // Release Notes
+    public DbSet<ReleaseNote> ReleaseNotes { get; set; }
+    public DbSet<UserDismissedRelease> UserDismissedReleases { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<User>(entity =>
@@ -1340,6 +1344,43 @@ public class ApplicationDbContext : DbContext
             entity.HasOne(q => q.InstaGame)
                   .WithMany(g => g.Queue)
                   .HasForeignKey(q => q.InstaGameId)
+                  .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // ReleaseNote configuration
+        modelBuilder.Entity<ReleaseNote>(entity =>
+        {
+            entity.Property(r => r.Version).IsRequired().HasMaxLength(50);
+            entity.Property(r => r.Title).IsRequired().HasMaxLength(200);
+            entity.Property(r => r.Content).IsRequired();
+            entity.HasIndex(r => r.ReleaseDate);
+            entity.HasIndex(r => r.IsActive);
+
+            entity.HasOne(r => r.CreatedBy)
+                  .WithMany()
+                  .HasForeignKey(r => r.CreatedByUserId)
+                  .OnDelete(DeleteBehavior.NoAction);
+
+            entity.HasOne(r => r.UpdatedBy)
+                  .WithMany()
+                  .HasForeignKey(r => r.UpdatedByUserId)
+                  .OnDelete(DeleteBehavior.NoAction);
+        });
+
+        // UserDismissedRelease configuration
+        modelBuilder.Entity<UserDismissedRelease>(entity =>
+        {
+            entity.HasIndex(d => d.UserId);
+            entity.HasIndex(d => new { d.UserId, d.ReleaseNoteId }).IsUnique();
+
+            entity.HasOne(d => d.User)
+                  .WithMany()
+                  .HasForeignKey(d => d.UserId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(d => d.ReleaseNote)
+                  .WithMany(r => r.DismissedByUsers)
+                  .HasForeignKey(d => d.ReleaseNoteId)
                   .OnDelete(DeleteBehavior.Cascade);
         });
     }
