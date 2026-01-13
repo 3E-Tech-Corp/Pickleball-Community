@@ -349,7 +349,27 @@ public class TournamentController : ControllerBase
             var teamSize = division.TeamUnit?.TotalPlayers ?? division.TeamSize;
             var isSingles = teamSize == 1;
 
-            // Check capacity
+            // Check MaxPlayers capacity (more accurate than MaxUnits for incomplete teams)
+            if (division.MaxPlayers.HasValue)
+            {
+                var currentPlayerCount = await _context.EventUnitMembers
+                    .Include(m => m.Unit)
+                    .CountAsync(m => m.Unit!.DivisionId == divisionId &&
+                        m.Unit.EventId == eventId &&
+                        m.Unit.Status != "Cancelled" &&
+                        m.InviteStatus == "Accepted");
+
+                if (currentPlayerCount >= division.MaxPlayers.Value)
+                {
+                    return BadRequest(new ApiResponse<List<EventUnitDto>>
+                    {
+                        Success = false,
+                        Message = $"Division '{division.Name}' has reached its maximum player limit of {division.MaxPlayers.Value} players."
+                    });
+                }
+            }
+
+            // Check MaxUnits capacity
             var currentCount = await _context.EventUnits
                 .CountAsync(u => u.DivisionId == divisionId && u.Status != "Cancelled" && u.Status != "Waitlisted");
 
@@ -487,6 +507,26 @@ public class TournamentController : ControllerBase
 
         if (currentMembers >= teamSize)
             return BadRequest(new ApiResponse<UnitJoinRequestDto> { Success = false, Message = "Unit is already full" });
+
+        // Check MaxPlayers capacity for the division
+        if (unit.Division?.MaxPlayers.HasValue == true)
+        {
+            var currentPlayerCount = await _context.EventUnitMembers
+                .Include(m => m.Unit)
+                .CountAsync(m => m.Unit!.DivisionId == unit.DivisionId &&
+                    m.Unit.EventId == unit.EventId &&
+                    m.Unit.Status != "Cancelled" &&
+                    m.InviteStatus == "Accepted");
+
+            if (currentPlayerCount >= unit.Division.MaxPlayers.Value)
+            {
+                return BadRequest(new ApiResponse<UnitJoinRequestDto>
+                {
+                    Success = false,
+                    Message = $"Division '{unit.Division.Name}' has reached its maximum player limit of {unit.Division.MaxPlayers.Value} players."
+                });
+            }
+        }
 
         // Check for existing request to this specific unit
         var existingToUnit = await _context.EventUnitJoinRequests
@@ -668,6 +708,32 @@ public class TournamentController : ControllerBase
 
         if (joinRequest.Unit?.CaptainUserId != userId.Value)
             return Forbid();
+
+        // If accepting, check MaxPlayers capacity first
+        if (request.Accept)
+        {
+            var division = await _context.EventDivisions
+                .FirstOrDefaultAsync(d => d.Id == joinRequest.Unit.DivisionId);
+
+            if (division?.MaxPlayers.HasValue == true)
+            {
+                var currentPlayerCount = await _context.EventUnitMembers
+                    .Include(m => m.Unit)
+                    .CountAsync(m => m.Unit!.DivisionId == division.Id &&
+                        m.Unit.EventId == joinRequest.Unit.EventId &&
+                        m.Unit.Status != "Cancelled" &&
+                        m.InviteStatus == "Accepted");
+
+                if (currentPlayerCount >= division.MaxPlayers.Value)
+                {
+                    return BadRequest(new ApiResponse<bool>
+                    {
+                        Success = false,
+                        Message = $"Cannot accept request. Division '{division.Name}' has reached its maximum player limit of {division.MaxPlayers.Value} players."
+                    });
+                }
+            }
+        }
 
         joinRequest.Status = request.Accept ? "Accepted" : "Declined";
         joinRequest.ResponseMessage = request.Message;
