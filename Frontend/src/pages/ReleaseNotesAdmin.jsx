@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
 import { releaseNotesApi } from '../services/api';
-import { toast } from 'react-hot-toast';
+import { useToast } from '../contexts/ToastContext';
 import {
   Plus, Edit2, Trash2, X, Save, Loader2, Check, Eye, EyeOff,
   Calendar, Tag, FileText, Star, Clock, FlaskConical
 } from 'lucide-react';
 
 export default function ReleaseNotesAdmin({ embedded = false }) {
+  const toast = useToast();
   const [releases, setReleases] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
