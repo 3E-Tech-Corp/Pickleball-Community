@@ -1,4 +1,4 @@
-namespace API.Models.DTOs;
+namespace Pickleball.Community.Models.DTOs;
 
 // Response DTO for release notes
 public class ReleaseNoteDto
