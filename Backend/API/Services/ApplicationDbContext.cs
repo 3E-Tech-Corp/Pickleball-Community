@@ -143,6 +143,9 @@ public class ApplicationDbContext : DbContext
     public DbSet<ReleaseNote> ReleaseNotes { get; set; }
     public DbSet<UserDismissedRelease> UserDismissedReleases { get; set; }
 
+    // Event Notification Templates
+    public DbSet<EventNotificationTemplate> EventNotificationTemplates { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<User>(entity =>

@@ -1749,4 +1749,31 @@ export const releaseNotesApi = {
   delete: (id) => api.delete(`/releasenotes/${id}`)
 }
 
+// Event Notification Templates API
+export const notificationTemplatesApi = {
+  // Get all notification types with placeholders
+  getTypes: () => api.get('/eventnotificationtemplates/types'),
+
+  // Get default templates
+  getDefaults: () => api.get('/eventnotificationtemplates'),
+
+  // Get templates for a specific event (includes defaults for missing types)
+  getForEvent: (eventId) => api.get(`/eventnotificationtemplates/event/${eventId}`),
+
+  // Create a new template
+  create: (data) => api.post('/eventnotificationtemplates', data),
+
+  // Update a template
+  update: (id, data) => api.put(`/eventnotificationtemplates/${id}`, data),
+
+  // Delete a template (event-specific only)
+  delete: (id) => api.delete(`/eventnotificationtemplates/${id}`),
+
+  // Preview a notification with sample data
+  preview: (data) => api.post('/eventnotificationtemplates/preview', data),
+
+  // Copy default templates to an event for customization
+  copyDefaultsToEvent: (eventId) => api.post(`/eventnotificationtemplates/event/${eventId}/copy-defaults`)
+}
+
 export default api
