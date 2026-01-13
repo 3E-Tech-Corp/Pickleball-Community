@@ -679,12 +679,6 @@ const AdminDashboard = () => {
     return matchesSearch && matchesRole
   })
 
-  // Filter materials
-  const filteredMaterials = materials.filter(m => {
-    return (m.title?.toLowerCase() || '').includes(materialSearch.toLowerCase()) ||
-           (m.description?.toLowerCase() || '').includes(materialSearch.toLowerCase())
-  })
-
   // Filter templates
   const filteredTemplates = templates.filter(t => {
     const matchesSearch =
