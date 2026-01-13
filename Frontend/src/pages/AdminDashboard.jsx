@@ -750,15 +750,6 @@ const AdminDashboard = () => {
     }
   }
 
-  // Sidebar navigation items
-  const navItems = [
-    { id: 'users', label: 'Users', icon: Users, count: users.length },
-    { id: 'materials', label: 'Materials', icon: BookOpen, count: materials.length },
-    { id: 'theme', label: 'Theme', icon: Palette },
-    { id: 'notifications', label: 'Notifications', icon: Bell, count: templates.length },
-    { id: 'certification', label: 'Certification', icon: Award, link: '/admin/certification' },
-    { id: 'events', label: 'Events', icon: Calendar, count: 0, disabled: true },
-    { id: 'transactions', label: 'Transactions', icon: DollarSign, count: 0, disabled: true }
   // Sidebar navigation items - all render inline now
   const navGroups = [
     {
