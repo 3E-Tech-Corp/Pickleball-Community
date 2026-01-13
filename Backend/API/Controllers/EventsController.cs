@@ -83,7 +83,7 @@ public class EventsController : ControllerBase
                 .Where(e => !e.IsPrivate ||
                     (userId.HasValue && (
                         e.OrganizedByUserId == userId.Value ||
-                        e.Divisions.Any(d => d.Units.Any(u => u.Status != "Cancelled" && u.Members.Any(m => m.UserId == userId.Value))) ||
+                        e.Divisions.Any(d => d.Units.Any(u => u.Status != "Cancelled" && !u.IsTemporary && u.Members.Any(m => m.UserId == userId.Value))) ||
                         (e.OrganizedByClubId.HasValue && _context.ClubMembers.Any(cm =>
                             cm.ClubId == e.OrganizedByClubId.Value &&
                             cm.UserId == userId.Value &&
