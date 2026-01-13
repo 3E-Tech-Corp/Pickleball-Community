@@ -2159,7 +2159,7 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
         setShowEditDivision(false);
         setEditingDivision(null);
         // Reload full event to get updated divisions and pass to onUpdate
-        const eventResponse = await eventsApi.getById(event.id);
+        const eventResponse = await eventsApi.getEvent(event.id);
         if (eventResponse.success) {
           onUpdate(eventResponse.data);
         } else {
