@@ -39,7 +39,7 @@ public class ScoreboardController : ControllerBase
             .FirstOrDefaultAsync(e => e.Id == eventId);
 
         if (evt == null)
-            return NotFound(new ApiResponse<ScoreboardDto> { Success = false, Error = "Event not found" });
+            return NotFound(new ApiResponse<ScoreboardDto> { Success = false, Message = "Event not found" });
 
         var query = _context.EventMatches
             .Where(m => m.EventId == eventId);
@@ -88,8 +88,8 @@ public class ScoreboardController : ControllerBase
                 ScheduledTime = m.ScheduledTime,
                 StartedAt = m.StartedAt,
                 CompletedAt = m.CompletedAt,
-                CourtName = m.TournamentCourt != null ? m.TournamentCourt.Name : null,
-                CourtNumber = m.TournamentCourt != null ? m.TournamentCourt.CourtNumber : null,
+                CourtName = m.TournamentCourt != null ? m.TournamentCourt.CourtLabel : null,
+                CourtNumber = m.TournamentCourt != null ? m.TournamentCourt.SortOrder : null,
                 Games = m.Games.OrderBy(g => g.GameNumber).Select(g => new ScoreboardGameDto
                 {
                     GameNumber = g.GameNumber,
@@ -138,7 +138,7 @@ public class ScoreboardController : ControllerBase
             .Include(g => g.Match)
                 .ThenInclude(m => m!.Division)
             .Include(g => g.TournamentCourt)
-            .OrderBy(g => g.TournamentCourt!.CourtNumber)
+            .OrderBy(g => g.TournamentCourt!.SortOrder)
             .Select(g => new LiveGameDto
             {
                 GameId = g.Id,
@@ -151,8 +151,8 @@ public class ScoreboardController : ControllerBase
                 Unit2Name = g.Match.Unit2!.Name,
                 DivisionName = g.Match.Division!.Name,
                 RoundName = g.Match.RoundName,
-                CourtName = g.TournamentCourt != null ? g.TournamentCourt.Name : null,
-                CourtNumber = g.TournamentCourt != null ? g.TournamentCourt.CourtNumber : null,
+                CourtName = g.TournamentCourt != null ? g.TournamentCourt.CourtLabel : null,
+                CourtNumber = g.TournamentCourt != null ? g.TournamentCourt.SortOrder : null,
                 StartedAt = g.StartedAt
             })
             .ToListAsync();
@@ -171,7 +171,7 @@ public class ScoreboardController : ControllerBase
             .FirstOrDefaultAsync(e => e.Id == eventId);
 
         if (evt == null)
-            return NotFound(new ApiResponse<EventResultsDto> { Success = false, Error = "Event not found" });
+            return NotFound(new ApiResponse<EventResultsDto> { Success = false, Message = "Event not found" });
 
         var query = _context.EventUnits
             .Where(u => u.EventId == eventId && u.Status != "Cancelled" && u.Status != "Waitlisted");
@@ -288,7 +288,7 @@ public class ScoreboardController : ControllerBase
             .FirstOrDefaultAsync(d => d.Id == divisionId && d.EventId == eventId);
 
         if (division == null)
-            return NotFound(new ApiResponse<BracketDto> { Success = false, Error = "Division not found" });
+            return NotFound(new ApiResponse<BracketDto> { Success = false, Message = "Division not found" });
 
         var matches = await _context.EventMatches
             .Where(m => m.DivisionId == divisionId && m.RoundType == "Bracket")
@@ -351,7 +351,7 @@ public class ScoreboardController : ControllerBase
             .FirstOrDefaultAsync(d => d.Id == divisionId && d.EventId == eventId);
 
         if (division == null)
-            return NotFound(new ApiResponse<PoolsDto> { Success = false, Error = "Division not found" });
+            return NotFound(new ApiResponse<PoolsDto> { Success = false, Message = "Division not found" });
 
         var units = await _context.EventUnits
             .Where(u => u.DivisionId == divisionId && u.Status != "Cancelled")
