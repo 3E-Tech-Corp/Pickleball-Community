@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import {
-  Plus, Edit2, Trash2, Check, X, Loader2, Search, ChevronDown, ChevronUp,
-  Settings, AlertCircle, Star, ToggleLeft, ToggleRight
+  Plus, Edit2, Trash2, X, Loader2, Search,
+  Settings, AlertCircle, Star, ToggleLeft, ToggleRight, Eye
 } from 'lucide-react';
 import { scoreFormatsApi, scoreMethodsApi } from '../services/api';
+import { GameFormatBadge } from '../components/GameFormatSelector';
 
 /**
  * Admin page for managing Game Format presets
@@ -170,6 +171,23 @@ export default function GameFormatsAdmin({ embedded = false }) {
     }
   };
 
+  // Generate preview display for modal
+  const getPreviewDisplay = () => {
+    const method = scoreMethods.find(m => m.id === formData.scoreMethodId);
+    const methodName = method?.shortCode || method?.name || 'Rally';
+    let display = `${methodName} ${formData.maxPoints}-${formData.winByMargin}`;
+    if (formData.capAfter > 0) {
+      display += ` cap ${formData.maxPoints + formData.capAfter}`;
+    }
+    if (formData.switchEndsAtMidpoint) {
+      display += ` switch@${formData.midpointScore || Math.floor(formData.maxPoints / 2)}`;
+    }
+    if (formData.timeLimitMinutes) {
+      display += ` ${formData.timeLimitMinutes}min`;
+    }
+    return display;
+  };
+
   // Filter formats
   const filteredFormats = formats.filter(f => {
     if (searchQuery) {
@@ -183,9 +201,7 @@ export default function GameFormatsAdmin({ embedded = false }) {
     return true;
   });
 
-  const containerClass = embedded
-    ? ''
-    : 'min-h-screen bg-gray-50 p-6';
+  const containerClass = embedded ? '' : 'min-h-screen bg-gray-50 p-6';
 
   return (
     <div className={containerClass}>
@@ -244,145 +260,181 @@ export default function GameFormatsAdmin({ embedded = false }) {
             <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
           </div>
         ) : (
-          /* Formats Grid */
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {filteredFormats.map(format => (
-              <div
-                key={format.id}
-                className={`bg-white rounded-xl border p-4 transition-all ${
-                  !format.isActive ? 'opacity-60 border-gray-200' : 'border-gray-200 hover:border-blue-300'
-                }`}
-              >
-                {/* Header */}
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <h3 className="font-semibold text-gray-900">{format.name}</h3>
-                      {format.isDefault && (
-                        <span className="px-2 py-0.5 text-xs font-medium bg-yellow-100 text-yellow-700 rounded">
-                          Default
+          /* Formats Table - Horizontal Layout */
+          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Name</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Preview</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Method</th>
+                    <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase">Play To</th>
+                    <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase">Win By</th>
+                    <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase">Cap</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Options</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Status</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {filteredFormats.map(format => (
+                    <tr
+                      key={format.id}
+                      className={`hover:bg-gray-50 ${!format.isActive ? 'opacity-50 bg-gray-50' : ''}`}
+                    >
+                      {/* Name */}
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-gray-900">{format.name}</span>
+                          {format.isDefault && (
+                            <span className="px-1.5 py-0.5 text-xs font-medium bg-yellow-100 text-yellow-700 rounded">
+                              Default
+                            </span>
+                          )}
+                        </div>
+                        {format.description && (
+                          <p className="text-xs text-gray-500 mt-0.5 max-w-xs truncate">{format.description}</p>
+                        )}
+                      </td>
+
+                      {/* Preview Badge */}
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          <Eye className="w-3 h-3 text-gray-400" />
+                          <GameFormatBadge format={format} className="cursor-default" />
+                        </div>
+                      </td>
+
+                      {/* Method */}
+                      <td className="px-4 py-3">
+                        <span className="text-sm text-gray-700">
+                          {format.scoreMethodName || format.scoringType}
                         </span>
-                      )}
-                    </div>
-                    <p className="text-sm text-gray-500 mt-0.5">{format.shortDisplay}</p>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={() => handleEdit(format)}
-                      className="p-1.5 text-gray-400 hover:text-blue-600 rounded"
-                      title="Edit"
-                    >
-                      <Edit2 className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => handleDelete(format)}
-                      disabled={deleting === format.id}
-                      className="p-1.5 text-gray-400 hover:text-red-600 rounded disabled:opacity-50"
-                      title="Delete"
-                    >
-                      {deleting === format.id ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <Trash2 className="w-4 h-4" />
-                      )}
-                    </button>
-                  </div>
-                </div>
+                      </td>
 
-                {/* Details */}
-                <div className="grid grid-cols-2 gap-2 text-sm mb-3">
-                  <div className="flex items-center gap-2">
-                    <span className="text-gray-500">Method:</span>
-                    <span className="font-medium">{format.scoreMethodName || format.scoringType}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-gray-500">Play To:</span>
-                    <span className="font-medium">{format.maxPoints}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-gray-500">Win By:</span>
-                    <span className="font-medium">{format.winByMargin}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-gray-500">Cap:</span>
-                    <span className="font-medium">
-                      {format.capAfter > 0 ? format.maxPoints + format.capAfter : 'None'}
-                    </span>
-                  </div>
-                </div>
+                      {/* Play To */}
+                      <td className="px-4 py-3 text-center">
+                        <span className="text-sm font-medium text-gray-900">{format.maxPoints}</span>
+                      </td>
 
-                {/* Badges */}
-                <div className="flex flex-wrap gap-2 mb-3">
-                  {format.switchEndsAtMidpoint && (
-                    <span className="px-2 py-0.5 text-xs bg-blue-50 text-blue-700 rounded">
-                      Switch Ends
-                    </span>
-                  )}
-                  {format.timeLimitMinutes && (
-                    <span className="px-2 py-0.5 text-xs bg-purple-50 text-purple-700 rounded">
-                      {format.timeLimitMinutes} min
-                    </span>
-                  )}
-                  {format.isTiebreaker && (
-                    <span className="px-2 py-0.5 text-xs bg-orange-50 text-orange-700 rounded">
-                      Tiebreaker
-                    </span>
-                  )}
-                </div>
+                      {/* Win By */}
+                      <td className="px-4 py-3 text-center">
+                        <span className="text-sm text-gray-700">{format.winByMargin}</span>
+                      </td>
 
-                {/* Actions */}
-                <div className="flex items-center justify-between pt-3 border-t border-gray-100">
+                      {/* Cap */}
+                      <td className="px-4 py-3 text-center">
+                        <span className="text-sm text-gray-700">
+                          {format.capAfter > 0 ? format.maxPoints + format.capAfter : '-'}
+                        </span>
+                      </td>
+
+                      {/* Options */}
+                      <td className="px-4 py-3">
+                        <div className="flex flex-wrap gap-1">
+                          {format.switchEndsAtMidpoint && (
+                            <span className="px-1.5 py-0.5 text-xs bg-blue-50 text-blue-700 rounded">
+                              Switch
+                            </span>
+                          )}
+                          {format.timeLimitMinutes && (
+                            <span className="px-1.5 py-0.5 text-xs bg-purple-50 text-purple-700 rounded">
+                              {format.timeLimitMinutes}min
+                            </span>
+                          )}
+                          {format.isTiebreaker && (
+                            <span className="px-1.5 py-0.5 text-xs bg-orange-50 text-orange-700 rounded">
+                              Tiebreaker
+                            </span>
+                          )}
+                          {!format.switchEndsAtMidpoint && !format.timeLimitMinutes && !format.isTiebreaker && (
+                            <span className="text-xs text-gray-400">-</span>
+                          )}
+                        </div>
+                      </td>
+
+                      {/* Status */}
+                      <td className="px-4 py-3">
+                        <button
+                          onClick={() => handleToggleActive(format)}
+                          className={`flex items-center gap-1 text-xs font-medium px-2 py-1 rounded transition-colors ${
+                            format.isActive
+                              ? 'text-green-700 bg-green-50 hover:bg-green-100'
+                              : 'text-gray-500 bg-gray-100 hover:bg-gray-200'
+                          }`}
+                        >
+                          {format.isActive ? (
+                            <>
+                              <ToggleRight className="w-3.5 h-3.5" />
+                              Active
+                            </>
+                          ) : (
+                            <>
+                              <ToggleLeft className="w-3.5 h-3.5" />
+                              Inactive
+                            </>
+                          )}
+                        </button>
+                      </td>
+
+                      {/* Actions */}
+                      <td className="px-4 py-3">
+                        <div className="flex items-center justify-end gap-1">
+                          {!format.isDefault && format.isActive && (
+                            <button
+                              onClick={() => handleSetDefault(format)}
+                              className="p-1.5 text-gray-400 hover:text-yellow-600 rounded"
+                              title="Set as default"
+                            >
+                              <Star className="w-4 h-4" />
+                            </button>
+                          )}
+                          <button
+                            onClick={() => handleEdit(format)}
+                            className="p-1.5 text-gray-400 hover:text-blue-600 rounded"
+                            title="Edit"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDelete(format)}
+                            disabled={deleting === format.id}
+                            className="p-1.5 text-gray-400 hover:text-red-600 rounded disabled:opacity-50"
+                            title="Delete"
+                          >
+                            {deleting === format.id ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <Trash2 className="w-4 h-4" />
+                            )}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Empty state */}
+            {filteredFormats.length === 0 && (
+              <div className="text-center py-12">
+                <Settings className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 mb-2">No formats found</h3>
+                <p className="text-gray-500 mb-4">
+                  {searchQuery ? 'Try adjusting your search' : 'Create your first game format preset'}
+                </p>
+                {!searchQuery && (
                   <button
-                    onClick={() => handleToggleActive(format)}
-                    className={`flex items-center gap-1.5 text-xs font-medium px-2 py-1 rounded transition-colors ${
-                      format.isActive
-                        ? 'text-gray-600 hover:bg-gray-100'
-                        : 'text-green-600 hover:bg-green-50'
-                    }`}
+                    onClick={handleCreate}
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
                   >
-                    {format.isActive ? (
-                      <>
-                        <ToggleRight className="w-4 h-4" />
-                        Active
-                      </>
-                    ) : (
-                      <>
-                        <ToggleLeft className="w-4 h-4" />
-                        Inactive
-                      </>
-                    )}
+                    <Plus className="w-4 h-4" />
+                    Add Format
                   </button>
-                  {!format.isDefault && format.isActive && (
-                    <button
-                      onClick={() => handleSetDefault(format)}
-                      className="flex items-center gap-1.5 text-xs font-medium text-gray-600 hover:text-yellow-600 px-2 py-1 rounded hover:bg-yellow-50 transition-colors"
-                    >
-                      <Star className="w-4 h-4" />
-                      Set Default
-                    </button>
-                  )}
-                </div>
+                )}
               </div>
-            ))}
-          </div>
-        )}
-
-        {/* Empty state */}
-        {!loading && filteredFormats.length === 0 && (
-          <div className="text-center py-12">
-            <Settings className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No formats found</h3>
-            <p className="text-gray-500 mb-4">
-              {searchQuery ? 'Try adjusting your search' : 'Create your first game format preset'}
-            </p>
-            {!searchQuery && (
-              <button
-                onClick={handleCreate}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-              >
-                <Plus className="w-4 h-4" />
-                Add Format
-              </button>
             )}
           </div>
         )}
@@ -405,6 +457,19 @@ export default function GameFormatsAdmin({ embedded = false }) {
             </div>
 
             <div className="p-6 space-y-4">
+              {/* Live Preview */}
+              <div className="bg-gray-50 rounded-lg p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <Eye className="w-4 h-4 text-gray-500" />
+                  <span className="text-sm font-medium text-gray-700">Preview on Game</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="inline-flex items-center px-3 py-1.5 text-sm font-medium bg-blue-50 text-blue-700 rounded-lg">
+                    {getPreviewDisplay()}
+                  </span>
+                </div>
+              </div>
+
               {/* Name */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Name *</label>
@@ -442,7 +507,9 @@ export default function GameFormatsAdmin({ embedded = false }) {
                 >
                   <option value="">Select method...</option>
                   {scoreMethods.map(method => (
-                    <option key={method.id} value={method.id}>{method.name}</option>
+                    <option key={method.id} value={method.id}>
+                      {method.name} {method.shortCode ? `(${method.shortCode})` : ''}
+                    </option>
                   ))}
                 </select>
               </div>
