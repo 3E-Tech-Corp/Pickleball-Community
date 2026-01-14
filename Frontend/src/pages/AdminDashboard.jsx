@@ -9,7 +9,7 @@ import {
   Shield, GraduationCap, User, CheckCircle, XCircle, Save,
   Palette, Upload, RefreshCw, Image, Layers, Check, Award, Tags, UserCog, Video,
   Building2, HelpCircle, MessageSquare, MapPin, Network, Plus, Play, ArrowUp, ArrowDown,
-  Bell, Send, Megaphone, Mail, RotateCcw, ToggleLeft, ToggleRight, Copy, AlertCircle
+  Bell, Send, Megaphone, Mail, RotateCcw, ToggleLeft, ToggleRight, Copy, AlertCircle, Settings
 } from 'lucide-react'
 import VideoUploadModal from '../components/ui/VideoUploadModal'
 import PublicProfileModal from '../components/ui/PublicProfileModal'
