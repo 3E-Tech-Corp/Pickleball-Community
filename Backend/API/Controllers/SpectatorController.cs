@@ -70,7 +70,7 @@ public class SpectatorController : ControllerBase
         // Validate event exists
         var evt = await _context.Events.FindAsync(request.EventId);
         if (evt == null)
-            return NotFound(new ApiResponse<SubscriptionDto> { Success = false, Error = "Event not found" });
+            return NotFound(new ApiResponse<SubscriptionDto> { Success = false, Message = "Event not found" });
 
         // Check if already subscribed
         var existing = await _context.SpectatorSubscriptions
@@ -158,7 +158,7 @@ public class SpectatorController : ControllerBase
             .FirstOrDefaultAsync(s => s.Id == subscriptionId && s.UserId == userId);
 
         if (subscription == null)
-            return NotFound(new ApiResponse<object> { Success = false, Error = "Subscription not found" });
+            return NotFound(new ApiResponse<object> { Success = false, Message = "Subscription not found" });
 
         _context.SpectatorSubscriptions.Remove(subscription);
         await _context.SaveChangesAsync();
@@ -180,7 +180,7 @@ public class SpectatorController : ControllerBase
             .FirstOrDefaultAsync(s => s.Id == subscriptionId && s.UserId == userId);
 
         if (subscription == null)
-            return NotFound(new ApiResponse<object> { Success = false, Error = "Subscription not found" });
+            return NotFound(new ApiResponse<object> { Success = false, Message = "Subscription not found" });
 
         subscription.IsActive = !subscription.IsActive;
         await _context.SaveChangesAsync();
@@ -203,7 +203,7 @@ public class SpectatorController : ControllerBase
             .FirstOrDefaultAsync(e => e.Id == eventId);
 
         if (evt == null)
-            return NotFound(new ApiResponse<SpectatorEventViewDto> { Success = false, Error = "Event not found" });
+            return NotFound(new ApiResponse<SpectatorEventViewDto> { Success = false, Message = "Event not found" });
 
         // Get courts with current games
         var courts = await _context.TournamentCourts
@@ -214,12 +214,12 @@ public class SpectatorController : ControllerBase
             .Include(c => c.CurrentGame)
                 .ThenInclude(g => g!.Match)
                     .ThenInclude(m => m!.Unit2)
-            .OrderBy(c => c.CourtNumber)
+            .OrderBy(c => c.SortOrder)
             .Select(c => new SpectatorCourtDto
             {
                 CourtId = c.Id,
-                Name = c.Name,
-                CourtNumber = c.CourtNumber,
+                Name = c.CourtLabel,
+                CourtNumber = c.SortOrder,
                 Status = c.Status,
                 CurrentGame = c.CurrentGame != null ? new SpectatorGameDto
                 {

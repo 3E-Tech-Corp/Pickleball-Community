@@ -39,7 +39,7 @@ public class TournamentGameDayController : ControllerBase
         var evt = await _context.Events.FindAsync(eventId);
         if (evt == null) return false;
         var user = await _context.Users.FindAsync(userId);
-        return evt.OrganizedByUserId == userId || user?.Role == UserRole.Admin;
+        return evt.OrganizedByUserId == userId || user?.Role == "Admin";
     }
 
     /// <summary>
@@ -58,14 +58,14 @@ public class TournamentGameDayController : ControllerBase
             .FirstOrDefaultAsync(e => e.Id == eventId);
 
         if (evt == null)
-            return NotFound(new ApiResponse<TDDashboardDto> { Success = false, Error = "Event not found" });
+            return NotFound(new ApiResponse<TDDashboardDto> { Success = false, Message = "Event not found" });
 
         // Get courts
         var courts = await _context.TournamentCourts
             .Where(c => c.EventId == eventId && c.IsActive)
             .Include(c => c.CurrentGame)
                 .ThenInclude(g => g!.Match)
-            .OrderBy(c => c.CourtNumber)
+            .OrderBy(c => c.SortOrder)
             .ToListAsync();
 
         // Get check-in stats
@@ -112,7 +112,7 @@ public class TournamentGameDayController : ControllerBase
                 Unit2Name = g.Match.Unit2!.Name,
                 CourtId = g.TournamentCourtId,
                 CourtName = g.TournamentCourt != null ? g.TournamentCourt.Name : null,
-                CourtNumber = g.TournamentCourt != null ? g.TournamentCourt.CourtNumber : null,
+                CourtNumber = g.TournamentCourt != null ? g.TournamentCourt.SortOrder : null,
                 QueuedAt = g.QueuedAt,
                 StartedAt = g.StartedAt
             })
@@ -137,8 +137,8 @@ public class TournamentGameDayController : ControllerBase
                 Courts = courts.Select(c => new CourtStatusDto
                 {
                     CourtId = c.Id,
-                    Name = c.Name,
-                    CourtNumber = c.CourtNumber,
+                    Name = c.CourtLabel,
+                    CourtNumber = c.SortOrder,
                     Status = c.Status,
                     CurrentGameId = c.CurrentGameId,
                     CurrentGameStatus = c.CurrentGame?.Status
@@ -161,7 +161,7 @@ public class TournamentGameDayController : ControllerBase
 
         var evt = await _context.Events.FindAsync(eventId);
         if (evt == null)
-            return NotFound(new ApiResponse<PlayerGameDayDto> { Success = false, Error = "Event not found" });
+            return NotFound(new ApiResponse<PlayerGameDayDto> { Success = false, Message = "Event not found" });
 
         // Get player's units
         var units = await _context.EventUnitMembers
@@ -203,7 +203,7 @@ public class TournamentGameDayController : ControllerBase
                 Unit2Id = p.Game.Match.Unit2Id,
                 Unit2Name = p.Game.Match.Unit2!.Name,
                 CourtName = p.Game.TournamentCourt != null ? p.Game.TournamentCourt.Name : null,
-                CourtNumber = p.Game.TournamentCourt != null ? p.Game.TournamentCourt.CourtNumber : null,
+                CourtNumber = p.Game.TournamentCourt != null ? p.Game.TournamentCourt.SortOrder : null,
                 ScheduledTime = p.Game.Match.ScheduledTime,
                 QueuedAt = p.Game.QueuedAt,
                 StartedAt = p.Game.StartedAt,
@@ -325,17 +325,17 @@ public class TournamentGameDayController : ControllerBase
             .FirstOrDefaultAsync(g => g.Id == request.GameId);
 
         if (game == null)
-            return NotFound(new ApiResponse<GameQueueItemDto> { Success = false, Error = "Game not found" });
+            return NotFound(new ApiResponse<GameQueueItemDto> { Success = false, Message = "Game not found" });
 
         if (!await IsEventOrganizer(game.Match!.EventId, userId))
             return Forbid();
 
         if (game.Status != "Ready")
-            return BadRequest(new ApiResponse<GameQueueItemDto> { Success = false, Error = "Game is not ready to be queued" });
+            return BadRequest(new ApiResponse<GameQueueItemDto> { Success = false, Message = "Game is not ready to be queued" });
 
         var court = await _context.TournamentCourts.FindAsync(request.CourtId);
         if (court == null || court.EventId != game.Match.EventId)
-            return BadRequest(new ApiResponse<GameQueueItemDto> { Success = false, Error = "Invalid court" });
+            return BadRequest(new ApiResponse<GameQueueItemDto> { Success = false, Message = "Invalid court" });
 
         // Update game
         game.Status = "Queued";
@@ -380,8 +380,8 @@ public class TournamentGameDayController : ControllerBase
                 GameId = game.Id,
                 Status = game.Status,
                 CourtId = request.CourtId,
-                CourtName = court.Name,
-                CourtNumber = court.CourtNumber,
+                CourtName = court.CourtLabel,
+                CourtNumber = court.SortOrder,
                 QueuedAt = game.QueuedAt
             }
         });
@@ -402,13 +402,13 @@ public class TournamentGameDayController : ControllerBase
             .FirstOrDefaultAsync(g => g.Id == gameId);
 
         if (game == null)
-            return NotFound(new ApiResponse<object> { Success = false, Error = "Game not found" });
+            return NotFound(new ApiResponse<object> { Success = false, Message = "Game not found" });
 
         if (!await IsEventOrganizer(game.Match!.EventId, userId))
             return Forbid();
 
         if (game.Status != "Queued")
-            return BadRequest(new ApiResponse<object> { Success = false, Error = "Game must be queued to start" });
+            return BadRequest(new ApiResponse<object> { Success = false, Message = "Game must be queued to start" });
 
         game.Status = "Playing";
         game.StartedAt = DateTime.Now;
@@ -451,7 +451,7 @@ public class TournamentGameDayController : ControllerBase
             .FirstOrDefaultAsync(g => g.Id == gameId);
 
         if (game == null)
-            return NotFound(new ApiResponse<object> { Success = false, Error = "Game not found" });
+            return NotFound(new ApiResponse<object> { Success = false, Message = "Game not found" });
 
         var isOrganizer = await IsEventOrganizer(game.Match!.EventId, userId);
         var isUnit1Player = game.Match.Unit1!.Members.Any(m => m.UserId == userId && m.InviteStatus == "Accepted");
@@ -595,7 +595,7 @@ public class TournamentGameDayController : ControllerBase
             .FirstOrDefaultAsync(u => u.Id == unitId);
 
         if (unit == null)
-            return NotFound(new ApiResponse<object> { Success = false, Error = "Unit not found" });
+            return NotFound(new ApiResponse<object> { Success = false, Message = "Unit not found" });
 
         if (!await IsEventOrganizer(unit.EventId, userId))
             return Forbid();
