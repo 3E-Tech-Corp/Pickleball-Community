@@ -7,6 +7,7 @@ public class ScoreMethodDto
 {
     public int Id { get; set; }
     public string Name { get; set; } = string.Empty;
+    public string? ShortCode { get; set; }
     public string? Description { get; set; }
     public string BaseType { get; set; } = "Rally"; // Classic or Rally
     public int SortOrder { get; set; }
@@ -17,6 +18,7 @@ public class ScoreMethodDto
 public class CreateScoreMethodDto
 {
     public string Name { get; set; } = string.Empty;
+    public string? ShortCode { get; set; }
     public string? Description { get; set; }
     public string BaseType { get; set; } = "Rally";
     public int SortOrder { get; set; } = 0;
@@ -27,6 +29,7 @@ public class CreateScoreMethodDto
 public class UpdateScoreMethodDto
 {
     public string? Name { get; set; }
+    public string? ShortCode { get; set; }
     public string? Description { get; set; }
     public string? BaseType { get; set; }
     public int? SortOrder { get; set; }

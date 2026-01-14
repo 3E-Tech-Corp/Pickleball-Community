@@ -28,6 +28,7 @@ import LeagueAdmin from './LeagueAdmin'
 import LeagueRolesAdmin from './LeagueRolesAdmin'
 import ReleaseNotesAdmin from './ReleaseNotesAdmin'
 import GameFormatsAdmin from './GameFormatsAdmin'
+import ScoreMethodsAdmin from './ScoreMethodsAdmin'
 
 const AdminDashboard = () => {
   const { user } = useAuth()
@@ -780,6 +781,7 @@ const AdminDashboard = () => {
         { id: 'clubRoles', label: 'Club Roles', icon: UserCog },
         { id: 'teamUnits', label: 'Team Units', icon: Users },
         { id: 'skillLevels', label: 'Skill Levels', icon: Award },
+        { id: 'scoreMethods', label: 'Score Methods', icon: Play },
         { id: 'gameFormats', label: 'Game Formats', icon: Settings }
       ]
     },
@@ -2356,6 +2358,9 @@ const AdminDashboard = () => {
 
           {/* Skill Levels Admin */}
           {activeTab === 'skillLevels' && <SkillLevelsAdmin embedded />}
+
+          {/* Score Methods Admin */}
+          {activeTab === 'scoreMethods' && <ScoreMethodsAdmin embedded />}
 
           {/* Game Formats Admin */}
           {activeTab === 'gameFormats' && <GameFormatsAdmin embedded />}
