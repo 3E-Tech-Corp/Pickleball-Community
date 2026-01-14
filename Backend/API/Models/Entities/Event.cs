@@ -195,6 +195,22 @@ public class EventDivision
 
     // Tournament structure
     public int? DefaultScoreFormatId { get; set; }
+
+    /// <summary>
+    /// Game format for Game 1 (overrides DefaultScoreFormatId for first game)
+    /// </summary>
+    public int? Game1ScoreFormatId { get; set; }
+
+    /// <summary>
+    /// Game format for Game 2 (for Best of 3/5 matches)
+    /// </summary>
+    public int? Game2ScoreFormatId { get; set; }
+
+    /// <summary>
+    /// Game format for Game 3 (tiebreaker for Best of 3, or third game in Best of 5)
+    /// </summary>
+    public int? Game3ScoreFormatId { get; set; }
+
     public int? PoolCount { get; set; } // Number of pools for round robin
     public int? PoolSize { get; set; } // Target number of units per pool
     [MaxLength(30)]
@@ -245,6 +261,15 @@ public class EventDivision
 
     [ForeignKey("DefaultScoreFormatId")]
     public ScoreFormat? DefaultScoreFormat { get; set; }
+
+    [ForeignKey("Game1ScoreFormatId")]
+    public ScoreFormat? Game1ScoreFormat { get; set; }
+
+    [ForeignKey("Game2ScoreFormatId")]
+    public ScoreFormat? Game2ScoreFormat { get; set; }
+
+    [ForeignKey("Game3ScoreFormatId")]
+    public ScoreFormat? Game3ScoreFormat { get; set; }
 
     public ICollection<EventRegistration> Registrations { get; set; } = new List<EventRegistration>();
     public ICollection<EventPartnerRequest> PartnerRequests { get; set; } = new List<EventPartnerRequest>();

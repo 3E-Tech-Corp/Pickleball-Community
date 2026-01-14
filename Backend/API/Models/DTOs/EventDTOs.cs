@@ -180,6 +180,9 @@ public class EventDivisionDto
 
     // Tournament structure
     public int? DefaultScoreFormatId { get; set; }
+    public int? Game1ScoreFormatId { get; set; }
+    public int? Game2ScoreFormatId { get; set; }
+    public int? Game3ScoreFormatId { get; set; }
     public int? PoolCount { get; set; }
     public int? PoolSize { get; set; }
     public string? ScheduleType { get; set; }
@@ -206,6 +209,9 @@ public class UpdateDivisionDto
 
     // Tournament structure
     public int? DefaultScoreFormatId { get; set; }
+    public int? Game1ScoreFormatId { get; set; }
+    public int? Game2ScoreFormatId { get; set; }
+    public int? Game3ScoreFormatId { get; set; }
     public int? PoolCount { get; set; }
     public int? PoolSize { get; set; }
     public string? ScheduleType { get; set; }
@@ -332,7 +338,17 @@ public class CreateEventDivisionDto
 
     public decimal? DivisionFee { get; set; }
     public int SortOrder { get; set; } = 0;
+
+    // Tournament structure
     public int? DefaultScoreFormatId { get; set; }
+    public int? Game1ScoreFormatId { get; set; }
+    public int? Game2ScoreFormatId { get; set; }
+    public int? Game3ScoreFormatId { get; set; }
+    public int? GamesPerMatch { get; set; }
+    public string? ScheduleType { get; set; }
+    public int? PoolCount { get; set; }
+    public int? PoolSize { get; set; }
+    public int? PlayoffFromPools { get; set; }
 
     // Rewards to create with this division
     public List<CreateDivisionRewardDto> Rewards { get; set; } = new();

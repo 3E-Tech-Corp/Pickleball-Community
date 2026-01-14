@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
-import { Calendar, MapPin, Clock, Users, Filter, Search, Plus, DollarSign, ChevronLeft, ChevronRight, X, UserPlus, Trophy, Layers, Check, AlertCircle, Navigation, Building2, Loader2, MessageCircle, CheckCircle, Edit3, ChevronDown, ChevronUp, Trash2, List, Map as MapIcon, Image, Upload, Play, Link2, QrCode, Download, ArrowRightLeft, FileText, Eye, EyeOff, ExternalLink, User, GitMerge, ArrowRight } from 'lucide-react';
+import { Calendar, MapPin, Clock, Users, Filter, Search, Plus, DollarSign, ChevronLeft, ChevronRight, X, UserPlus, Trophy, Layers, Check, AlertCircle, Navigation, Building2, Loader2, MessageCircle, CheckCircle, Edit3, ChevronDown, ChevronUp, Trash2, List, Map as MapIcon, Image, Upload, Play, Link2, QrCode, Download, ArrowRightLeft, FileText, Eye, EyeOff, ExternalLink, User, GitMerge, ArrowRight, Copy } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import { eventsApi, eventTypesApi, courtsApi, teamUnitsApi, skillLevelsApi, ageGroupsApi, tournamentApi, sharedAssetApi, getSharedAssetUrl } from '../services/api';
@@ -1679,6 +1679,8 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
   const [showEditDivision, setShowEditDivision] = useState(false);
   const [editingDivision, setEditingDivision] = useState(null);
   const [savingDivision, setSavingDivision] = useState(false);
+  const [showCopySettings, setShowCopySettings] = useState(false);
+  const [copyingSettings, setCopyingSettings] = useState(false);
 
   // Score formats state
   const [scoreFormats, setScoreFormats] = useState([]);
@@ -2169,7 +2171,10 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
       poolSize: division.poolSize || '',
       playoffFromPools: division.playoffFromPools || '',
       gamesPerMatch: division.gamesPerMatch || 1,
-      defaultScoreFormatId: division.defaultScoreFormatId || null
+      defaultScoreFormatId: division.defaultScoreFormatId || null,
+      game1ScoreFormatId: division.game1ScoreFormatId || null,
+      game2ScoreFormatId: division.game2ScoreFormatId || null,
+      game3ScoreFormatId: division.game3ScoreFormatId || null
     });
     setShowEditDivision(true);
   };
@@ -2194,7 +2199,10 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
         poolSize: editingDivision.poolSize ? parseInt(editingDivision.poolSize) : null,
         playoffFromPools: editingDivision.playoffFromPools ? parseInt(editingDivision.playoffFromPools) : null,
         gamesPerMatch: editingDivision.gamesPerMatch ? parseInt(editingDivision.gamesPerMatch) : 1,
-        defaultScoreFormatId: editingDivision.defaultScoreFormatId ? parseInt(editingDivision.defaultScoreFormatId) : null
+        defaultScoreFormatId: editingDivision.defaultScoreFormatId ? parseInt(editingDivision.defaultScoreFormatId) : null,
+        game1ScoreFormatId: editingDivision.game1ScoreFormatId ? parseInt(editingDivision.game1ScoreFormatId) : null,
+        game2ScoreFormatId: editingDivision.game2ScoreFormatId ? parseInt(editingDivision.game2ScoreFormatId) : null,
+        game3ScoreFormatId: editingDivision.game3ScoreFormatId ? parseInt(editingDivision.game3ScoreFormatId) : null
       };
 
       const response = await eventsApi.updateDivision(event.id, editingDivision.id, updateData);
@@ -2227,6 +2235,49 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
       toast.error('Failed to update division');
     } finally {
       setSavingDivision(false);
+    }
+  };
+
+  // Copy match settings to other divisions
+  const handleCopySettingsToOther = async (targetDivisionIds) => {
+    if (!editingDivision || targetDivisionIds.length === 0) return;
+
+    setCopyingSettings(true);
+    try {
+      const matchSettings = {
+        scheduleType: editingDivision.scheduleType || null,
+        poolCount: editingDivision.poolCount ? parseInt(editingDivision.poolCount) : null,
+        poolSize: editingDivision.poolSize ? parseInt(editingDivision.poolSize) : null,
+        playoffFromPools: editingDivision.playoffFromPools ? parseInt(editingDivision.playoffFromPools) : null,
+        gamesPerMatch: editingDivision.gamesPerMatch ? parseInt(editingDivision.gamesPerMatch) : 1,
+        defaultScoreFormatId: editingDivision.defaultScoreFormatId ? parseInt(editingDivision.defaultScoreFormatId) : null,
+        game1ScoreFormatId: editingDivision.game1ScoreFormatId ? parseInt(editingDivision.game1ScoreFormatId) : null,
+        game2ScoreFormatId: editingDivision.game2ScoreFormatId ? parseInt(editingDivision.game2ScoreFormatId) : null,
+        game3ScoreFormatId: editingDivision.game3ScoreFormatId ? parseInt(editingDivision.game3ScoreFormatId) : null
+      };
+
+      let successCount = 0;
+      for (const divId of targetDivisionIds) {
+        const response = await eventsApi.updateDivision(event.id, divId, matchSettings);
+        if (response.success) successCount++;
+      }
+
+      if (successCount > 0) {
+        toast.success(`Copied match settings to ${successCount} division(s)`);
+        // Reload event to get updated divisions
+        const eventResponse = await eventsApi.getEvent(event.id);
+        if (eventResponse.success) {
+          onUpdate(eventResponse.data);
+        }
+      } else {
+        toast.error('Failed to copy settings');
+      }
+    } catch (err) {
+      console.error('Error copying settings:', err);
+      toast.error('Failed to copy settings');
+    } finally {
+      setCopyingSettings(false);
+      setShowCopySettings(false);
     }
   };
 
@@ -2363,7 +2414,15 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
         divisionFee: d.divisionFee || d.entryFee || 0,
         teamUnitId: d.teamUnitId || null,
         skillLevelId: d.skillLevelId || null,
-        defaultScoreFormatId: d.defaultScoreFormatId || null
+        defaultScoreFormatId: d.defaultScoreFormatId || null,
+        game1ScoreFormatId: d.game1ScoreFormatId || null,
+        game2ScoreFormatId: d.game2ScoreFormatId || null,
+        game3ScoreFormatId: d.game3ScoreFormatId || null,
+        gamesPerMatch: d.gamesPerMatch ? parseInt(d.gamesPerMatch) : 1,
+        scheduleType: d.scheduleType || null,
+        poolCount: d.poolCount ? parseInt(d.poolCount) : null,
+        poolSize: d.poolSize ? parseInt(d.poolSize) : null,
+        playoffFromPools: d.playoffFromPools ? parseInt(d.playoffFromPools) : null
       }));
 
       const response = await eventsApi.update(event.id, {
@@ -5611,22 +5670,105 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
                   </select>
                 </div>
 
-                <div className="mt-3">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Default Game Format</label>
-                  <select
-                    value={editingDivision.defaultScoreFormatId || ''}
-                    onChange={(e) => setEditingDivision({ ...editingDivision, defaultScoreFormatId: e.target.value ? parseInt(e.target.value) : null })}
-                    className="w-full border border-gray-300 rounded-lg p-2"
-                  >
-                    <option value="">Use event default</option>
-                    {scoreFormats.map(format => (
-                      <option key={format.id} value={format.id}>
-                        {format.name} ({format.pointsToWin} pts, win by {format.winByPoints})
-                      </option>
-                    ))}
-                  </select>
-                  <p className="text-xs text-gray-500 mt-1">Override the event's default game format for this division</p>
-                </div>
+                {/* Single game format - shown when not Best of 3/5 */}
+                {(!editingDivision.gamesPerMatch || parseInt(editingDivision.gamesPerMatch) === 1) && (
+                  <div className="mt-3">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Default Game Format</label>
+                    <select
+                      value={editingDivision.defaultScoreFormatId || ''}
+                      onChange={(e) => setEditingDivision({ ...editingDivision, defaultScoreFormatId: e.target.value ? parseInt(e.target.value) : null })}
+                      className="w-full border border-gray-300 rounded-lg p-2"
+                    >
+                      <option value="">Use event default</option>
+                      {scoreFormats.map(format => (
+                        <option key={format.id} value={format.id}>
+                          {format.name} ({format.pointsToWin} pts, win by {format.winByPoints})
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-xs text-gray-500 mt-1">Override the event's default game format for this division</p>
+                  </div>
+                )}
+
+                {/* Per-game format selection - shown when Best of 3 or 5 */}
+                {editingDivision.gamesPerMatch && parseInt(editingDivision.gamesPerMatch) > 1 && (
+                  <div className="mt-3 space-y-3">
+                    <label className="block text-sm font-medium text-gray-700">Game Formats</label>
+                    <p className="text-xs text-gray-500">Set different formats for each game in the match</p>
+
+                    {/* Game 1 */}
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium w-16">Game 1:</span>
+                      <select
+                        value={editingDivision.game1ScoreFormatId || editingDivision.defaultScoreFormatId || ''}
+                        onChange={(e) => setEditingDivision({ ...editingDivision, game1ScoreFormatId: e.target.value ? parseInt(e.target.value) : null })}
+                        className="flex-1 border border-gray-300 rounded-lg p-2 text-sm"
+                      >
+                        <option value="">Use default</option>
+                        {scoreFormats.map(format => (
+                          <option key={format.id} value={format.id}>
+                            {format.name} ({format.pointsToWin} pts)
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Game 2 */}
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium w-16">Game 2:</span>
+                      <select
+                        value={editingDivision.game2ScoreFormatId || editingDivision.defaultScoreFormatId || ''}
+                        onChange={(e) => setEditingDivision({ ...editingDivision, game2ScoreFormatId: e.target.value ? parseInt(e.target.value) : null })}
+                        className="flex-1 border border-gray-300 rounded-lg p-2 text-sm"
+                      >
+                        <option value="">Use default</option>
+                        {scoreFormats.map(format => (
+                          <option key={format.id} value={format.id}>
+                            {format.name} ({format.pointsToWin} pts)
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Game 3 (Tiebreaker) */}
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium w-16">{parseInt(editingDivision.gamesPerMatch) === 3 ? 'Game 3:' : 'Game 3:'}</span>
+                      <select
+                        value={editingDivision.game3ScoreFormatId || editingDivision.defaultScoreFormatId || ''}
+                        onChange={(e) => setEditingDivision({ ...editingDivision, game3ScoreFormatId: e.target.value ? parseInt(e.target.value) : null })}
+                        className="flex-1 border border-gray-300 rounded-lg p-2 text-sm"
+                      >
+                        <option value="">Use default</option>
+                        {scoreFormats.filter(f => f.isTiebreaker || true).map(format => (
+                          <option key={format.id} value={format.id}>
+                            {format.name} ({format.pointsToWin} pts){format.isTiebreaker ? ' - Tiebreaker' : ''}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {parseInt(editingDivision.gamesPerMatch) === 3 && (
+                      <p className="text-xs text-gray-500 italic">Game 3 is the tiebreaker - often uses a shorter format</p>
+                    )}
+
+                    {/* Default format for reference */}
+                    <div className="mt-2 pt-2 border-t">
+                      <label className="block text-xs font-medium text-gray-500 mb-1">Default Format (fallback)</label>
+                      <select
+                        value={editingDivision.defaultScoreFormatId || ''}
+                        onChange={(e) => setEditingDivision({ ...editingDivision, defaultScoreFormatId: e.target.value ? parseInt(e.target.value) : null })}
+                        className="w-full border border-gray-300 rounded-lg p-2 text-sm"
+                      >
+                        <option value="">Use event default</option>
+                        {scoreFormats.map(format => (
+                          <option key={format.id} value={format.id}>
+                            {format.name} ({format.pointsToWin} pts, win by {format.winByPoints})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Schedule Status Display */}
@@ -5639,24 +5781,92 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
               )}
             </div>
 
-            <div className="p-4 border-t bg-gray-50 flex justify-end gap-3">
-              <button
-                onClick={() => {
-                  setShowEditDivision(false);
-                  setEditingDivision(null);
-                }}
-                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-100"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSaveDivision}
-                disabled={savingDivision}
-                className="px-4 py-2 bg-orange-600 text-white rounded-lg font-medium hover:bg-orange-700 disabled:opacity-50 flex items-center gap-2"
-              >
-                {savingDivision && <Loader2 className="w-4 h-4 animate-spin" />}
-                Save Changes
-              </button>
+            <div className="p-4 border-t bg-gray-50 flex justify-between">
+              {/* Copy to Other Divisions Button */}
+              <div className="relative">
+                {event.divisions?.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => setShowCopySettings(!showCopySettings)}
+                    className="px-3 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg flex items-center gap-1"
+                    title="Copy match settings to other divisions"
+                  >
+                    <Copy className="w-4 h-4" />
+                    Copy to Others
+                  </button>
+                )}
+
+                {/* Copy Settings Dropdown */}
+                {showCopySettings && event.divisions?.length > 1 && (
+                  <div className="absolute bottom-full left-0 mb-2 w-64 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
+                    <div className="p-3 border-b">
+                      <p className="text-sm font-medium text-gray-900">Copy Match Settings To:</p>
+                      <p className="text-xs text-gray-500 mt-1">Schedule type, games per match, and game formats</p>
+                    </div>
+                    <div className="p-2 max-h-48 overflow-y-auto">
+                      {event.divisions
+                        .filter(d => d.id !== editingDivision?.id)
+                        .map(div => (
+                          <label key={div.id} className="flex items-center gap-2 p-2 hover:bg-gray-50 rounded cursor-pointer">
+                            <input
+                              type="checkbox"
+                              className="w-4 h-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500"
+                              data-division-id={div.id}
+                            />
+                            <span className="text-sm text-gray-700">{div.name}</span>
+                          </label>
+                        ))}
+                    </div>
+                    <div className="p-2 border-t flex justify-end gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setShowCopySettings(false)}
+                        className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-900"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const checkboxes = document.querySelectorAll('[data-division-id]:checked');
+                          const selectedIds = Array.from(checkboxes).map(cb => parseInt(cb.dataset.divisionId));
+                          if (selectedIds.length > 0) {
+                            handleCopySettingsToOther(selectedIds);
+                          } else {
+                            toast.error('Select at least one division');
+                          }
+                        }}
+                        disabled={copyingSettings}
+                        className="px-3 py-1.5 text-sm bg-orange-600 text-white rounded hover:bg-orange-700 disabled:opacity-50 flex items-center gap-1"
+                      >
+                        {copyingSettings && <Loader2 className="w-3 h-3 animate-spin" />}
+                        Apply
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    setShowEditDivision(false);
+                    setEditingDivision(null);
+                    setShowCopySettings(false);
+                  }}
+                  className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-100"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveDivision}
+                  disabled={savingDivision}
+                  className="px-4 py-2 bg-orange-600 text-white rounded-lg font-medium hover:bg-orange-700 disabled:opacity-50 flex items-center gap-2"
+                >
+                  {savingDivision && <Loader2 className="w-4 h-4 animate-spin" />}
+                  Save Changes
+                </button>
+              </div>
             </div>
           </div>
         </div>
