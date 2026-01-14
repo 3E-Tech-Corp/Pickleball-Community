@@ -102,6 +102,11 @@ public class Event
     public int? MaxParticipants { get; set; }
 
     /// <summary>
+    /// Default score format for new divisions in this event.
+    /// </summary>
+    public int? DefaultScoreFormatId { get; set; }
+
+    /// <summary>
     /// Whether players can register for multiple divisions in this event.
     /// Defaults to true. If false, players can only register for one division.
     /// </summary>
@@ -129,6 +134,9 @@ public class Event
 
     [ForeignKey("OrganizedByClubId")]
     public Club? OrganizedByClub { get; set; }
+
+    [ForeignKey("DefaultScoreFormatId")]
+    public ScoreFormat? DefaultScoreFormat { get; set; }
 
     public ICollection<EventDivision> Divisions { get; set; } = new List<EventDivision>();
     public ICollection<EventRegistration> Registrations { get; set; } = new List<EventRegistration>();
