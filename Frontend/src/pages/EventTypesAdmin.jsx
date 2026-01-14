@@ -133,6 +133,14 @@ const COLOR_OPTIONS = [
 // Get unique categories
 const ICON_CATEGORIES = [...new Set(ICON_OPTIONS.map(o => o.category))];
 
+// Schedule type options
+const SCHEDULE_TYPE_OPTIONS = [
+  { value: 'PrePlanned', label: 'Pre-Planned', description: 'Schedule is set up before the event starts' },
+  { value: 'Manual Only', label: 'Manual Only', description: 'Admin manually schedules each round' },
+  { value: 'Dynamic', label: 'Dynamic', description: 'System generates schedule dynamically' },
+  { value: 'None', label: 'None', description: 'No scheduling required' },
+];
+
 export default function EventTypesAdmin({ embedded = false }) {
   const { user } = useAuth();
   const [eventTypes, setEventTypes] = useState([]);
@@ -146,6 +154,8 @@ export default function EventTypesAdmin({ embedded = false }) {
     description: '',
     icon: 'calendar',
     color: 'green',
+    divisionMax: null,
+    scheduleType: 'Manual Only',
     sortOrder: 0,
     isActive: true
   });
@@ -189,6 +199,8 @@ export default function EventTypesAdmin({ embedded = false }) {
       description: '',
       icon: 'calendar',
       color: 'green',
+      divisionMax: null,
+      scheduleType: 'Manual Only',
       sortOrder: eventTypes.length,
       isActive: true
     });
@@ -205,6 +217,8 @@ export default function EventTypesAdmin({ embedded = false }) {
       description: eventType.description || '',
       icon: eventType.icon || 'calendar',
       color: eventType.color || 'green',
+      divisionMax: eventType.divisionMax,
+      scheduleType: eventType.scheduleType || 'Manual Only',
       sortOrder: eventType.sortOrder,
       isActive: eventType.isActive
     });
@@ -357,7 +371,10 @@ export default function EventTypesAdmin({ embedded = false }) {
                     Event Type
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Description
+                    Division Max
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Schedule Type
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Status
@@ -377,13 +394,18 @@ export default function EventTypesAdmin({ embedded = false }) {
                         </div>
                         <div>
                           <div className="font-medium text-gray-900">{eventType.name}</div>
-                          <div className="text-xs text-gray-500">Order: {eventType.sortOrder}</div>
+                          <div className="text-xs text-gray-500">{eventType.description || ''}</div>
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4">
-                      <span className="text-sm text-gray-600">
-                        {eventType.description || '-'}
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className="text-sm text-gray-900">
+                        {eventType.divisionMax === null ? 'Unlimited' : eventType.divisionMax}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className="text-sm text-gray-900">
+                        {eventType.scheduleType || '-'}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -574,6 +596,43 @@ export default function EventTypesAdmin({ embedded = false }) {
                   </div>
                 </div>
 
+                {/* Division Max & Schedule Type */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Division Max
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        value={formData.divisionMax === null ? '' : formData.divisionMax}
+                        onChange={(e) => setFormData({ ...formData, divisionMax: e.target.value === '' ? null : parseInt(e.target.value) || 1 })}
+                        min="1"
+                        placeholder="Unlimited"
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-green-500 focus:border-green-500"
+                      />
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">Leave empty for unlimited</p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Schedule Type
+                    </label>
+                    <select
+                      value={formData.scheduleType || ''}
+                      onChange={(e) => setFormData({ ...formData, scheduleType: e.target.value })}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-green-500 focus:border-green-500"
+                    >
+                      {SCHEDULE_TYPE_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
                 {/* Sort Order & Active */}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
@@ -611,9 +670,13 @@ export default function EventTypesAdmin({ embedded = false }) {
                     <div className={`w-12 h-12 rounded-lg ${getColorClass(formData.color)} flex items-center justify-center text-white`}>
                       {getIconComponent(formData.icon)}
                     </div>
-                    <div>
+                    <div className="flex-1">
                       <div className="font-medium text-gray-900">{formData.name || 'Event Type Name'}</div>
-                      <div className="text-sm text-gray-500">{formData.description || 'Description...'}</div>
+                      <div className="text-xs text-gray-500">{formData.description || 'Description...'}</div>
+                      <div className="flex gap-4 mt-1 text-xs text-gray-600">
+                        <span>Divisions: {formData.divisionMax === null ? 'Unlimited' : formData.divisionMax}</span>
+                        <span>Schedule: {formData.scheduleType || 'None'}</span>
+                      </div>
                     </div>
                   </div>
                 </div>

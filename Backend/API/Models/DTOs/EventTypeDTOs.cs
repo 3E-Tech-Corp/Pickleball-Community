@@ -8,6 +8,8 @@ public class EventTypeDto
     public string? Icon { get; set; }
     public string? Color { get; set; }
     public bool AllowMultipleDivisions { get; set; } = true;
+    public int? DivisionMax { get; set; }
+    public string? ScheduleType { get; set; }
     public int SortOrder { get; set; }
     public bool IsActive { get; set; }
 }
@@ -19,6 +21,8 @@ public class CreateEventTypeDto
     public string? Icon { get; set; }
     public string? Color { get; set; }
     public bool AllowMultipleDivisions { get; set; } = true;
+    public int? DivisionMax { get; set; }
+    public string? ScheduleType { get; set; }
     public int SortOrder { get; set; } = 0;
     public bool IsActive { get; set; } = true;
 }
@@ -30,6 +34,8 @@ public class UpdateEventTypeDto
     public string? Icon { get; set; }
     public string? Color { get; set; }
     public bool? AllowMultipleDivisions { get; set; }
+    public int? DivisionMax { get; set; }
+    public string? ScheduleType { get; set; }
     public int? SortOrder { get; set; }
     public bool? IsActive { get; set; }
 }

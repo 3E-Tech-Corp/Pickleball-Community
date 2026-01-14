@@ -44,6 +44,8 @@ public class EventTypesController : ControllerBase
                     Icon = et.Icon,
                     Color = et.Color,
                     AllowMultipleDivisions = et.AllowMultipleDivisions,
+                    DivisionMax = et.DivisionMax,
+                    ScheduleType = et.ScheduleType,
                     SortOrder = et.SortOrder,
                     IsActive = et.IsActive
                 })
@@ -76,6 +78,8 @@ public class EventTypesController : ControllerBase
                 Icon = eventType.Icon,
                 Color = eventType.Color,
                 AllowMultipleDivisions = eventType.AllowMultipleDivisions,
+                DivisionMax = eventType.DivisionMax,
+                ScheduleType = eventType.ScheduleType,
                 SortOrder = eventType.SortOrder,
                 IsActive = eventType.IsActive
             };
@@ -108,6 +112,8 @@ public class EventTypesController : ControllerBase
                 Icon = dto.Icon,
                 Color = dto.Color,
                 AllowMultipleDivisions = dto.AllowMultipleDivisions,
+                DivisionMax = dto.DivisionMax,
+                ScheduleType = dto.ScheduleType,
                 SortOrder = dto.SortOrder,
                 IsActive = dto.IsActive
             };
@@ -123,6 +129,8 @@ public class EventTypesController : ControllerBase
                 Icon = eventType.Icon,
                 Color = eventType.Color,
                 AllowMultipleDivisions = eventType.AllowMultipleDivisions,
+                DivisionMax = eventType.DivisionMax,
+                ScheduleType = eventType.ScheduleType,
                 SortOrder = eventType.SortOrder,
                 IsActive = eventType.IsActive
             };
@@ -160,6 +168,8 @@ public class EventTypesController : ControllerBase
             eventType.Icon = dto.Icon ?? eventType.Icon;
             eventType.Color = dto.Color ?? eventType.Color;
             eventType.AllowMultipleDivisions = dto.AllowMultipleDivisions ?? eventType.AllowMultipleDivisions;
+            eventType.DivisionMax = dto.DivisionMax ?? eventType.DivisionMax;
+            eventType.ScheduleType = dto.ScheduleType ?? eventType.ScheduleType;
             eventType.SortOrder = dto.SortOrder ?? eventType.SortOrder;
             eventType.IsActive = dto.IsActive ?? eventType.IsActive;
             eventType.UpdatedAt = DateTime.Now;
@@ -174,6 +184,8 @@ public class EventTypesController : ControllerBase
                 Icon = eventType.Icon,
                 Color = eventType.Color,
                 AllowMultipleDivisions = eventType.AllowMultipleDivisions,
+                DivisionMax = eventType.DivisionMax,
+                ScheduleType = eventType.ScheduleType,
                 SortOrder = eventType.SortOrder,
                 IsActive = eventType.IsActive
             };
@@ -235,6 +247,8 @@ public class EventTypesController : ControllerBase
                 Icon = eventType.Icon,
                 Color = eventType.Color,
                 AllowMultipleDivisions = eventType.AllowMultipleDivisions,
+                DivisionMax = eventType.DivisionMax,
+                ScheduleType = eventType.ScheduleType,
                 SortOrder = eventType.SortOrder,
                 IsActive = eventType.IsActive
             };
