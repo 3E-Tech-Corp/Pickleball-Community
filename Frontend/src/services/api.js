@@ -1809,6 +1809,39 @@ export const playerHistoryApi = {
   getRatingTypes: () => api.get('/api/player-history/rating-types')
 }
 
+// Help Topics API (dynamic contextual help)
+export const helpApi = {
+  // Public - Get help topic by code
+  getByCode: (topicCode) => api.get(`/helptopics/code/${topicCode}`),
+
+  // Public - Get multiple help topics by codes (batch)
+  getBatch: (topicCodes) => api.post('/helptopics/batch', topicCodes),
+
+  // Public - Get help topics by category
+  getByCategory: (category) => api.get(`/helptopics/category/${category}`),
+
+  // Admin - Get all help topics
+  getAll: (category = null) => {
+    const params = category ? `?category=${category}` : '';
+    return api.get(`/helptopics${params}`);
+  },
+
+  // Admin - Get help topic by ID
+  getById: (id) => api.get(`/helptopics/${id}`),
+
+  // Admin - Create help topic
+  create: (data) => api.post('/helptopics', data),
+
+  // Admin - Update help topic
+  update: (id, data) => api.put(`/helptopics/${id}`, data),
+
+  // Admin - Delete help topic
+  delete: (id) => api.delete(`/helptopics/${id}`),
+
+  // Admin - Get all categories
+  getCategories: () => api.get('/helptopics/categories')
+}
+
 // Release Notes API
 export const releaseNotesApi = {
   // Public - Get all active release notes

@@ -103,6 +103,9 @@ public class ApplicationDbContext : DbContext
     // Site Content
     public DbSet<SiteContent> SiteContents { get; set; }
 
+    // Help Topics
+    public DbSet<HelpTopic> HelpTopics { get; set; }
+
     // Feedback
     public DbSet<FeedbackCategory> FeedbackCategories { get; set; }
     public DbSet<FeedbackEntry> FeedbackEntries { get; set; }
