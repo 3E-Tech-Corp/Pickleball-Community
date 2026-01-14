@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
-import { Calendar, MapPin, Clock, Users, Filter, Search, Plus, DollarSign, ChevronLeft, ChevronRight, X, UserPlus, Trophy, Layers, Check, AlertCircle, Navigation, Building2, Loader2, MessageCircle, CheckCircle, Edit3, ChevronDown, ChevronUp, Trash2, List, Map as MapIcon, Image, Upload, Play, Link2, QrCode, Download, ArrowRightLeft, FileText, Eye, EyeOff, ExternalLink, User, GitMerge, ArrowRight, Copy } from 'lucide-react';
+import { Calendar, MapPin, Clock, Users, Filter, Search, Plus, DollarSign, ChevronLeft, ChevronRight, X, UserPlus, Trophy, Layers, Check, AlertCircle, Navigation, Building2, Loader2, MessageCircle, CheckCircle, Edit3, ChevronDown, ChevronUp, Trash2, List, Map as MapIcon, Image, Upload, Play, Link2, QrCode, Download, ArrowRightLeft, FileText, Eye, EyeOff, ExternalLink, User, GitMerge, ArrowRight, Copy, Info, Grid, Shuffle, ClipboardList } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import { eventsApi, eventTypesApi, courtsApi, teamUnitsApi, skillLevelsApi, ageGroupsApi, tournamentApi, sharedAssetApi, getSharedAssetUrl } from '../services/api';
@@ -6480,19 +6480,85 @@ function CreateEventModal({ eventTypes, teamUnits = [], skillLevels = [], courtI
           {step === 2 && (
             <>
               <div>
-                <label className="flex items-center gap-1 text-sm font-medium text-gray-700 mb-1">
+                <label className="flex items-center gap-1 text-sm font-medium text-gray-700 mb-2">
                   Event Type *
                   <HelpIcon topicCode="event.eventType" size="sm" />
                 </label>
-                <select
-                  value={formData.eventTypeId}
-                  onChange={(e) => setFormData({ ...formData, eventTypeId: parseInt(e.target.value) })}
-                  className="w-full border border-gray-300 rounded-lg p-2"
-                >
-                  {eventTypes.map(type => (
-                    <option key={type.id} value={type.id}>{type.name}</option>
-                  ))}
-                </select>
+
+                {/* Event Type Comparison Cards */}
+                <div className="grid gap-3 mb-4">
+                  {eventTypes.map(type => {
+                    const isSelected = formData.eventTypeId === type.id;
+                    const TypeIcon = type.icon ? getIconByName(type.icon, Trophy) : Trophy;
+                    const colors = getColorValues(type.color);
+
+                    // Schedule type descriptions
+                    const scheduleTypeInfo = {
+                      'PrePlanned': { label: 'Pre-Planned', desc: 'Brackets/pools created before event', icon: ClipboardList },
+                      'Manual Only': { label: 'Manual', desc: 'Organizer creates all games manually', icon: Edit3 },
+                      'Dynamic': { label: 'Dynamic', desc: 'Popcorn/Gauntlet auto-scheduling', icon: Shuffle },
+                      'None': { label: 'No Scheduling', desc: 'No game scheduling needed', icon: Users }
+                    };
+
+                    const schedInfo = scheduleTypeInfo[type.scheduleType] || scheduleTypeInfo['None'];
+                    const ScheduleIcon = schedInfo.icon;
+
+                    return (
+                      <button
+                        key={type.id}
+                        type="button"
+                        onClick={() => setFormData({ ...formData, eventTypeId: type.id })}
+                        className={`text-left p-4 rounded-xl border-2 transition-all ${
+                          isSelected
+                            ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-200'
+                            : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                        }`}
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex items-center gap-3">
+                            <div
+                              className="w-10 h-10 rounded-lg flex items-center justify-center"
+                              style={{ backgroundColor: colors.bg, color: colors.text }}
+                            >
+                              <TypeIcon className="w-5 h-5" />
+                            </div>
+                            <div>
+                              <div className="font-medium text-gray-900">{type.name}</div>
+                              {type.description && (
+                                <div className="text-sm text-gray-500 mt-0.5">{type.description}</div>
+                              )}
+                            </div>
+                          </div>
+                          {isSelected && (
+                            <CheckCircle className="w-5 h-5 text-blue-500 flex-shrink-0" />
+                          )}
+                        </div>
+
+                        {/* Features */}
+                        <div className="mt-3 pt-3 border-t border-gray-100 grid grid-cols-2 gap-2 text-xs">
+                          <div className="flex items-center gap-1.5 text-gray-600">
+                            <ScheduleIcon className="w-3.5 h-3.5" />
+                            <span>{schedInfo.label}</span>
+                          </div>
+                          <div className="flex items-center gap-1.5 text-gray-600">
+                            <Grid className="w-3.5 h-3.5" />
+                            <span>
+                              {type.divisionMax ? `Max ${type.divisionMax} division${type.divisionMax > 1 ? 's' : ''}` : 'Unlimited divisions'}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Schedule type tooltip on hover */}
+                        {isSelected && type.scheduleType && (
+                          <div className="mt-2 p-2 bg-blue-100 rounded-lg text-xs text-blue-700">
+                            <Info className="w-3 h-3 inline mr-1" />
+                            {schedInfo.desc}
+                          </div>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
 
               <div>
