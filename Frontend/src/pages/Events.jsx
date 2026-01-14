@@ -3552,6 +3552,59 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
                 )}
               </div>
 
+              {/* Game Day Dashboard Buttons */}
+              {/* Admin sees all dashboards always; regular users see when event is started */}
+              {(isAdmin || (isRegistered && event.isStarted)) && (
+                <div className="border-t border-gray-200 pt-4">
+                  <h3 className="text-sm font-medium text-gray-700 mb-3 flex items-center gap-2">
+                    <Play className="w-4 h-4 text-blue-600" />
+                    Game Day Dashboards
+                    {isAdmin && !event.isStarted && (
+                      <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded">Admin Preview</span>
+                    )}
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    {/* TD Dashboard - Admin and Organizers only */}
+                    {(isAdmin || isOrganizer) && (
+                      <Link
+                        to={`/event/${event.id}/manage`}
+                        className="flex items-center gap-2 p-3 bg-orange-50 border border-orange-200 rounded-lg text-orange-700 hover:bg-orange-100 transition-colors"
+                      >
+                        <ClipboardList className="w-5 h-5" />
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium text-sm">TD Dashboard</div>
+                          <div className="text-xs text-orange-600 truncate">Manage games & courts</div>
+                        </div>
+                      </Link>
+                    )}
+                    {/* Player Dashboard - Registered users */}
+                    {(isAdmin || isRegistered) && (
+                      <Link
+                        to={`/event/${event.id}/gameday`}
+                        className="flex items-center gap-2 p-3 bg-blue-50 border border-blue-200 rounded-lg text-blue-700 hover:bg-blue-100 transition-colors"
+                      >
+                        <User className="w-5 h-5" />
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium text-sm">Player View</div>
+                          <div className="text-xs text-blue-600 truncate">Your games & schedule</div>
+                        </div>
+                      </Link>
+                    )}
+                    {/* Spectator Dashboard - Everyone */}
+                    <Link
+                      to={`/event/${event.id}/scoreboard`}
+                      className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-lg text-green-700 hover:bg-green-100 transition-colors"
+                    >
+                      <Eye className="w-5 h-5" />
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium text-sm">Spectator View</div>
+                        <div className="text-xs text-green-600 truncate">Live scores & courts</div>
+                      </div>
+                    </Link>
+                  </div>
+                </div>
+              )}
+
               {/* Description */}
               {event.description && (
                 <div>
