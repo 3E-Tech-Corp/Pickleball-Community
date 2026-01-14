@@ -2588,39 +2588,87 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
       return;
     }
 
-    // Sort by division name, then by registration date
+    // Sort: completed units first, then by division name, then by registration date
     allUnits.sort((a, b) => {
+      // Completed units first
+      const aComplete = a.isComplete ? 0 : 1;
+      const bComplete = b.isComplete ? 0 : 1;
+      if (aComplete !== bComplete) return aComplete - bComplete;
+      // Then by division name
       if (a.divisionName !== b.divisionName) {
         return (a.divisionName || '').localeCompare(b.divisionName || '');
       }
+      // Then by registration date
       return new Date(a.createdAt || 0) - new Date(b.createdAt || 0);
     });
 
     // Track unit number per division
     const divisionUnitCounts = {};
 
-    const headers = ['Division', 'Unit #', 'Player 1', 'Player 2', 'Payment Status', 'Registered At'];
-    const rows = allUnits.map(unit => {
+    // Build rows - one row per player
+    const headers = [
+      'Division',
+      'Unit #',
+      'Unit Status',
+      'Player Name',
+      'User ID',
+      'Email',
+      'Invite Status',
+      'Payment Status',
+      'Amount Paid',
+      'Date Registered',
+      'Date Paid',
+      'Checked In',
+      'Waiver Signed'
+    ];
+
+    const rows = [];
+    allUnits.forEach(unit => {
       divisionUnitCounts[unit.divisionId] = (divisionUnitCounts[unit.divisionId] || 0) + 1;
       const unitNumber = divisionUnitCounts[unit.divisionId];
-      const player1 = unit.members?.[0]
-        ? (unit.members[0].lastName && unit.members[0].firstName
-            ? `${unit.members[0].lastName}, ${unit.members[0].firstName}`
-            : unit.members[0].lastName || unit.members[0].firstName || '')
-        : '';
-      const player2 = unit.members?.[1]
-        ? (unit.members[1].lastName && unit.members[1].firstName
-            ? `${unit.members[1].lastName}, ${unit.members[1].firstName}`
-            : unit.members[1].lastName || unit.members[1].firstName || '')
-        : '';
-      return [
-        unit.divisionName || '',
-        unitNumber.toString(),
-        player1,
-        player2,
-        unit.paymentStatus || 'Pending',
-        unit.createdAt ? new Date(unit.createdAt).toLocaleDateString() : ''
-      ];
+      const unitStatus = unit.isComplete ? 'Complete' : 'Incomplete';
+
+      // Add a row for each member in the unit
+      if (unit.members && unit.members.length > 0) {
+        unit.members.forEach(member => {
+          const playerName = member.lastName && member.firstName
+            ? `${member.lastName}, ${member.firstName}`
+            : member.lastName || member.firstName || member.displayName || '';
+
+          rows.push([
+            unit.divisionName || '',
+            unitNumber.toString(),
+            unitStatus,
+            playerName,
+            member.userId?.toString() || '',
+            member.email || '',
+            member.inviteStatus || '',
+            member.paymentStatus || unit.paymentStatus || 'Pending',
+            member.amountPaid?.toString() || unit.amountPaid?.toString() || '0',
+            member.registeredAt ? new Date(member.registeredAt).toLocaleDateString() : (unit.createdAt ? new Date(unit.createdAt).toLocaleDateString() : ''),
+            member.paidAt ? new Date(member.paidAt).toLocaleDateString() : '',
+            member.isCheckedIn ? 'Yes' : 'No',
+            member.waiverSignedAt ? 'Yes' : 'No'
+          ]);
+        });
+      } else {
+        // Unit with no members yet
+        rows.push([
+          unit.divisionName || '',
+          unitNumber.toString(),
+          unitStatus,
+          unit.name || '',
+          '',
+          '',
+          '',
+          unit.paymentStatus || 'Pending',
+          unit.amountPaid?.toString() || '0',
+          unit.createdAt ? new Date(unit.createdAt).toLocaleDateString() : '',
+          '',
+          'No',
+          'No'
+        ]);
+      }
     });
 
     const csvContent = [
