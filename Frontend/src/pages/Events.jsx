@@ -2319,6 +2319,7 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
         description: d.description || '',
         teamSize: d.teamSize || 2,
         maxTeams: d.maxTeams || null,
+        maxPlayers: d.maxPlayers || null,
         divisionFee: d.divisionFee || d.entryFee || 0,
         teamUnitId: d.teamUnitId || null,
         skillLevelId: d.skillLevelId || null
