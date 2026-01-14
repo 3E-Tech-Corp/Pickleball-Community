@@ -174,6 +174,7 @@ BEGIN
     ALTER TABLE EventUnits ADD FinalPlacement INT NULL;
     PRINT 'Added FinalPlacement to EventUnits';
 END
+GO
 
 -- =====================================================
 -- 8. Create stored procedure for getting game day dashboard data
