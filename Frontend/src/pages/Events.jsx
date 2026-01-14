@@ -1680,6 +1680,10 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
   const [editingDivision, setEditingDivision] = useState(null);
   const [savingDivision, setSavingDivision] = useState(false);
 
+  // Score formats state
+  const [scoreFormats, setScoreFormats] = useState([]);
+  const [loadingScoreFormats, setLoadingScoreFormats] = useState(false);
+
   // Team registration state
   const [showTeamRegistration, setShowTeamRegistration] = useState(false);
   const [selectedDivisionForRegistration, setSelectedDivisionForRegistration] = useState(null);
@@ -2053,7 +2057,25 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
   };
 
   // Initialize edit form data when entering edit mode
+  // Load score formats for event/division editing
+  const loadScoreFormats = async () => {
+    setLoadingScoreFormats(true);
+    try {
+      const response = await tournamentApi.getScoreFormats();
+      if (response.success) {
+        setScoreFormats(response.data || []);
+      }
+    } catch (err) {
+      console.error('Error loading score formats:', err);
+    } finally {
+      setLoadingScoreFormats(false);
+    }
+  };
+
   const startEditing = () => {
+    // Load score formats when editing
+    loadScoreFormats();
+
     // Extract date and time directly from ISO string without timezone conversion
     const extractDateTime = (isoString) => {
       if (!isoString) return { date: '', time: '' };
@@ -2093,7 +2115,8 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
       isPublished: event.isPublished,
       isPrivate: event.isPrivate,
       allowMultipleDivisions: event.allowMultipleDivisions ?? true,
-      posterImageUrl: event.posterImageUrl || ''
+      posterImageUrl: event.posterImageUrl || '',
+      defaultScoreFormatId: event.defaultScoreFormatId || null
     });
     setSelectedCourt(event.courtId ? {
       courtId: event.courtId,
@@ -2134,13 +2157,19 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
 
   // Open edit division modal
   const handleEditDivision = (division) => {
+    // Load score formats if not already loaded
+    if (scoreFormats.length === 0) {
+      loadScoreFormats();
+    }
+
     setEditingDivision({
       ...division,
       scheduleType: division.scheduleType || '',
       poolCount: division.poolCount || '',
       poolSize: division.poolSize || '',
       playoffFromPools: division.playoffFromPools || '',
-      gamesPerMatch: division.gamesPerMatch || 1
+      gamesPerMatch: division.gamesPerMatch || 1,
+      defaultScoreFormatId: division.defaultScoreFormatId || null
     });
     setShowEditDivision(true);
   };
@@ -2164,7 +2193,8 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
         poolCount: editingDivision.poolCount ? parseInt(editingDivision.poolCount) : null,
         poolSize: editingDivision.poolSize ? parseInt(editingDivision.poolSize) : null,
         playoffFromPools: editingDivision.playoffFromPools ? parseInt(editingDivision.playoffFromPools) : null,
-        gamesPerMatch: editingDivision.gamesPerMatch ? parseInt(editingDivision.gamesPerMatch) : 1
+        gamesPerMatch: editingDivision.gamesPerMatch ? parseInt(editingDivision.gamesPerMatch) : 1,
+        defaultScoreFormatId: editingDivision.defaultScoreFormatId ? parseInt(editingDivision.defaultScoreFormatId) : null
       };
 
       const response = await eventsApi.updateDivision(event.id, editingDivision.id, updateData);
@@ -2332,7 +2362,8 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
         maxPlayers: d.maxPlayers || null,
         divisionFee: d.divisionFee || d.entryFee || 0,
         teamUnitId: d.teamUnitId || null,
-        skillLevelId: d.skillLevelId || null
+        skillLevelId: d.skillLevelId || null,
+        defaultScoreFormatId: d.defaultScoreFormatId || null
       }));
 
       const response = await eventsApi.update(event.id, {
@@ -2342,6 +2373,7 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
         registrationFee: parseFloat(editFormData.registrationFee) || 0,
         perDivisionFee: parseFloat(editFormData.perDivisionFee) || 0,
         maxParticipants: editFormData.maxParticipants ? parseInt(editFormData.maxParticipants) : null,
+        defaultScoreFormatId: editFormData.defaultScoreFormatId ? parseInt(editFormData.defaultScoreFormatId) : null,
         divisions: divisionsToSave
       });
 
@@ -4724,6 +4756,38 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
                     </div>
                   </div>
 
+                  {/* Default Game Format */}
+                  <div className="border-t pt-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Default Game Format</label>
+                    <p className="text-xs text-gray-500 mb-2">This format will be used as the default for all games in this event</p>
+                    <select
+                      value={editFormData?.defaultScoreFormatId || ''}
+                      onChange={(e) => {
+                        const newFormatId = e.target.value ? parseInt(e.target.value) : null;
+                        const oldFormatId = editFormData?.defaultScoreFormatId;
+                        setEditFormData({ ...editFormData, defaultScoreFormatId: newFormatId });
+
+                        // If changing format and divisions exist, ask if they want to update divisions too
+                        if (newFormatId && oldFormatId !== newFormatId && editDivisions.length > 0) {
+                          const divisionsWithoutFormat = editDivisions.filter(d => !d.defaultScoreFormatId).length;
+                          if (divisionsWithoutFormat > 0 && confirm(`Apply this format to ${divisionsWithoutFormat} division(s) without a format set?`)) {
+                            setEditDivisions(prev => prev.map(d =>
+                              !d.defaultScoreFormatId ? { ...d, defaultScoreFormatId: newFormatId } : d
+                            ));
+                          }
+                        }
+                      }}
+                      className="w-full border border-gray-300 rounded-lg p-2 text-sm"
+                    >
+                      <option value="">No default format</option>
+                      {scoreFormats.map(format => (
+                        <option key={format.id} value={format.id}>
+                          {format.name} ({format.pointsToWin} pts, win by {format.winByPoints})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
                   {/* Divisions Section */}
                   <div className="border-t pt-4">
                     <div className="flex items-center justify-between mb-3">
@@ -5545,6 +5609,23 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
                     <option value="3">Best of 3</option>
                     <option value="5">Best of 5</option>
                   </select>
+                </div>
+
+                <div className="mt-3">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Default Game Format</label>
+                  <select
+                    value={editingDivision.defaultScoreFormatId || ''}
+                    onChange={(e) => setEditingDivision({ ...editingDivision, defaultScoreFormatId: e.target.value ? parseInt(e.target.value) : null })}
+                    className="w-full border border-gray-300 rounded-lg p-2"
+                  >
+                    <option value="">Use event default</option>
+                    {scoreFormats.map(format => (
+                      <option key={format.id} value={format.id}>
+                        {format.name} ({format.pointsToWin} pts, win by {format.winByPoints})
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-gray-500 mt-1">Override the event's default game format for this division</p>
                 </div>
               </div>
 

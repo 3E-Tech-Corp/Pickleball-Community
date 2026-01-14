@@ -788,6 +788,7 @@ public class EventsController : ControllerBase
             evt.ContactPhone = dto.ContactPhone;
             evt.PaymentInstructions = dto.PaymentInstructions;
             evt.MaxParticipants = dto.MaxParticipants;
+            evt.DefaultScoreFormatId = dto.DefaultScoreFormatId;
             evt.UpdatedAt = DateTime.Now;
 
             // Handle divisions update
@@ -831,6 +832,7 @@ public class EventsController : ControllerBase
                             existingDiv.MaxSkillRating = divDto.MaxSkillRating;
                             existingDiv.MaxUnits = divDto.MaxUnits;
                             existingDiv.MaxPlayers = divDto.MaxPlayers;
+                            existingDiv.DefaultScoreFormatId = divDto.DefaultScoreFormatId;
                         }
                     }
                     else
@@ -851,7 +853,8 @@ public class EventsController : ControllerBase
                             MaxSkillRating = divDto.MaxSkillRating,
                             MaxUnits = divDto.MaxUnits,
                             MaxPlayers = divDto.MaxPlayers,
-                            SortOrder = divDto.SortOrder
+                            SortOrder = divDto.SortOrder,
+                            DefaultScoreFormatId = divDto.DefaultScoreFormatId
                         };
                         evt.Divisions.Add(newDivision);
                     }

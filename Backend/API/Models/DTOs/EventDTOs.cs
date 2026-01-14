@@ -303,6 +303,7 @@ public class CreateEventDto
     public string? PaymentInstructions { get; set; }
     public int? OrganizedByClubId { get; set; }
     public int? MaxParticipants { get; set; }
+    public int? DefaultScoreFormatId { get; set; }
     public List<CreateEventDivisionDto> Divisions { get; set; } = new();
 }
 
@@ -331,6 +332,7 @@ public class CreateEventDivisionDto
 
     public decimal? DivisionFee { get; set; }
     public int SortOrder { get; set; } = 0;
+    public int? DefaultScoreFormatId { get; set; }
 
     // Rewards to create with this division
     public List<CreateDivisionRewardDto> Rewards { get; set; } = new();
