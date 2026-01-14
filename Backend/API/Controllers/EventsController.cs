@@ -596,9 +596,6 @@ public class EventsController : ControllerBase
                         LookingForPartnerCount = d.PartnerRequests.Count(p => p.IsLookingForPartner && p.Status == "Open"),
                         // Tournament structure
                         DefaultScoreFormatId = d.DefaultScoreFormatId,
-                        Game1ScoreFormatId = d.Game1ScoreFormatId,
-                        Game2ScoreFormatId = d.Game2ScoreFormatId,
-                        Game3ScoreFormatId = d.Game3ScoreFormatId,
                         PoolCount = d.PoolCount,
                         PoolSize = d.PoolSize,
                         ScheduleType = d.ScheduleType,
@@ -711,9 +708,6 @@ public class EventsController : ControllerBase
                     SortOrder = divDto.SortOrder > 0 ? divDto.SortOrder : sortOrder++,
                     // Tournament structure
                     DefaultScoreFormatId = divDto.DefaultScoreFormatId,
-                    Game1ScoreFormatId = divDto.Game1ScoreFormatId,
-                    Game2ScoreFormatId = divDto.Game2ScoreFormatId,
-                    Game3ScoreFormatId = divDto.Game3ScoreFormatId,
                     GamesPerMatch = divDto.GamesPerMatch ?? 1,
                     ScheduleType = divDto.ScheduleType,
                     PoolCount = divDto.PoolCount,
@@ -855,9 +849,6 @@ public class EventsController : ControllerBase
                             existingDiv.MaxUnits = divDto.MaxUnits;
                             existingDiv.MaxPlayers = divDto.MaxPlayers;
                             existingDiv.DefaultScoreFormatId = divDto.DefaultScoreFormatId;
-                            existingDiv.Game1ScoreFormatId = divDto.Game1ScoreFormatId;
-                            existingDiv.Game2ScoreFormatId = divDto.Game2ScoreFormatId;
-                            existingDiv.Game3ScoreFormatId = divDto.Game3ScoreFormatId;
                             existingDiv.GamesPerMatch = divDto.GamesPerMatch ?? 1;
                             existingDiv.ScheduleType = divDto.ScheduleType;
                             existingDiv.PoolCount = divDto.PoolCount;
@@ -885,9 +876,6 @@ public class EventsController : ControllerBase
                             MaxPlayers = divDto.MaxPlayers,
                             SortOrder = divDto.SortOrder,
                             DefaultScoreFormatId = divDto.DefaultScoreFormatId,
-                            Game1ScoreFormatId = divDto.Game1ScoreFormatId,
-                            Game2ScoreFormatId = divDto.Game2ScoreFormatId,
-                            Game3ScoreFormatId = divDto.Game3ScoreFormatId,
                             GamesPerMatch = divDto.GamesPerMatch ?? 1,
                             ScheduleType = divDto.ScheduleType,
                             PoolCount = divDto.PoolCount,
@@ -1542,9 +1530,6 @@ public class EventsController : ControllerBase
                 SortOrder = dto.SortOrder > 0 ? dto.SortOrder : maxSortOrder + 1,
                 // Tournament structure
                 DefaultScoreFormatId = dto.DefaultScoreFormatId,
-                Game1ScoreFormatId = dto.Game1ScoreFormatId,
-                Game2ScoreFormatId = dto.Game2ScoreFormatId,
-                Game3ScoreFormatId = dto.Game3ScoreFormatId,
                 GamesPerMatch = dto.GamesPerMatch ?? 1,
                 ScheduleType = dto.ScheduleType,
                 PoolCount = dto.PoolCount,
@@ -1611,9 +1596,6 @@ public class EventsController : ControllerBase
                     LookingForPartnerCount = 0,
                     // Tournament structure
                     DefaultScoreFormatId = division.DefaultScoreFormatId,
-                    Game1ScoreFormatId = division.Game1ScoreFormatId,
-                    Game2ScoreFormatId = division.Game2ScoreFormatId,
-                    Game3ScoreFormatId = division.Game3ScoreFormatId,
                     PoolCount = division.PoolCount,
                     PoolSize = division.PoolSize,
                     ScheduleType = division.ScheduleType,
@@ -1685,9 +1667,6 @@ public class EventsController : ControllerBase
 
             // Tournament structure fields
             if (dto.DefaultScoreFormatId.HasValue) division.DefaultScoreFormatId = dto.DefaultScoreFormatId;
-            if (dto.Game1ScoreFormatId.HasValue) division.Game1ScoreFormatId = dto.Game1ScoreFormatId;
-            if (dto.Game2ScoreFormatId.HasValue) division.Game2ScoreFormatId = dto.Game2ScoreFormatId;
-            if (dto.Game3ScoreFormatId.HasValue) division.Game3ScoreFormatId = dto.Game3ScoreFormatId;
             if (dto.PoolCount.HasValue) division.PoolCount = dto.PoolCount;
             if (dto.PoolSize.HasValue) division.PoolSize = dto.PoolSize;
             if (dto.ScheduleType != null) division.ScheduleType = dto.ScheduleType;
@@ -1731,9 +1710,6 @@ public class EventsController : ControllerBase
                     RegisteredPlayerCount = registeredPlayerCount,
                     // Tournament structure
                     DefaultScoreFormatId = division.DefaultScoreFormatId,
-                    Game1ScoreFormatId = division.Game1ScoreFormatId,
-                    Game2ScoreFormatId = division.Game2ScoreFormatId,
-                    Game3ScoreFormatId = division.Game3ScoreFormatId,
                     PoolCount = division.PoolCount,
                     PoolSize = division.PoolSize,
                     ScheduleType = division.ScheduleType,

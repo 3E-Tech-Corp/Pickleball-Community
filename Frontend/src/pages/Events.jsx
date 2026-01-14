@@ -2171,10 +2171,7 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
       poolSize: division.poolSize || '',
       playoffFromPools: division.playoffFromPools || '',
       gamesPerMatch: division.gamesPerMatch || 1,
-      defaultScoreFormatId: division.defaultScoreFormatId || null,
-      game1ScoreFormatId: division.game1ScoreFormatId || null,
-      game2ScoreFormatId: division.game2ScoreFormatId || null,
-      game3ScoreFormatId: division.game3ScoreFormatId || null
+      defaultScoreFormatId: division.defaultScoreFormatId || null
     });
     setShowEditDivision(true);
   };
@@ -2199,10 +2196,7 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
         poolSize: editingDivision.poolSize ? parseInt(editingDivision.poolSize) : null,
         playoffFromPools: editingDivision.playoffFromPools ? parseInt(editingDivision.playoffFromPools) : null,
         gamesPerMatch: editingDivision.gamesPerMatch ? parseInt(editingDivision.gamesPerMatch) : 1,
-        defaultScoreFormatId: editingDivision.defaultScoreFormatId ? parseInt(editingDivision.defaultScoreFormatId) : null,
-        game1ScoreFormatId: editingDivision.game1ScoreFormatId ? parseInt(editingDivision.game1ScoreFormatId) : null,
-        game2ScoreFormatId: editingDivision.game2ScoreFormatId ? parseInt(editingDivision.game2ScoreFormatId) : null,
-        game3ScoreFormatId: editingDivision.game3ScoreFormatId ? parseInt(editingDivision.game3ScoreFormatId) : null
+        defaultScoreFormatId: editingDivision.defaultScoreFormatId ? parseInt(editingDivision.defaultScoreFormatId) : null
       };
 
       const response = await eventsApi.updateDivision(event.id, editingDivision.id, updateData);
@@ -2250,10 +2244,7 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
         poolSize: editingDivision.poolSize ? parseInt(editingDivision.poolSize) : null,
         playoffFromPools: editingDivision.playoffFromPools ? parseInt(editingDivision.playoffFromPools) : null,
         gamesPerMatch: editingDivision.gamesPerMatch ? parseInt(editingDivision.gamesPerMatch) : 1,
-        defaultScoreFormatId: editingDivision.defaultScoreFormatId ? parseInt(editingDivision.defaultScoreFormatId) : null,
-        game1ScoreFormatId: editingDivision.game1ScoreFormatId ? parseInt(editingDivision.game1ScoreFormatId) : null,
-        game2ScoreFormatId: editingDivision.game2ScoreFormatId ? parseInt(editingDivision.game2ScoreFormatId) : null,
-        game3ScoreFormatId: editingDivision.game3ScoreFormatId ? parseInt(editingDivision.game3ScoreFormatId) : null
+        defaultScoreFormatId: editingDivision.defaultScoreFormatId ? parseInt(editingDivision.defaultScoreFormatId) : null
       };
 
       let successCount = 0;
@@ -2415,9 +2406,6 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
         teamUnitId: d.teamUnitId || null,
         skillLevelId: d.skillLevelId || null,
         defaultScoreFormatId: d.defaultScoreFormatId || null,
-        game1ScoreFormatId: d.game1ScoreFormatId || null,
-        game2ScoreFormatId: d.game2ScoreFormatId || null,
-        game3ScoreFormatId: d.game3ScoreFormatId || null,
         gamesPerMatch: d.gamesPerMatch ? parseInt(d.gamesPerMatch) : 1,
         scheduleType: d.scheduleType || null,
         poolCount: d.poolCount ? parseInt(d.poolCount) : null,
@@ -5670,105 +5658,22 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
                   </select>
                 </div>
 
-                {/* Single game format - shown when not Best of 3/5 */}
-                {(!editingDivision.gamesPerMatch || parseInt(editingDivision.gamesPerMatch) === 1) && (
-                  <div className="mt-3">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Default Game Format</label>
-                    <select
-                      value={editingDivision.defaultScoreFormatId || ''}
-                      onChange={(e) => setEditingDivision({ ...editingDivision, defaultScoreFormatId: e.target.value ? parseInt(e.target.value) : null })}
-                      className="w-full border border-gray-300 rounded-lg p-2"
-                    >
-                      <option value="">Use event default</option>
-                      {scoreFormats.map(format => (
-                        <option key={format.id} value={format.id}>
-                          {format.name} ({format.pointsToWin} pts, win by {format.winByPoints})
-                        </option>
-                      ))}
-                    </select>
-                    <p className="text-xs text-gray-500 mt-1">Override the event's default game format for this division</p>
-                  </div>
-                )}
-
-                {/* Per-game format selection - shown when Best of 3 or 5 */}
-                {editingDivision.gamesPerMatch && parseInt(editingDivision.gamesPerMatch) > 1 && (
-                  <div className="mt-3 space-y-3">
-                    <label className="block text-sm font-medium text-gray-700">Game Formats</label>
-                    <p className="text-xs text-gray-500">Set different formats for each game in the match</p>
-
-                    {/* Game 1 */}
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium w-16">Game 1:</span>
-                      <select
-                        value={editingDivision.game1ScoreFormatId || editingDivision.defaultScoreFormatId || ''}
-                        onChange={(e) => setEditingDivision({ ...editingDivision, game1ScoreFormatId: e.target.value ? parseInt(e.target.value) : null })}
-                        className="flex-1 border border-gray-300 rounded-lg p-2 text-sm"
-                      >
-                        <option value="">Use default</option>
-                        {scoreFormats.map(format => (
-                          <option key={format.id} value={format.id}>
-                            {format.name} ({format.pointsToWin} pts)
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {/* Game 2 */}
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium w-16">Game 2:</span>
-                      <select
-                        value={editingDivision.game2ScoreFormatId || editingDivision.defaultScoreFormatId || ''}
-                        onChange={(e) => setEditingDivision({ ...editingDivision, game2ScoreFormatId: e.target.value ? parseInt(e.target.value) : null })}
-                        className="flex-1 border border-gray-300 rounded-lg p-2 text-sm"
-                      >
-                        <option value="">Use default</option>
-                        {scoreFormats.map(format => (
-                          <option key={format.id} value={format.id}>
-                            {format.name} ({format.pointsToWin} pts)
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {/* Game 3 (Tiebreaker) */}
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium w-16">{parseInt(editingDivision.gamesPerMatch) === 3 ? 'Game 3:' : 'Game 3:'}</span>
-                      <select
-                        value={editingDivision.game3ScoreFormatId || editingDivision.defaultScoreFormatId || ''}
-                        onChange={(e) => setEditingDivision({ ...editingDivision, game3ScoreFormatId: e.target.value ? parseInt(e.target.value) : null })}
-                        className="flex-1 border border-gray-300 rounded-lg p-2 text-sm"
-                      >
-                        <option value="">Use default</option>
-                        {scoreFormats.filter(f => f.isTiebreaker || true).map(format => (
-                          <option key={format.id} value={format.id}>
-                            {format.name} ({format.pointsToWin} pts){format.isTiebreaker ? ' - Tiebreaker' : ''}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {parseInt(editingDivision.gamesPerMatch) === 3 && (
-                      <p className="text-xs text-gray-500 italic">Game 3 is the tiebreaker - often uses a shorter format</p>
-                    )}
-
-                    {/* Default format for reference */}
-                    <div className="mt-2 pt-2 border-t">
-                      <label className="block text-xs font-medium text-gray-500 mb-1">Default Format (fallback)</label>
-                      <select
-                        value={editingDivision.defaultScoreFormatId || ''}
-                        onChange={(e) => setEditingDivision({ ...editingDivision, defaultScoreFormatId: e.target.value ? parseInt(e.target.value) : null })}
-                        className="w-full border border-gray-300 rounded-lg p-2 text-sm"
-                      >
-                        <option value="">Use event default</option>
-                        {scoreFormats.map(format => (
-                          <option key={format.id} value={format.id}>
-                            {format.name} ({format.pointsToWin} pts, win by {format.winByPoints})
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-                )}
+                <div className="mt-3">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Default Game Format</label>
+                  <select
+                    value={editingDivision.defaultScoreFormatId || ''}
+                    onChange={(e) => setEditingDivision({ ...editingDivision, defaultScoreFormatId: e.target.value ? parseInt(e.target.value) : null })}
+                    className="w-full border border-gray-300 rounded-lg p-2"
+                  >
+                    <option value="">Use event default</option>
+                    {scoreFormats.map(format => (
+                      <option key={format.id} value={format.id}>
+                        {format.name} ({format.pointsToWin} pts, win by {format.winByPoints})
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-gray-500 mt-1">Applied to all games when created. Individual game formats can be edited later.</p>
+                </div>
               </div>
 
               {/* Schedule Status Display */}
