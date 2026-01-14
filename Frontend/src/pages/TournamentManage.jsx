@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
   ArrowLeft, Users, Trophy, Calendar, Clock, MapPin, Play, Check, X,
   ChevronDown, ChevronUp, RefreshCw, Shuffle, Settings, Target,
-  AlertCircle, Loader2, Plus, Edit2, DollarSign, Eye, Share2
+  AlertCircle, Loader2, Plus, Edit2, DollarSign, Eye, Share2, LayoutGrid
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { tournamentApi, eventsApi, getSharedAssetUrl } from '../services/api';
@@ -305,7 +305,7 @@ export default function TournamentManage() {
       <div className="bg-white border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex overflow-x-auto">
-            {['overview', 'divisions', 'courts', 'schedule', 'checkin', 'scoring'].map(tab => (
+            {['overview', 'divisions', 'courts', 'schedule', 'checkin', 'scoring', 'gameday'].map(tab => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
@@ -315,7 +315,7 @@ export default function TournamentManage() {
                     : 'border-transparent text-gray-500 hover:text-gray-700'
                 }`}
               >
-                {tab === 'checkin' ? 'Check-in' : tab.charAt(0).toUpperCase() + tab.slice(1)}
+                {tab === 'checkin' ? 'Check-in' : tab === 'gameday' ? 'Game Day' : tab.charAt(0).toUpperCase() + tab.slice(1)}
               </button>
             ))}
           </div>
@@ -999,6 +999,71 @@ export default function TournamentManage() {
                 Players submit and confirm scores from their Events page. When a score is disputed,
                 the tournament director can manually enter the correct score.
               </p>
+            </div>
+          </div>
+        )}
+
+        {/* Game Day Tab */}
+        {activeTab === 'gameday' && (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-gray-900">Game Day Manager</h2>
+            </div>
+
+            {/* Game Day Manager Link Card */}
+            <Link
+              to={`/gameday/${eventId}/manage`}
+              className="block bg-white border border-gray-200 rounded-lg p-6 hover:border-blue-300 hover:shadow-md transition-all"
+            >
+              <div className="flex items-center gap-4">
+                <div className="p-4 bg-blue-100 rounded-xl">
+                  <Play className="w-8 h-8 text-blue-600" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-lg font-semibold text-gray-900">Open Game Day Manager</h3>
+                  <p className="text-gray-600 mt-1">
+                    Manage live games, courts, and real-time scoring during the event
+                  </p>
+                </div>
+                <ChevronDown className="w-5 h-5 text-gray-400 rotate-[-90deg]" />
+              </div>
+            </Link>
+
+            {/* Quick Info */}
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="bg-white border border-gray-200 rounded-lg p-4">
+                <h3 className="font-medium text-gray-900 mb-3 flex items-center gap-2">
+                  <LayoutGrid className="w-5 h-5 text-gray-500" />
+                  Game Day Features
+                </h3>
+                <ul className="space-y-2 text-sm text-gray-600">
+                  <li className="flex items-center gap-2">
+                    <Check className="w-4 h-4 text-green-500" />
+                    Create and manage ad-hoc games
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="w-4 h-4 text-green-500" />
+                    Assign games to courts in real-time
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="w-4 h-4 text-green-500" />
+                    Live score tracking and updates
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="w-4 h-4 text-green-500" />
+                    View games by court or division
+                  </li>
+                </ul>
+              </div>
+
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <h3 className="font-medium text-blue-900 mb-3">When to Use</h3>
+                <p className="text-sm text-blue-700">
+                  Use the Game Day Manager during your tournament for quick game creation,
+                  court assignments, and live scoring. This is ideal for managing the flow of
+                  games on event day.
+                </p>
+              </div>
             </div>
           </div>
         )}

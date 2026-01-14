@@ -7,6 +7,7 @@ public class ScoreMethodDto
 {
     public int Id { get; set; }
     public string Name { get; set; } = string.Empty;
+    public string? ShortCode { get; set; }
     public string? Description { get; set; }
     public string BaseType { get; set; } = "Rally"; // Classic or Rally
     public int SortOrder { get; set; }
@@ -17,6 +18,7 @@ public class ScoreMethodDto
 public class CreateScoreMethodDto
 {
     public string Name { get; set; } = string.Empty;
+    public string? ShortCode { get; set; }
     public string? Description { get; set; }
     public string BaseType { get; set; } = "Rally";
     public int SortOrder { get; set; } = 0;
@@ -27,6 +29,7 @@ public class CreateScoreMethodDto
 public class UpdateScoreMethodDto
 {
     public string? Name { get; set; }
+    public string? ShortCode { get; set; }
     public string? Description { get; set; }
     public string? BaseType { get; set; }
     public int? SortOrder { get; set; }
@@ -53,6 +56,15 @@ public class ScoreFormatDto
     public int? TimeLimitMinutes { get; set; }
     public bool IsTiebreaker { get; set; }
     public bool IsDefault { get; set; }
+    public bool IsPreset { get; set; }
+    public bool IsActive { get; set; }
+    public int SortOrder { get; set; }
+    public int? EventId { get; set; }
+
+    /// <summary>
+    /// Short display string like "Rally 11-2" or "Rally 15-2 cap 19"
+    /// </summary>
+    public string ShortDisplay { get; set; } = string.Empty;
 }
 
 public class CreateScoreFormatRequest
@@ -68,6 +80,43 @@ public class CreateScoreFormatRequest
     public int? MidpointScore { get; set; }
     public int? TimeLimitMinutes { get; set; }
     public bool? IsTiebreaker { get; set; }
+    public bool? IsPreset { get; set; }
+    public int? EventId { get; set; }
+    public int? SortOrder { get; set; }
+}
+
+public class UpdateScoreFormatRequest
+{
+    public string? Name { get; set; }
+    public string? Description { get; set; }
+    public int? ScoreMethodId { get; set; }
+    public string? ScoringType { get; set; }
+    public int? MaxPoints { get; set; }
+    public int? WinByMargin { get; set; }
+    public int? CapAfter { get; set; }
+    public bool? SwitchEndsAtMidpoint { get; set; }
+    public int? MidpointScore { get; set; }
+    public int? TimeLimitMinutes { get; set; }
+    public bool? IsTiebreaker { get; set; }
+    public bool? IsActive { get; set; }
+    public bool? IsDefault { get; set; }
+    public int? SortOrder { get; set; }
+}
+
+/// <summary>
+/// Request to find an existing format or create a new one if not found
+/// </summary>
+public class FindOrCreateScoreFormatRequest
+{
+    public int? ScoreMethodId { get; set; }
+    public int MaxPoints { get; set; } = 11;
+    public int WinByMargin { get; set; } = 2;
+    public int CapAfter { get; set; } = 0;
+    public bool SwitchEndsAtMidpoint { get; set; } = false;
+    public int? MidpointScore { get; set; }
+    public int? TimeLimitMinutes { get; set; }
+    public bool IsTiebreaker { get; set; } = false;
+    public int? EventId { get; set; } // For event-specific formats
 }
 
 // ============================================
@@ -142,6 +191,14 @@ public class EventUnitMemberDto
     public DateTime? CheckedInAt { get; set; }
     // For join requests - the request ID (null for regular members)
     public int? JoinRequestId { get; set; }
+
+    // Member-level payment info
+    public bool HasPaid { get; set; }
+    public DateTime? PaidAt { get; set; }
+    public decimal AmountPaid { get; set; }
+    public string? PaymentProofUrl { get; set; }
+    public string? PaymentReference { get; set; }
+    public string? ReferenceId { get; set; }
 }
 
 public class CreateUnitRequest
@@ -161,6 +218,13 @@ public class JoinUnitRequest
 public class MoveRegistrationRequest
 {
     public int NewDivisionId { get; set; }
+}
+
+public class SelfMoveDivisionRequest
+{
+    public int NewDivisionId { get; set; }
+    public int? JoinUnitId { get; set; } // If set, join this existing unit; otherwise create new
+    public string? NewUnitName { get; set; } // Optional name for new unit if creating
 }
 
 public class MergeRegistrationsRequest
@@ -576,6 +640,7 @@ public class EventDivisionDetailDto
     public decimal? DivisionFee { get; set; }
     public int? MaxUnits { get; set; }
     public int RegisteredCount { get; set; }
+    public int CompletedCount { get; set; }
     public int WaitlistedCount { get; set; }
     public bool IsFull { get; set; }
     public bool HasWaitlist => WaitlistedCount > 0;
@@ -600,4 +665,27 @@ public class PaymentInfoDto
     public string? PaymentReference { get; set; }
     public string? ReferenceId { get; set; }
     public DateTime? PaidAt { get; set; }
+}
+
+public class MemberPaymentDto
+{
+    public int UserId { get; set; }
+    public string? FirstName { get; set; }
+    public string? LastName { get; set; }
+    public bool HasPaid { get; set; }
+    public DateTime? PaidAt { get; set; }
+    public decimal AmountPaid { get; set; }
+    public string? PaymentProofUrl { get; set; }
+    public string? PaymentReference { get; set; }
+    public string? ReferenceId { get; set; }
+    public string? UnitPaymentStatus { get; set; }
+}
+
+public class UpdateMemberPaymentRequest
+{
+    public bool? HasPaid { get; set; }
+    public decimal? AmountPaid { get; set; }
+    public string? PaymentProofUrl { get; set; }
+    public string? PaymentReference { get; set; }
+    public string? ReferenceId { get; set; }
 }

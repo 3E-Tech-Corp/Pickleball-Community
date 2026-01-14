@@ -64,6 +64,7 @@ public class ScoreMethodsController : ControllerBase
                 {
                     Id = s.Id,
                     Name = s.Name,
+                    ShortCode = s.ShortCode,
                     Description = s.Description,
                     BaseType = s.BaseType,
                     SortOrder = s.SortOrder,
@@ -98,6 +99,7 @@ public class ScoreMethodsController : ControllerBase
                 {
                     Id = method.Id,
                     Name = method.Name,
+                    ShortCode = method.ShortCode,
                     Description = method.Description,
                     BaseType = method.BaseType,
                     SortOrder = method.SortOrder,
@@ -141,6 +143,7 @@ public class ScoreMethodsController : ControllerBase
             var method = new ScoreMethod
             {
                 Name = dto.Name,
+                ShortCode = dto.ShortCode,
                 Description = dto.Description,
                 BaseType = dto.BaseType,
                 SortOrder = dto.SortOrder,
@@ -158,6 +161,7 @@ public class ScoreMethodsController : ControllerBase
                 {
                     Id = method.Id,
                     Name = method.Name,
+                    ShortCode = method.ShortCode,
                     Description = method.Description,
                     BaseType = method.BaseType,
                     SortOrder = method.SortOrder,
@@ -212,6 +216,9 @@ public class ScoreMethodsController : ControllerBase
             if (!string.IsNullOrEmpty(dto.Name))
                 method.Name = dto.Name;
 
+            if (dto.ShortCode != null)
+                method.ShortCode = dto.ShortCode;
+
             if (dto.Description != null)
                 method.Description = dto.Description;
 
@@ -235,6 +242,7 @@ public class ScoreMethodsController : ControllerBase
                 {
                     Id = method.Id,
                     Name = method.Name,
+                    ShortCode = method.ShortCode,
                     Description = method.Description,
                     BaseType = method.BaseType,
                     SortOrder = method.SortOrder,

@@ -4,11 +4,11 @@ using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
 using System.Text.Json;
 using System.Text.RegularExpressions;
-using Pickleball.College.Database;
-using Pickleball.College.Models.Entities;
-using Pickleball.College.Models.DTOs;
+using Pickleball.Community.Database;
+using Pickleball.Community.Models.Entities;
+using Pickleball.Community.Models.DTOs;
 
-namespace Pickleball.College.API.Controllers;
+namespace Pickleball.Community.API.Controllers;
 
 [ApiController]
 [Route("[controller]")]
@@ -579,10 +579,11 @@ public class NotificationTemplatesController : ControllerBase
             }
 
             var currentUserId = GetCurrentUserId();
+            var content = defaultContent.Value;
 
-            template.Subject = defaultContent.Subject;
-            template.Body = defaultContent.Body;
-            template.Placeholders = defaultContent.Placeholders;
+            template.Subject = content.Subject;
+            template.Body = content.Body;
+            template.Placeholders = content.Placeholders;
             template.UpdatedAt = DateTime.UtcNow;
             template.UpdatedByUserId = currentUserId;
 

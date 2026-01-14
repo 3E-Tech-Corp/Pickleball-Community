@@ -164,6 +164,24 @@ public class TournamentController : ControllerBase
             .Select(g => new { g.Key.DivisionId, g.Key.Status, Count = g.Count() })
             .ToListAsync();
 
+        // Get completed unit counts per division (for MaxUnits check)
+        var completedUnitCounts = await _context.EventUnits
+            .Include(u => u.Members)
+            .Include(u => u.Division)
+                .ThenInclude(d => d!.TeamUnit)
+            .Where(u => u.EventId == eventId && u.Status != "Cancelled" && u.Status != "Waitlisted")
+            .ToListAsync();
+
+        var completedCountsByDivision = completedUnitCounts
+            .GroupBy(u => u.DivisionId)
+            .ToDictionary(
+                g => g.Key,
+                g => g.Count(u => {
+                    var teamSize = u.Division?.TeamUnit?.TotalPlayers ?? u.Division?.TeamSize ?? 1;
+                    return u.Members.Count(m => m.InviteStatus == "Accepted") >= teamSize;
+                })
+            );
+
         // Get user's registrations
         var userRegistrations = userId.HasValue
             ? await _context.EventUnitMembers
@@ -223,6 +241,7 @@ public class TournamentController : ControllerBase
                     .Where(r => r.DivisionId == d.Id && r.Status == "Waitlisted")
                     .Sum(r => r.Count);
 
+                var completedCount = completedCountsByDivision.GetValueOrDefault(d.Id, 0);
                 return new EventDivisionDetailDto
                 {
                     Id = d.Id,
@@ -236,8 +255,9 @@ public class TournamentController : ControllerBase
                     DivisionFee = d.DivisionFee,
                     MaxUnits = d.MaxUnits,
                     RegisteredCount = regCount,
+                    CompletedCount = completedCount,
                     WaitlistedCount = waitlistCount,
-                    IsFull = d.MaxUnits.HasValue && regCount >= d.MaxUnits.Value,
+                    IsFull = d.MaxUnits.HasValue && completedCount >= d.MaxUnits.Value,
                     LookingForPartner = incompleteUnits.ContainsKey(d.Id)
                         ? incompleteUnits[d.Id].Select(u => MapToUnitDto(u)).ToList()
                         : new List<EventUnitDto>()
@@ -349,11 +369,35 @@ public class TournamentController : ControllerBase
             var teamSize = division.TeamUnit?.TotalPlayers ?? division.TeamSize;
             var isSingles = teamSize == 1;
 
-            // Check capacity
-            var currentCount = await _context.EventUnits
-                .CountAsync(u => u.DivisionId == divisionId && u.Status != "Cancelled" && u.Status != "Waitlisted");
+            // Check MaxPlayers capacity (more accurate than MaxUnits for incomplete teams)
+            if (division.MaxPlayers.HasValue)
+            {
+                var currentPlayerCount = await _context.EventUnitMembers
+                    .Include(m => m.Unit)
+                    .CountAsync(m => m.Unit!.DivisionId == divisionId &&
+                        m.Unit.EventId == eventId &&
+                        m.Unit.Status != "Cancelled" &&
+                        m.InviteStatus == "Accepted");
 
-            var isWaitlisted = division.MaxUnits.HasValue && currentCount >= division.MaxUnits.Value;
+                if (currentPlayerCount >= division.MaxPlayers.Value)
+                {
+                    return BadRequest(new ApiResponse<List<EventUnitDto>>
+                    {
+                        Success = false,
+                        Message = $"Division '{division.Name}' has reached its maximum player limit of {division.MaxPlayers.Value} players."
+                    });
+                }
+            }
+
+            // Check MaxUnits capacity - only count completed units
+            var completedUnitCount = await _context.EventUnits
+                .Include(u => u.Members)
+                .CountAsync(u => u.DivisionId == divisionId &&
+                    u.Status != "Cancelled" &&
+                    u.Status != "Waitlisted" &&
+                    u.Members.Count(m => m.InviteStatus == "Accepted") >= teamSize);
+
+            var isWaitlisted = division.MaxUnits.HasValue && completedUnitCount >= division.MaxUnits.Value;
 
             // Create unit
             var unitName = isSingles
@@ -487,6 +531,26 @@ public class TournamentController : ControllerBase
 
         if (currentMembers >= teamSize)
             return BadRequest(new ApiResponse<UnitJoinRequestDto> { Success = false, Message = "Unit is already full" });
+
+        // Check MaxPlayers capacity for the division
+        if (unit.Division?.MaxPlayers.HasValue == true)
+        {
+            var currentPlayerCount = await _context.EventUnitMembers
+                .Include(m => m.Unit)
+                .CountAsync(m => m.Unit!.DivisionId == unit.DivisionId &&
+                    m.Unit.EventId == unit.EventId &&
+                    m.Unit.Status != "Cancelled" &&
+                    m.InviteStatus == "Accepted");
+
+            if (currentPlayerCount >= unit.Division.MaxPlayers.Value)
+            {
+                return BadRequest(new ApiResponse<UnitJoinRequestDto>
+                {
+                    Success = false,
+                    Message = $"Division '{unit.Division.Name}' has reached its maximum player limit of {unit.Division.MaxPlayers.Value} players."
+                });
+            }
+        }
 
         // Check for existing request to this specific unit
         var existingToUnit = await _context.EventUnitJoinRequests
@@ -668,6 +732,32 @@ public class TournamentController : ControllerBase
 
         if (joinRequest.Unit?.CaptainUserId != userId.Value)
             return Forbid();
+
+        // If accepting, check MaxPlayers capacity first
+        if (request.Accept)
+        {
+            var division = await _context.EventDivisions
+                .FirstOrDefaultAsync(d => d.Id == joinRequest.Unit.DivisionId);
+
+            if (division?.MaxPlayers.HasValue == true)
+            {
+                var currentPlayerCount = await _context.EventUnitMembers
+                    .Include(m => m.Unit)
+                    .CountAsync(m => m.Unit!.DivisionId == division.Id &&
+                        m.Unit.EventId == joinRequest.Unit.EventId &&
+                        m.Unit.Status != "Cancelled" &&
+                        m.InviteStatus == "Accepted");
+
+                if (currentPlayerCount >= division.MaxPlayers.Value)
+                {
+                    return BadRequest(new ApiResponse<bool>
+                    {
+                        Success = false,
+                        Message = $"Cannot accept request. Division '{division.Name}' has reached its maximum player limit of {division.MaxPlayers.Value} players."
+                    });
+                }
+            }
+        }
 
         joinRequest.Status = request.Accept ? "Accepted" : "Declined";
         joinRequest.ResponseMessage = request.Message;
@@ -1036,6 +1126,19 @@ public class TournamentController : ControllerBase
             unit.PaymentStatus = "PendingVerification";
         }
 
+        // Mark the submitting user's member record as paid and copy payment details
+        var memberRecord = unit.Members.FirstOrDefault(m => m.UserId == userId.Value);
+        if (memberRecord != null)
+        {
+            memberRecord.HasPaid = true;
+            memberRecord.PaidAt = DateTime.Now;
+            memberRecord.AmountPaid = request.AmountPaid ?? 0;
+            memberRecord.PaymentProofUrl = unit.PaymentProofUrl;
+            memberRecord.PaymentReference = unit.PaymentReference;
+            // Generate member-specific ReferenceId (not copied from unit)
+            memberRecord.ReferenceId = $"E{eventId}-U{unitId}-P{userId.Value}";
+        }
+
         unit.UpdatedAt = DateTime.Now;
         await _context.SaveChangesAsync();
 
@@ -1071,6 +1174,7 @@ public class TournamentController : ControllerBase
         var unit = await _context.EventUnits
             .Include(u => u.Event)
             .Include(u => u.Division)
+            .Include(u => u.Members)
             .FirstOrDefaultAsync(u => u.Id == unitId && u.EventId == eventId);
 
         if (unit == null)
@@ -1087,6 +1191,13 @@ public class TournamentController : ControllerBase
         unit.AmountPaid = amountDue;
         unit.PaidAt = DateTime.Now;
         unit.UpdatedAt = DateTime.Now;
+
+        // Mark all members as paid when organizer marks the whole unit as paid
+        foreach (var member in unit.Members)
+        {
+            member.HasPaid = true;
+            member.PaidAt = DateTime.Now;
+        }
 
         await _context.SaveChangesAsync();
 
@@ -1122,6 +1233,7 @@ public class TournamentController : ControllerBase
         var unit = await _context.EventUnits
             .Include(u => u.Event)
             .Include(u => u.Division)
+            .Include(u => u.Members)
             .FirstOrDefaultAsync(u => u.Id == unitId && u.EventId == eventId);
 
         if (unit == null)
@@ -1147,6 +1259,13 @@ public class TournamentController : ControllerBase
         unit.PaidAt = null;
         unit.UpdatedAt = DateTime.Now;
 
+        // Reset all member payment status
+        foreach (var member in unit.Members)
+        {
+            member.HasPaid = false;
+            member.PaidAt = null;
+        }
+
         await _context.SaveChangesAsync();
 
         return Ok(new ApiResponse<PaymentInfoDto>
@@ -1164,6 +1283,285 @@ public class TournamentController : ControllerBase
                 PaidAt = unit.PaidAt
             },
             Message = "Payment unmarked"
+        });
+    }
+
+    /// <summary>
+    /// Mark a specific member as paid (organizer/admin only)
+    /// </summary>
+    [Authorize]
+    [HttpPost("events/{eventId}/units/{unitId}/members/{memberId}/mark-paid")]
+    public async Task<ActionResult<ApiResponse<MemberPaymentDto>>> MarkMemberAsPaid(int eventId, int unitId, int memberId)
+    {
+        var userId = GetUserId();
+        if (!userId.HasValue)
+            return Unauthorized(new ApiResponse<MemberPaymentDto> { Success = false, Message = "Unauthorized" });
+
+        var unit = await _context.EventUnits
+            .Include(u => u.Event)
+            .Include(u => u.Division)
+            .Include(u => u.Members)
+            .FirstOrDefaultAsync(u => u.Id == unitId && u.EventId == eventId);
+
+        if (unit == null)
+            return NotFound(new ApiResponse<MemberPaymentDto> { Success = false, Message = "Registration not found" });
+
+        // Only organizer or site admin can mark as paid
+        var isAdmin = await IsAdminAsync();
+        if (unit.Event?.OrganizedByUserId != userId.Value && !isAdmin)
+            return Forbid();
+
+        var member = unit.Members.FirstOrDefault(m => m.UserId == memberId);
+        if (member == null)
+            return NotFound(new ApiResponse<MemberPaymentDto> { Success = false, Message = "Member not found in unit" });
+
+        var memberCount = unit.Members.Count;
+        var amountDue = (unit.Event?.RegistrationFee ?? 0m) + (unit.Division?.DivisionFee ?? 0m);
+        var perMemberAmount = memberCount > 0 ? amountDue / memberCount : amountDue;
+
+        // Mark this specific member as paid
+        member.HasPaid = true;
+        member.PaidAt = DateTime.Now;
+        member.AmountPaid = perMemberAmount;
+        if (string.IsNullOrEmpty(member.ReferenceId))
+        {
+            member.ReferenceId = $"E{eventId}-U{unitId}-P{memberId}";
+        }
+
+        // Update unit-level payment status based on all members
+        var allMembersPaid = unit.Members.All(m => m.HasPaid);
+        var anyMemberPaid = unit.Members.Any(m => m.HasPaid);
+
+        if (allMembersPaid)
+        {
+            unit.PaymentStatus = "Paid";
+            unit.AmountPaid = amountDue;
+            unit.PaidAt = DateTime.Now;
+        }
+        else if (anyMemberPaid)
+        {
+            unit.PaymentStatus = "Partial";
+            unit.AmountPaid = unit.Members.Where(m => m.HasPaid).Sum(m => m.AmountPaid);
+        }
+        unit.UpdatedAt = DateTime.Now;
+
+        await _context.SaveChangesAsync();
+
+        // Get member user info
+        var memberUser = await _context.Users.FirstOrDefaultAsync(u => u.Id == memberId);
+
+        return Ok(new ApiResponse<MemberPaymentDto>
+        {
+            Success = true,
+            Data = new MemberPaymentDto
+            {
+                UserId = member.UserId,
+                FirstName = memberUser?.FirstName,
+                LastName = memberUser?.LastName,
+                HasPaid = member.HasPaid,
+                PaidAt = member.PaidAt,
+                AmountPaid = member.AmountPaid,
+                PaymentProofUrl = member.PaymentProofUrl,
+                PaymentReference = member.PaymentReference,
+                ReferenceId = member.ReferenceId,
+                UnitPaymentStatus = unit.PaymentStatus
+            },
+            Message = "Member marked as paid"
+        });
+    }
+
+    /// <summary>
+    /// Unmark a specific member's payment (organizer/admin only)
+    /// </summary>
+    [Authorize]
+    [HttpPost("events/{eventId}/units/{unitId}/members/{memberId}/unmark-paid")]
+    public async Task<ActionResult<ApiResponse<MemberPaymentDto>>> UnmarkMemberPaid(int eventId, int unitId, int memberId)
+    {
+        var userId = GetUserId();
+        if (!userId.HasValue)
+            return Unauthorized(new ApiResponse<MemberPaymentDto> { Success = false, Message = "Unauthorized" });
+
+        var unit = await _context.EventUnits
+            .Include(u => u.Event)
+            .Include(u => u.Division)
+            .Include(u => u.Members)
+            .FirstOrDefaultAsync(u => u.Id == unitId && u.EventId == eventId);
+
+        if (unit == null)
+            return NotFound(new ApiResponse<MemberPaymentDto> { Success = false, Message = "Registration not found" });
+
+        // Only organizer or site admin can unmark payment
+        var isAdmin = await IsAdminAsync();
+        if (unit.Event?.OrganizedByUserId != userId.Value && !isAdmin)
+            return Forbid();
+
+        var member = unit.Members.FirstOrDefault(m => m.UserId == memberId);
+        if (member == null)
+            return NotFound(new ApiResponse<MemberPaymentDto> { Success = false, Message = "Member not found in unit" });
+
+        // Reset this member's payment
+        member.HasPaid = false;
+        member.PaidAt = null;
+        member.AmountPaid = 0;
+        // Keep ReferenceId, PaymentProofUrl, PaymentReference for records
+
+        // Update unit-level payment status based on all members
+        var allMembersPaid = unit.Members.All(m => m.HasPaid);
+        var anyMemberPaid = unit.Members.Any(m => m.HasPaid);
+        var amountDue = (unit.Event?.RegistrationFee ?? 0m) + (unit.Division?.DivisionFee ?? 0m);
+
+        if (allMembersPaid)
+        {
+            unit.PaymentStatus = "Paid";
+            unit.AmountPaid = amountDue;
+        }
+        else if (anyMemberPaid)
+        {
+            unit.PaymentStatus = "Partial";
+            unit.AmountPaid = unit.Members.Where(m => m.HasPaid).Sum(m => m.AmountPaid);
+        }
+        else if (!string.IsNullOrEmpty(unit.PaymentProofUrl))
+        {
+            unit.PaymentStatus = "PendingVerification";
+            unit.AmountPaid = 0;
+        }
+        else
+        {
+            unit.PaymentStatus = "Pending";
+            unit.AmountPaid = 0;
+        }
+        unit.PaidAt = allMembersPaid ? unit.PaidAt : null;
+        unit.UpdatedAt = DateTime.Now;
+
+        await _context.SaveChangesAsync();
+
+        // Get member user info
+        var memberUser = await _context.Users.FirstOrDefaultAsync(u => u.Id == memberId);
+
+        return Ok(new ApiResponse<MemberPaymentDto>
+        {
+            Success = true,
+            Data = new MemberPaymentDto
+            {
+                UserId = member.UserId,
+                FirstName = memberUser?.FirstName,
+                LastName = memberUser?.LastName,
+                HasPaid = member.HasPaid,
+                PaidAt = member.PaidAt,
+                AmountPaid = member.AmountPaid,
+                PaymentProofUrl = member.PaymentProofUrl,
+                PaymentReference = member.PaymentReference,
+                ReferenceId = member.ReferenceId,
+                UnitPaymentStatus = unit.PaymentStatus
+            },
+            Message = "Member payment unmarked"
+        });
+    }
+
+    /// <summary>
+    /// Update a member's payment info (organizer/admin only)
+    /// </summary>
+    [Authorize]
+    [HttpPut("events/{eventId}/units/{unitId}/members/{memberId}/payment")]
+    public async Task<ActionResult<ApiResponse<MemberPaymentDto>>> UpdateMemberPayment(
+        int eventId, int unitId, int memberId, [FromBody] UpdateMemberPaymentRequest request)
+    {
+        var userId = GetUserId();
+        if (!userId.HasValue)
+            return Unauthorized(new ApiResponse<MemberPaymentDto> { Success = false, Message = "Unauthorized" });
+
+        var unit = await _context.EventUnits
+            .Include(u => u.Event)
+            .Include(u => u.Division)
+            .Include(u => u.Members)
+            .FirstOrDefaultAsync(u => u.Id == unitId && u.EventId == eventId);
+
+        if (unit == null)
+            return NotFound(new ApiResponse<MemberPaymentDto> { Success = false, Message = "Registration not found" });
+
+        // Only organizer or site admin can update payment info
+        var isAdmin = await IsAdminAsync();
+        if (unit.Event?.OrganizedByUserId != userId.Value && !isAdmin)
+            return Forbid();
+
+        var member = unit.Members.FirstOrDefault(m => m.UserId == memberId);
+        if (member == null)
+            return NotFound(new ApiResponse<MemberPaymentDto> { Success = false, Message = "Member not found in unit" });
+
+        // Update member payment fields
+        if (request.PaymentReference != null)
+            member.PaymentReference = request.PaymentReference;
+        if (request.PaymentProofUrl != null)
+            member.PaymentProofUrl = request.PaymentProofUrl;
+        if (request.AmountPaid.HasValue)
+            member.AmountPaid = request.AmountPaid.Value;
+        if (request.ReferenceId != null)
+            member.ReferenceId = request.ReferenceId;
+
+        // If marking as paid
+        if (request.HasPaid.HasValue)
+        {
+            member.HasPaid = request.HasPaid.Value;
+            if (request.HasPaid.Value && !member.PaidAt.HasValue)
+            {
+                member.PaidAt = DateTime.Now;
+            }
+            else if (!request.HasPaid.Value)
+            {
+                member.PaidAt = null;
+            }
+        }
+
+        // Update unit-level payment status based on all members
+        var allMembersPaid = unit.Members.All(m => m.HasPaid);
+        var anyMemberPaid = unit.Members.Any(m => m.HasPaid);
+        var amountDue = (unit.Event?.RegistrationFee ?? 0m) + (unit.Division?.DivisionFee ?? 0m);
+
+        if (allMembersPaid)
+        {
+            unit.PaymentStatus = "Paid";
+            unit.AmountPaid = amountDue;
+            unit.PaidAt = DateTime.Now;
+        }
+        else if (anyMemberPaid)
+        {
+            unit.PaymentStatus = "Partial";
+            unit.AmountPaid = unit.Members.Where(m => m.HasPaid).Sum(m => m.AmountPaid);
+        }
+        else if (unit.Members.Any(m => !string.IsNullOrEmpty(m.PaymentProofUrl)))
+        {
+            unit.PaymentStatus = "PendingVerification";
+            unit.AmountPaid = 0;
+        }
+        else
+        {
+            unit.PaymentStatus = "Pending";
+            unit.AmountPaid = 0;
+        }
+        unit.UpdatedAt = DateTime.Now;
+
+        await _context.SaveChangesAsync();
+
+        // Get member user info
+        var memberUser = await _context.Users.FirstOrDefaultAsync(u => u.Id == memberId);
+
+        return Ok(new ApiResponse<MemberPaymentDto>
+        {
+            Success = true,
+            Data = new MemberPaymentDto
+            {
+                UserId = member.UserId,
+                FirstName = memberUser?.FirstName,
+                LastName = memberUser?.LastName,
+                HasPaid = member.HasPaid,
+                PaidAt = member.PaidAt,
+                AmountPaid = member.AmountPaid,
+                PaymentProofUrl = member.PaymentProofUrl,
+                PaymentReference = member.PaymentReference,
+                ReferenceId = member.ReferenceId,
+                UnitPaymentStatus = unit.PaymentStatus
+            },
+            Message = "Payment info updated"
         });
     }
 
@@ -1246,6 +1644,209 @@ public class TournamentController : ControllerBase
         await _context.SaveChangesAsync();
 
         return Ok(new ApiResponse<bool> { Success = true, Data = true, Message = "Registration moved to new division" });
+    }
+
+    /// <summary>
+    /// Allow a player to move themselves to a different division.
+    /// Handles leaving current unit and either creating new unit or joining existing one.
+    /// </summary>
+    [Authorize]
+    [HttpPost("events/{eventId}/self-move-division")]
+    public async Task<ActionResult<ApiResponse<EventUnitDto>>> SelfMoveToDivision(int eventId, [FromBody] SelfMoveDivisionRequest request)
+    {
+        var userId = GetUserId();
+        if (!userId.HasValue)
+            return Unauthorized(new ApiResponse<EventUnitDto> { Success = false, Message = "Unauthorized" });
+
+        var evt = await _context.Events
+            .Include(e => e.Divisions)
+                .ThenInclude(d => d.TeamUnit)
+            .FirstOrDefaultAsync(e => e.Id == eventId && e.IsActive);
+        if (evt == null)
+            return NotFound(new ApiResponse<EventUnitDto> { Success = false, Message = "Event not found" });
+
+        // Verify target division exists
+        var targetDivision = evt.Divisions.FirstOrDefault(d => d.Id == request.NewDivisionId && d.IsActive);
+        if (targetDivision == null)
+            return NotFound(new ApiResponse<EventUnitDto> { Success = false, Message = "Target division not found" });
+
+        // Find user's current unit in this event
+        var currentMembership = await _context.EventUnitMembers
+            .Include(m => m.Unit)
+                .ThenInclude(u => u.Members)
+            .FirstOrDefaultAsync(m => m.UserId == userId.Value &&
+                m.Unit!.EventId == eventId &&
+                m.Unit.Status != "Cancelled" &&
+                m.InviteStatus == "Accepted");
+
+        if (currentMembership == null)
+            return BadRequest(new ApiResponse<EventUnitDto> { Success = false, Message = "You are not registered for this event" });
+
+        var currentUnit = currentMembership.Unit!;
+
+        // Check if already in target division
+        if (currentUnit.DivisionId == request.NewDivisionId)
+            return BadRequest(new ApiResponse<EventUnitDto> { Success = false, Message = "You are already in this division" });
+
+        // Check if already registered in target division
+        var alreadyInTarget = await _context.EventUnitMembers
+            .Include(m => m.Unit)
+            .AnyAsync(m => m.UserId == userId.Value &&
+                m.Unit!.DivisionId == request.NewDivisionId &&
+                m.Unit.Status != "Cancelled" &&
+                m.InviteStatus == "Accepted");
+        if (alreadyInTarget)
+            return BadRequest(new ApiResponse<EventUnitDto> { Success = false, Message = "You are already registered in the target division" });
+
+        EventUnit? targetUnit = null;
+        var teamSize = targetDivision.TeamUnit?.TotalPlayers ?? 2;
+
+        // Option 1: Join an existing unit
+        if (request.JoinUnitId.HasValue)
+        {
+            targetUnit = await _context.EventUnits
+                .Include(u => u.Members)
+                .Include(u => u.Division)
+                    .ThenInclude(d => d!.TeamUnit)
+                .FirstOrDefaultAsync(u => u.Id == request.JoinUnitId.Value &&
+                    u.DivisionId == request.NewDivisionId &&
+                    u.Status != "Cancelled");
+
+            if (targetUnit == null)
+                return NotFound(new ApiResponse<EventUnitDto> { Success = false, Message = "Target unit not found in that division" });
+
+            var targetTeamSize = targetUnit.Division?.TeamUnit?.TotalPlayers ?? 2;
+            var acceptedMembers = targetUnit.Members.Count(m => m.InviteStatus == "Accepted");
+            if (acceptedMembers >= targetTeamSize)
+                return BadRequest(new ApiResponse<EventUnitDto> { Success = false, Message = "Target unit is already full" });
+        }
+
+        // Remove player from current unit
+        _context.EventUnitMembers.Remove(currentMembership);
+
+        // Handle current unit after player leaves
+        var remainingMembers = currentUnit.Members.Where(m => m.Id != currentMembership.Id && m.InviteStatus == "Accepted").ToList();
+        if (remainingMembers.Count == 0)
+        {
+            // No members left - delete the unit
+            currentUnit.Status = "Cancelled";
+        }
+        else if (currentUnit.CaptainUserId == userId.Value)
+        {
+            // Player was captain - assign new captain to first remaining member
+            currentUnit.CaptainUserId = remainingMembers.First().UserId;
+        }
+
+        // Option 1: Join existing unit
+        if (targetUnit != null)
+        {
+            var newMembership = new EventUnitMember
+            {
+                UnitId = targetUnit.Id,
+                UserId = userId.Value,
+                Role = "Player",
+                InviteStatus = "Accepted",
+                CreatedAt = DateTime.Now
+            };
+            _context.EventUnitMembers.Add(newMembership);
+
+            await _context.SaveChangesAsync();
+
+            // Reload for response
+            targetUnit = await _context.EventUnits
+                .Include(u => u.Members).ThenInclude(m => m.User)
+                .Include(u => u.Division).ThenInclude(d => d!.TeamUnit)
+                .Include(u => u.Captain)
+                .Include(u => u.Event)
+                .FirstOrDefaultAsync(u => u.Id == targetUnit.Id);
+
+            return Ok(new ApiResponse<EventUnitDto>
+            {
+                Success = true,
+                Data = MapToUnitDto(targetUnit!),
+                Message = "Successfully moved to new division and joined existing team"
+            });
+        }
+
+        // Option 2: Create a new unit
+        var newUnit = new EventUnit
+        {
+            EventId = eventId,
+            DivisionId = request.NewDivisionId,
+            Name = request.NewUnitName,
+            CaptainUserId = userId.Value,
+            Status = "Registered",
+            CreatedAt = DateTime.Now,
+            UpdatedAt = DateTime.Now
+        };
+        _context.EventUnits.Add(newUnit);
+        await _context.SaveChangesAsync();
+
+        // Add player as member
+        var captainMembership = new EventUnitMember
+        {
+            UnitId = newUnit.Id,
+            UserId = userId.Value,
+            Role = "Captain",
+            InviteStatus = "Accepted",
+            CreatedAt = DateTime.Now
+        };
+        _context.EventUnitMembers.Add(captainMembership);
+        await _context.SaveChangesAsync();
+
+        // Reload for response
+        newUnit = await _context.EventUnits
+            .Include(u => u.Members).ThenInclude(m => m.User)
+            .Include(u => u.Division).ThenInclude(d => d!.TeamUnit)
+            .Include(u => u.Captain)
+            .Include(u => u.Event)
+            .FirstOrDefaultAsync(u => u.Id == newUnit.Id);
+
+        return Ok(new ApiResponse<EventUnitDto>
+        {
+            Success = true,
+            Data = MapToUnitDto(newUnit!),
+            Message = "Successfully moved to new division with new team"
+        });
+    }
+
+    /// <summary>
+    /// Get incomplete units in a division that a player can join
+    /// </summary>
+    [Authorize]
+    [HttpGet("events/{eventId}/divisions/{divisionId}/joinable-units")]
+    public async Task<ActionResult<ApiResponse<List<EventUnitDto>>>> GetJoinableUnits(int eventId, int divisionId)
+    {
+        var userId = GetUserId();
+        if (!userId.HasValue)
+            return Unauthorized(new ApiResponse<List<EventUnitDto>> { Success = false, Message = "Unauthorized" });
+
+        var division = await _context.EventDivisions
+            .Include(d => d.TeamUnit)
+            .FirstOrDefaultAsync(d => d.Id == divisionId && d.EventId == eventId && d.IsActive);
+
+        if (division == null)
+            return NotFound(new ApiResponse<List<EventUnitDto>> { Success = false, Message = "Division not found" });
+
+        var teamSize = division.TeamUnit?.TotalPlayers ?? 2;
+
+        // Find units that are incomplete (fewer accepted members than team size)
+        var units = await _context.EventUnits
+            .Include(u => u.Members).ThenInclude(m => m.User)
+            .Include(u => u.Division).ThenInclude(d => d!.TeamUnit)
+            .Include(u => u.Captain)
+            .Where(u => u.DivisionId == divisionId &&
+                u.EventId == eventId &&
+                u.Status != "Cancelled" &&
+                u.Members.Count(m => m.InviteStatus == "Accepted") < teamSize)
+            .OrderBy(u => u.CreatedAt)
+            .ToListAsync();
+
+        return Ok(new ApiResponse<List<EventUnitDto>>
+        {
+            Success = true,
+            Data = units.Select(MapToUnitDto).ToList()
+        });
     }
 
     /// <summary>
@@ -2399,7 +3000,14 @@ public class TournamentController : ControllerBase
                     InviteStatus = m.InviteStatus,
                     IsCheckedIn = m.IsCheckedIn,
                     CheckedInAt = m.CheckedInAt,
-                    JoinRequestId = null
+                    JoinRequestId = null,
+                    // Member-level payment info
+                    HasPaid = m.HasPaid,
+                    PaidAt = m.PaidAt,
+                    AmountPaid = m.AmountPaid,
+                    PaymentProofUrl = m.PaymentProofUrl,
+                    PaymentReference = m.PaymentReference,
+                    ReferenceId = m.ReferenceId
                 }).Concat(
                     pendingJoinRequests.Select(jr => new EventUnitMemberDto
                     {

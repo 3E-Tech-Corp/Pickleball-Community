@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, DollarSign, Upload, CheckCircle, AlertCircle, Loader2, Image, ExternalLink, Copy, Check } from 'lucide-react';
+import { X, DollarSign, Upload, CheckCircle, AlertCircle, Loader2, Image, ExternalLink, Copy, Check, FileText } from 'lucide-react';
 import { useToast } from '../contexts/ToastContext';
 import { tournamentApi, sharedAssetApi, getSharedAssetUrl } from '../services/api';
 
@@ -12,12 +12,22 @@ export default function PaymentModal({ isOpen, onClose, registration, event, onP
   const [previewImage, setPreviewImage] = useState(null);
   const [paymentAmount, setPaymentAmount] = useState('');
   const [copied, setCopied] = useState(false);
+  const [proofUrlCopied, setProofUrlCopied] = useState(false);
+
+  // Helper to check if URL is a PDF
+  const isPdfUrl = (url) => {
+    if (!url) return false;
+    const lowercaseUrl = url.toLowerCase();
+    return lowercaseUrl.endsWith('.pdf') || lowercaseUrl.includes('.pdf?');
+  };
 
   useEffect(() => {
     if (registration) {
       setPaymentReference(registration.paymentReference || '');
       setPaymentProofUrl(registration.paymentProofUrl || '');
-      setPreviewImage(registration.paymentProofUrl || null);
+      // Only set preview image for non-PDF files
+      const proofUrl = registration.paymentProofUrl || '';
+      setPreviewImage(proofUrl && !isPdfUrl(proofUrl) ? proofUrl : null);
       // Initialize payment amount to remaining balance
       const remaining = (registration.amountDue || 0) - (registration.amountPaid || 0);
       setPaymentAmount(remaining > 0 ? remaining.toFixed(2) : '');
@@ -37,7 +47,22 @@ export default function PaymentModal({ isOpen, onClose, registration, event, onP
     }
   };
 
+  const handleCopyProofUrl = async () => {
+    try {
+      await navigator.clipboard.writeText(paymentProofUrl);
+      setProofUrlCopied(true);
+      toast.success('Proof URL copied to clipboard');
+      setTimeout(() => setProofUrlCopied(false), 2000);
+    } catch (err) {
+      toast.error('Failed to copy');
+    }
+  };
+
   if (!isOpen || !registration) return null;
+
+  // Find current user's member record to check their payment status
+  const currentMember = registration.members?.find(m => m.userId === userId);
+  const memberHasPaid = currentMember?.hasPaid || false;
 
   const amountDue = registration.amountDue || 0;
   const amountPaid = registration.amountPaid || 0;
@@ -163,45 +188,116 @@ export default function PaymentModal({ isOpen, onClose, registration, event, onP
           {/* Payment Summary */}
           <div className="space-y-2">
             <div className="flex justify-between">
-              <span className="text-gray-600">Registration Fee (per team):</span>
+              <span className="text-gray-600">Registration Fee:</span>
               <span className="font-medium">${amountDue.toFixed(2)}</span>
             </div>
-            {amountPaid > 0 && (
+            {(memberHasPaid && currentMember?.amountPaid > 0) ? (
+              <div className="flex justify-between text-green-600">
+                <span>Your Payment:</span>
+                <span className="font-medium">${currentMember.amountPaid.toFixed(2)}</span>
+              </div>
+            ) : amountPaid > 0 && (
               <div className="flex justify-between text-green-600">
                 <span>Amount Paid:</span>
-                <span className="font-medium">-${amountPaid.toFixed(2)}</span>
+                <span className="font-medium">${amountPaid.toFixed(2)}</span>
               </div>
             )}
-            <div className="flex justify-between border-t pt-2">
-              <span className="font-medium">Amount Due:</span>
-              <span className={`font-bold ${remainingAmount > 0 ? 'text-orange-600' : 'text-green-600'}`}>
-                ${remainingAmount.toFixed(2)}
-              </span>
-            </div>
           </div>
 
-          {/* Status Badge */}
+          {/* Status Badge - show member's payment status */}
           <div className={`flex items-center gap-2 p-3 rounded-lg ${
-            isPaid ? 'bg-green-50 text-green-700' :
-            registration.paymentStatus === 'PendingVerification' ? 'bg-blue-50 text-blue-700' :
-            registration.paymentStatus === 'Partial' ? 'bg-yellow-50 text-yellow-700' :
+            memberHasPaid ? 'bg-green-50 text-green-700' :
             'bg-orange-50 text-orange-700'
           }`}>
-            {isPaid ? (
+            {memberHasPaid ? (
               <CheckCircle className="w-5 h-5" />
             ) : (
               <AlertCircle className="w-5 h-5" />
             )}
             <span className="font-medium">
-              {isPaid ? 'Payment Complete' :
-               registration.paymentStatus === 'PendingVerification' ? 'Awaiting Verification' :
-               registration.paymentStatus === 'Partial' ? 'Partial Payment' :
-               'Payment Required'}
+              {memberHasPaid ? 'Your Payment Submitted' : 'Payment Required'}
             </span>
           </div>
 
-          {/* Payment Form (only if not fully paid) */}
-          {!isPaid && (
+          {/* Show member's payment details if they have paid */}
+          {memberHasPaid && currentMember && (
+            <div className="space-y-3 border-t pt-4">
+              <h3 className="font-medium text-gray-900">Your Payment Details</h3>
+
+              {currentMember.paidAt && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600">Paid On:</span>
+                  <span className="font-medium">{new Date(currentMember.paidAt).toLocaleDateString()}</span>
+                </div>
+              )}
+
+              {currentMember.referenceId && (
+                <div className="text-sm">
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-600">Reference ID:</span>
+                    <button
+                      onClick={handleCopyReferenceId}
+                      className="text-orange-600 hover:text-orange-700"
+                    >
+                      {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                    </button>
+                  </div>
+                  <code className="block mt-1 bg-gray-100 rounded px-2 py-1 text-xs font-mono">
+                    {currentMember.referenceId}
+                  </code>
+                </div>
+              )}
+
+              {currentMember.paymentReference && (
+                <div className="text-sm">
+                  <span className="text-gray-600">Payment Reference:</span>
+                  <div className="mt-1 text-gray-700">{currentMember.paymentReference}</div>
+                </div>
+              )}
+
+              {currentMember.paymentProofUrl && (
+                <div className="text-sm">
+                  <span className="text-gray-600">Payment Proof:</span>
+                  <div className="mt-2 border rounded-lg p-3 bg-gray-50">
+                    {isPdfUrl(currentMember.paymentProofUrl) ? (
+                      <div className="flex flex-col items-center gap-2">
+                        <FileText className="w-10 h-10 text-red-500" />
+                        <a
+                          href={getSharedAssetUrl(currentMember.paymentProofUrl)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-orange-600 hover:text-orange-700 flex items-center gap-1"
+                        >
+                          <ExternalLink className="w-4 h-4" />
+                          View PDF
+                        </a>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center gap-2">
+                        <img
+                          src={getSharedAssetUrl(currentMember.paymentProofUrl)}
+                          alt="Payment proof"
+                          className="max-h-32 rounded-lg object-contain"
+                        />
+                        <a
+                          href={getSharedAssetUrl(currentMember.paymentProofUrl)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-orange-600 hover:text-orange-700 flex items-center gap-1 text-xs"
+                        >
+                          <ExternalLink className="w-4 h-4" />
+                          View Full Size
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Payment Form (only if member hasn't paid yet) */}
+          {!memberHasPaid && (
             <form onSubmit={handleSubmit} className="space-y-4">
               {/* Reference ID for Payment */}
               <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
@@ -272,6 +368,11 @@ export default function PaymentModal({ isOpen, onClose, registration, event, onP
                     </div>
                   ) : paymentProofUrl ? (
                     <div className="space-y-2">
+                      {isPdfUrl(paymentProofUrl) && (
+                        <div className="flex justify-center">
+                          <FileText className="w-12 h-12 text-red-500" />
+                        </div>
+                      )}
                       <a
                         href={paymentProofUrl}
                         target="_blank"
@@ -279,7 +380,7 @@ export default function PaymentModal({ isOpen, onClose, registration, event, onP
                         className="text-orange-600 hover:text-orange-700 flex items-center justify-center gap-1"
                       >
                         <ExternalLink className="w-4 h-4" />
-                        View Uploaded File
+                        {isPdfUrl(paymentProofUrl) ? 'View PDF' : 'View Uploaded File'}
                       </a>
                       <button
                         type="button"
@@ -348,13 +449,6 @@ export default function PaymentModal({ isOpen, onClose, registration, event, onP
                 )}
               </button>
             </form>
-          )}
-
-          {/* Already Paid Info */}
-          {isPaid && registration.paidAt && (
-            <div className="text-sm text-gray-500 text-center">
-              Paid on {new Date(registration.paidAt).toLocaleDateString()}
-            </div>
           )}
         </div>
       </div>

@@ -1,0 +1,44 @@
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+
+namespace Pickleball.Community.Models.Entities;
+
+/// <summary>
+/// Event-specific waiver document that players must sign
+/// </summary>
+public class EventWaiver
+{
+    public int Id { get; set; }
+
+    public int EventId { get; set; }
+
+    [Required]
+    [MaxLength(200)]
+    public string Title { get; set; } = string.Empty;
+
+    [Required]
+    public string Content { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Version number for tracking waiver updates
+    /// </summary>
+    public int Version { get; set; } = 1;
+
+    /// <summary>
+    /// Whether signing this waiver is required to participate
+    /// </summary>
+    public bool IsRequired { get; set; } = true;
+
+    public bool IsActive { get; set; } = true;
+
+    public DateTime CreatedAt { get; set; } = DateTime.Now;
+    public DateTime UpdatedAt { get; set; } = DateTime.Now;
+    public int? CreatedByUserId { get; set; }
+
+    // Navigation
+    [ForeignKey("EventId")]
+    public Event? Event { get; set; }
+
+    [ForeignKey("CreatedByUserId")]
+    public User? CreatedBy { get; set; }
+}

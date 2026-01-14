@@ -153,8 +153,8 @@ public class SharedAuthService : ISharedAuthService
             {
                 Id = sharedUser.Id,  // Use the shared UserId
                 Email = sharedUser.Email,
-                FirstName = sharedUser.FirstName,
-                LastName = sharedUser.LastName,
+                FirstName = !string.IsNullOrEmpty(sharedUser.FirstName) ? sharedUser.FirstName : "New",
+                LastName = !string.IsNullOrEmpty(sharedUser.LastName) ? sharedUser.LastName : "User",
                 Phone = sharedUser.Phone,
                 ProfileImageUrl = sharedUser.ProfileImageUrl,
                 Role = "Player",  // Default role for new users
@@ -233,8 +233,8 @@ public class SharedAuthService : ISharedAuthService
         {
             Id = sharedUserId,
             Email = email,
-            FirstName = firstName,
-            LastName = lastName,
+            FirstName = !string.IsNullOrEmpty(firstName) ? firstName : "New",
+            LastName = !string.IsNullOrEmpty(lastName) ? lastName : "User",
             Role = "Player",
             PasswordHash = null,
             IsActive = true,

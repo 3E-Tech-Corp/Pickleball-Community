@@ -110,6 +110,9 @@ public class UserRegistrationInfoDto
     public bool NeedsPartner { get; set; } = false;
     public List<PartnerInfoDto> Partners { get; set; } = new();
 
+    // All members with payment data
+    public List<TeamMemberDto> Members { get; set; } = new();
+
     // Captain info - for managing join requests
     public bool IsCaptain { get; set; } = false;
     public List<UnitJoinRequestInfoDto> PendingJoinRequests { get; set; } = new();
@@ -158,6 +161,7 @@ public class EventDivisionDto
     public decimal? MinSkillRating { get; set; }
     public decimal? MaxSkillRating { get; set; }
     public int? MaxUnits { get; set; }
+    public int? MaxPlayers { get; set; }
 
     // Legacy fields (for backward compatibility)
     public int TeamSize { get; set; } = 1;
@@ -170,6 +174,7 @@ public class EventDivisionDto
     public decimal? DivisionFee { get; set; }
     public int SortOrder { get; set; }
     public int RegisteredCount { get; set; }
+    public int RegisteredPlayerCount { get; set; }
     public int LookingForPartnerCount { get; set; }
     public int WaitlistedCount { get; set; }
 
@@ -196,6 +201,7 @@ public class UpdateDivisionDto
     public int? AgeGroupId { get; set; }
     public int? SkillLevelId { get; set; }
     public int? MaxUnits { get; set; }
+    public int? MaxPlayers { get; set; }
     public decimal? DivisionFee { get; set; }
 
     // Tournament structure
@@ -297,6 +303,7 @@ public class CreateEventDto
     public string? PaymentInstructions { get; set; }
     public int? OrganizedByClubId { get; set; }
     public int? MaxParticipants { get; set; }
+    public int? DefaultScoreFormatId { get; set; }
     public List<CreateEventDivisionDto> Divisions { get; set; } = new();
 }
 
@@ -313,6 +320,7 @@ public class CreateEventDivisionDto
     public decimal? MinSkillRating { get; set; }
     public decimal? MaxSkillRating { get; set; }
     public int? MaxUnits { get; set; }
+    public int? MaxPlayers { get; set; }
 
     // Legacy fields (for backward compatibility)
     public int TeamSize { get; set; } = 1;
@@ -324,6 +332,14 @@ public class CreateEventDivisionDto
 
     public decimal? DivisionFee { get; set; }
     public int SortOrder { get; set; } = 0;
+
+    // Tournament structure
+    public int? DefaultScoreFormatId { get; set; }
+    public int? GamesPerMatch { get; set; }
+    public string? ScheduleType { get; set; }
+    public int? PoolCount { get; set; }
+    public int? PoolSize { get; set; }
+    public int? PlayoffFromPools { get; set; }
 
     // Rewards to create with this division
     public List<CreateDivisionRewardDto> Rewards { get; set; } = new();
@@ -456,6 +472,12 @@ public class TeamMemberDto
     public string Role { get; set; } = "Player"; // Captain or Player
     public string InviteStatus { get; set; } = "Accepted"; // Pending, Accepted, Declined
     public bool IsCurrentUser { get; set; }
+    public bool HasPaid { get; set; } = false;
+    public DateTime? PaidAt { get; set; }
+    public decimal AmountPaid { get; set; } = 0;
+    public string? PaymentProofUrl { get; set; }
+    public string? PaymentReference { get; set; }
+    public string? ReferenceId { get; set; }
 }
 
 // Featured events for home page

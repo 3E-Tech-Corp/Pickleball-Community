@@ -668,7 +668,6 @@ export const notificationTemplateApi = {
     api.post(`/notificationtemplates/${id}/reset`)
 }
 
-export default api
 // Venues API (formerly Courts - places with pickleball courts)
 export const venuesApi = {
   // Search venues with filters
@@ -1072,6 +1071,33 @@ export const scoreMethodsApi = {
   delete: (id) => api.delete(`/scoremethods/${id}`)
 }
 
+// Score Formats API (Game format presets)
+export const scoreFormatsApi = {
+  // Get all score formats (presets by default)
+  getAll: ({ includeInactive = false, presetsOnly = true, eventId = null } = {}) => {
+    const params = new URLSearchParams();
+    if (includeInactive) params.append('includeInactive', 'true');
+    if (!presetsOnly) params.append('presetsOnly', 'false');
+    if (eventId) params.append('eventId', eventId);
+    return api.get(`/scoreformats?${params.toString()}`);
+  },
+
+  // Get single score format
+  getById: (id) => api.get(`/scoreformats/${id}`),
+
+  // Create new score format (Admin only for presets)
+  create: (data) => api.post('/scoreformats', data),
+
+  // Update score format (Admin only for presets)
+  update: (id, data) => api.put(`/scoreformats/${id}`, data),
+
+  // Delete score format (Admin only for presets)
+  delete: (id) => api.delete(`/scoreformats/${id}`),
+
+  // Find existing format or create new one
+  findOrCreate: (data) => api.post('/scoreformats/find-or-create', data)
+}
+
 // Blog API
 export const blogApi = {
   // Categories (public for active only, admin for all)
@@ -1353,6 +1379,12 @@ export const tournamentApi = {
   mergeRegistrations: (eventId, targetUnitId, sourceUnitId) =>
     api.post(`/tournament/events/${eventId}/registrations/merge`, { targetUnitId, sourceUnitId }),
 
+  // Player self-move to different division
+  selfMoveToDivision: (eventId, newDivisionId, joinUnitId = null, newUnitName = null) =>
+    api.post(`/tournament/events/${eventId}/self-move-division`, { newDivisionId, joinUnitId, newUnitName }),
+  getJoinableUnits: (eventId, divisionId) =>
+    api.get(`/tournament/events/${eventId}/divisions/${divisionId}/joinable-units`),
+
   // Payment
   uploadPaymentProof: (eventId, unitId, data) =>
     api.post(`/tournament/events/${eventId}/units/${unitId}/payment`, data),
@@ -1360,6 +1392,12 @@ export const tournamentApi = {
     api.post(`/tournament/events/${eventId}/units/${unitId}/mark-paid`),
   unmarkPaid: (eventId, unitId) =>
     api.post(`/tournament/events/${eventId}/units/${unitId}/unmark-paid`),
+  markMemberAsPaid: (eventId, unitId, memberId) =>
+    api.post(`/tournament/events/${eventId}/units/${unitId}/members/${memberId}/mark-paid`),
+  unmarkMemberPaid: (eventId, unitId, memberId) =>
+    api.post(`/tournament/events/${eventId}/units/${unitId}/members/${memberId}/unmark-paid`),
+  updateMemberPayment: (eventId, unitId, memberId, data) =>
+    api.put(`/tournament/events/${eventId}/units/${unitId}/members/${memberId}/payment`, data),
 
   // Tournament Courts
   getTournamentCourts: (eventId) => api.get(`/tournament/events/${eventId}/courts`),
@@ -1771,6 +1809,39 @@ export const playerHistoryApi = {
   getRatingTypes: () => api.get('/api/player-history/rating-types')
 }
 
+// Help Topics API (dynamic contextual help)
+export const helpApi = {
+  // Public - Get help topic by code
+  getByCode: (topicCode) => api.get(`/helptopics/code/${topicCode}`),
+
+  // Public - Get multiple help topics by codes (batch)
+  getBatch: (topicCodes) => api.post('/helptopics/batch', topicCodes),
+
+  // Public - Get help topics by category
+  getByCategory: (category) => api.get(`/helptopics/category/${category}`),
+
+  // Admin - Get all help topics
+  getAll: (category = null) => {
+    const params = category ? `?category=${category}` : '';
+    return api.get(`/helptopics${params}`);
+  },
+
+  // Admin - Get help topic by ID
+  getById: (id) => api.get(`/helptopics/${id}`),
+
+  // Admin - Create help topic
+  create: (data) => api.post('/helptopics', data),
+
+  // Admin - Update help topic
+  update: (id, data) => api.put(`/helptopics/${id}`, data),
+
+  // Admin - Delete help topic
+  delete: (id) => api.delete(`/helptopics/${id}`),
+
+  // Admin - Get all categories
+  getCategories: () => api.get('/helptopics/categories')
+}
+
 // Release Notes API
 export const releaseNotesApi = {
   // Public - Get all active release notes
@@ -1826,6 +1897,121 @@ export const notificationTemplatesApi = {
 
   // Copy default templates to an event for customization
   copyDefaultsToEvent: (eventId) => api.post(`/eventnotificationtemplates/event/${eventId}/copy-defaults`)
+}
+
+// Check-In API (Game Day)
+export const checkInApi = {
+  // Get check-in status for current user
+  getStatus: (eventId) => api.get(`/checkin/status/${eventId}`),
+
+  // Self check-in
+  checkIn: (eventId) => api.post(`/checkin/${eventId}`),
+
+  // Manual check-in by TD
+  manualCheckIn: (eventId, userId, data = {}) => api.post(`/checkin/manual/${eventId}/${userId}`, data),
+
+  // Sign waiver
+  signWaiver: (eventId, waiverId) => api.post(`/checkin/waiver/${eventId}`, { waiverId }),
+
+  // Get event check-in summary (TD view)
+  getEventCheckIns: (eventId) => api.get(`/checkin/event/${eventId}`),
+
+  // Get waivers for event
+  getWaivers: (eventId) => api.get(`/checkin/waivers/${eventId}`),
+
+  // Create waiver (TD)
+  createWaiver: (eventId, data) => api.post(`/checkin/waivers/${eventId}`, data)
+}
+
+// Tournament Game Day API
+export const gameDayApi = {
+  // TD Dashboard
+  getTDDashboard: (eventId) => api.get(`/tournament-gameday/td/${eventId}`),
+
+  // Player Dashboard
+  getPlayerGameDay: (eventId) => api.get(`/tournament-gameday/player/${eventId}`),
+
+  // Get ready games
+  getReadyGames: (eventId, divisionId = null) => {
+    const params = divisionId ? `?divisionId=${divisionId}` : ''
+    return api.get(`/tournament-gameday/ready-games/${eventId}${params}`)
+  },
+
+  // Queue a game to a court
+  queueGame: (gameId, courtId) => api.post('/tournament-gameday/queue-game', { gameId, courtId }),
+
+  // Start a game
+  startGame: (gameId) => api.post(`/tournament-gameday/start-game/${gameId}`),
+
+  // Submit score
+  submitScore: (gameId, unit1Score, unit2Score, finalize = false, reason = null) =>
+    api.post(`/tournament-gameday/score/${gameId}`, { unit1Score, unit2Score, finalize, reason }),
+
+  // Get standings
+  getStandings: (eventId, divisionId) => api.get(`/tournament-gameday/standings/${eventId}/${divisionId}`),
+
+  // Override rank (TD only)
+  overrideRank: (unitId, data) => api.post(`/tournament-gameday/override-rank/${unitId}`, data),
+
+  // Send notification
+  sendNotification: (eventId, data) => api.post(`/tournament-gameday/notify/${eventId}`, data)
+}
+
+// Spectator API
+export const spectatorApi = {
+  // Get subscriptions
+  getSubscriptions: (eventId) => api.get(`/spectator/subscriptions/${eventId}`),
+
+  // Subscribe
+  subscribe: (data) => api.post('/spectator/subscribe', data),
+
+  // Unsubscribe
+  unsubscribe: (subscriptionId) => api.delete(`/spectator/unsubscribe/${subscriptionId}`),
+
+  // Toggle subscription
+  toggleSubscription: (subscriptionId) => api.put(`/spectator/toggle/${subscriptionId}`),
+
+  // Get spectator view
+  getEventView: (eventId) => api.get(`/spectator/event/${eventId}`),
+
+  // Get subscribable items
+  getSubscribableItems: (eventId) => api.get(`/spectator/subscribable/${eventId}`)
+}
+
+// Scoreboard API
+export const scoreboardApi = {
+  // Get scoreboard with filters
+  getScoreboard: (eventId, params = {}) => {
+    const queryParams = new URLSearchParams()
+    if (params.divisionId) queryParams.append('divisionId', params.divisionId)
+    if (params.roundType) queryParams.append('roundType', params.roundType)
+    if (params.status) queryParams.append('status', params.status)
+    if (params.page) queryParams.append('page', params.page)
+    if (params.pageSize) queryParams.append('pageSize', params.pageSize)
+    const queryString = queryParams.toString()
+    return api.get(`/scoreboard/${eventId}${queryString ? `?${queryString}` : ''}`)
+  },
+
+  // Get live scores
+  getLiveScores: (eventId) => api.get(`/scoreboard/live/${eventId}`),
+
+  // Get event results
+  getResults: (eventId, divisionId = null) => {
+    const params = divisionId ? `?divisionId=${divisionId}` : ''
+    return api.get(`/scoreboard/results/${eventId}${params}`)
+  },
+
+  // Download results CSV
+  getResultsDownloadUrl: (eventId, divisionId = null) => {
+    const params = divisionId ? `?divisionId=${divisionId}` : ''
+    return `${API_BASE_URL}/scoreboard/results/${eventId}/download${params}`
+  },
+
+  // Get bracket
+  getBracket: (eventId, divisionId) => api.get(`/scoreboard/bracket/${eventId}/${divisionId}`),
+
+  // Get pools
+  getPools: (eventId, divisionId) => api.get(`/scoreboard/pools/${eventId}/${divisionId}`)
 }
 
 export default api

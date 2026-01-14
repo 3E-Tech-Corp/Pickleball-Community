@@ -40,15 +40,6 @@ public class ApplicationDbContext : DbContext
     // Notification Templates
     public DbSet<NotificationTemplate> NotificationTemplates { get; set; }
 
-    protected override void OnModelCreating(ModelBuilder modelBuilder)
-    {
-        modelBuilder.Entity<User>(entity =>
-        {
-            // UserId comes from shared auth service - not auto-generated
-            entity.Property(u => u.Id).ValueGeneratedNever();
-            entity.HasIndex(u => u.Email).IsUnique();
-            entity.Property(u => u.Role).HasConversion<string>();
-        });
     // Friends
     public DbSet<FriendRequest> FriendRequests { get; set; }
     public DbSet<Friendship> Friendships { get; set; }
@@ -112,6 +103,9 @@ public class ApplicationDbContext : DbContext
     // Site Content
     public DbSet<SiteContent> SiteContents { get; set; }
 
+    // Help Topics
+    public DbSet<HelpTopic> HelpTopics { get; set; }
+
     // Feedback
     public DbSet<FeedbackCategory> FeedbackCategories { get; set; }
     public DbSet<FeedbackEntry> FeedbackEntries { get; set; }
@@ -157,6 +151,12 @@ public class ApplicationDbContext : DbContext
 
     // Event Notification Templates
     public DbSet<EventNotificationTemplate> EventNotificationTemplates { get; set; }
+
+    // Game Day System
+    public DbSet<EventWaiver> EventWaivers { get; set; }
+    public DbSet<EventCheckIn> EventCheckIns { get; set; }
+    public DbSet<SpectatorSubscription> SpectatorSubscriptions { get; set; }
+    public DbSet<GameQueue> GameQueues { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -1421,6 +1421,97 @@ public class ApplicationDbContext : DbContext
                   .WithMany(r => r.DismissedByUsers)
                   .HasForeignKey(d => d.ReleaseNoteId)
                   .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // Event Waiver configuration
+        modelBuilder.Entity<EventWaiver>(entity =>
+        {
+            entity.Property(w => w.Title).IsRequired().HasMaxLength(200);
+            entity.Property(w => w.Content).IsRequired();
+            entity.HasIndex(w => w.EventId);
+            entity.HasIndex(w => w.IsActive);
+
+            entity.HasOne(w => w.Event)
+                  .WithMany()
+                  .HasForeignKey(w => w.EventId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(w => w.CreatedBy)
+                  .WithMany()
+                  .HasForeignKey(w => w.CreatedByUserId)
+                  .OnDelete(DeleteBehavior.NoAction);
+        });
+
+        // Event Check-In configuration
+        modelBuilder.Entity<EventCheckIn>(entity =>
+        {
+            entity.Property(c => c.CheckInMethod).HasMaxLength(20);
+            entity.HasIndex(c => c.EventId);
+            entity.HasIndex(c => c.UserId);
+            entity.HasIndex(c => new { c.EventId, c.UserId }).IsUnique();
+
+            entity.HasOne(c => c.Event)
+                  .WithMany()
+                  .HasForeignKey(c => c.EventId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(c => c.User)
+                  .WithMany()
+                  .HasForeignKey(c => c.UserId)
+                  .OnDelete(DeleteBehavior.NoAction);
+
+            entity.HasOne(c => c.CheckedInBy)
+                  .WithMany()
+                  .HasForeignKey(c => c.CheckedInByUserId)
+                  .OnDelete(DeleteBehavior.NoAction);
+        });
+
+        // Spectator Subscription configuration
+        modelBuilder.Entity<SpectatorSubscription>(entity =>
+        {
+            entity.Property(s => s.SubscriptionType).IsRequired().HasMaxLength(20);
+            entity.HasIndex(s => s.UserId);
+            entity.HasIndex(s => s.EventId);
+            entity.HasIndex(s => new { s.SubscriptionType, s.TargetId });
+
+            entity.HasOne(s => s.User)
+                  .WithMany()
+                  .HasForeignKey(s => s.UserId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(s => s.Event)
+                  .WithMany()
+                  .HasForeignKey(s => s.EventId)
+                  .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // Game Queue configuration
+        modelBuilder.Entity<GameQueue>(entity =>
+        {
+            entity.Property(q => q.Status).HasMaxLength(20);
+            entity.HasIndex(q => q.EventId);
+            entity.HasIndex(q => new { q.TournamentCourtId, q.Status });
+            entity.HasIndex(q => q.GameId);
+
+            entity.HasOne(q => q.Event)
+                  .WithMany()
+                  .HasForeignKey(q => q.EventId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(q => q.TournamentCourt)
+                  .WithMany()
+                  .HasForeignKey(q => q.TournamentCourtId)
+                  .OnDelete(DeleteBehavior.NoAction);
+
+            entity.HasOne(q => q.Game)
+                  .WithMany()
+                  .HasForeignKey(q => q.GameId)
+                  .OnDelete(DeleteBehavior.NoAction);
+
+            entity.HasOne(q => q.QueuedBy)
+                  .WithMany()
+                  .HasForeignKey(q => q.QueuedByUserId)
+                  .OnDelete(DeleteBehavior.NoAction);
         });
     }
 }

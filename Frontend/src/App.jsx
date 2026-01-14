@@ -24,8 +24,12 @@ import FeedbackAdmin from './pages/FeedbackAdmin'
 import Events from './pages/Events'
 import TournamentManage from './pages/TournamentManage'
 import GameDayManage from './pages/GameDayManage'
+import EventManage from './pages/EventManage'
 import EventDashboard from './pages/EventDashboard'
 import EventRunningAdmin from './pages/EventRunningAdmin'
+import TDGameDayDashboard from './pages/TDGameDayDashboard'
+import PlayerGameDay from './pages/PlayerGameDay'
+import EventScoreboard from './pages/EventScoreboard'
 import Venues from './pages/Venues'
 import Clubs from './pages/Clubs'
 import Leagues from './pages/Leagues'
@@ -75,6 +79,11 @@ function App() {
           <GameDayManage />
         </ProtectedRoute>
       } />
+      <Route path="/event/:eventId/manage" element={
+        <ProtectedRoute>
+          <EventManage />
+        </ProtectedRoute>
+      } />
       <Route path="/event-dashboard/:eventId" element={
         <ProtectedRoute>
           <EventDashboard />
@@ -85,6 +94,17 @@ function App() {
           <EventRunningAdmin />
         </ProtectedRoute>
       } />
+      <Route path="/event/:eventId/td-dashboard" element={
+        <ProtectedRoute>
+          <TDGameDayDashboard />
+        </ProtectedRoute>
+      } />
+      <Route path="/event/:eventId/gameday" element={
+        <ProtectedRoute>
+          <PlayerGameDay />
+        </ProtectedRoute>
+      } />
+      <Route path="/event/:eventId/scoreboard" element={<EventScoreboard />} />
       <Route path="/venues" element={<Venues />} />
       <Route path="/courts" element={<Navigate to="/venues" replace />} />
       <Route path="/clubs" element={<Clubs />} />

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
-import { Calendar, MapPin, Clock, Users, Filter, Search, Plus, DollarSign, ChevronLeft, ChevronRight, X, UserPlus, Trophy, Layers, Check, AlertCircle, Navigation, Building2, Loader2, MessageCircle, CheckCircle, Edit3, ChevronDown, ChevronUp, Trash2, List, Map as MapIcon, Image, Upload, Play, Link2, QrCode, Download, ArrowRightLeft, FileText, Eye, EyeOff, ExternalLink, User, GitMerge, ArrowRight } from 'lucide-react';
+import { Calendar, MapPin, Clock, Users, Filter, Search, Plus, DollarSign, ChevronLeft, ChevronRight, X, UserPlus, Trophy, Layers, Check, AlertCircle, Navigation, Building2, Loader2, MessageCircle, CheckCircle, Edit3, ChevronDown, ChevronUp, Trash2, List, Map as MapIcon, Image, Upload, Play, Link2, QrCode, Download, ArrowRightLeft, FileText, Eye, EyeOff, ExternalLink, User, GitMerge, ArrowRight, Copy } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import { eventsApi, eventTypesApi, courtsApi, teamUnitsApi, skillLevelsApi, ageGroupsApi, tournamentApi, sharedAssetApi, getSharedAssetUrl } from '../services/api';
@@ -10,6 +10,7 @@ import { getIconByName } from '../utils/iconMap';
 import { getColorValues } from '../utils/colorMap';
 import PaymentModal from '../components/PaymentModal';
 import AdminPaymentModal from '../components/AdminPaymentModal';
+import MemberPaymentModal from '../components/MemberPaymentModal';
 import PublicProfileModal from '../components/ui/PublicProfileModal';
 
 export default function Events() {
@@ -1639,6 +1640,9 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
   // Admin payment modal state
   const [selectedAdminPaymentUnit, setSelectedAdminPaymentUnit] = useState(null);
 
+  // Member payment view state (for viewing individual member payment details)
+  const [selectedMemberPayment, setSelectedMemberPayment] = useState(null);
+
   // Registration filters state
   const [regFilterDivision, setRegFilterDivision] = useState('');
   const [regFilterStatus, setRegFilterStatus] = useState('');
@@ -1649,6 +1653,15 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
   const [availableUnits, setAvailableUnits] = useState([]);
   const [loadingAvailableUnits, setLoadingAvailableUnits] = useState(false);
   const [joiningUnitId, setJoiningUnitId] = useState(null);
+
+  // Change division state (player self-move)
+  const [changingDivisionReg, setChangingDivisionReg] = useState(null);
+  const [changeDivisionStep, setChangeDivisionStep] = useState('select-division'); // 'select-division' | 'select-action'
+  const [selectedNewDivision, setSelectedNewDivision] = useState(null);
+  const [joinableUnitsInNewDivision, setJoinableUnitsInNewDivision] = useState([]);
+  const [loadingJoinableUnits, setLoadingJoinableUnits] = useState(false);
+  const [movingToDivision, setMovingToDivision] = useState(false);
+  const [newUnitName, setNewUnitName] = useState('');
 
   // Court selection for editing
   const [topCourts, setTopCourts] = useState([]);
@@ -1666,6 +1679,12 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
   const [showEditDivision, setShowEditDivision] = useState(false);
   const [editingDivision, setEditingDivision] = useState(null);
   const [savingDivision, setSavingDivision] = useState(false);
+  const [showCopySettings, setShowCopySettings] = useState(false);
+  const [copyingSettings, setCopyingSettings] = useState(false);
+
+  // Score formats state
+  const [scoreFormats, setScoreFormats] = useState([]);
+  const [loadingScoreFormats, setLoadingScoreFormats] = useState(false);
 
   // Team registration state
   const [showTeamRegistration, setShowTeamRegistration] = useState(false);
@@ -2040,7 +2059,25 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
   };
 
   // Initialize edit form data when entering edit mode
+  // Load score formats for event/division editing
+  const loadScoreFormats = async () => {
+    setLoadingScoreFormats(true);
+    try {
+      const response = await tournamentApi.getScoreFormats();
+      if (response.success) {
+        setScoreFormats(response.data || []);
+      }
+    } catch (err) {
+      console.error('Error loading score formats:', err);
+    } finally {
+      setLoadingScoreFormats(false);
+    }
+  };
+
   const startEditing = () => {
+    // Load score formats when editing
+    loadScoreFormats();
+
     // Extract date and time directly from ISO string without timezone conversion
     const extractDateTime = (isoString) => {
       if (!isoString) return { date: '', time: '' };
@@ -2080,7 +2117,8 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
       isPublished: event.isPublished,
       isPrivate: event.isPrivate,
       allowMultipleDivisions: event.allowMultipleDivisions ?? true,
-      posterImageUrl: event.posterImageUrl || ''
+      posterImageUrl: event.posterImageUrl || '',
+      defaultScoreFormatId: event.defaultScoreFormatId || null
     });
     setSelectedCourt(event.courtId ? {
       courtId: event.courtId,
@@ -2121,13 +2159,19 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
 
   // Open edit division modal
   const handleEditDivision = (division) => {
+    // Load score formats if not already loaded
+    if (scoreFormats.length === 0) {
+      loadScoreFormats();
+    }
+
     setEditingDivision({
       ...division,
       scheduleType: division.scheduleType || '',
       poolCount: division.poolCount || '',
       poolSize: division.poolSize || '',
       playoffFromPools: division.playoffFromPools || '',
-      gamesPerMatch: division.gamesPerMatch || 1
+      gamesPerMatch: division.gamesPerMatch || 1,
+      defaultScoreFormatId: division.defaultScoreFormatId || null
     });
     setShowEditDivision(true);
   };
@@ -2145,17 +2189,29 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
         skillLevelId: editingDivision.skillLevelId || null,
         ageGroupId: editingDivision.ageGroupId || null,
         maxUnits: editingDivision.maxUnits ? parseInt(editingDivision.maxUnits) : null,
+        maxPlayers: editingDivision.maxPlayers ? parseInt(editingDivision.maxPlayers) : null,
         divisionFee: editingDivision.divisionFee ? parseFloat(editingDivision.divisionFee) : null,
         scheduleType: editingDivision.scheduleType || null,
         poolCount: editingDivision.poolCount ? parseInt(editingDivision.poolCount) : null,
         poolSize: editingDivision.poolSize ? parseInt(editingDivision.poolSize) : null,
         playoffFromPools: editingDivision.playoffFromPools ? parseInt(editingDivision.playoffFromPools) : null,
-        gamesPerMatch: editingDivision.gamesPerMatch ? parseInt(editingDivision.gamesPerMatch) : 1
+        gamesPerMatch: editingDivision.gamesPerMatch ? parseInt(editingDivision.gamesPerMatch) : 1,
+        defaultScoreFormatId: editingDivision.defaultScoreFormatId ? parseInt(editingDivision.defaultScoreFormatId) : null
       };
 
       const response = await eventsApi.updateDivision(event.id, editingDivision.id, updateData);
       if (response.success) {
         toast.success('Division updated successfully');
+
+        // Also update editDivisions if we're in edit mode, so changes aren't lost when saving the main form
+        if (editDivisions.length > 0) {
+          setEditDivisions(prev => prev.map(d =>
+            d.id === editingDivision.id
+              ? { ...d, ...editingDivision, ...response.data }
+              : d
+          ));
+        }
+
         setShowEditDivision(false);
         setEditingDivision(null);
         // Reload full event to get updated divisions and pass to onUpdate
@@ -2173,6 +2229,46 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
       toast.error('Failed to update division');
     } finally {
       setSavingDivision(false);
+    }
+  };
+
+  // Copy match settings to other divisions
+  const handleCopySettingsToOther = async (targetDivisionIds) => {
+    if (!editingDivision || targetDivisionIds.length === 0) return;
+
+    setCopyingSettings(true);
+    try {
+      const matchSettings = {
+        scheduleType: editingDivision.scheduleType || null,
+        poolCount: editingDivision.poolCount ? parseInt(editingDivision.poolCount) : null,
+        poolSize: editingDivision.poolSize ? parseInt(editingDivision.poolSize) : null,
+        playoffFromPools: editingDivision.playoffFromPools ? parseInt(editingDivision.playoffFromPools) : null,
+        gamesPerMatch: editingDivision.gamesPerMatch ? parseInt(editingDivision.gamesPerMatch) : 1,
+        defaultScoreFormatId: editingDivision.defaultScoreFormatId ? parseInt(editingDivision.defaultScoreFormatId) : null
+      };
+
+      let successCount = 0;
+      for (const divId of targetDivisionIds) {
+        const response = await eventsApi.updateDivision(event.id, divId, matchSettings);
+        if (response.success) successCount++;
+      }
+
+      if (successCount > 0) {
+        toast.success(`Copied match settings to ${successCount} division(s)`);
+        // Reload event to get updated divisions
+        const eventResponse = await eventsApi.getEvent(event.id);
+        if (eventResponse.success) {
+          onUpdate(eventResponse.data);
+        }
+      } else {
+        toast.error('Failed to copy settings');
+      }
+    } catch (err) {
+      console.error('Error copying settings:', err);
+      toast.error('Failed to copy settings');
+    } finally {
+      setCopyingSettings(false);
+      setShowCopySettings(false);
     }
   };
 
@@ -2305,9 +2401,16 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
         description: d.description || '',
         teamSize: d.teamSize || 2,
         maxTeams: d.maxTeams || null,
+        maxPlayers: d.maxPlayers || null,
         divisionFee: d.divisionFee || d.entryFee || 0,
         teamUnitId: d.teamUnitId || null,
-        skillLevelId: d.skillLevelId || null
+        skillLevelId: d.skillLevelId || null,
+        defaultScoreFormatId: d.defaultScoreFormatId || null,
+        gamesPerMatch: d.gamesPerMatch ? parseInt(d.gamesPerMatch) : 1,
+        scheduleType: d.scheduleType || null,
+        poolCount: d.poolCount ? parseInt(d.poolCount) : null,
+        poolSize: d.poolSize ? parseInt(d.poolSize) : null,
+        playoffFromPools: d.playoffFromPools ? parseInt(d.playoffFromPools) : null
       }));
 
       const response = await eventsApi.update(event.id, {
@@ -2317,6 +2420,7 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
         registrationFee: parseFloat(editFormData.registrationFee) || 0,
         perDivisionFee: parseFloat(editFormData.perDivisionFee) || 0,
         maxParticipants: editFormData.maxParticipants ? parseInt(editFormData.maxParticipants) : null,
+        defaultScoreFormatId: editFormData.defaultScoreFormatId ? parseInt(editFormData.defaultScoreFormatId) : null,
         divisions: divisionsToSave
       });
 
@@ -2345,9 +2449,19 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
         amountPaid: (event.registrationFee || 0) + (event.perDivisionFee || 0)
       });
       if (response.success) {
-        setAllRegistrations(prev =>
-          prev.map(r => r.id === registration.id ? { ...r, paymentStatus: 'Paid' } : r)
-        );
+        const updatePaymentStatus = (r) =>
+          (r.id === registration.id || r.unitId === registration.unitId) ? { ...r, paymentStatus: 'Paid' } : r;
+
+        setAllRegistrations(prev => prev.map(updatePaymentStatus));
+
+        // Also update divisionRegistrationsCache
+        setDivisionRegistrationsCache(prev => {
+          const updated = { ...prev };
+          Object.keys(updated).forEach(divId => {
+            updated[divId] = updated[divId].map(updatePaymentStatus);
+          });
+          return updated;
+        });
       }
     } catch (err) {
       console.error('Error updating registration:', err);
@@ -2362,9 +2476,19 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
     try {
       const response = await eventsApi.updateRegistration(event.id, registration.id, { teamName });
       if (response.success) {
-        setAllRegistrations(prev =>
-          prev.map(r => r.id === registration.id ? { ...r, teamName } : r)
-        );
+        const updateTeamName = (r) =>
+          (r.id === registration.id || r.unitId === registration.unitId) ? { ...r, teamName } : r;
+
+        setAllRegistrations(prev => prev.map(updateTeamName));
+
+        // Also update divisionRegistrationsCache
+        setDivisionRegistrationsCache(prev => {
+          const updated = { ...prev };
+          Object.keys(updated).forEach(divId => {
+            updated[divId] = updated[divId].map(updateTeamName);
+          });
+          return updated;
+        });
       }
     } catch (err) {
       console.error('Error updating registration:', err);
@@ -2399,6 +2523,15 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
         setAllRegistrations(prev =>
           prev.map(r => r.id === registration.id ? { ...r, divisionId: newDivisionId, divisionName: newDivision?.name || 'Unknown' } : r)
         );
+
+        // Invalidate cache for both old and new divisions so they get refetched
+        setDivisionRegistrationsCache(prev => {
+          const updated = { ...prev };
+          delete updated[registration.divisionId];
+          delete updated[newDivisionId];
+          return updated;
+        });
+
         toast.success('Registration moved to new division');
       } else {
         toast.error(response.message || 'Failed to move registration');
@@ -2420,6 +2553,14 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
       const response = await tournamentApi.removeRegistration(event.id, registration.unitId, registration.userId);
       if (response.success) {
         setAllRegistrations(prev => prev.filter(r => r.id !== registration.id));
+
+        // Invalidate cache for the division so it gets refetched
+        setDivisionRegistrationsCache(prev => {
+          const updated = { ...prev };
+          delete updated[registration.divisionId];
+          return updated;
+        });
+
         toast.success('Registration removed');
         onUpdate();
       } else {
@@ -2583,39 +2724,81 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
       return;
     }
 
-    // Sort by division name, then by registration date
+    // Sort: completed units first, then by division name, then by registration date
     allUnits.sort((a, b) => {
+      // Completed units first
+      const aComplete = a.isComplete ? 0 : 1;
+      const bComplete = b.isComplete ? 0 : 1;
+      if (aComplete !== bComplete) return aComplete - bComplete;
+      // Then by division name
       if (a.divisionName !== b.divisionName) {
         return (a.divisionName || '').localeCompare(b.divisionName || '');
       }
+      // Then by registration date
       return new Date(a.createdAt || 0) - new Date(b.createdAt || 0);
     });
 
     // Track unit number per division
     const divisionUnitCounts = {};
 
-    const headers = ['Division', 'Unit #', 'Player 1', 'Player 2', 'Payment Status', 'Registered At'];
-    const rows = allUnits.map(unit => {
+    // Build rows - one row per player
+    const headers = [
+      'Division',
+      'Unit #',
+      'Unit Status',
+      'Player Name',
+      'User ID',
+      'Payment Status',
+      'Amount Paid',
+      'Date Registered',
+      'Date Paid',
+      'Checked In',
+      'Waiver Signed'
+    ];
+
+    const rows = [];
+    allUnits.forEach(unit => {
       divisionUnitCounts[unit.divisionId] = (divisionUnitCounts[unit.divisionId] || 0) + 1;
       const unitNumber = divisionUnitCounts[unit.divisionId];
-      const player1 = unit.members?.[0]
-        ? (unit.members[0].lastName && unit.members[0].firstName
-            ? `${unit.members[0].lastName}, ${unit.members[0].firstName}`
-            : unit.members[0].lastName || unit.members[0].firstName || '')
-        : '';
-      const player2 = unit.members?.[1]
-        ? (unit.members[1].lastName && unit.members[1].firstName
-            ? `${unit.members[1].lastName}, ${unit.members[1].firstName}`
-            : unit.members[1].lastName || unit.members[1].firstName || '')
-        : '';
-      return [
-        unit.divisionName || '',
-        unitNumber.toString(),
-        player1,
-        player2,
-        unit.paymentStatus || 'Pending',
-        unit.createdAt ? new Date(unit.createdAt).toLocaleDateString() : ''
-      ];
+      const unitStatus = unit.isComplete ? 'Complete' : 'Incomplete';
+
+      // Add a row for each member in the unit
+      if (unit.members && unit.members.length > 0) {
+        unit.members.forEach(member => {
+          const playerName = member.lastName && member.firstName
+            ? `${member.lastName}, ${member.firstName}`
+            : member.lastName || member.firstName || member.displayName || '';
+
+          rows.push([
+            unit.divisionName || '',
+            unitNumber.toString(),
+            unitStatus,
+            playerName,
+            member.userId?.toString() || '',
+            member.paymentStatus || unit.paymentStatus || 'Pending',
+            member.amountPaid?.toString() || unit.amountPaid?.toString() || '0',
+            member.registeredAt ? new Date(member.registeredAt).toLocaleDateString() : (unit.createdAt ? new Date(unit.createdAt).toLocaleDateString() : ''),
+            member.paidAt ? new Date(member.paidAt).toLocaleDateString() : '',
+            member.isCheckedIn ? 'Yes' : 'No',
+            member.waiverSignedAt ? 'Yes' : 'No'
+          ]);
+        });
+      } else {
+        // Unit with no members yet
+        rows.push([
+          unit.divisionName || '',
+          unitNumber.toString(),
+          unitStatus,
+          unit.name || '',
+          '',
+          unit.paymentStatus || 'Pending',
+          unit.amountPaid?.toString() || '0',
+          unit.createdAt ? new Date(unit.createdAt).toLocaleDateString() : '',
+          '',
+          'No',
+          'No'
+        ]);
+      }
     });
 
     const csvContent = [
@@ -2830,6 +3013,71 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
     } catch (err) {
       console.error('Error cancelling registration:', err);
       toast.error(err.message || 'Failed to unregister');
+    }
+  };
+
+  // Start change division flow
+  const handleStartChangeDivision = (reg) => {
+    setChangingDivisionReg(reg);
+    setChangeDivisionStep('select-division');
+    setSelectedNewDivision(null);
+    setJoinableUnitsInNewDivision([]);
+    setNewUnitName('');
+  };
+
+  // When user selects a new division, load joinable units
+  const handleSelectNewDivision = async (divisionId) => {
+    const division = event.divisions?.find(d => d.id === divisionId);
+    setSelectedNewDivision(division);
+    setChangeDivisionStep('select-action');
+    setLoadingJoinableUnits(true);
+    try {
+      const response = await tournamentApi.getJoinableUnits(event.id, divisionId);
+      if (response.success) {
+        setJoinableUnitsInNewDivision(response.data || []);
+      }
+    } catch (err) {
+      console.error('Error loading joinable units:', err);
+    } finally {
+      setLoadingJoinableUnits(false);
+    }
+  };
+
+  // Execute the division change
+  const handleConfirmChangeDivision = async (joinUnitId = null) => {
+    if (!selectedNewDivision) return;
+
+    setMovingToDivision(true);
+    try {
+      const response = await tournamentApi.selfMoveToDivision(
+        event.id,
+        selectedNewDivision.id,
+        joinUnitId,
+        joinUnitId ? null : (newUnitName || null)
+      );
+      if (response.success) {
+        toast.success(joinUnitId
+          ? 'Successfully moved to new division and joined team!'
+          : 'Successfully moved to new division!');
+        // Close modal and refresh
+        setChangingDivisionReg(null);
+        // Invalidate division cache
+        setDivisionRegistrationsCache({});
+        // Refetch event data
+        const updatedEventResponse = await eventsApi.getEvent(event.id);
+        if (updatedEventResponse.success) {
+          onUpdate(updatedEventResponse.data);
+        } else {
+          onUpdate();
+        }
+      } else {
+        toast.error(response.message || 'Failed to change division');
+      }
+    } catch (err) {
+      console.error('Error changing division:', err);
+      toast.error(err.message || 'Failed to change division');
+    } finally {
+      setMovingToDivision(false);
     }
   };
 
@@ -3502,23 +3750,34 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
                             )}
                           </div>
                           <div className="flex items-center gap-2">
-                            {/* Payment status/button - now allowed even before team is complete */}
-                            {reg.amountDue > 0 && (
+                            {/* Payment status/button - shows current user's payment status */}
+                            {reg.amountDue > 0 && (() => {
+                              const myMember = reg.members?.find(m => m.userId === user?.id);
+                              const myHasPaid = myMember?.hasPaid || false;
+                              return (
+                                <button
+                                  onClick={() => setSelectedPaymentReg(reg)}
+                                  className={`px-2 py-1 text-sm rounded-lg flex items-center gap-1 ${
+                                    myHasPaid
+                                      ? 'bg-green-100 text-green-700'
+                                      : 'bg-orange-100 text-orange-700 hover:bg-orange-200'
+                                  }`}
+                                  title={myHasPaid ? 'View your payment' : 'Submit payment'}
+                                >
+                                  <DollarSign className="w-4 h-4" />
+                                  {myHasPaid ? 'Paid' : 'Pay'}
+                                </button>
+                              );
+                            })()}
+                            {/* Change Division button - only show if multiple divisions available */}
+                            {canRegister() && event.divisions?.filter(d => d.id !== reg.divisionId && d.isActive).length > 0 && (
                               <button
-                                onClick={() => setSelectedPaymentReg(reg)}
-                                className={`px-2 py-1 text-sm rounded-lg flex items-center gap-1 ${
-                                  reg.paymentStatus === 'Paid'
-                                    ? 'bg-green-100 text-green-700'
-                                    : reg.paymentStatus === 'Partial' || reg.paymentStatus === 'PendingVerification'
-                                    ? 'bg-yellow-100 text-yellow-700'
-                                    : 'bg-orange-100 text-orange-700 hover:bg-orange-200'
-                                }`}
-                                title={reg.paymentStatus === 'Paid' ? 'Payment complete' : `$${reg.amountDue - reg.amountPaid} remaining`}
+                                onClick={() => handleStartChangeDivision(reg)}
+                                className="px-2 py-1 text-sm text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors flex items-center gap-1"
+                                title="Move to a different division"
                               >
-                                <DollarSign className="w-4 h-4" />
-                                {reg.paymentStatus === 'Paid' ? 'Paid' :
-                                 reg.paymentStatus === 'PendingVerification' ? 'Pending' :
-                                 reg.paymentStatus === 'Partial' ? 'Partial' : 'Pay'}
+                                <ArrowRightLeft className="w-4 h-4" />
+                                Change
                               </button>
                             )}
                             {/* Cancel button */}
@@ -3630,7 +3889,7 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
                       <option value="all">All Divisions</option>
                       {event.divisions.map(div => (
                         <option key={div.id} value={div.id}>
-                          {div.name} ({div.registeredCount || 0} registered{div.maxUnits ? ` / ${div.maxUnits}` : ''})
+                          {div.name} ({div.registeredCount || 0} registered{div.maxUnits ? ` / ${div.maxUnits}` : ''}{div.maxPlayers ? `, ${div.registeredPlayerCount || 0}/${div.maxPlayers} players` : ''})
                         </option>
                       ))}
                     </select>
@@ -3703,11 +3962,17 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
                 const renderDivisionSection = (division, showDivisionHeader = false) => {
                   const teamUnit = division.teamUnitId ? teamUnits.find(t => t.id === division.teamUnitId) : null;
                   const teamSize = teamUnit?.totalPlayers || division.teamSize || 1;
-                  const isFull = division.maxUnits && division.registeredCount >= division.maxUnits;
-                  const canRegisterForThisDivision = canRegisterForDivision(division.id) && isAuthenticated && canRegister();
 
                   // Get all units, then filter, then sort
                   const allUnits = divisionRegistrationsCache[division.id] || [];
+
+                  // Only count completed units for maxUnits check
+                  // Use backend value if available, fallback to local calculation
+                  const completedUnitCount = division.completedCount ?? allUnits.filter(u => u.isComplete).length;
+                  const isFullByUnits = division.maxUnits && completedUnitCount >= division.maxUnits;
+                  const isFullByPlayers = division.maxPlayers && division.registeredPlayerCount >= division.maxPlayers;
+                  const isFull = isFullByUnits || isFullByPlayers;
+                  const canRegisterForThisDivision = canRegisterForDivision(division.id) && isAuthenticated && canRegister();
                   const filteredUnits = filterUnits(allUnits);
 
                   // Sort units: completed first, then incomplete
@@ -3760,7 +4025,9 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
                         <div className="px-4 py-3 border-b bg-gray-50/50 flex items-center justify-between">
                           <h5 className="text-sm font-medium text-gray-700 flex items-center gap-2">
                             <Users className="w-4 h-4" />
-                            {division.registeredCount || 0} {teamSize > 2 ? 'Teams' : teamSize === 2 ? 'Pairs' : 'Players'} Registered
+                            {division.registeredCount || 0}{division.maxUnits ? `/${division.maxUnits}` : ''} {teamSize > 2 ? 'Teams' : teamSize === 2 ? 'Pairs' : 'Players'} Registered
+                            {division.maxPlayers && <span className="text-gray-500 ml-1">({division.registeredPlayerCount || 0}/{division.maxPlayers} players)</span>}
+                            {isFull && <span className="ml-1 px-1.5 py-0.5 bg-red-100 text-red-700 text-xs rounded">FULL</span>}
                             {division.waitlistedCount > 0 && <span className="text-yellow-600">(+{division.waitlistedCount} waitlisted)</span>}
                             {(regTabSearchQuery || regTabStatusFilter) && sortedUnits.length !== allUnits.length && (
                               <span className="text-gray-500">({sortedUnits.length} shown)</span>
@@ -3850,7 +4117,8 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
                                       // Payment status at unit level
                                       const unitPaymentStatus = unit.paymentStatus;
                                       const hasPaymentSubmitted = unitPaymentStatus === 'PendingVerification' || unitPaymentStatus === 'Paid' || unitPaymentStatus === 'Partial';
-                                      const isPaymentVerified = unitPaymentStatus === 'Paid';
+                                      // Member's payment is verified if unit is fully Paid, or if Partial and this member has been verified
+                                      const isPaymentVerified = unitPaymentStatus === 'Paid' || (unitPaymentStatus === 'Partial' && member.hasPaid);
                                       // Can remove only if no payment has been submitted
                                       const canRemove = isOrganizer && !hasPaymentSubmitted;
 
@@ -3886,27 +4154,51 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
                                               <span className="hidden sm:inline text-xs text-blue-600">(requested)</span>
                                             )}
                                           </button>
-                                          {/* Payment status indicator - $ icon */}
-                                          {hasPaymentSubmitted && (
-                                            <button
-                                              onClick={(e) => {
-                                                e.stopPropagation();
-                                                if (isOrganizer) {
-                                                  setSelectedAdminPaymentUnit({
-                                                    ...unit,
-                                                    unitId: unit.id,
-                                                    divisionName: division.name
-                                                  });
+                                          {/* Payment status indicator - $ icon (per-member) */}
+                                          {/* Show for: 1) members with payment info, 2) admin can click gray $ to add payment for any member */}
+                                          {(() => {
+                                            // Has payment info if hasPaid OR has proof/reference (even if unmarked)
+                                            const hasPaymentInfo = member.hasPaid || member.paymentProofUrl || member.paymentReference;
+                                            const showIcon = hasPaymentInfo || isOrganizer;
+                                            if (!showIcon) return null;
+                                            return (
+                                              <button
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  if (isOrganizer) {
+                                                    // Admin: open AdminPaymentModal to review/verify or add payment for specific member
+                                                    setSelectedAdminPaymentUnit({
+                                                      ...unit,
+                                                      unitId: unit.id,
+                                                      divisionName: division.name,
+                                                      selectedMember: member
+                                                    });
+                                                  } else {
+                                                    // Non-admin: show member payment details
+                                                    setSelectedMemberPayment({
+                                                      member,
+                                                      unit,
+                                                      division,
+                                                      event
+                                                    });
+                                                  }
+                                                }}
+                                                className="p-0.5 rounded transition-colors hover:bg-gray-100 cursor-pointer"
+                                                title={hasPaymentInfo
+                                                  ? `${member.firstName || 'Member'} ${member.hasPaid ? 'paid' : 'has payment info'}${member.paidAt ? ` on ${new Date(member.paidAt).toLocaleDateString()}` : ''}`
+                                                  : 'Add payment info'
                                                 }
-                                              }}
-                                              className={`p-0.5 rounded transition-colors ${
-                                                isOrganizer ? 'hover:bg-gray-100 cursor-pointer' : 'cursor-default'
-                                              }`}
-                                              title={isPaymentVerified ? 'Payment verified' : 'Payment submitted - click to verify'}
-                                            >
-                                              <DollarSign className={`w-4 h-4 ${isPaymentVerified ? 'text-green-600' : 'text-orange-500'}`} />
-                                            </button>
-                                          )}
+                                              >
+                                                <DollarSign className={`w-4 h-4 ${
+                                                  isPaymentVerified
+                                                    ? 'text-green-600'
+                                                    : hasPaymentInfo
+                                                      ? 'text-orange-500'
+                                                      : 'text-gray-400'
+                                                }`} />
+                                              </button>
+                                            );
+                                          })()}
                                           {/* Trash icon - only if no payment submitted */}
                                           {canRemove && (
                                             <button
@@ -4042,33 +4334,42 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
           {/* Manage Tab */}
           {activeTab === 'manage' && isOrganizer && (
             <div className="space-y-6">
-              {/* Management Dashboard Links */}
-              <div className="grid gap-3 sm:grid-cols-2">
-                {/* Tournament Dashboard */}
-                <Link
-                  to={`/tournament/${event.id}/manage`}
-                  className="flex items-center justify-between p-4 bg-orange-50 border border-orange-200 rounded-lg text-orange-700 hover:bg-orange-100 transition-colors"
-                >
-                  <div className="flex items-center gap-3">
-                    <Trophy className="w-5 h-5" />
-                    <div>
-                      <div className="font-medium">Tournament Dashboard</div>
-                      <div className="text-sm text-orange-600">Brackets, pools, and tournament play</div>
+              {/* Management Dashboard Link - conditional based on event type */}
+              <div className="grid gap-3">
+                {event.eventTypeName?.toLowerCase() === 'tournament' && (
+                  // Tournament events get the full Tournament Dashboard
+                  <Link
+                    to={`/tournament/${event.id}/manage`}
+                    className="flex items-center justify-between p-4 bg-orange-50 border border-orange-200 rounded-lg text-orange-700 hover:bg-orange-100 transition-colors"
+                  >
+                    <div className="flex items-center gap-3">
+                      <Trophy className="w-5 h-5" />
+                      <div>
+                        <div className="font-medium">Tournament Dashboard</div>
+                        <div className="text-sm text-orange-600">Brackets, pools, game day manager, and tournament play</div>
+                      </div>
                     </div>
-                  </div>
-                  <ChevronRight className="w-5 h-5" />
-                </Link>
-
-                {/* Game Day Dashboard */}
+                    <ChevronRight className="w-5 h-5" />
+                  </Link>
+                )}
+                {/* Event Management Dashboard - available for all event types */}
                 <Link
-                  to={`/gameday/${event.id}/manage`}
+                  to={`/event/${event.id}/manage`}
                   className="flex items-center justify-between p-4 bg-blue-50 border border-blue-200 rounded-lg text-blue-700 hover:bg-blue-100 transition-colors"
                 >
                   <div className="flex items-center gap-3">
                     <Play className="w-5 h-5" />
                     <div>
-                      <div className="font-medium">Game Day Manager</div>
-                      <div className="text-sm text-blue-600">Quick games, courts, and scoring</div>
+                      <div className="font-medium">
+                        {event.eventTypeName?.toLowerCase() === 'tournament'
+                          ? 'Quick Scheduling'
+                          : `${event.eventTypeName || 'Event'} Dashboard`}
+                      </div>
+                      <div className="text-sm text-blue-600">
+                        {event.eventTypeName?.toLowerCase() === 'tournament'
+                          ? 'Popcorn & gauntlet scheduling for casual play'
+                          : 'Manage games, courts, and scoring'}
+                      </div>
                     </div>
                   </div>
                   <ChevronRight className="w-5 h-5" />
@@ -4500,6 +4801,38 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
                         </div>
                       </label>
                     </div>
+                  </div>
+
+                  {/* Default Game Format */}
+                  <div className="border-t pt-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Default Game Format</label>
+                    <p className="text-xs text-gray-500 mb-2">This format will be used as the default for all games in this event</p>
+                    <select
+                      value={editFormData?.defaultScoreFormatId || ''}
+                      onChange={(e) => {
+                        const newFormatId = e.target.value ? parseInt(e.target.value) : null;
+                        const oldFormatId = editFormData?.defaultScoreFormatId;
+                        setEditFormData({ ...editFormData, defaultScoreFormatId: newFormatId });
+
+                        // If changing format and divisions exist, ask if they want to update divisions too
+                        if (newFormatId && oldFormatId !== newFormatId && editDivisions.length > 0) {
+                          const divisionsWithoutFormat = editDivisions.filter(d => !d.defaultScoreFormatId).length;
+                          if (divisionsWithoutFormat > 0 && confirm(`Apply this format to ${divisionsWithoutFormat} division(s) without a format set?`)) {
+                            setEditDivisions(prev => prev.map(d =>
+                              !d.defaultScoreFormatId ? { ...d, defaultScoreFormatId: newFormatId } : d
+                            ));
+                          }
+                        }
+                      }}
+                      className="w-full border border-gray-300 rounded-lg p-2 text-sm"
+                    >
+                      <option value="">No default format</option>
+                      {scoreFormats.map(format => (
+                        <option key={format.id} value={format.id}>
+                          {format.name} ({format.pointsToWin} pts, win by {format.winByPoints})
+                        </option>
+                      ))}
+                    </select>
                   </div>
 
                   {/* Divisions Section */}
@@ -5215,7 +5548,7 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-3 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Max Teams</label>
                   <input
@@ -5223,6 +5556,17 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
                     min="1"
                     value={editingDivision.maxUnits || ''}
                     onChange={(e) => setEditingDivision({ ...editingDivision, maxUnits: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg p-2"
+                    placeholder="Unlimited"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Max Players</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={editingDivision.maxPlayers || ''}
+                    onChange={(e) => setEditingDivision({ ...editingDivision, maxPlayers: e.target.value })}
                     className="w-full border border-gray-300 rounded-lg p-2"
                     placeholder="Unlimited"
                   />
@@ -5313,6 +5657,23 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
                     <option value="5">Best of 5</option>
                   </select>
                 </div>
+
+                <div className="mt-3">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Default Game Format</label>
+                  <select
+                    value={editingDivision.defaultScoreFormatId || ''}
+                    onChange={(e) => setEditingDivision({ ...editingDivision, defaultScoreFormatId: e.target.value ? parseInt(e.target.value) : null })}
+                    className="w-full border border-gray-300 rounded-lg p-2"
+                  >
+                    <option value="">Use event default</option>
+                    {scoreFormats.map(format => (
+                      <option key={format.id} value={format.id}>
+                        {format.name} ({format.pointsToWin} pts, win by {format.winByPoints})
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-gray-500 mt-1">Applied to all games when created. Individual game formats can be edited later.</p>
+                </div>
               </div>
 
               {/* Schedule Status Display */}
@@ -5325,24 +5686,92 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
               )}
             </div>
 
-            <div className="p-4 border-t bg-gray-50 flex justify-end gap-3">
-              <button
-                onClick={() => {
-                  setShowEditDivision(false);
-                  setEditingDivision(null);
-                }}
-                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-100"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSaveDivision}
-                disabled={savingDivision}
-                className="px-4 py-2 bg-orange-600 text-white rounded-lg font-medium hover:bg-orange-700 disabled:opacity-50 flex items-center gap-2"
-              >
-                {savingDivision && <Loader2 className="w-4 h-4 animate-spin" />}
-                Save Changes
-              </button>
+            <div className="p-4 border-t bg-gray-50 flex justify-between">
+              {/* Copy to Other Divisions Button */}
+              <div className="relative">
+                {event.divisions?.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => setShowCopySettings(!showCopySettings)}
+                    className="px-3 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg flex items-center gap-1"
+                    title="Copy match settings to other divisions"
+                  >
+                    <Copy className="w-4 h-4" />
+                    Copy to Others
+                  </button>
+                )}
+
+                {/* Copy Settings Dropdown */}
+                {showCopySettings && event.divisions?.length > 1 && (
+                  <div className="absolute bottom-full left-0 mb-2 w-64 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
+                    <div className="p-3 border-b">
+                      <p className="text-sm font-medium text-gray-900">Copy Match Settings To:</p>
+                      <p className="text-xs text-gray-500 mt-1">Schedule type, games per match, and game formats</p>
+                    </div>
+                    <div className="p-2 max-h-48 overflow-y-auto">
+                      {event.divisions
+                        .filter(d => d.id !== editingDivision?.id)
+                        .map(div => (
+                          <label key={div.id} className="flex items-center gap-2 p-2 hover:bg-gray-50 rounded cursor-pointer">
+                            <input
+                              type="checkbox"
+                              className="w-4 h-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500"
+                              data-division-id={div.id}
+                            />
+                            <span className="text-sm text-gray-700">{div.name}</span>
+                          </label>
+                        ))}
+                    </div>
+                    <div className="p-2 border-t flex justify-end gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setShowCopySettings(false)}
+                        className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-900"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const checkboxes = document.querySelectorAll('[data-division-id]:checked');
+                          const selectedIds = Array.from(checkboxes).map(cb => parseInt(cb.dataset.divisionId));
+                          if (selectedIds.length > 0) {
+                            handleCopySettingsToOther(selectedIds);
+                          } else {
+                            toast.error('Select at least one division');
+                          }
+                        }}
+                        disabled={copyingSettings}
+                        className="px-3 py-1.5 text-sm bg-orange-600 text-white rounded hover:bg-orange-700 disabled:opacity-50 flex items-center gap-1"
+                      >
+                        {copyingSettings && <Loader2 className="w-3 h-3 animate-spin" />}
+                        Apply
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    setShowEditDivision(false);
+                    setEditingDivision(null);
+                    setShowCopySettings(false);
+                  }}
+                  className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-100"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveDivision}
+                  disabled={savingDivision}
+                  className="px-4 py-2 bg-orange-600 text-white rounded-lg font-medium hover:bg-orange-700 disabled:opacity-50 flex items-center gap-2"
+                >
+                  {savingDivision && <Loader2 className="w-4 h-4 animate-spin" />}
+                  Save Changes
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -5383,19 +5812,51 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
         unit={selectedAdminPaymentUnit}
         event={event}
         onPaymentUpdated={(unitId, paymentInfo) => {
-          // Update the registration in allRegistrations with new payment info
-          setAllRegistrations(prev =>
-            prev.map(r => r.unitId === unitId ? {
-              ...r,
-              paymentStatus: paymentInfo.paymentStatus,
-              amountPaid: paymentInfo.amountPaid,
-              amountDue: paymentInfo.amountDue,
-              paymentProofUrl: paymentInfo.paymentProofUrl,
-              paymentReference: paymentInfo.paymentReference,
-              paidAt: paymentInfo.paidAt
-            } : r)
-          );
+          // Helper function to update unit with payment info
+          const updateUnit = (unit) => {
+            if (unit.id !== unitId && unit.unitId !== unitId) return unit;
+            const updatedMembers = unit.members?.map(m =>
+              m.userId === paymentInfo.userId
+                ? {
+                    ...m,
+                    hasPaid: paymentInfo.hasPaid,
+                    paidAt: paymentInfo.paidAt,
+                    amountPaid: paymentInfo.amountPaid,
+                    paymentProofUrl: paymentInfo.paymentProofUrl,
+                    paymentReference: paymentInfo.paymentReference,
+                    referenceId: paymentInfo.referenceId
+                  }
+                : m
+            );
+            return {
+              ...unit,
+              members: updatedMembers,
+              paymentStatus: paymentInfo.unitPaymentStatus || unit.paymentStatus
+            };
+          };
+
+          // Update allRegistrations
+          setAllRegistrations(prev => prev.map(updateUnit));
+
+          // Update divisionRegistrationsCache so the UI reflects changes immediately
+          setDivisionRegistrationsCache(prev => {
+            const updated = { ...prev };
+            Object.keys(updated).forEach(divId => {
+              updated[divId] = updated[divId].map(updateUnit);
+            });
+            return updated;
+          });
+
+          // Refresh from server to ensure consistency
+          onUpdate();
         }}
+      />
+
+      {/* Member Payment Modal - View individual member payment details */}
+      <MemberPaymentModal
+        isOpen={!!selectedMemberPayment}
+        onClose={() => setSelectedMemberPayment(null)}
+        memberPayment={selectedMemberPayment}
       />
 
       {/* Public Profile Modal */}
@@ -5445,6 +5906,159 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
                 <Loader2 className="w-6 h-6 animate-spin text-orange-600" />
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Change Division Modal - Player self-move */}
+      {changingDivisionReg && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-[1100]">
+          <div className="bg-white rounded-xl shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
+            {/* Header */}
+            <div className="flex items-center justify-between p-4 border-b sticky top-0 bg-white z-10">
+              <div className="flex items-center gap-2">
+                <ArrowRightLeft className="w-5 h-5 text-blue-600" />
+                <h2 className="text-lg font-semibold text-gray-900">Change Division</h2>
+              </div>
+              <button
+                onClick={() => setChangingDivisionReg(null)}
+                disabled={movingToDivision}
+                className="p-1 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-4">
+              {/* Current registration info */}
+              <div className="bg-gray-50 rounded-lg p-3 mb-4">
+                <div className="text-sm text-gray-500">Currently registered in:</div>
+                <div className="font-medium text-gray-900">{changingDivisionReg.divisionName}</div>
+                {changingDivisionReg.partners?.length > 0 && (
+                  <div className="mt-2 text-sm text-orange-600 flex items-center gap-1">
+                    <AlertCircle className="w-4 h-4" />
+                    You will leave your current team if you change divisions
+                  </div>
+                )}
+              </div>
+
+              {/* Step 1: Select new division */}
+              {changeDivisionStep === 'select-division' && (
+                <div>
+                  <div className="text-sm font-medium text-gray-700 mb-3">Select your new division:</div>
+                  <div className="space-y-2">
+                    {event.divisions?.filter(d => d.id !== changingDivisionReg.divisionId && d.isActive).map(div => (
+                      <button
+                        key={div.id}
+                        onClick={() => handleSelectNewDivision(div.id)}
+                        className="w-full px-4 py-3 text-left border border-gray-200 rounded-lg hover:bg-blue-50 hover:border-blue-300 transition-colors flex items-center justify-between"
+                      >
+                        <div>
+                          <div className="font-medium text-gray-900">{div.name}</div>
+                          {div.description && <div className="text-sm text-gray-500">{div.description}</div>}
+                        </div>
+                        <ChevronRight className="w-5 h-5 text-gray-400" />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Step 2: Choose to create new unit or join existing */}
+              {changeDivisionStep === 'select-action' && selectedNewDivision && (
+                <div>
+                  <button
+                    onClick={() => setChangeDivisionStep('select-division')}
+                    className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-1 mb-3"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                    Back
+                  </button>
+
+                  <div className="text-sm text-gray-500 mb-1">Moving to:</div>
+                  <div className="font-medium text-gray-900 mb-4">{selectedNewDivision.name}</div>
+
+                  {/* Option 1: Create new team */}
+                  <div className="mb-4">
+                    <div className="text-sm font-medium text-gray-700 mb-2">Option 1: Create a new team</div>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={newUnitName}
+                        onChange={(e) => setNewUnitName(e.target.value)}
+                        placeholder="Team name (optional)"
+                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      />
+                      <button
+                        onClick={() => handleConfirmChangeDivision(null)}
+                        disabled={movingToDivision}
+                        className="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center gap-2"
+                      >
+                        {movingToDivision ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+                        Create
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Option 2: Join existing team */}
+                  <div>
+                    <div className="text-sm font-medium text-gray-700 mb-2">
+                      Option 2: Join an existing team
+                      {loadingJoinableUnits && <Loader2 className="w-4 h-4 animate-spin inline ml-2" />}
+                    </div>
+                    {!loadingJoinableUnits && joinableUnitsInNewDivision.length === 0 ? (
+                      <div className="text-sm text-gray-500 bg-gray-50 rounded-lg p-3 text-center">
+                        No teams looking for partners in this division
+                      </div>
+                    ) : (
+                      <div className="space-y-2 max-h-60 overflow-y-auto">
+                        {joinableUnitsInNewDivision.map(unit => (
+                          <div
+                            key={unit.id}
+                            className="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:bg-gray-50"
+                          >
+                            <div className="flex items-center gap-2">
+                              {unit.members?.map(member => (
+                                <div key={member.id} className="flex items-center gap-1.5">
+                                  {member.profileImageUrl ? (
+                                    <img src={getSharedAssetUrl(member.profileImageUrl)} alt="" className="w-6 h-6 rounded-full object-cover" />
+                                  ) : (
+                                    <div className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center text-xs text-gray-500">
+                                      {member.firstName?.charAt(0) || '?'}
+                                    </div>
+                                  )}
+                                  <span className="text-sm text-gray-700">{member.firstName} {member.lastName}</span>
+                                </div>
+                              ))}
+                              {unit.name && <span className="text-xs text-gray-400">({unit.name})</span>}
+                            </div>
+                            <button
+                              onClick={() => handleConfirmChangeDivision(unit.id)}
+                              disabled={movingToDivision}
+                              className="px-3 py-1.5 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center gap-1"
+                            >
+                              {movingToDivision ? <Loader2 className="w-3 h-3 animate-spin" /> : <UserPlus className="w-3 h-3" />}
+                              Join
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="flex justify-end gap-3 p-4 border-t bg-gray-50">
+              <button
+                onClick={() => setChangingDivisionReg(null)}
+                disabled={movingToDivision}
+                className="px-4 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-100 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -83,7 +83,7 @@ public class EventsController : ControllerBase
                 .Where(e => !e.IsPrivate ||
                     (userId.HasValue && (
                         e.OrganizedByUserId == userId.Value ||
-                        e.Divisions.Any(d => d.Units.Any(u => u.Status != "Cancelled" && u.Members.Any(m => m.UserId == userId.Value))) ||
+                        e.Divisions.Any(d => d.Units.Any(u => u.Status != "Cancelled" && !u.IsTemporary && u.Members.Any(m => m.UserId == userId.Value))) ||
                         (e.OrganizedByClubId.HasValue && _context.ClubMembers.Any(cm =>
                             cm.ClubId == e.OrganizedByClubId.Value &&
                             cm.UserId == userId.Value &&
@@ -525,6 +525,23 @@ public class EventsController : ControllerBase
                                             Role = m.Role,
                                             InviteStatus = m.InviteStatus
                                         }).ToList(),
+                                    // All members with payment data
+                                    Members = u.Members
+                                        .Select(m => new TeamMemberDto
+                                        {
+                                            UserId = m.UserId,
+                                            Name = m.User != null ? Utility.FormatName(m.User.LastName, m.User.FirstName) : "Unknown",
+                                            ProfileImageUrl = m.User?.ProfileImageUrl,
+                                            Role = m.Role,
+                                            InviteStatus = m.InviteStatus,
+                                            IsCurrentUser = m.UserId == userId.Value,
+                                            HasPaid = m.HasPaid,
+                                            PaidAt = m.PaidAt,
+                                            AmountPaid = m.AmountPaid,
+                                            PaymentProofUrl = m.PaymentProofUrl,
+                                            PaymentReference = m.PaymentReference,
+                                            ReferenceId = m.ReferenceId
+                                        }).ToList(),
                                     // Captain info for managing join requests
                                     IsCaptain = u.CaptainUserId == userId.Value,
                                     PendingJoinRequests = u.CaptainUserId == userId.Value
@@ -564,6 +581,7 @@ public class EventsController : ControllerBase
                         MinSkillRating = d.MinSkillRating,
                         MaxSkillRating = d.MaxSkillRating,
                         MaxUnits = d.MaxUnits,
+                        MaxPlayers = d.MaxPlayers,
                         // Legacy fields
                         TeamSize = d.TeamSize,
                         SkillLevelMin = d.SkillLevelMin,
@@ -574,7 +592,17 @@ public class EventsController : ControllerBase
                         DivisionFee = d.DivisionFee,
                         SortOrder = d.SortOrder,
                         RegisteredCount = d.Units.Count(u => u.Status != "Cancelled"),
+                        RegisteredPlayerCount = d.Units.Where(u => u.Status != "Cancelled").SelectMany(u => u.Members).Count(m => m.InviteStatus == "Accepted"),
                         LookingForPartnerCount = d.PartnerRequests.Count(p => p.IsLookingForPartner && p.Status == "Open"),
+                        // Tournament structure
+                        DefaultScoreFormatId = d.DefaultScoreFormatId,
+                        PoolCount = d.PoolCount,
+                        PoolSize = d.PoolSize,
+                        ScheduleType = d.ScheduleType,
+                        ScheduleStatus = d.ScheduleStatus,
+                        BracketType = d.BracketType,
+                        PlayoffFromPools = d.PlayoffFromPools,
+                        GamesPerMatch = d.GamesPerMatch,
                         Rewards = d.Rewards.Where(r => r.IsActive).OrderBy(r => r.Placement).Select(r => new DivisionRewardDto
                         {
                             Id = r.Id,
@@ -668,6 +696,7 @@ public class EventsController : ControllerBase
                     MinSkillRating = divDto.MinSkillRating,
                     MaxSkillRating = divDto.MaxSkillRating,
                     MaxUnits = divDto.MaxUnits,
+                    MaxPlayers = divDto.MaxPlayers,
                     // Legacy fields
                     TeamSize = divDto.TeamSize,
                     SkillLevelMin = divDto.SkillLevelMin,
@@ -676,7 +705,14 @@ public class EventsController : ControllerBase
                     AgeGroup = divDto.AgeGroup,
                     MaxTeams = divDto.MaxTeams,
                     DivisionFee = divDto.DivisionFee,
-                    SortOrder = divDto.SortOrder > 0 ? divDto.SortOrder : sortOrder++
+                    SortOrder = divDto.SortOrder > 0 ? divDto.SortOrder : sortOrder++,
+                    // Tournament structure
+                    DefaultScoreFormatId = divDto.DefaultScoreFormatId,
+                    GamesPerMatch = divDto.GamesPerMatch ?? 1,
+                    ScheduleType = divDto.ScheduleType,
+                    PoolCount = divDto.PoolCount,
+                    PoolSize = divDto.PoolSize,
+                    PlayoffFromPools = divDto.PlayoffFromPools
                 };
                 _context.EventDivisions.Add(division);
                 await _context.SaveChangesAsync();
@@ -768,6 +804,7 @@ public class EventsController : ControllerBase
             evt.ContactPhone = dto.ContactPhone;
             evt.PaymentInstructions = dto.PaymentInstructions;
             evt.MaxParticipants = dto.MaxParticipants;
+            evt.DefaultScoreFormatId = dto.DefaultScoreFormatId;
             evt.UpdatedAt = DateTime.Now;
 
             // Handle divisions update
@@ -810,6 +847,13 @@ public class EventsController : ControllerBase
                             existingDiv.MinSkillRating = divDto.MinSkillRating;
                             existingDiv.MaxSkillRating = divDto.MaxSkillRating;
                             existingDiv.MaxUnits = divDto.MaxUnits;
+                            existingDiv.MaxPlayers = divDto.MaxPlayers;
+                            existingDiv.DefaultScoreFormatId = divDto.DefaultScoreFormatId;
+                            existingDiv.GamesPerMatch = divDto.GamesPerMatch ?? 1;
+                            existingDiv.ScheduleType = divDto.ScheduleType;
+                            existingDiv.PoolCount = divDto.PoolCount;
+                            existingDiv.PoolSize = divDto.PoolSize;
+                            existingDiv.PlayoffFromPools = divDto.PlayoffFromPools;
                         }
                     }
                     else
@@ -829,7 +873,14 @@ public class EventsController : ControllerBase
                             MinSkillRating = divDto.MinSkillRating,
                             MaxSkillRating = divDto.MaxSkillRating,
                             MaxUnits = divDto.MaxUnits,
-                            SortOrder = divDto.SortOrder
+                            MaxPlayers = divDto.MaxPlayers,
+                            SortOrder = divDto.SortOrder,
+                            DefaultScoreFormatId = divDto.DefaultScoreFormatId,
+                            GamesPerMatch = divDto.GamesPerMatch ?? 1,
+                            ScheduleType = divDto.ScheduleType,
+                            PoolCount = divDto.PoolCount,
+                            PoolSize = divDto.PoolSize,
+                            PlayoffFromPools = divDto.PlayoffFromPools
                         };
                         evt.Divisions.Add(newDivision);
                     }
@@ -979,6 +1030,22 @@ public class EventsController : ControllerBase
             var division = await _context.EventDivisions.FindAsync(dto.DivisionId);
             if (division == null || division.EventId != id || !division.IsActive)
                 return NotFound(new ApiResponse<EventRegistrationDto> { Success = false, Message = "Division not found" });
+
+            // Check MaxPlayers capacity
+            if (division.MaxPlayers.HasValue)
+            {
+                var currentPlayerCount = await _context.EventRegistrations
+                    .CountAsync(r => r.DivisionId == dto.DivisionId && r.Status != "Cancelled");
+
+                if (currentPlayerCount >= division.MaxPlayers.Value)
+                {
+                    return BadRequest(new ApiResponse<EventRegistrationDto>
+                    {
+                        Success = false,
+                        Message = $"Division '{division.Name}' has reached its maximum capacity of {division.MaxPlayers.Value} players."
+                    });
+                }
+            }
 
             // Check if already registered for this division
             var existingReg = await _context.EventRegistrations
@@ -1364,7 +1431,13 @@ public class EventsController : ControllerBase
                                     ProfileImageUrl = mem.User?.ProfileImageUrl,
                                     Role = mem.Role,
                                     InviteStatus = mem.InviteStatus,
-                                    IsCurrentUser = mem.UserId == userId.Value
+                                    IsCurrentUser = mem.UserId == userId.Value,
+                                    HasPaid = mem.HasPaid,
+                                    PaidAt = mem.PaidAt,
+                                    AmountPaid = mem.AmountPaid,
+                                    PaymentProofUrl = mem.PaymentProofUrl,
+                                    PaymentReference = mem.PaymentReference,
+                                    ReferenceId = mem.ReferenceId
                                 }).ToList()
                         };
                     }).ToList();
@@ -1445,6 +1518,7 @@ public class EventsController : ControllerBase
                 MinSkillRating = dto.MinSkillRating,
                 MaxSkillRating = dto.MaxSkillRating,
                 MaxUnits = dto.MaxUnits,
+                MaxPlayers = dto.MaxPlayers,
                 // Legacy fields
                 TeamSize = dto.TeamSize,
                 SkillLevelMin = dto.SkillLevelMin,
@@ -1453,7 +1527,14 @@ public class EventsController : ControllerBase
                 AgeGroup = dto.AgeGroup,
                 MaxTeams = dto.MaxTeams,
                 DivisionFee = dto.DivisionFee,
-                SortOrder = dto.SortOrder > 0 ? dto.SortOrder : maxSortOrder + 1
+                SortOrder = dto.SortOrder > 0 ? dto.SortOrder : maxSortOrder + 1,
+                // Tournament structure
+                DefaultScoreFormatId = dto.DefaultScoreFormatId,
+                GamesPerMatch = dto.GamesPerMatch ?? 1,
+                ScheduleType = dto.ScheduleType,
+                PoolCount = dto.PoolCount,
+                PoolSize = dto.PoolSize,
+                PlayoffFromPools = dto.PlayoffFromPools
             };
 
             _context.EventDivisions.Add(division);
@@ -1500,6 +1581,7 @@ public class EventsController : ControllerBase
                     MinSkillRating = division.MinSkillRating,
                     MaxSkillRating = division.MaxSkillRating,
                     MaxUnits = division.MaxUnits,
+                    MaxPlayers = division.MaxPlayers,
                     // Legacy fields
                     TeamSize = division.TeamSize,
                     SkillLevelMin = division.SkillLevelMin,
@@ -1510,7 +1592,17 @@ public class EventsController : ControllerBase
                     DivisionFee = division.DivisionFee,
                     SortOrder = division.SortOrder,
                     RegisteredCount = 0,
+                    RegisteredPlayerCount = 0,
                     LookingForPartnerCount = 0,
+                    // Tournament structure
+                    DefaultScoreFormatId = division.DefaultScoreFormatId,
+                    PoolCount = division.PoolCount,
+                    PoolSize = division.PoolSize,
+                    ScheduleType = division.ScheduleType,
+                    ScheduleStatus = division.ScheduleStatus,
+                    BracketType = division.BracketType,
+                    PlayoffFromPools = division.PlayoffFromPools,
+                    GamesPerMatch = division.GamesPerMatch,
                     Rewards = dto.Rewards.Select((r, i) => new DivisionRewardDto
                     {
                         Id = i + 1, // Placeholder - actual IDs are in the database
@@ -1570,6 +1662,7 @@ public class EventsController : ControllerBase
             if (dto.AgeGroupId.HasValue) division.AgeGroupId = dto.AgeGroupId;
             if (dto.SkillLevelId.HasValue) division.SkillLevelId = dto.SkillLevelId;
             if (dto.MaxUnits.HasValue) division.MaxUnits = dto.MaxUnits;
+            if (dto.MaxPlayers.HasValue) division.MaxPlayers = dto.MaxPlayers;
             if (dto.DivisionFee.HasValue) division.DivisionFee = dto.DivisionFee;
 
             // Tournament structure fields
@@ -1591,6 +1684,9 @@ public class EventsController : ControllerBase
             var registeredCount = await _context.EventUnits
                 .CountAsync(u => u.DivisionId == division.Id && u.Status != "Cancelled");
 
+            var registeredPlayerCount = await _context.EventUnitMembers
+                .CountAsync(m => m.Unit != null && m.Unit.DivisionId == division.Id && m.Unit.Status != "Cancelled" && m.InviteStatus == "Accepted");
+
             return Ok(new ApiResponse<EventDivisionDto>
             {
                 Success = true,
@@ -1607,9 +1703,11 @@ public class EventsController : ControllerBase
                     SkillLevelId = division.SkillLevelId,
                     SkillLevelName = division.SkillLevel?.Name,
                     MaxUnits = division.MaxUnits,
+                    MaxPlayers = division.MaxPlayers,
                     DivisionFee = division.DivisionFee,
                     SortOrder = division.SortOrder,
                     RegisteredCount = registeredCount,
+                    RegisteredPlayerCount = registeredPlayerCount,
                     // Tournament structure
                     DefaultScoreFormatId = division.DefaultScoreFormatId,
                     PoolCount = division.PoolCount,

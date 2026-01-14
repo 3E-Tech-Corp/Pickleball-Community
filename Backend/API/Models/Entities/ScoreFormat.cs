@@ -69,10 +69,23 @@ public class ScoreFormat
     public bool IsActive { get; set; } = true;
     public bool IsDefault { get; set; } = false;
 
+    /// <summary>
+    /// Whether this is a global preset format (true) or event-specific custom format (false)
+    /// </summary>
+    public bool IsPreset { get; set; } = true;
+
+    /// <summary>
+    /// Event ID for event-specific formats (null for global presets)
+    /// </summary>
+    public int? EventId { get; set; }
+
     public DateTime CreatedAt { get; set; } = DateTime.Now;
     public DateTime UpdatedAt { get; set; } = DateTime.Now;
 
     // Navigation
     [ForeignKey("ScoreMethodId")]
     public ScoreMethod? ScoreMethod { get; set; }
+
+    [ForeignKey("EventId")]
+    public Event? Event { get; set; }
 }

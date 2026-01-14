@@ -2,16 +2,14 @@ import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
-import { userApi, materialApi, themeApi, notificationTemplateApi, getAssetUrl } from '../services/api'
-import { userApi, themeApi, sharedAssetApi, getAssetUrl, getSharedAssetUrl, SHARED_AUTH_URL, notificationsApi } from '../services/api'
+import { userApi, themeApi, notificationTemplateApi, getAssetUrl, sharedAssetApi, getSharedAssetUrl, SHARED_AUTH_URL, notificationsApi } from '../services/api'
 import {
   Users, BookOpen, Calendar, DollarSign, Search, Edit2, Trash2,
   ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Filter, MoreVertical, Eye, X,
   Shield, GraduationCap, User, CheckCircle, XCircle, Save,
-  Palette, Upload, RefreshCw, Image, Layers, Check, Award, Tags, UserCog, Video, Building2, HelpCircle, MessageSquare, MapPin, Network, Plus, Play, ArrowUp, ArrowDown, Bell, Send, Megaphone
-  Palette, Upload, RefreshCw, Image, Layers, Check, Award, Bell,
-  Mail, Plus, RotateCcw, ToggleLeft, ToggleRight, Copy, AlertCircle
-  Palette, Upload, RefreshCw, Image, Layers, Check, Award, Tags, UserCog, Video, Building2, HelpCircle, MessageSquare, MapPin, Network, Plus, Play, ArrowUp, ArrowDown, Bell, Send
+  Palette, Upload, RefreshCw, Image, Layers, Check, Award, Tags, UserCog, Video,
+  Building2, HelpCircle, MessageSquare, MapPin, Network, Plus, Play, ArrowUp, ArrowDown,
+  Bell, Send, Megaphone, Mail, RotateCcw, ToggleLeft, ToggleRight, Copy, AlertCircle, Settings
 } from 'lucide-react'
 import VideoUploadModal from '../components/ui/VideoUploadModal'
 import PublicProfileModal from '../components/ui/PublicProfileModal'
@@ -29,6 +27,8 @@ import SkillLevelsAdmin from './SkillLevelsAdmin'
 import LeagueAdmin from './LeagueAdmin'
 import LeagueRolesAdmin from './LeagueRolesAdmin'
 import ReleaseNotesAdmin from './ReleaseNotesAdmin'
+import GameFormatsAdmin from './GameFormatsAdmin'
+import ScoreMethodsAdmin from './ScoreMethodsAdmin'
 
 const AdminDashboard = () => {
   const { user } = useAuth()
@@ -681,12 +681,6 @@ const AdminDashboard = () => {
     return matchesSearch && matchesRole
   })
 
-  // Filter materials
-  const filteredMaterials = materials.filter(m => {
-    return (m.title?.toLowerCase() || '').includes(materialSearch.toLowerCase()) ||
-           (m.description?.toLowerCase() || '').includes(materialSearch.toLowerCase())
-  })
-
   // Filter templates
   const filteredTemplates = templates.filter(t => {
     const matchesSearch =
@@ -752,15 +746,6 @@ const AdminDashboard = () => {
     }
   }
 
-  // Sidebar navigation items
-  const navItems = [
-    { id: 'users', label: 'Users', icon: Users, count: users.length },
-    { id: 'materials', label: 'Materials', icon: BookOpen, count: materials.length },
-    { id: 'theme', label: 'Theme', icon: Palette },
-    { id: 'notifications', label: 'Notifications', icon: Bell, count: templates.length },
-    { id: 'certification', label: 'Certification', icon: Award, link: '/admin/certification' },
-    { id: 'events', label: 'Events', icon: Calendar, count: 0, disabled: true },
-    { id: 'transactions', label: 'Transactions', icon: DollarSign, count: 0, disabled: true }
   // Sidebar navigation items - all render inline now
   const navGroups = [
     {
@@ -795,7 +780,9 @@ const AdminDashboard = () => {
         { id: 'venueTypes', label: 'Venue Types', icon: Building2 },
         { id: 'clubRoles', label: 'Club Roles', icon: UserCog },
         { id: 'teamUnits', label: 'Team Units', icon: Users },
-        { id: 'skillLevels', label: 'Skill Levels', icon: Award }
+        { id: 'skillLevels', label: 'Skill Levels', icon: Award },
+        { id: 'scoreMethods', label: 'Score Methods', icon: Play },
+        { id: 'gameFormats', label: 'Game Formats', icon: Settings }
       ]
     },
     {
@@ -2372,6 +2359,12 @@ const AdminDashboard = () => {
           {/* Skill Levels Admin */}
           {activeTab === 'skillLevels' && <SkillLevelsAdmin embedded />}
 
+          {/* Score Methods Admin */}
+          {activeTab === 'scoreMethods' && <ScoreMethodsAdmin embedded />}
+
+          {/* Game Formats Admin */}
+          {activeTab === 'gameFormats' && <GameFormatsAdmin embedded />}
+
           {/* League Admin */}
           {activeTab === 'leagues' && <LeagueAdmin embedded />}
 
@@ -3010,6 +3003,8 @@ const AdminDashboard = () => {
             </div>
           </div>
         </div>
+      )}
+
       {/* Hero Video Upload Modal (Legacy single video) */}
       <VideoUploadModal
         isOpen={isHeroVideoModalOpen}

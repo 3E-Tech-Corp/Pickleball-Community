@@ -14,6 +14,12 @@ public class ScoreMethod
     [MaxLength(100)]
     public string Name { get; set; } = string.Empty;
 
+    /// <summary>
+    /// Short code for compact display (e.g., "Rally", "Classic", "MLP")
+    /// </summary>
+    [MaxLength(20)]
+    public string? ShortCode { get; set; }
+
     [MaxLength(1000)]
     public string? Description { get; set; }
 

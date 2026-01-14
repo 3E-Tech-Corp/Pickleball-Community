@@ -1,11 +1,15 @@
 import { useEffect } from 'react'
 import { Loader2 } from 'lucide-react'
+import i18n from '../i18n'
 
 // Shared Auth UI URL from environment
 const SHARED_AUTH_UI_URL = import.meta.env.VITE_SHARED_AUTH_UI_URL || 'https://shared.funtimepb.com'
 
 // Global site key for cross-site auth
 const SITE_KEY = 'community'
+
+// Get current language code for shared auth
+const getCurrentLang = () => i18n.language?.split('-')[0] || 'en'
 
 /**
  * Register page - redirects to shared auth UI
@@ -16,8 +20,8 @@ const Register = () => {
     // Build the return URL for after registration
     const callbackUrl = `${window.location.origin}/auth/callback`
 
-    // Redirect to shared auth UI register page
-    const authUrl = `${SHARED_AUTH_UI_URL}/register?site=${SITE_KEY}&returnUrl=${encodeURIComponent(callbackUrl)}`
+    // Redirect to shared auth UI register page with language preference
+    const authUrl = `${SHARED_AUTH_UI_URL}/register?site=${SITE_KEY}&returnUrl=${encodeURIComponent(callbackUrl)}&Langcode=${getCurrentLang()}`
     window.location.href = authUrl
   }, [])
 
