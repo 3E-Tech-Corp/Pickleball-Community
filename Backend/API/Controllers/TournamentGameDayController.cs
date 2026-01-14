@@ -436,7 +436,7 @@ public class TournamentGameDayController : ControllerBase
     /// </summary>
     [HttpPost("score/{gameId}")]
     [Authorize]
-    public async Task<ActionResult<ApiResponse<object>>> SubmitScore(int gameId, [FromBody] SubmitScoreRequest request)
+    public async Task<ActionResult<ApiResponse<object>>> SubmitScore(int gameId, [FromBody] GameDaySubmitScoreRequest request)
     {
         var userId = GetUserId();
 
@@ -1016,7 +1016,7 @@ public class QueueGameRequest
     public int CourtId { get; set; }
 }
 
-public class SubmitScoreRequest
+public class GameDaySubmitScoreRequest
 {
     public int Unit1Score { get; set; }
     public int Unit2Score { get; set; }
