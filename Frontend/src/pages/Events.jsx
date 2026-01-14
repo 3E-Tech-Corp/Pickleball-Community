@@ -3708,13 +3708,17 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
                 const renderDivisionSection = (division, showDivisionHeader = false) => {
                   const teamUnit = division.teamUnitId ? teamUnits.find(t => t.id === division.teamUnitId) : null;
                   const teamSize = teamUnit?.totalPlayers || division.teamSize || 1;
-                  const isFullByUnits = division.maxUnits && division.registeredCount >= division.maxUnits;
-                  const isFullByPlayers = division.maxPlayers && division.registeredPlayerCount >= division.maxPlayers;
-                  const isFull = isFullByUnits || isFullByPlayers;
-                  const canRegisterForThisDivision = canRegisterForDivision(division.id) && isAuthenticated && canRegister();
 
                   // Get all units, then filter, then sort
                   const allUnits = divisionRegistrationsCache[division.id] || [];
+
+                  // Only count completed units for maxUnits check
+                  // Use backend value if available, fallback to local calculation
+                  const completedUnitCount = division.completedCount ?? allUnits.filter(u => u.isComplete).length;
+                  const isFullByUnits = division.maxUnits && completedUnitCount >= division.maxUnits;
+                  const isFullByPlayers = division.maxPlayers && division.registeredPlayerCount >= division.maxPlayers;
+                  const isFull = isFullByUnits || isFullByPlayers;
+                  const canRegisterForThisDivision = canRegisterForDivision(division.id) && isAuthenticated && canRegister();
                   const filteredUnits = filterUnits(allUnits);
 
                   // Sort units: completed first, then incomplete

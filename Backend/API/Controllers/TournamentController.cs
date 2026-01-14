@@ -164,6 +164,24 @@ public class TournamentController : ControllerBase
             .Select(g => new { g.Key.DivisionId, g.Key.Status, Count = g.Count() })
             .ToListAsync();
 
+        // Get completed unit counts per division (for MaxUnits check)
+        var completedUnitCounts = await _context.EventUnits
+            .Include(u => u.Members)
+            .Include(u => u.Division)
+                .ThenInclude(d => d!.TeamUnit)
+            .Where(u => u.EventId == eventId && u.Status != "Cancelled" && u.Status != "Waitlisted")
+            .ToListAsync();
+
+        var completedCountsByDivision = completedUnitCounts
+            .GroupBy(u => u.DivisionId)
+            .ToDictionary(
+                g => g.Key,
+                g => g.Count(u => {
+                    var teamSize = u.Division?.TeamUnit?.TotalPlayers ?? u.Division?.TeamSize ?? 1;
+                    return u.Members.Count(m => m.InviteStatus == "Accepted") >= teamSize;
+                })
+            );
+
         // Get user's registrations
         var userRegistrations = userId.HasValue
             ? await _context.EventUnitMembers
@@ -223,6 +241,7 @@ public class TournamentController : ControllerBase
                     .Where(r => r.DivisionId == d.Id && r.Status == "Waitlisted")
                     .Sum(r => r.Count);
 
+                var completedCount = completedCountsByDivision.GetValueOrDefault(d.Id, 0);
                 return new EventDivisionDetailDto
                 {
                     Id = d.Id,
@@ -236,8 +255,9 @@ public class TournamentController : ControllerBase
                     DivisionFee = d.DivisionFee,
                     MaxUnits = d.MaxUnits,
                     RegisteredCount = regCount,
+                    CompletedCount = completedCount,
                     WaitlistedCount = waitlistCount,
-                    IsFull = d.MaxUnits.HasValue && regCount >= d.MaxUnits.Value,
+                    IsFull = d.MaxUnits.HasValue && completedCount >= d.MaxUnits.Value,
                     LookingForPartner = incompleteUnits.ContainsKey(d.Id)
                         ? incompleteUnits[d.Id].Select(u => MapToUnitDto(u)).ToList()
                         : new List<EventUnitDto>()
@@ -369,11 +389,15 @@ public class TournamentController : ControllerBase
                 }
             }
 
-            // Check MaxUnits capacity
-            var currentCount = await _context.EventUnits
-                .CountAsync(u => u.DivisionId == divisionId && u.Status != "Cancelled" && u.Status != "Waitlisted");
+            // Check MaxUnits capacity - only count completed units
+            var completedUnitCount = await _context.EventUnits
+                .Include(u => u.Members)
+                .CountAsync(u => u.DivisionId == divisionId &&
+                    u.Status != "Cancelled" &&
+                    u.Status != "Waitlisted" &&
+                    u.Members.Count(m => m.InviteStatus == "Accepted") >= teamSize);
 
-            var isWaitlisted = division.MaxUnits.HasValue && currentCount >= division.MaxUnits.Value;
+            var isWaitlisted = division.MaxUnits.HasValue && completedUnitCount >= division.MaxUnits.Value;
 
             // Create unit
             var unitName = isSingles

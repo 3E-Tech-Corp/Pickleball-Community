@@ -633,6 +633,7 @@ public class EventDivisionDetailDto
     public decimal? DivisionFee { get; set; }
     public int? MaxUnits { get; set; }
     public int RegisteredCount { get; set; }
+    public int CompletedCount { get; set; }
     public int WaitlistedCount { get; set; }
     public bool IsFull { get; set; }
     public bool HasWaitlist => WaitlistedCount > 0;
