@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { scoreFormatsApi, scoreMethodsApi } from '../services/api';
 import { GameFormatBadge } from '../components/GameFormatSelector';
+import HelpIcon from '../components/ui/HelpIcon';
 
 /**
  * Admin page for managing Game Format presets
@@ -209,7 +210,10 @@ export default function GameFormatsAdmin({ embedded = false }) {
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Game Formats</h1>
+            <h1 className="flex items-center gap-2 text-2xl font-bold text-gray-900">
+              Game Formats
+              <HelpIcon topicCode="admin.gameFormats" size="sm" />
+            </h1>
             <p className="text-sm text-gray-500 mt-1">
               Manage preset scoring formats for games
             </p>

@@ -7,6 +7,7 @@ import {
 import api, { scoreMethodsApi } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import { getSharedAssetUrl } from '../services/api';
+import HelpIcon from '../components/ui/HelpIcon';
 
 // API endpoints
 const gamedayApi = {

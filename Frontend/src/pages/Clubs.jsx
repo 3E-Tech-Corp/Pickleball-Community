@@ -18,6 +18,7 @@ import PublicProfileModal from '../components/ui/PublicProfileModal';
 import VenueMap from '../components/ui/VenueMap';
 import VenuePicker from '../components/ui/VenuePicker';
 import ShareLink from '../components/ui/ShareLink';
+import HelpIcon from '../components/ui/HelpIcon';
 
 export default function Clubs() {
   const { user, isAuthenticated } = useAuth();
@@ -2134,6 +2135,7 @@ function ClubDetailModal({ club, isAuthenticated, currentUserId, onClose, onJoin
                   <h3 className="font-medium text-gray-900 mb-2 flex items-center gap-2">
                     <DollarSign className="w-5 h-5 text-green-600" />
                     Membership Fee
+                    <HelpIcon topicCode="club.membership" size="sm" />
                   </h3>
                   <div className="bg-green-50 border border-green-200 rounded-lg p-4">
                     <div className="flex items-center justify-between mb-2">

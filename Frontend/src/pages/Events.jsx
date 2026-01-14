@@ -12,6 +12,7 @@ import PaymentModal from '../components/PaymentModal';
 import AdminPaymentModal from '../components/AdminPaymentModal';
 import MemberPaymentModal from '../components/MemberPaymentModal';
 import PublicProfileModal from '../components/ui/PublicProfileModal';
+import HelpIcon from '../components/ui/HelpIcon';
 
 export default function Events() {
   const { user, isAuthenticated } = useAuth();
@@ -4721,7 +4722,10 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
                       </select>
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Payment Model</label>
+                      <label className="flex items-center gap-1 text-sm font-medium text-gray-700 mb-1">
+                        Payment Model
+                        <HelpIcon topicCode="event.paymentModel" size="sm" />
+                      </label>
                       <select value={editFormData?.paymentModel || 'per_unit'} onChange={(e) => setEditFormData({ ...editFormData, paymentModel: e.target.value })} className="w-full border border-gray-300 rounded-lg p-2">
                         <option value="per_unit">Per Unit (team pays)</option>
                         <option value="per_person">Per Person (each pays)</option>
@@ -6476,7 +6480,10 @@ function CreateEventModal({ eventTypes, teamUnits = [], skillLevels = [], courtI
           {step === 2 && (
             <>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Event Type *</label>
+                <label className="flex items-center gap-1 text-sm font-medium text-gray-700 mb-1">
+                  Event Type *
+                  <HelpIcon topicCode="event.eventType" size="sm" />
+                </label>
                 <select
                   value={formData.eventTypeId}
                   onChange={(e) => setFormData({ ...formData, eventTypeId: parseInt(e.target.value) })}
@@ -6663,7 +6670,10 @@ function CreateEventModal({ eventTypes, teamUnits = [], skillLevels = [], courtI
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Payment Model</label>
+                  <label className="flex items-center gap-1 text-sm font-medium text-gray-700 mb-1">
+                    Payment Model
+                    <HelpIcon topicCode="event.paymentModel" size="sm" />
+                  </label>
                   <select
                     value={formData.paymentModel}
                     onChange={(e) => setFormData({ ...formData, paymentModel: e.target.value })}

@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import { certificationApi, SHARED_AUTH_URL, getSharedAssetUrl } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import { User, Star, CheckCircle, AlertCircle, Award, GraduationCap, RefreshCw, Info } from 'lucide-react';
+import HelpIcon from '../components/ui/HelpIcon';
 
 export default function PlayerReview() {
   const { token } = useParams();
@@ -326,8 +327,9 @@ export default function PlayerReview() {
           {/* Knowledge Level - Hidden for self-review */}
           {!isSelfReview && (
             <div className="bg-white rounded-xl shadow-lg p-6">
-              <label className="block text-lg font-semibold text-gray-900 mb-2">
+              <label className="flex items-center gap-2 text-lg font-semibold text-gray-900 mb-2">
                 How well do you know this player? *
+                <HelpIcon topicCode="review.weights" size="sm" />
               </label>
               <select
                 value={formData.knowledgeLevelId}
