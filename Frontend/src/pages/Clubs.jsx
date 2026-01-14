@@ -789,8 +789,8 @@ export default function Clubs() {
                     </div>
                   </div>
                 ) : (
-                  /* List View */
-                  <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                  /* List View - Row-based cards */
+                  <div className="space-y-4">
                     {clubs.map(club => (
                       <ClubCard
                         key={club.id}
@@ -858,7 +858,7 @@ export default function Clubs() {
                   <Crown className="w-5 h-5 text-yellow-500" />
                   Clubs I Manage
                 </h2>
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                <div className="space-y-4">
                   {myClubs.clubsIManage.map(club => (
                     <ClubCard
                       key={club.id}
@@ -878,7 +878,7 @@ export default function Clubs() {
                   <Users className="w-5 h-5 text-purple-500" />
                   Clubs I'm a Member Of
                 </h2>
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                <div className="space-y-4">
                   {myClubs.clubsIBelong.map(club => (
                     <ClubCard
                       key={club.id}
@@ -984,32 +984,48 @@ export default function Clubs() {
 
 function ClubCard({ club, onViewDetails, showManageButton = false }) {
   return (
-    <div className="bg-white rounded-xl shadow-sm overflow-hidden hover:shadow-md transition-shadow">
-      {club.logoUrl && (
-        <div className="h-32 bg-purple-100 relative">
+    <div
+      onClick={onViewDetails}
+      className="bg-white rounded-xl shadow-sm overflow-hidden hover:shadow-md transition-all cursor-pointer group flex flex-col sm:flex-row"
+    >
+      {/* Logo/Image - Left side on desktop, top on mobile */}
+      <div className="sm:w-48 sm:flex-shrink-0 h-32 sm:h-auto bg-purple-100 relative">
+        {club.logoUrl ? (
           <img
             src={getSharedAssetUrl(club.logoUrl)}
             alt={club.name}
             className="w-full h-full object-cover"
           />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-purple-100 to-purple-200">
+            <Users className="w-12 h-12 text-purple-400" />
+          </div>
+        )}
+      </div>
+
+      {/* Content - Right side on desktop */}
+      <div className="flex-1 p-4 sm:p-5 flex flex-col">
+        <div className="flex items-start justify-between gap-2 mb-2">
+          <div className="flex-1 min-w-0">
+            <h3 className="font-semibold text-gray-900 group-hover:text-purple-600 transition-colors">{club.name}</h3>
+            {club.description && (
+              <p className="text-sm text-gray-600 mt-1 line-clamp-2">{club.description}</p>
+            )}
+          </div>
+          <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-purple-600 transition-colors flex-shrink-0 hidden sm:block" />
         </div>
-      )}
-      <div className="p-5">
-        <div className="flex items-start justify-between mb-2">
-          <h3 className="font-semibold text-gray-900">{club.name}</h3>
+
+        {/* Info row */}
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-600 mt-auto">
+          {/* Members count */}
           <div className="flex items-center gap-1 text-purple-600">
             <Users className="w-4 h-4" />
-            <span className="text-sm font-medium">{club.memberCount}</span>
+            <span className="font-medium">{club.memberCount} member{club.memberCount !== 1 ? 's' : ''}</span>
           </div>
-        </div>
 
-        {club.description && (
-          <p className="text-sm text-gray-600 mb-3 line-clamp-2">{club.description}</p>
-        )}
-
-        <div className="space-y-2 text-sm text-gray-600">
+          {/* Location */}
           {club.homeVenueId && club.homeVenueName ? (
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1">
               <MapPin className="w-4 h-4 flex-shrink-0" />
               <Link
                 to={`/venues?venueId=${club.homeVenueId}`}
@@ -1020,42 +1036,48 @@ function ClubCard({ club, onViewDetails, showManageButton = false }) {
               </Link>
             </div>
           ) : (club.city || club.state) && (
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1">
               <MapPin className="w-4 h-4 flex-shrink-0" />
               <span className="truncate">
                 {club.city}{club.state && `, ${club.state}`}{club.country && club.country !== 'USA' && `, ${club.country}`}
               </span>
             </div>
           )}
+
+          {/* Distance */}
           {club.distance && (
-            <div className="flex items-center gap-2 text-purple-600">
+            <div className="flex items-center gap-1 text-purple-600 font-medium">
               <MapPin className="w-4 h-4" />
-              <span>{club.distance.toFixed(1)} miles away</span>
+              <span>{club.distance.toFixed(1)} mi</span>
             </div>
           )}
+
+          {/* Membership fee */}
           {club.hasMembershipFee && (
-            <div className="flex items-center gap-2 text-green-600">
+            <div className="flex items-center gap-1 text-green-600">
               <DollarSign className="w-4 h-4" />
-              <span>Membership Fee{club.membershipFeeAmount && `: ${club.membershipFeeAmount}`}</span>
+              <span>Fee{club.membershipFeeAmount && `: ${club.membershipFeeAmount}`}</span>
             </div>
           )}
         </div>
 
-        <div className="mt-4 flex gap-2">
+        {/* Action buttons - right aligned on desktop */}
+        <div className="mt-3 pt-3 border-t border-gray-100 flex items-center justify-end gap-2">
+          {showManageButton && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onViewDetails(); }}
+              className="px-3 py-1.5 text-sm border border-purple-600 text-purple-600 rounded-lg hover:bg-purple-50 transition-colors flex items-center gap-1"
+            >
+              <Settings className="w-4 h-4" />
+              Manage
+            </button>
+          )}
           <button
-            onClick={onViewDetails}
-            className="flex-1 py-2 bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700 transition-colors"
+            onClick={(e) => { e.stopPropagation(); onViewDetails(); }}
+            className="px-4 py-1.5 text-sm bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700 transition-colors"
           >
             View Details
           </button>
-          {showManageButton && (
-            <button
-              onClick={onViewDetails}
-              className="p-2 border border-purple-600 text-purple-600 rounded-lg hover:bg-purple-50 transition-colors"
-            >
-              <Settings className="w-5 h-5" />
-            </button>
-          )}
         </div>
       </div>
     </div>
