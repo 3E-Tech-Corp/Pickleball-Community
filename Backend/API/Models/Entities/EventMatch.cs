@@ -88,6 +88,16 @@ public class EventMatch
     [MaxLength(500)]
     public string? Notes { get; set; }
 
+    /// <summary>
+    /// Whether winning this match qualifies a unit for playoffs
+    /// </summary>
+    public bool IsPlayoffQualifier { get; set; } = false;
+
+    /// <summary>
+    /// Which playoff position the winner advances to
+    /// </summary>
+    public int? PlayoffAdvancePosition { get; set; }
+
     public DateTime CreatedAt { get; set; } = DateTime.Now;
     public DateTime UpdatedAt { get; set; } = DateTime.Now;
 

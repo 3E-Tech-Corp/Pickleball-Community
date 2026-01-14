@@ -1,0 +1,495 @@
+import React, { useState, useEffect, useCallback } from 'react'
+import { useParams, useNavigate } from 'react-router-dom'
+import {
+  ArrowLeft, CheckCircle, XCircle, Play, Clock, MapPin,
+  RefreshCw, AlertCircle, FileText, Trophy, Calendar,
+  ChevronRight, User
+} from 'lucide-react'
+import { gameDayApi, checkInApi } from '../services/api'
+
+export default function PlayerGameDay() {
+  const { eventId } = useParams()
+  const navigate = useNavigate()
+  const [gameDay, setGameDay] = useState(null)
+  const [checkInStatus, setCheckInStatus] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [refreshing, setRefreshing] = useState(false)
+  const [showWaiverModal, setShowWaiverModal] = useState(false)
+  const [showScoreModal, setShowScoreModal] = useState(null)
+
+  const loadData = useCallback(async () => {
+    try {
+      setRefreshing(true)
+      const [gameDayRes, checkInRes] = await Promise.all([
+        gameDayApi.getPlayerGameDay(eventId),
+        checkInApi.getStatus(eventId)
+      ])
+      if (gameDayRes.success) setGameDay(gameDayRes.data)
+      if (checkInRes.success) setCheckInStatus(checkInRes.data)
+    } catch (err) {
+      setError(err.message || 'Failed to load data')
+    } finally {
+      setLoading(false)
+      setRefreshing(false)
+    }
+  }, [eventId])
+
+  useEffect(() => {
+    loadData()
+    // Auto-refresh every 15 seconds
+    const interval = setInterval(loadData, 15000)
+    return () => clearInterval(interval)
+  }, [loadData])
+
+  const handleCheckIn = async () => {
+    try {
+      // Check if waiver needs to be signed first
+      if (checkInStatus?.pendingWaivers?.length > 0) {
+        setShowWaiverModal(true)
+        return
+      }
+
+      const result = await checkInApi.checkIn(eventId)
+      if (result.success) {
+        loadData()
+      }
+    } catch (err) {
+      if (err.response?.data?.error?.includes('waiver')) {
+        setShowWaiverModal(true)
+      } else {
+        alert('Failed to check in: ' + (err.message || 'Unknown error'))
+      }
+    }
+  }
+
+  const handleSignWaiver = async (waiverId) => {
+    try {
+      await checkInApi.signWaiver(eventId, waiverId)
+      setShowWaiverModal(false)
+      loadData()
+    } catch (err) {
+      alert('Failed to sign waiver: ' + (err.message || 'Unknown error'))
+    }
+  }
+
+  const handleSubmitScore = async (gameId, unit1Score, unit2Score) => {
+    try {
+      await gameDayApi.submitScore(gameId, unit1Score, unit2Score)
+      setShowScoreModal(null)
+      loadData()
+    } catch (err) {
+      alert('Failed to submit score: ' + (err.message || 'Unknown error'))
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <div className="text-center">
+          <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">Error</h2>
+          <p className="text-gray-600 mb-4">{error}</p>
+          <button
+            onClick={loadData}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          >
+            Try Again
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  if (!gameDay) return null
+
+  return (
+    <div className="min-h-screen bg-gray-50 pb-20">
+      {/* Header */}
+      <header className="bg-white border-b sticky top-0 z-10">
+        <div className="max-w-lg mx-auto px-4 py-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <button onClick={() => navigate(-1)} className="p-2 hover:bg-gray-100 rounded-lg">
+                <ArrowLeft className="w-5 h-5" />
+              </button>
+              <div>
+                <h1 className="text-lg font-semibold">{gameDay.eventName}</h1>
+                <p className="text-sm text-gray-500">Game Day</p>
+              </div>
+            </div>
+            <button
+              onClick={loadData}
+              disabled={refreshing}
+              className="p-2 hover:bg-gray-100 rounded-lg"
+            >
+              <RefreshCw className={`w-5 h-5 ${refreshing ? 'animate-spin' : ''}`} />
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <div className="max-w-lg mx-auto px-4 py-4 space-y-4">
+        {/* Check-in Card */}
+        <div className={`rounded-xl p-4 ${
+          gameDay.isCheckedIn ? 'bg-green-50 border border-green-200' : 'bg-yellow-50 border border-yellow-200'
+        }`}>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              {gameDay.isCheckedIn ? (
+                <CheckCircle className="w-8 h-8 text-green-600" />
+              ) : (
+                <AlertCircle className="w-8 h-8 text-yellow-600" />
+              )}
+              <div>
+                <div className="font-semibold">
+                  {gameDay.isCheckedIn ? 'Checked In' : 'Not Checked In'}
+                </div>
+                {gameDay.isCheckedIn && gameDay.checkedInAt && (
+                  <div className="text-sm text-gray-600">
+                    {new Date(gameDay.checkedInAt).toLocaleTimeString()}
+                  </div>
+                )}
+              </div>
+            </div>
+            {!gameDay.isCheckedIn && (
+              <button
+                onClick={handleCheckIn}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
+              >
+                Check In
+              </button>
+            )}
+          </div>
+
+          {/* Waiver status */}
+          {checkInStatus && !gameDay.waiverSigned && checkInStatus.pendingWaivers?.length > 0 && (
+            <div className="mt-3 pt-3 border-t border-yellow-200">
+              <button
+                onClick={() => setShowWaiverModal(true)}
+                className="flex items-center gap-2 text-yellow-700 hover:text-yellow-800"
+              >
+                <FileText className="w-4 h-4" />
+                <span className="text-sm">Waiver requires signature</span>
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* My Divisions */}
+        {gameDay.myDivisions.length > 0 && (
+          <div className="bg-white rounded-xl p-4 border">
+            <h2 className="font-semibold mb-3 flex items-center gap-2">
+              <User className="w-5 h-5 text-blue-600" /> My Registrations
+            </h2>
+            <div className="space-y-2">
+              {gameDay.myDivisions.map((div, idx) => (
+                <div key={idx} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                  <div>
+                    <div className="font-medium">{div.divisionName}</div>
+                    <div className="text-sm text-gray-500">{div.unitName}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Current/Upcoming Game Alert */}
+        {gameDay.upcomingGame && (
+          <div className="bg-blue-600 text-white rounded-xl p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <Play className="w-5 h-5" />
+              <span className="font-semibold">
+                {gameDay.upcomingGame.status === 'Playing' ? 'Game In Progress' : 'You\'re Up Next!'}
+              </span>
+            </div>
+            <div className="text-lg font-bold mb-1">
+              {gameDay.upcomingGame.unit1Name} vs {gameDay.upcomingGame.unit2Name}
+            </div>
+            {gameDay.upcomingGame.courtName && (
+              <div className="flex items-center gap-1 text-blue-100">
+                <MapPin className="w-4 h-4" />
+                {gameDay.upcomingGame.courtName}
+              </div>
+            )}
+            <div className="text-sm text-blue-100 mt-1">{gameDay.upcomingGame.divisionName}</div>
+
+            {gameDay.upcomingGame.status === 'Playing' && (
+              <div className="mt-3 text-center">
+                <div className="text-3xl font-bold">
+                  {gameDay.upcomingGame.unit1Score} - {gameDay.upcomingGame.unit2Score}
+                </div>
+                {gameDay.upcomingGame.canSubmitScore && (
+                  <button
+                    onClick={() => setShowScoreModal(gameDay.upcomingGame)}
+                    className="mt-2 px-4 py-2 bg-white text-blue-600 rounded-lg font-medium"
+                  >
+                    Submit Score
+                  </button>
+                )}
+                {gameDay.upcomingGame.needsConfirmation && (
+                  <button
+                    onClick={() => setShowScoreModal(gameDay.upcomingGame)}
+                    className="mt-2 px-4 py-2 bg-yellow-500 text-white rounded-lg font-medium"
+                  >
+                    Confirm Score
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* All My Games */}
+        <div className="bg-white rounded-xl p-4 border">
+          <h2 className="font-semibold mb-3 flex items-center gap-2">
+            <Calendar className="w-5 h-5 text-blue-600" /> My Games
+          </h2>
+          <div className="space-y-3">
+            {gameDay.myGames.length === 0 ? (
+              <p className="text-gray-500 text-center py-4">No games scheduled yet</p>
+            ) : (
+              gameDay.myGames.map(game => (
+                <GameCard
+                  key={game.gameId}
+                  game={game}
+                  onSubmitScore={() => setShowScoreModal(game)}
+                />
+              ))
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Waiver Modal */}
+      {showWaiverModal && checkInStatus?.pendingWaivers && (
+        <WaiverModal
+          waivers={checkInStatus.pendingWaivers}
+          onSign={handleSignWaiver}
+          onClose={() => setShowWaiverModal(false)}
+        />
+      )}
+
+      {/* Score Modal */}
+      {showScoreModal && (
+        <ScoreModal
+          game={showScoreModal}
+          onSubmit={handleSubmitScore}
+          onClose={() => setShowScoreModal(null)}
+        />
+      )}
+    </div>
+  )
+}
+
+function GameCard({ game, onSubmitScore }) {
+  const isMyUnit1 = game.myUnitId === game.unit1Id
+  const myTeam = isMyUnit1 ? game.unit1Name : game.unit2Name
+  const opponent = isMyUnit1 ? game.unit2Name : game.unit1Name
+  const myScore = isMyUnit1 ? game.unit1Score : game.unit2Score
+  const opponentScore = isMyUnit1 ? game.unit2Score : game.unit1Score
+
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'Playing': return 'bg-green-100 text-green-700'
+      case 'Queued': return 'bg-blue-100 text-blue-700'
+      case 'Ready': return 'bg-yellow-100 text-yellow-700'
+      case 'Finished': return 'bg-gray-100 text-gray-700'
+      default: return 'bg-gray-100 text-gray-700'
+    }
+  }
+
+  return (
+    <div className="border rounded-lg p-3">
+      <div className="flex items-center justify-between mb-2">
+        <span className={`text-xs px-2 py-0.5 rounded-full ${getStatusColor(game.status)}`}>
+          {game.status}
+        </span>
+        <span className="text-xs text-gray-500">{game.divisionName}</span>
+      </div>
+
+      <div className="flex items-center justify-between">
+        <div className="flex-1">
+          <div className="font-medium text-blue-600">{myTeam}</div>
+          <div className="text-sm text-gray-600">vs {opponent}</div>
+        </div>
+
+        {game.status === 'Finished' && (
+          <div className="text-right">
+            <div className={`text-xl font-bold ${myScore > opponentScore ? 'text-green-600' : myScore < opponentScore ? 'text-red-600' : ''}`}>
+              {myScore} - {opponentScore}
+            </div>
+            {myScore > opponentScore && <Trophy className="w-4 h-4 text-yellow-500 ml-auto" />}
+          </div>
+        )}
+
+        {game.status === 'Playing' && (
+          <div className="text-right">
+            <div className="text-xl font-bold">{myScore} - {opponentScore}</div>
+            {game.canSubmitScore && (
+              <button
+                onClick={onSubmitScore}
+                className="text-xs text-blue-600 hover:underline"
+              >
+                Submit Score
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+
+      {game.courtName && (
+        <div className="mt-2 flex items-center gap-1 text-sm text-gray-500">
+          <MapPin className="w-3 h-3" />
+          {game.courtName}
+        </div>
+      )}
+
+      {game.roundName && (
+        <div className="mt-1 text-xs text-gray-400">{game.roundName}</div>
+      )}
+    </div>
+  )
+}
+
+function WaiverModal({ waivers, onSign, onClose }) {
+  const [currentWaiver, setCurrentWaiver] = useState(waivers[0])
+  const [agreed, setAgreed] = useState(false)
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-end md:items-center justify-center z-50">
+      <div className="bg-white rounded-t-2xl md:rounded-xl w-full max-w-lg max-h-[90vh] overflow-hidden">
+        <div className="p-4 border-b flex justify-between items-center">
+          <h3 className="font-semibold">Sign Waiver</h3>
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
+            <XCircle className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="p-4 overflow-auto max-h-[60vh]">
+          <h4 className="font-medium mb-2">{currentWaiver.title}</h4>
+          <div className="prose prose-sm text-gray-600 whitespace-pre-wrap">
+            {currentWaiver.content}
+          </div>
+        </div>
+
+        <div className="p-4 border-t">
+          <label className="flex items-start gap-2 mb-4">
+            <input
+              type="checkbox"
+              checked={agreed}
+              onChange={(e) => setAgreed(e.target.checked)}
+              className="mt-1"
+            />
+            <span className="text-sm text-gray-600">
+              I have read and agree to the terms of this waiver
+            </span>
+          </label>
+
+          <div className="flex gap-2">
+            <button
+              onClick={onClose}
+              className="flex-1 py-2 border rounded-lg hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => onSign(currentWaiver.id)}
+              disabled={!agreed}
+              className="flex-1 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+            >
+              Sign Waiver
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ScoreModal({ game, onSubmit, onClose }) {
+  const [unit1Score, setUnit1Score] = useState(game.unit1Score || 0)
+  const [unit2Score, setUnit2Score] = useState(game.unit2Score || 0)
+  const [submitting, setSubmitting] = useState(false)
+
+  const handleSubmit = async () => {
+    setSubmitting(true)
+    await onSubmit(game.gameId, unit1Score, unit2Score)
+    setSubmitting(false)
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-end md:items-center justify-center z-50">
+      <div className="bg-white rounded-t-2xl md:rounded-xl w-full max-w-md">
+        <div className="p-4 border-b flex justify-between items-center">
+          <h3 className="font-semibold">
+            {game.needsConfirmation ? 'Confirm Score' : 'Submit Score'}
+          </h3>
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
+            <XCircle className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="p-6">
+          <div className="grid grid-cols-3 gap-4 items-center">
+            <div className="text-center">
+              <div className="font-medium mb-2">{game.unit1Name}</div>
+              <input
+                type="number"
+                min="0"
+                value={unit1Score}
+                onChange={(e) => setUnit1Score(parseInt(e.target.value) || 0)}
+                className="w-20 h-16 text-2xl font-bold text-center border rounded-lg mx-auto"
+              />
+            </div>
+
+            <div className="text-center text-2xl font-bold text-gray-400">vs</div>
+
+            <div className="text-center">
+              <div className="font-medium mb-2">{game.unit2Name}</div>
+              <input
+                type="number"
+                min="0"
+                value={unit2Score}
+                onChange={(e) => setUnit2Score(parseInt(e.target.value) || 0)}
+                className="w-20 h-16 text-2xl font-bold text-center border rounded-lg mx-auto"
+              />
+            </div>
+          </div>
+
+          {game.needsConfirmation && (
+            <p className="text-sm text-gray-500 text-center mt-4">
+              Opponent submitted: {game.unit1Score} - {game.unit2Score}
+            </p>
+          )}
+        </div>
+
+        <div className="p-4 border-t flex gap-2">
+          <button
+            onClick={onClose}
+            className="flex-1 py-2 border rounded-lg hover:bg-gray-50"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSubmit}
+            disabled={submitting}
+            className="flex-1 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+          >
+            {submitting ? 'Submitting...' : game.needsConfirmation ? 'Confirm' : 'Submit'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}

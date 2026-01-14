@@ -96,6 +96,32 @@ public class EventUnit
     public int PointsScored { get; set; } = 0;
     public int PointsAgainst { get; set; } = 0;
 
+    // Ranking and Playoff
+    /// <summary>
+    /// Rank within pool (for round robin)
+    /// </summary>
+    public int? PoolRank { get; set; }
+
+    /// <summary>
+    /// Overall rank in division
+    /// </summary>
+    public int? OverallRank { get; set; }
+
+    /// <summary>
+    /// Whether this unit advanced to playoff round
+    /// </summary>
+    public bool AdvancedToPlayoff { get; set; } = false;
+
+    /// <summary>
+    /// Whether this unit was manually advanced by TD
+    /// </summary>
+    public bool ManuallyAdvanced { get; set; } = false;
+
+    /// <summary>
+    /// Final placement in the tournament (1st, 2nd, 3rd, etc.)
+    /// </summary>
+    public int? FinalPlacement { get; set; }
+
     public DateTime CreatedAt { get; set; } = DateTime.Now;
     public DateTime UpdatedAt { get; set; } = DateTime.Now;
 
@@ -154,6 +180,16 @@ public class EventUnitMember
     public string? PaymentReference { get; set; }
     public string? ReferenceId { get; set; }
 
+    /// <summary>
+    /// When the waiver was signed
+    /// </summary>
+    public DateTime? WaiverSignedAt { get; set; }
+
+    /// <summary>
+    /// Reference to the waiver document signed
+    /// </summary>
+    public int? WaiverDocumentId { get; set; }
+
     public DateTime CreatedAt { get; set; } = DateTime.Now;
 
     // Navigation
@@ -162,6 +198,9 @@ public class EventUnitMember
 
     [ForeignKey("UserId")]
     public User? User { get; set; }
+
+    [ForeignKey("WaiverDocumentId")]
+    public EventWaiver? WaiverDocument { get; set; }
 }
 
 /// <summary>

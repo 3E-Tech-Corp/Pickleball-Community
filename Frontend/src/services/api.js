@@ -1860,4 +1860,119 @@ export const notificationTemplatesApi = {
   copyDefaultsToEvent: (eventId) => api.post(`/eventnotificationtemplates/event/${eventId}/copy-defaults`)
 }
 
+// Check-In API (Game Day)
+export const checkInApi = {
+  // Get check-in status for current user
+  getStatus: (eventId) => api.get(`/checkin/status/${eventId}`),
+
+  // Self check-in
+  checkIn: (eventId) => api.post(`/checkin/${eventId}`),
+
+  // Manual check-in by TD
+  manualCheckIn: (eventId, userId, data = {}) => api.post(`/checkin/manual/${eventId}/${userId}`, data),
+
+  // Sign waiver
+  signWaiver: (eventId, waiverId) => api.post(`/checkin/waiver/${eventId}`, { waiverId }),
+
+  // Get event check-in summary (TD view)
+  getEventCheckIns: (eventId) => api.get(`/checkin/event/${eventId}`),
+
+  // Get waivers for event
+  getWaivers: (eventId) => api.get(`/checkin/waivers/${eventId}`),
+
+  // Create waiver (TD)
+  createWaiver: (eventId, data) => api.post(`/checkin/waivers/${eventId}`, data)
+}
+
+// Tournament Game Day API
+export const gameDayApi = {
+  // TD Dashboard
+  getTDDashboard: (eventId) => api.get(`/tournament-gameday/td/${eventId}`),
+
+  // Player Dashboard
+  getPlayerGameDay: (eventId) => api.get(`/tournament-gameday/player/${eventId}`),
+
+  // Get ready games
+  getReadyGames: (eventId, divisionId = null) => {
+    const params = divisionId ? `?divisionId=${divisionId}` : ''
+    return api.get(`/tournament-gameday/ready-games/${eventId}${params}`)
+  },
+
+  // Queue a game to a court
+  queueGame: (gameId, courtId) => api.post('/tournament-gameday/queue-game', { gameId, courtId }),
+
+  // Start a game
+  startGame: (gameId) => api.post(`/tournament-gameday/start-game/${gameId}`),
+
+  // Submit score
+  submitScore: (gameId, unit1Score, unit2Score, finalize = false, reason = null) =>
+    api.post(`/tournament-gameday/score/${gameId}`, { unit1Score, unit2Score, finalize, reason }),
+
+  // Get standings
+  getStandings: (eventId, divisionId) => api.get(`/tournament-gameday/standings/${eventId}/${divisionId}`),
+
+  // Override rank (TD only)
+  overrideRank: (unitId, data) => api.post(`/tournament-gameday/override-rank/${unitId}`, data),
+
+  // Send notification
+  sendNotification: (eventId, data) => api.post(`/tournament-gameday/notify/${eventId}`, data)
+}
+
+// Spectator API
+export const spectatorApi = {
+  // Get subscriptions
+  getSubscriptions: (eventId) => api.get(`/spectator/subscriptions/${eventId}`),
+
+  // Subscribe
+  subscribe: (data) => api.post('/spectator/subscribe', data),
+
+  // Unsubscribe
+  unsubscribe: (subscriptionId) => api.delete(`/spectator/unsubscribe/${subscriptionId}`),
+
+  // Toggle subscription
+  toggleSubscription: (subscriptionId) => api.put(`/spectator/toggle/${subscriptionId}`),
+
+  // Get spectator view
+  getEventView: (eventId) => api.get(`/spectator/event/${eventId}`),
+
+  // Get subscribable items
+  getSubscribableItems: (eventId) => api.get(`/spectator/subscribable/${eventId}`)
+}
+
+// Scoreboard API
+export const scoreboardApi = {
+  // Get scoreboard with filters
+  getScoreboard: (eventId, params = {}) => {
+    const queryParams = new URLSearchParams()
+    if (params.divisionId) queryParams.append('divisionId', params.divisionId)
+    if (params.roundType) queryParams.append('roundType', params.roundType)
+    if (params.status) queryParams.append('status', params.status)
+    if (params.page) queryParams.append('page', params.page)
+    if (params.pageSize) queryParams.append('pageSize', params.pageSize)
+    const queryString = queryParams.toString()
+    return api.get(`/scoreboard/${eventId}${queryString ? `?${queryString}` : ''}`)
+  },
+
+  // Get live scores
+  getLiveScores: (eventId) => api.get(`/scoreboard/live/${eventId}`),
+
+  // Get event results
+  getResults: (eventId, divisionId = null) => {
+    const params = divisionId ? `?divisionId=${divisionId}` : ''
+    return api.get(`/scoreboard/results/${eventId}${params}`)
+  },
+
+  // Download results CSV
+  getResultsDownloadUrl: (eventId, divisionId = null) => {
+    const params = divisionId ? `?divisionId=${divisionId}` : ''
+    return `${API_BASE_URL}/scoreboard/results/${eventId}/download${params}`
+  },
+
+  // Get bracket
+  getBracket: (eventId, divisionId) => api.get(`/scoreboard/bracket/${eventId}/${divisionId}`),
+
+  // Get pools
+  getPools: (eventId, divisionId) => api.get(`/scoreboard/pools/${eventId}/${divisionId}`)
+}
+
 export default api
