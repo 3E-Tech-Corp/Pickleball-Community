@@ -33,7 +33,7 @@ public class CheckInController : ControllerBase
     /// </summary>
     [HttpGet("status/{eventId}")]
     [Authorize]
-    public async Task<ActionResult<ApiResponse<CheckInStatusDto>>> GetCheckInStatus(int eventId)
+    public async Task<ActionResult<ApiResponse<PlayerCheckInStatusDto>>> GetCheckInStatus(int eventId)
     {
         var userId = GetUserId();
         if (userId == 0) return Unauthorized();
@@ -48,10 +48,10 @@ public class CheckInController : ControllerBase
 
         if (!registrations.Any())
         {
-            return Ok(new ApiResponse<CheckInStatusDto>
+            return Ok(new ApiResponse<PlayerCheckInStatusDto>
             {
                 Success = true,
-                Data = new CheckInStatusDto
+                Data = new PlayerCheckInStatusDto
                 {
                     IsRegistered = false,
                     IsCheckedIn = false,
@@ -72,10 +72,10 @@ public class CheckInController : ControllerBase
         var firstReg = registrations.First();
         var allWaiversSigned = !waivers.Any() || firstReg.WaiverSignedAt != null;
 
-        return Ok(new ApiResponse<CheckInStatusDto>
+        return Ok(new ApiResponse<PlayerCheckInStatusDto>
         {
             Success = true,
-            Data = new CheckInStatusDto
+            Data = new PlayerCheckInStatusDto
             {
                 IsRegistered = true,
                 IsCheckedIn = firstReg.IsCheckedIn,
@@ -475,7 +475,7 @@ public class CheckInController : ControllerBase
 }
 
 // DTOs for Check-In
-public class CheckInStatusDto
+public class PlayerCheckInStatusDto
 {
     public bool IsRegistered { get; set; }
     public bool IsCheckedIn { get; set; }

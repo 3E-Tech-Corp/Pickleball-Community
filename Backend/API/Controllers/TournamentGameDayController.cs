@@ -134,7 +134,7 @@ public class TournamentGameDayController : ControllerBase
                 GamesReady = games.FirstOrDefault(g => g.Status == "Ready")?.Count ?? 0,
                 GamesInProgress = games.Where(g => g.Status == "Queued" || g.Status == "Started" || g.Status == "Playing").Sum(g => g.Count),
                 GamesCompleted = games.FirstOrDefault(g => g.Status == "Finished")?.Count ?? 0,
-                Courts = courts.Select(c => new CourtStatusDto
+                Courts = courts.Select(c => new TDCourtStatusDto
                 {
                     CourtId = c.Id,
                     Name = c.CourtLabel,
@@ -186,7 +186,7 @@ public class TournamentGameDayController : ControllerBase
                 .ThenInclude(g => g!.TournamentCourt)
             .OrderBy(p => p.Game!.Match!.RoundNumber)
             .ThenBy(p => p.Game!.Match!.MatchNumber)
-            .Select(p => new PlayerGameDto
+            .Select(p => new PlayerGameDayDto
             {
                 GameId = p.GameId,
                 GameNumber = p.Game!.GameNumber,
@@ -900,12 +900,12 @@ public class TDDashboardDto
     public int GamesReady { get; set; }
     public int GamesInProgress { get; set; }
     public int GamesCompleted { get; set; }
-    public List<CourtStatusDto> Courts { get; set; } = new();
+    public List<TDCourtStatusDto> Courts { get; set; } = new();
     public List<ReadyGameDto> ReadyGames { get; set; } = new();
     public List<GameQueueItemDto> InProgressGames { get; set; } = new();
 }
 
-public class CourtStatusDto
+public class TDCourtStatusDto
 {
     public int CourtId { get; set; }
     public string Name { get; set; } = string.Empty;
@@ -971,9 +971,9 @@ public class PlayerGameDayDto
     public DateTime? CheckedInAt { get; set; }
     public bool WaiverSigned { get; set; }
     public List<PlayerDivisionDto> MyDivisions { get; set; } = new();
-    public List<PlayerGameDto> MyGames { get; set; } = new();
-    public PlayerGameDto? UpcomingGame { get; set; }
-    public PlayerGameDto? NextGame { get; set; }
+    public List<PlayerGameDayDto> MyGames { get; set; } = new();
+    public PlayerGameDayDto? UpcomingGame { get; set; }
+    public PlayerGameDayDto? NextGame { get; set; }
 }
 
 public class PlayerDivisionDto
@@ -984,7 +984,7 @@ public class PlayerDivisionDto
     public string UnitName { get; set; } = string.Empty;
 }
 
-public class PlayerGameDto
+public class PlayerGameDayDto
 {
     public int GameId { get; set; }
     public int GameNumber { get; set; }
