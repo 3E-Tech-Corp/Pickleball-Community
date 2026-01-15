@@ -731,12 +731,18 @@ public class TournamentController : ControllerBase
 
         var joinRequest = await _context.EventUnitJoinRequests
             .Include(r => r.Unit)
+                .ThenInclude(u => u!.Event)
             .FirstOrDefaultAsync(r => r.Id == request.RequestId);
 
         if (joinRequest == null)
             return NotFound(new ApiResponse<bool> { Success = false, Message = "Request not found" });
 
-        if (joinRequest.Unit?.CaptainUserId != userId.Value)
+        // Allow captain, site admin, or event organizer to respond
+        var isAdmin = await IsAdminAsync();
+        var isOrganizer = joinRequest.Unit?.Event?.OrganizedByUserId == userId.Value;
+        var isCaptain = joinRequest.Unit?.CaptainUserId == userId.Value;
+
+        if (!isCaptain && !isAdmin && !isOrganizer)
             return Forbid();
 
         // If accepting, check MaxPlayers capacity (allow but waitlist if over capacity)
@@ -1081,6 +1087,72 @@ public class TournamentController : ControllerBase
         await _context.SaveChangesAsync();
 
         return Ok(new ApiResponse<bool> { Success = true, Data = true, Message = "Successfully unregistered from division" });
+    }
+
+    /// <summary>
+    /// Admin/Organizer: Cancel a unit registration (break/remove team)
+    /// </summary>
+    [Authorize]
+    [HttpDelete("units/{unitId}/admin-cancel")]
+    public async Task<ActionResult<ApiResponse<bool>>> AdminCancelUnit(int unitId)
+    {
+        var userId = GetUserId();
+        if (!userId.HasValue)
+            return Unauthorized(new ApiResponse<bool> { Success = false, Message = "Unauthorized" });
+
+        var unit = await _context.EventUnits
+            .Include(u => u.Event)
+            .Include(u => u.Members)
+            .Include(u => u.JoinRequests)
+            .FirstOrDefaultAsync(u => u.Id == unitId);
+
+        if (unit == null)
+            return NotFound(new ApiResponse<bool> { Success = false, Message = "Unit not found" });
+
+        // Only site admin or event organizer can cancel units
+        var isAdmin = await IsAdminAsync();
+        var isOrganizer = unit.Event?.OrganizedByUserId == userId.Value;
+
+        if (!isAdmin && !isOrganizer)
+            return Forbid();
+
+        // Check if unit has scheduled matches
+        var hasScheduledMatches = await _context.EventMatches
+            .AnyAsync(m => (m.Unit1Id == unitId || m.Unit2Id == unitId) && m.Status != "Cancelled");
+
+        if (hasScheduledMatches)
+        {
+            return BadRequest(new ApiResponse<bool>
+            {
+                Success = false,
+                Message = "Cannot cancel unit with scheduled matches. Cancel or reassign the matches first."
+            });
+        }
+
+        // Remove all join requests for this unit
+        if (unit.JoinRequests.Any())
+        {
+            _context.EventUnitJoinRequests.RemoveRange(unit.JoinRequests);
+        }
+
+        // Remove all members
+        if (unit.Members.Any())
+        {
+            _context.EventUnitMembers.RemoveRange(unit.Members);
+        }
+
+        // Mark unit as cancelled (or delete if preferred)
+        unit.Status = "Cancelled";
+        unit.UpdatedAt = DateTime.Now;
+
+        await _context.SaveChangesAsync();
+
+        return Ok(new ApiResponse<bool>
+        {
+            Success = true,
+            Data = true,
+            Message = "Unit registration cancelled successfully"
+        });
     }
 
     // ============================================

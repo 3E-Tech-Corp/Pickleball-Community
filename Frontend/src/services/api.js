@@ -1382,13 +1382,15 @@ export const tournamentApi = {
   unregisterFromDivision: (eventId, divisionId) =>
     api.delete(`/tournament/events/${eventId}/divisions/${divisionId}/unregister`),
 
-  // Registration Management (organizer)
+  // Registration Management (organizer/admin)
   removeRegistration: (eventId, unitId, userId) =>
     api.delete(`/tournament/events/${eventId}/registrations/${unitId}/members/${userId}`),
   moveRegistration: (eventId, unitId, newDivisionId) =>
     api.post(`/tournament/events/${eventId}/registrations/${unitId}/move`, { newDivisionId }),
   mergeRegistrations: (eventId, targetUnitId, sourceUnitId) =>
     api.post(`/tournament/events/${eventId}/registrations/merge`, { targetUnitId, sourceUnitId }),
+  adminCancelUnit: (unitId) =>
+    api.delete(`/tournament/units/${unitId}/admin-cancel`),
 
   // Player self-move to different division
   selfMoveToDivision: (eventId, newDivisionId, joinUnitId = null, newUnitName = null) =>
