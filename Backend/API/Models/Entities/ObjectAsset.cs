@@ -118,7 +118,7 @@ public class ObjectAsset
     public string Title { get; set; } = string.Empty;
 
     [Required]
-    [MaxLength(500)]
+    [MaxLength(2000)]
     public string FileUrl { get; set; } = string.Empty;
 
     [Required]
