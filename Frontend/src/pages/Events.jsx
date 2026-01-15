@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams, useLocation, Link } from 'react-router-dom';
-import { Calendar, MapPin, Clock, Users, Filter, Search, Plus, DollarSign, ChevronLeft, ChevronRight, X, UserPlus, Trophy, Layers, Check, AlertCircle, Navigation, Building2, Loader2, MessageCircle, CheckCircle, Edit3, ChevronDown, ChevronUp, Trash2, List, Map as MapIcon, Image, Upload, Play, Link2, QrCode, Download, ArrowRightLeft, FileText, Eye, EyeOff, ExternalLink, User, GitMerge, ArrowRight, Copy, Info, Grid, Shuffle, ClipboardList, Shield, BookOpen, Phone } from 'lucide-react';
+import { Calendar, MapPin, Clock, Users, Filter, Search, Plus, DollarSign, ChevronLeft, ChevronRight, X, UserPlus, Trophy, Layers, Check, AlertCircle, Navigation, Building2, Loader2, MessageCircle, CheckCircle, Edit3, ChevronDown, ChevronUp, Trash2, List, Map as MapIcon, Image, Upload, Play, Link2, QrCode, Download, ArrowRightLeft, FileText, Eye, EyeOff, ExternalLink, User, GitMerge, ArrowRight, Copy, Info, Grid, Shuffle, ClipboardList, Shield, BookOpen, Phone, XCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import { eventsApi, eventTypesApi, courtsApi, teamUnitsApi, skillLevelsApi, ageGroupsApi, tournamentApi, sharedAssetApi, getSharedAssetUrl, objectAssetsApi, objectAssetTypesApi } from '../services/api';
@@ -4426,6 +4426,71 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
                                         title="Move to different division"
                                       >
                                         <ArrowRight className="w-4 h-4" />
+                                      </button>
+                                    )}
+
+                                    {/* Admin: Accept/Reject join requests */}
+                                    {isOrganizer && hasJoinRequest && (
+                                      <div className="flex items-center gap-1">
+                                        {unit.members?.filter(m => m.inviteStatus === 'Requested').map((reqMember, reqIdx) => (
+                                          <div key={reqIdx} className="flex items-center gap-0.5">
+                                            <button
+                                              onClick={() => {
+                                                if (reqMember.joinRequestId) {
+                                                  handleRespondToJoinRequest(reqMember.joinRequestId, true);
+                                                }
+                                              }}
+                                              className="p-1 text-green-600 hover:bg-green-100 rounded"
+                                              title={`Accept ${reqMember.firstName || 'request'}`}
+                                            >
+                                              <Check className="w-4 h-4" />
+                                            </button>
+                                            <button
+                                              onClick={() => {
+                                                if (reqMember.joinRequestId) {
+                                                  handleRespondToJoinRequest(reqMember.joinRequestId, false);
+                                                }
+                                              }}
+                                              className="p-1 text-red-600 hover:bg-red-100 rounded"
+                                              title={`Reject ${reqMember.firstName || 'request'}`}
+                                            >
+                                              <X className="w-4 h-4" />
+                                            </button>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )}
+
+                                    {/* Admin: Cancel/Break unit */}
+                                    {isOrganizer && (
+                                      <button
+                                        onClick={async () => {
+                                          if (!confirm(`Cancel registration for ${unit.name || 'this unit'}? This will remove all members.`)) return;
+                                          try {
+                                            const response = await tournamentApi.adminCancelUnit(unit.id);
+                                            if (response.success) {
+                                              toast.success('Unit cancelled');
+                                              // Refresh registrations
+                                              setDivisionRegistrationsCache(prev => {
+                                                const updated = { ...prev };
+                                                if (updated[division.id]) {
+                                                  updated[division.id] = updated[division.id].filter(u => u.id !== unit.id);
+                                                }
+                                                return updated;
+                                              });
+                                              onUpdate();
+                                            } else {
+                                              toast.error(response.message || 'Failed to cancel unit');
+                                            }
+                                          } catch (err) {
+                                            console.error('Error cancelling unit:', err);
+                                            toast.error(err?.message || 'Failed to cancel unit');
+                                          }
+                                        }}
+                                        className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded"
+                                        title="Cancel registration"
+                                      >
+                                        <XCircle className="w-4 h-4" />
                                       </button>
                                     )}
                                   </div>
