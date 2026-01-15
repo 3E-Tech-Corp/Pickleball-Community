@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
-import api, { eventsApi, checkInApi, getSharedAssetUrl } from '../services/api';
+import api, { eventsApi, checkInApi, sharedAssetApi, getSharedAssetUrl } from '../services/api';
 
 // Scheduling API
 const schedulingApi = {
@@ -57,21 +57,24 @@ export default function EventManage() {
   const [showDocumentForm, setShowDocumentForm] = useState(false);
   const [editingDocument, setEditingDocument] = useState(null);
   const [documentForm, setDocumentForm] = useState({
-    documentType: 'waiver',
+    documentType: 'other',
     title: '',
-    content: '',
-    isRequired: true,
-    requiresMinorWaiver: false,
-    minorAgeThreshold: 18
+    fileUrl: '',
+    fileName: '',
+    fileType: '',
+    fileSize: 0,
+    isPublic: true
   });
   const [savingDocument, setSavingDocument] = useState(false);
+  const [uploadingFile, setUploadingFile] = useState(false);
 
   // Document type options
   const documentTypes = [
     { value: 'waiver', label: 'Waiver', icon: 'Shield', description: 'Liability and consent forms' },
     { value: 'map', label: 'Map', icon: 'Map', description: 'Venue and court layouts' },
     { value: 'rules', label: 'Rules', icon: 'Book', description: 'Event rules and guidelines' },
-    { value: 'contacts', label: 'Contacts', icon: 'Phone', description: 'Emergency and staff contacts' }
+    { value: 'contacts', label: 'Contacts', icon: 'Phone', description: 'Emergency and staff contacts' },
+    { value: 'other', label: 'Other', icon: 'FileText', description: 'Other event documents' }
   ];
 
   useEffect(() => {
@@ -122,7 +125,7 @@ export default function EventManage() {
   const loadDocuments = async () => {
     setLoadingDocuments(true);
     try {
-      const response = await checkInApi.getDocuments(eventId);
+      const response = await eventsApi.getDocuments(eventId);
       if (response.success) {
         setDocuments(response.data || []);
       }
@@ -133,29 +136,75 @@ export default function EventManage() {
     }
   };
 
+  const handleFileUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadingFile(true);
+    try {
+      const response = await sharedAssetApi.upload(file, 'document', 'event', true);
+      if (response.data?.url) {
+        setDocumentForm({
+          ...documentForm,
+          fileUrl: response.data.url,
+          fileName: file.name,
+          fileType: file.type,
+          fileSize: file.size
+        });
+        toast.success('File uploaded');
+      } else {
+        toast.error('Failed to upload file');
+      }
+    } catch (err) {
+      console.error('Error uploading file:', err);
+      toast.error('Failed to upload file');
+    } finally {
+      setUploadingFile(false);
+    }
+  };
+
   const handleSaveDocument = async () => {
-    if (!documentForm.title.trim() || !documentForm.content.trim()) {
-      toast.error('Please enter a title and content for the document');
+    if (!documentForm.title.trim()) {
+      toast.error('Please enter a title for the document');
+      return;
+    }
+    if (!documentForm.fileUrl && !editingDocument) {
+      toast.error('Please upload a file');
       return;
     }
 
     setSavingDocument(true);
     try {
-      const response = await checkInApi.createDocument(eventId, {
-        ...documentForm,
-        id: editingDocument?.id || 0
-      });
+      let response;
+      if (editingDocument) {
+        response = await eventsApi.updateDocument(eventId, editingDocument.id, {
+          documentType: documentForm.documentType,
+          title: documentForm.title,
+          isPublic: documentForm.isPublic
+        });
+      } else {
+        response = await eventsApi.addDocument(eventId, {
+          documentType: documentForm.documentType,
+          title: documentForm.title,
+          fileUrl: documentForm.fileUrl,
+          fileName: documentForm.fileName,
+          fileType: documentForm.fileType,
+          fileSize: documentForm.fileSize,
+          isPublic: documentForm.isPublic
+        });
+      }
       if (response.success) {
-        toast.success(editingDocument ? 'Document updated' : 'Document created');
+        toast.success(editingDocument ? 'Document updated' : 'Document added');
         setShowDocumentForm(false);
         setEditingDocument(null);
         setDocumentForm({
-          documentType: 'waiver',
+          documentType: 'other',
           title: '',
-          content: '',
-          isRequired: true,
-          requiresMinorWaiver: false,
-          minorAgeThreshold: 18
+          fileUrl: '',
+          fileName: '',
+          fileType: '',
+          fileSize: 0,
+          isPublic: true
         });
         loadDocuments();
       } else {
@@ -173,7 +222,7 @@ export default function EventManage() {
     if (!confirm('Are you sure you want to delete this document?')) return;
 
     try {
-      const response = await checkInApi.deleteDocument(eventId, documentId);
+      const response = await eventsApi.deleteDocument(eventId, documentId);
       if (response.success) {
         toast.success('Document deleted');
         loadDocuments();
@@ -189,12 +238,13 @@ export default function EventManage() {
   const handleEditDocument = (doc) => {
     setEditingDocument(doc);
     setDocumentForm({
-      documentType: doc.documentType || 'waiver',
+      documentType: doc.documentType || 'other',
       title: doc.title,
-      content: doc.content,
-      isRequired: doc.isRequired,
-      requiresMinorWaiver: doc.requiresMinorWaiver,
-      minorAgeThreshold: doc.minorAgeThreshold
+      fileUrl: doc.fileUrl,
+      fileName: doc.fileName,
+      fileType: doc.fileType,
+      fileSize: doc.fileSize,
+      isPublic: doc.isPublic
     });
     setShowDocumentForm(true);
   };
@@ -545,12 +595,13 @@ export default function EventManage() {
               onClick={() => {
                 setEditingDocument(null);
                 setDocumentForm({
-                  documentType: 'waiver',
+                  documentType: 'other',
                   title: '',
-                  content: '',
-                  isRequired: true,
-                  requiresMinorWaiver: false,
-                  minorAgeThreshold: 18
+                  fileUrl: '',
+                  fileName: '',
+                  fileType: '',
+                  fileSize: 0,
+                  isPublic: true
                 });
                 setShowDocumentForm(true);
               }}
@@ -580,7 +631,8 @@ export default function EventManage() {
                   const IconComponent = doc.documentType === 'waiver' ? Shield
                     : doc.documentType === 'map' ? Map
                     : doc.documentType === 'rules' ? BookOpen
-                    : Phone;
+                    : doc.documentType === 'contacts' ? Phone
+                    : FileText;
                   return (
                     <div key={doc.id} className="p-4 hover:bg-gray-50">
                       <div className="flex items-start justify-between gap-3">
@@ -589,29 +641,35 @@ export default function EventManage() {
                             doc.documentType === 'waiver' ? 'bg-red-100' :
                             doc.documentType === 'map' ? 'bg-green-100' :
                             doc.documentType === 'rules' ? 'bg-purple-100' :
-                            'bg-blue-100'
+                            doc.documentType === 'contacts' ? 'bg-blue-100' :
+                            'bg-gray-100'
                           }`}>
                             <IconComponent className={`w-4 h-4 ${
                               doc.documentType === 'waiver' ? 'text-red-600' :
                               doc.documentType === 'map' ? 'text-green-600' :
                               doc.documentType === 'rules' ? 'text-purple-600' :
-                              'text-blue-600'
+                              doc.documentType === 'contacts' ? 'text-blue-600' :
+                              'text-gray-600'
                             }`} />
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
                               <span className="px-2 py-0.5 text-xs bg-gray-100 text-gray-600 rounded capitalize">{typeInfo.label}</span>
                               <h4 className="font-medium text-gray-900 truncate">{doc.title}</h4>
-                              {doc.documentType === 'waiver' && doc.isRequired && (
-                                <span className="px-2 py-0.5 text-xs bg-red-100 text-red-700 rounded">Required</span>
-                              )}
-                              {doc.documentType === 'waiver' && doc.requiresMinorWaiver && (
-                                <span className="px-2 py-0.5 text-xs bg-orange-100 text-orange-700 rounded">Minor Waiver</span>
+                              {!doc.isPublic && (
+                                <span className="px-2 py-0.5 text-xs bg-yellow-100 text-yellow-700 rounded">Private</span>
                               )}
                             </div>
-                            <p className="text-sm text-gray-500 mt-1 line-clamp-2">{doc.content}</p>
-                            {doc.documentType === 'waiver' && doc.requiresMinorWaiver && (
-                              <p className="text-xs text-gray-400 mt-1">Parent/guardian signature required for players under {doc.minorAgeThreshold}</p>
+                            <p className="text-sm text-gray-500 mt-1 truncate">{doc.fileName}</p>
+                            {doc.fileUrl && (
+                              <a
+                                href={getSharedAssetUrl(doc.fileUrl)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-xs text-blue-600 hover:underline mt-1 inline-block"
+                              >
+                                View document
+                              </a>
                             )}
                           </div>
                         </div>
@@ -666,7 +724,8 @@ export default function EventManage() {
                       const IconComponent = type.value === 'waiver' ? Shield
                         : type.value === 'map' ? Map
                         : type.value === 'rules' ? BookOpen
-                        : Phone;
+                        : type.value === 'contacts' ? Phone
+                        : FileText;
                       return (
                         <button
                           key={type.value}
@@ -702,71 +761,78 @@ export default function EventManage() {
                     placeholder={documentForm.documentType === 'waiver' ? 'e.g., Liability Waiver' :
                       documentForm.documentType === 'map' ? 'e.g., Venue Map' :
                       documentForm.documentType === 'rules' ? 'e.g., Tournament Rules' :
-                      'e.g., Emergency Contacts'}
+                      documentForm.documentType === 'contacts' ? 'e.g., Emergency Contacts' :
+                      'e.g., Event Schedule'}
                     className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   />
                 </div>
 
+                {/* File Upload */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Content</label>
-                  <textarea
-                    value={documentForm.content}
-                    onChange={(e) => setDocumentForm({ ...documentForm, content: e.target.value })}
-                    rows={8}
-                    placeholder={documentForm.documentType === 'waiver' ? 'Enter the full waiver text that players must agree to...' :
-                      documentForm.documentType === 'map' ? 'Describe the venue layout, court locations, parking, etc...' :
-                      documentForm.documentType === 'rules' ? 'Enter tournament rules, scoring format, code of conduct...' :
-                      'List emergency contacts, staff contacts, facility contacts...'}
-                    className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  />
-                </div>
-
-                {/* Waiver-specific options */}
-                {documentForm.documentType === 'waiver' && (
-                  <div className="space-y-3 border-t border-gray-200 pt-4">
-                    <p className="text-sm font-medium text-gray-700">Waiver Options</p>
-                    <label className="flex items-center gap-3">
-                      <input
-                        type="checkbox"
-                        checked={documentForm.isRequired}
-                        onChange={(e) => setDocumentForm({ ...documentForm, isRequired: e.target.checked })}
-                        className="w-4 h-4 text-blue-600 rounded"
-                      />
-                      <div>
-                        <span className="text-sm font-medium text-gray-700">Required to participate</span>
-                        <p className="text-xs text-gray-500">Players must sign this waiver to check in</p>
-                      </div>
-                    </label>
-
-                    <label className="flex items-center gap-3">
-                      <input
-                        type="checkbox"
-                        checked={documentForm.requiresMinorWaiver}
-                        onChange={(e) => setDocumentForm({ ...documentForm, requiresMinorWaiver: e.target.checked })}
-                        className="w-4 h-4 text-blue-600 rounded"
-                      />
-                      <div>
-                        <span className="text-sm font-medium text-gray-700">Requires minor waiver</span>
-                        <p className="text-xs text-gray-500">Parent/guardian must sign for minors</p>
-                      </div>
-                    </label>
-
-                    {documentForm.requiresMinorWaiver && (
-                      <div className="ml-7">
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Minor age threshold</label>
-                        <select
-                          value={documentForm.minorAgeThreshold}
-                          onChange={(e) => setDocumentForm({ ...documentForm, minorAgeThreshold: parseInt(e.target.value) })}
-                          className="border border-gray-300 rounded-lg p-2 text-sm"
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    {editingDocument ? 'Replace File (optional)' : 'Upload File'}
+                  </label>
+                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-4">
+                    {documentForm.fileUrl ? (
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <FileText className="w-5 h-5 text-gray-400" />
+                          <span className="text-sm text-gray-700">{documentForm.fileName}</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setDocumentForm({ ...documentForm, fileUrl: '', fileName: '', fileType: '', fileSize: 0 })}
+                          className="text-red-500 hover:text-red-700 text-sm"
                         >
-                          <option value={16}>Under 16</option>
-                          <option value={18}>Under 18</option>
-                          <option value={21}>Under 21</option>
-                        </select>
+                          Remove
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="text-center">
+                        <input
+                          type="file"
+                          id="document-file"
+                          className="hidden"
+                          onChange={handleFileUpload}
+                          accept=".pdf,.doc,.docx,.png,.jpg,.jpeg"
+                        />
+                        <label
+                          htmlFor="document-file"
+                          className={`cursor-pointer flex flex-col items-center ${uploadingFile ? 'pointer-events-none' : ''}`}
+                        >
+                          {uploadingFile ? (
+                            <Loader2 className="w-8 h-8 text-blue-500 animate-spin mb-2" />
+                          ) : (
+                            <FileText className="w-8 h-8 text-gray-400 mb-2" />
+                          )}
+                          <span className="text-sm text-gray-600">
+                            {uploadingFile ? 'Uploading...' : 'Click to upload a file'}
+                          </span>
+                          <span className="text-xs text-gray-400 mt-1">PDF, DOC, DOCX, PNG, JPG</span>
+                        </label>
                       </div>
                     )}
                   </div>
-                )}
+                  {editingDocument && !documentForm.fileUrl && (
+                    <p className="text-xs text-gray-500 mt-1">Current file: {editingDocument.fileName}</p>
+                  )}
+                </div>
+
+                {/* Visibility option */}
+                <div className="border-t border-gray-200 pt-4">
+                  <label className="flex items-center gap-3">
+                    <input
+                      type="checkbox"
+                      checked={documentForm.isPublic}
+                      onChange={(e) => setDocumentForm({ ...documentForm, isPublic: e.target.checked })}
+                      className="w-4 h-4 text-blue-600 rounded"
+                    />
+                    <div>
+                      <span className="text-sm font-medium text-gray-700">Public document</span>
+                      <p className="text-xs text-gray-500">Visible to all users, not just registered participants</p>
+                    </div>
+                  </label>
+                </div>
               </div>
 
               <div className="p-4 border-t border-gray-200 flex gap-3">

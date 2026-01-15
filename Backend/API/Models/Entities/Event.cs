@@ -346,6 +346,12 @@ public class EventDocument
 
     public int EventId { get; set; }
 
+    /// <summary>
+    /// Document type: waiver, map, rules, contacts, other
+    /// </summary>
+    [MaxLength(50)]
+    public string DocumentType { get; set; } = "other";
+
     [Required]
     [MaxLength(200)]
     public string Title { get; set; } = string.Empty;
