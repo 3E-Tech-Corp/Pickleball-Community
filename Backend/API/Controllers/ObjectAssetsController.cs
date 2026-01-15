@@ -49,8 +49,8 @@ public class ObjectAssetsController : ControllerBase
         {
             "Event" => await _context.Events.AnyAsync(e => e.Id == objectId && e.OrganizedByUserId == userId.Value),
             "Club" => await _context.ClubMembers.AnyAsync(m => m.ClubId == objectId && m.UserId == userId.Value && m.Role == "Admin"),
-            "Venue" => await _context.Venues.AnyAsync(v => v.Id == objectId && v.CreatedByUserId == userId.Value),
-            "League" => await _context.Set<League>().AnyAsync(l => l.Id == objectId && l.CreatedByUserId == userId.Value),
+            "Venue" => await _context.Venues.AnyAsync(v => v.VenueId == objectId && v.AdminUid == userId.Value),
+            "League" => await _context.Set<LeagueManager>().AnyAsync(m => m.LeagueId == objectId && m.UserId == userId.Value && m.IsActive),
             "User" => objectId == userId.Value,
             _ => false
         };
@@ -72,7 +72,7 @@ public class ObjectAssetsController : ControllerBase
         {
             "Event" => await _context.EventUnitMembers.AnyAsync(m =>
                 m.Unit!.EventId == objectId && m.UserId == userId.Value && m.Unit.Status != "Cancelled"),
-            "Club" => await _context.ClubMembers.AnyAsync(m => m.ClubId == objectId && m.UserId == userId.Value && m.Status == "Active"),
+            "Club" => await _context.ClubMembers.AnyAsync(m => m.ClubId == objectId && m.UserId == userId.Value && m.IsActive),
             _ => false
         };
     }
