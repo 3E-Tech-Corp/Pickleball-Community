@@ -1764,7 +1764,7 @@ export const clubFinanceApi = {
 // Player History API
 export const playerHistoryApi = {
   // Summary
-  getSummary: (userId) => api.get(`/api/player-history/${userId}/summary`),
+  getSummary: (userId) => api.get(`/player-history/${userId}/summary`),
 
   // Game History
   getGames: (userId, params = {}) => {
@@ -1781,7 +1781,7 @@ export const playerHistoryApi = {
     if (params.page) queryParams.append('page', params.page);
     if (params.pageSize) queryParams.append('pageSize', params.pageSize);
     const queryString = queryParams.toString();
-    return api.get(`/api/player-history/${userId}/games${queryString ? `?${queryString}` : ''}`);
+    return api.get(`/player-history/${userId}/games${queryString ? `?${queryString}` : ''}`);
   },
 
   // Awards
@@ -1797,9 +1797,9 @@ export const playerHistoryApi = {
     if (params.page) queryParams.append('page', params.page);
     if (params.pageSize) queryParams.append('pageSize', params.pageSize);
     const queryString = queryParams.toString();
-    return api.get(`/api/player-history/${userId}/awards${queryString ? `?${queryString}` : ''}`);
+    return api.get(`/player-history/${userId}/awards${queryString ? `?${queryString}` : ''}`);
   },
-  createAward: (data) => api.post('/api/player-history/awards', data),
+  createAward: (data) => api.post('/player-history/awards', data),
 
   // Ratings
   getRatings: (userId, params = {}) => {
@@ -1810,9 +1810,9 @@ export const playerHistoryApi = {
     if (params.page) queryParams.append('page', params.page);
     if (params.pageSize) queryParams.append('pageSize', params.pageSize);
     const queryString = queryParams.toString();
-    return api.get(`/api/player-history/${userId}/ratings${queryString ? `?${queryString}` : ''}`);
+    return api.get(`/player-history/${userId}/ratings${queryString ? `?${queryString}` : ''}`);
   },
-  createRating: (data) => api.post('/api/player-history/ratings', data),
+  createRating: (data) => api.post('/player-history/ratings', data),
 
   // Payments
   getPayments: (userId, params = {}) => {
@@ -1824,14 +1824,14 @@ export const playerHistoryApi = {
     if (params.page) queryParams.append('page', params.page);
     if (params.pageSize) queryParams.append('pageSize', params.pageSize);
     const queryString = queryParams.toString();
-    return api.get(`/api/player-history/${userId}/payments${queryString ? `?${queryString}` : ''}`);
+    return api.get(`/player-history/${userId}/payments${queryString ? `?${queryString}` : ''}`);
   },
 
   // Helpers
-  getEventTypes: () => api.get('/api/player-history/event-types'),
-  getAwardTypes: () => api.get('/api/player-history/award-types'),
-  getRatingTypes: () => api.get('/api/player-history/rating-types'),
-  getPaymentStatuses: () => api.get('/api/player-history/payment-statuses')
+  getEventTypes: () => api.get('/player-history/event-types'),
+  getAwardTypes: () => api.get('/player-history/award-types'),
+  getRatingTypes: () => api.get('/player-history/rating-types'),
+  getPaymentStatuses: () => api.get('/player-history/payment-statuses')
 }
 
 // Help Topics API (dynamic contextual help)
