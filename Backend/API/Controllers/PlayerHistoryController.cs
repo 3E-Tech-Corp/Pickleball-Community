@@ -132,7 +132,7 @@ public class PlayerHistoryController : ControllerBase
 
         // Payment summary
         var payments = await _context.UserPayments
-            .Where(p => p.UserId == userId && p.PaymentType == PaymentTypes.EventRegistration)
+            .Where(p => p.UserId == userId && p.PaymentType == "EventRegistration")
             .ToListAsync();
 
         var totalPayments = payments.Count;
@@ -750,7 +750,7 @@ public class PlayerHistoryController : ControllerBase
 
         var query = _context.UserPayments
             .Include(p => p.VerifiedByUser)
-            .Where(p => p.UserId == userId && p.PaymentType == PaymentTypes.EventRegistration);
+            .Where(p => p.UserId == userId && p.PaymentType == "EventRegistration");
 
         // Apply filters
         if (!string.IsNullOrEmpty(request.Status))
@@ -832,7 +832,7 @@ public class PlayerHistoryController : ControllerBase
 
         // Calculate summary stats for all payments (not just current page)
         var allPayments = await _context.UserPayments
-            .Where(p => p.UserId == userId && p.PaymentType == PaymentTypes.EventRegistration)
+            .Where(p => p.UserId == userId && p.PaymentType == "EventRegistration")
             .ToListAsync();
 
         var response = new PaymentHistoryPagedResponse
