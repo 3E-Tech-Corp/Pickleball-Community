@@ -36,6 +36,7 @@ import Leagues from './pages/Leagues'
 import LeagueDetail from './pages/LeagueDetail'
 import LeagueStructure from './pages/LeagueStructure'
 import LeagueAdmin from './pages/LeagueAdmin'
+import ObjectAssetTypesAdmin from './pages/ObjectAssetTypesAdmin'
 import Blog from './pages/Blog'
 import BlogAdmin from './pages/BlogAdmin'
 import MyBlog from './pages/MyBlog'
@@ -261,6 +262,12 @@ function App() {
       <Route path="/admin/leagues" element={
         <ProtectedRoute role="Admin">
           <LeagueAdmin />
+        </ProtectedRoute>
+      } />
+
+      <Route path="/admin/asset-types" element={
+        <ProtectedRoute role="Admin">
+          <ObjectAssetTypesAdmin />
         </ProtectedRoute>
       } />
 
