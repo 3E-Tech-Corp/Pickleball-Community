@@ -26,14 +26,26 @@ export default function AdminPaymentModal({ isOpen, onClose, unit, event, onPaym
   // Reset edit form when member changes
   useEffect(() => {
     if (member) {
+      // If no amount paid, calculate the per-person amount as default
+      let defaultAmount = '';
+      if (member.amountPaid > 0) {
+        defaultAmount = member.amountPaid.toString();
+      } else if (unit?.members && event) {
+        const acceptedCount = unit.members.filter(m => m.inviteStatus === 'Accepted').length;
+        if (acceptedCount > 0) {
+          const totalAmount = (event.registrationFee || 0) + (unit.divisionFee || 0);
+          defaultAmount = (totalAmount / acceptedCount).toFixed(2);
+        }
+      }
+
       setEditForm({
         paymentReference: member.paymentReference || '',
         paymentProofUrl: member.paymentProofUrl || '',
-        amountPaid: member.amountPaid > 0 ? member.amountPaid.toString() : '',
+        amountPaid: defaultAmount,
         referenceId: member.referenceId || ''
       });
     }
-  }, [member]);
+  }, [member, unit?.members, event, unit?.divisionFee]);
 
   // Reset state when modal closes
   useEffect(() => {
@@ -153,6 +165,19 @@ export default function AdminPaymentModal({ isOpen, onClose, unit, event, onPaym
   const memberProofUrl = getProofUrl(member.paymentProofUrl);
   const isPdf = isPdfUrl(memberProofUrl);
   const isImage = isImageUrl(memberProofUrl);
+
+  // Check if there's any existing payment data
+  const hasExistingPaymentData = member.paymentProofUrl || member.paymentReference || member.amountPaid > 0;
+
+  // Determine if we should show "Add Payment" vs "Edit Payment" vs "Verify Payment"
+  const isAddingPayment = isEditing && !member.hasPaid && !hasExistingPaymentData;
+
+  // Auto-start in edit mode if no payment data and not paid
+  useEffect(() => {
+    if (member && !member.hasPaid && !hasExistingPaymentData && !isEditing) {
+      setIsEditing(true);
+    }
+  }, [member, hasExistingPaymentData, isEditing]);
 
   const handleMarkAsPaid = async () => {
     setIsUpdating(true);
@@ -281,7 +306,7 @@ export default function AdminPaymentModal({ isOpen, onClose, unit, event, onPaym
           <div className="flex items-center gap-2">
             <DollarSign className="w-5 h-5 text-orange-600" />
             <h2 className="text-lg font-semibold">
-              {isEditing ? 'Edit Payment Info' : 'Verify Payment'}
+              {isAddingPayment ? 'Add Payment' : isEditing ? 'Edit Payment Info' : 'Verify Payment'}
             </h2>
           </div>
           <button
@@ -414,25 +439,79 @@ export default function AdminPaymentModal({ isOpen, onClose, unit, event, onPaym
 
               {/* Edit Form Buttons */}
               <div className="flex gap-2 pt-2">
-                <button
-                  onClick={handleSavePaymentInfo}
-                  disabled={isUpdating}
-                  className="flex-1 py-2.5 bg-orange-600 text-white rounded-lg font-medium hover:bg-orange-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
-                >
-                  {isUpdating ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <CheckCircle className="w-4 h-4" />
-                  )}
-                  Save
-                </button>
-                <button
-                  onClick={() => setIsEditing(false)}
-                  disabled={isUpdating}
-                  className="px-4 py-2.5 border border-gray-300 rounded-lg font-medium hover:bg-gray-50 transition-colors"
-                >
-                  Cancel
-                </button>
+                {isAddingPayment ? (
+                  <>
+                    <button
+                      onClick={async () => {
+                        // Save payment info first, then mark as paid
+                        setIsUpdating(true);
+                        try {
+                          // Save the payment info
+                          const updateData = {
+                            paymentReference: editForm.paymentReference || null,
+                            paymentProofUrl: editForm.paymentProofUrl || null,
+                            amountPaid: editForm.amountPaid ? parseFloat(editForm.amountPaid) : null,
+                            referenceId: editForm.referenceId || null,
+                            hasPaid: true // Mark as paid
+                          };
+                          const response = await tournamentApi.updateMemberPayment(event.id, unit.unitId, member.userId, updateData);
+                          if (response.success) {
+                            toast.success('Payment added and verified');
+                            const updatedMember = { ...member, ...response.data };
+                            setLocalMember(updatedMember);
+                            setIsEditing(false);
+                            onPaymentUpdated?.(unit.unitId, response.data);
+                          } else {
+                            toast.error(response.message || 'Failed to add payment');
+                          }
+                        } catch (err) {
+                          console.error('Error adding payment:', err);
+                          toast.error('Failed to add payment');
+                        } finally {
+                          setIsUpdating(false);
+                        }
+                      }}
+                      disabled={isUpdating}
+                      className="flex-1 py-2.5 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+                    >
+                      {isUpdating ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <CheckCircle className="w-4 h-4" />
+                      )}
+                      Save & Mark Paid
+                    </button>
+                    <button
+                      onClick={onClose}
+                      disabled={isUpdating}
+                      className="px-4 py-2.5 border border-gray-300 rounded-lg font-medium hover:bg-gray-50 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      onClick={handleSavePaymentInfo}
+                      disabled={isUpdating}
+                      className="flex-1 py-2.5 bg-orange-600 text-white rounded-lg font-medium hover:bg-orange-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+                    >
+                      {isUpdating ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <CheckCircle className="w-4 h-4" />
+                      )}
+                      Save
+                    </button>
+                    <button
+                      onClick={() => setIsEditing(false)}
+                      disabled={isUpdating}
+                      className="px-4 py-2.5 border border-gray-300 rounded-lg font-medium hover:bg-gray-50 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </>
+                )}
               </div>
             </div>
           ) : (
