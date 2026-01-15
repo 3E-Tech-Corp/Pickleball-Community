@@ -90,7 +90,9 @@ public class CheckInController : ControllerBase
                         Title = w.Title,
                         Content = w.Content,
                         Version = w.Version,
-                        IsRequired = w.IsRequired
+                        IsRequired = w.IsRequired,
+                        RequiresMinorWaiver = w.RequiresMinorWaiver,
+                        MinorAgeThreshold = w.MinorAgeThreshold
                     }).ToList(),
                 Divisions = registrations.Select(r => new CheckInDivisionDto
                 {
@@ -130,16 +132,26 @@ public class CheckInController : ControllerBase
         if (!registrations.Any())
             return BadRequest(new ApiResponse<object> { Success = false, Message = "Not registered for this event" });
 
+        // Validate signature
+        if (string.IsNullOrWhiteSpace(request.Signature))
+            return BadRequest(new ApiResponse<object> { Success = false, Message = "Signature is required" });
+
         // Sign waiver for all registrations
         foreach (var reg in registrations)
         {
             reg.WaiverSignedAt = DateTime.Now;
             reg.WaiverDocumentId = waiver.Id;
+            reg.WaiverSignature = request.Signature.Trim();
+            reg.WaiverSignerRole = request.SignerRole;
+            reg.ParentGuardianName = request.ParentGuardianName?.Trim();
+            reg.EmergencyPhone = request.EmergencyPhone?.Trim();
+            reg.ChineseName = request.ChineseName?.Trim();
         }
 
         await _context.SaveChangesAsync();
 
-        _logger.LogInformation("User {UserId} signed waiver {WaiverId} for event {EventId}", userId, waiver.Id, eventId);
+        _logger.LogInformation("User {UserId} signed waiver {WaiverId} for event {EventId} with signature '{Signature}'",
+            userId, waiver.Id, eventId, request.Signature);
 
         return Ok(new ApiResponse<object>
         {
@@ -402,20 +414,23 @@ public class CheckInController : ControllerBase
     }
 
     /// <summary>
-    /// Get waivers for an event
+    /// Get waivers for an event (legacy - returns only waiver type documents)
     /// </summary>
     [HttpGet("waivers/{eventId}")]
     public async Task<ActionResult<ApiResponse<List<WaiverDto>>>> GetEventWaivers(int eventId)
     {
         var waivers = await _context.EventWaivers
-            .Where(w => w.EventId == eventId && w.IsActive)
+            .Where(w => w.EventId == eventId && w.IsActive && (w.DocumentType == "waiver" || w.DocumentType == null))
             .Select(w => new WaiverDto
             {
                 Id = w.Id,
+                DocumentType = w.DocumentType ?? "waiver",
                 Title = w.Title,
                 Content = w.Content,
                 Version = w.Version,
-                IsRequired = w.IsRequired
+                IsRequired = w.IsRequired,
+                RequiresMinorWaiver = w.RequiresMinorWaiver,
+                MinorAgeThreshold = w.MinorAgeThreshold
             })
             .ToListAsync();
 
@@ -427,7 +442,37 @@ public class CheckInController : ControllerBase
     }
 
     /// <summary>
-    /// Create or update a waiver (TD only)
+    /// Get all documents for an event (waivers, maps, rules, contacts)
+    /// </summary>
+    [HttpGet("documents/{eventId}")]
+    public async Task<ActionResult<ApiResponse<List<WaiverDto>>>> GetEventDocuments(int eventId)
+    {
+        var documents = await _context.EventWaivers
+            .Where(w => w.EventId == eventId && w.IsActive)
+            .OrderBy(w => w.DocumentType)
+            .ThenBy(w => w.Title)
+            .Select(w => new WaiverDto
+            {
+                Id = w.Id,
+                DocumentType = w.DocumentType ?? "waiver",
+                Title = w.Title,
+                Content = w.Content,
+                Version = w.Version,
+                IsRequired = w.IsRequired,
+                RequiresMinorWaiver = w.RequiresMinorWaiver,
+                MinorAgeThreshold = w.MinorAgeThreshold
+            })
+            .ToListAsync();
+
+        return Ok(new ApiResponse<List<WaiverDto>>
+        {
+            Success = true,
+            Data = documents
+        });
+    }
+
+    /// <summary>
+    /// Create or update a waiver (TD only) - legacy endpoint
     /// </summary>
     [HttpPost("waivers/{eventId}")]
     [Authorize]
@@ -447,16 +492,42 @@ public class CheckInController : ControllerBase
         if (!isOrganizer)
             return Forbid();
 
-        var waiver = new EventWaiver
-        {
-            EventId = eventId,
-            Title = request.Title,
-            Content = request.Content,
-            IsRequired = request.IsRequired,
-            CreatedByUserId = userId
-        };
+        EventWaiver waiver;
 
-        _context.EventWaivers.Add(waiver);
+        if (request.Id > 0)
+        {
+            // Update existing waiver
+            waiver = await _context.EventWaivers
+                .FirstOrDefaultAsync(w => w.Id == request.Id && w.EventId == eventId);
+            if (waiver == null)
+                return NotFound(new ApiResponse<WaiverDto> { Success = false, Message = "Waiver not found" });
+
+            waiver.DocumentType = request.DocumentType ?? "waiver";
+            waiver.Title = request.Title;
+            waiver.Content = request.Content;
+            waiver.IsRequired = request.IsRequired;
+            waiver.RequiresMinorWaiver = request.RequiresMinorWaiver;
+            waiver.MinorAgeThreshold = request.MinorAgeThreshold;
+            waiver.UpdatedAt = DateTime.Now;
+            waiver.Version++;
+        }
+        else
+        {
+            // Create new waiver
+            waiver = new EventWaiver
+            {
+                EventId = eventId,
+                DocumentType = request.DocumentType ?? "waiver",
+                Title = request.Title,
+                Content = request.Content,
+                IsRequired = request.IsRequired,
+                RequiresMinorWaiver = request.RequiresMinorWaiver,
+                MinorAgeThreshold = request.MinorAgeThreshold,
+                CreatedByUserId = userId
+            };
+            _context.EventWaivers.Add(waiver);
+        }
+
         await _context.SaveChangesAsync();
 
         return Ok(new ApiResponse<WaiverDto>
@@ -465,11 +536,173 @@ public class CheckInController : ControllerBase
             Data = new WaiverDto
             {
                 Id = waiver.Id,
+                DocumentType = waiver.DocumentType,
                 Title = waiver.Title,
                 Content = waiver.Content,
                 Version = waiver.Version,
-                IsRequired = waiver.IsRequired
+                IsRequired = waiver.IsRequired,
+                RequiresMinorWaiver = waiver.RequiresMinorWaiver,
+                MinorAgeThreshold = waiver.MinorAgeThreshold
             }
+        });
+    }
+
+    /// <summary>
+    /// Delete a waiver (TD only) - legacy endpoint
+    /// </summary>
+    [HttpDelete("waivers/{eventId}/{waiverId}")]
+    [Authorize]
+    public async Task<ActionResult<ApiResponse<bool>>> DeleteWaiver(int eventId, int waiverId)
+    {
+        var userId = GetUserId();
+        if (userId == 0) return Unauthorized();
+
+        // Verify user is organizer
+        var evt = await _context.Events.FirstOrDefaultAsync(e => e.Id == eventId);
+        if (evt == null)
+            return NotFound(new ApiResponse<bool> { Success = false, Message = "Event not found" });
+
+        var isOrganizer = evt.OrganizedByUserId == userId;
+        if (!isOrganizer)
+            return Forbid();
+
+        var waiver = await _context.EventWaivers
+            .FirstOrDefaultAsync(w => w.Id == waiverId && w.EventId == eventId);
+
+        if (waiver == null)
+            return NotFound(new ApiResponse<bool> { Success = false, Message = "Waiver not found" });
+
+        // Soft delete - mark as inactive
+        waiver.IsActive = false;
+        waiver.UpdatedAt = DateTime.Now;
+        await _context.SaveChangesAsync();
+
+        return Ok(new ApiResponse<bool>
+        {
+            Success = true,
+            Data = true,
+            Message = "Waiver deleted"
+        });
+    }
+
+    /// <summary>
+    /// Create or update an event document (TD only)
+    /// </summary>
+    [HttpPost("documents/{eventId}")]
+    [Authorize]
+    public async Task<ActionResult<ApiResponse<WaiverDto>>> CreateDocument(int eventId, [FromBody] CreateWaiverRequest request)
+    {
+        var userId = GetUserId();
+        if (userId == 0) return Unauthorized();
+
+        // Verify user is organizer
+        var evt = await _context.Events.FindAsync(eventId);
+        if (evt == null)
+            return NotFound(new ApiResponse<WaiverDto> { Success = false, Message = "Event not found" });
+
+        var currentUser = await _context.Users.FindAsync(userId);
+        var isOrganizer = evt.OrganizedByUserId == userId || currentUser?.Role == "Admin";
+
+        if (!isOrganizer)
+            return Forbid();
+
+        // Validate document type
+        var validTypes = new[] { "waiver", "map", "rules", "contacts" };
+        var docType = request.DocumentType ?? "waiver";
+        if (!validTypes.Contains(docType))
+            return BadRequest(new ApiResponse<WaiverDto> { Success = false, Message = "Invalid document type" });
+
+        EventWaiver document;
+
+        if (request.Id > 0)
+        {
+            // Update existing document
+            document = await _context.EventWaivers
+                .FirstOrDefaultAsync(w => w.Id == request.Id && w.EventId == eventId);
+            if (document == null)
+                return NotFound(new ApiResponse<WaiverDto> { Success = false, Message = "Document not found" });
+
+            document.DocumentType = docType;
+            document.Title = request.Title;
+            document.Content = request.Content;
+            document.IsRequired = docType == "waiver" && request.IsRequired;
+            document.RequiresMinorWaiver = docType == "waiver" && request.RequiresMinorWaiver;
+            document.MinorAgeThreshold = request.MinorAgeThreshold;
+            document.UpdatedAt = DateTime.Now;
+            document.Version++;
+        }
+        else
+        {
+            // Create new document
+            document = new EventWaiver
+            {
+                EventId = eventId,
+                DocumentType = docType,
+                Title = request.Title,
+                Content = request.Content,
+                IsRequired = docType == "waiver" && request.IsRequired,
+                RequiresMinorWaiver = docType == "waiver" && request.RequiresMinorWaiver,
+                MinorAgeThreshold = request.MinorAgeThreshold,
+                CreatedByUserId = userId
+            };
+            _context.EventWaivers.Add(document);
+        }
+
+        await _context.SaveChangesAsync();
+
+        return Ok(new ApiResponse<WaiverDto>
+        {
+            Success = true,
+            Data = new WaiverDto
+            {
+                Id = document.Id,
+                DocumentType = document.DocumentType,
+                Title = document.Title,
+                Content = document.Content,
+                Version = document.Version,
+                IsRequired = document.IsRequired,
+                RequiresMinorWaiver = document.RequiresMinorWaiver,
+                MinorAgeThreshold = document.MinorAgeThreshold
+            }
+        });
+    }
+
+    /// <summary>
+    /// Delete an event document (TD only)
+    /// </summary>
+    [HttpDelete("documents/{eventId}/{documentId}")]
+    [Authorize]
+    public async Task<ActionResult<ApiResponse<bool>>> DeleteDocument(int eventId, int documentId)
+    {
+        var userId = GetUserId();
+        if (userId == 0) return Unauthorized();
+
+        // Verify user is organizer
+        var evt = await _context.Events.FirstOrDefaultAsync(e => e.Id == eventId);
+        if (evt == null)
+            return NotFound(new ApiResponse<bool> { Success = false, Message = "Event not found" });
+
+        var currentUser = await _context.Users.FindAsync(userId);
+        var isOrganizer = evt.OrganizedByUserId == userId || currentUser?.Role == "Admin";
+        if (!isOrganizer)
+            return Forbid();
+
+        var document = await _context.EventWaivers
+            .FirstOrDefaultAsync(w => w.Id == documentId && w.EventId == eventId);
+
+        if (document == null)
+            return NotFound(new ApiResponse<bool> { Success = false, Message = "Document not found" });
+
+        // Soft delete - mark as inactive
+        document.IsActive = false;
+        document.UpdatedAt = DateTime.Now;
+        await _context.SaveChangesAsync();
+
+        return Ok(new ApiResponse<bool>
+        {
+            Success = true,
+            Data = true,
+            Message = "Document deleted"
         });
     }
 }
@@ -499,15 +732,38 @@ public class CheckInDivisionDto
 public class WaiverDto
 {
     public int Id { get; set; }
+    public string DocumentType { get; set; } = "waiver";
     public string Title { get; set; } = string.Empty;
     public string Content { get; set; } = string.Empty;
     public int Version { get; set; }
     public bool IsRequired { get; set; }
+    public bool RequiresMinorWaiver { get; set; }
+    public int MinorAgeThreshold { get; set; }
 }
 
 public class SignWaiverRequest
 {
     public int WaiverId { get; set; }
+    /// <summary>
+    /// Digital signature (typed full name)
+    /// </summary>
+    public string Signature { get; set; } = string.Empty;
+    /// <summary>
+    /// Who is signing: Participant, Parent, Guardian
+    /// </summary>
+    public string SignerRole { get; set; } = "Participant";
+    /// <summary>
+    /// Parent/Guardian name if signing for a minor
+    /// </summary>
+    public string? ParentGuardianName { get; set; }
+    /// <summary>
+    /// Emergency contact phone
+    /// </summary>
+    public string? EmergencyPhone { get; set; }
+    /// <summary>
+    /// Chinese name (optional, for tournaments requiring it)
+    /// </summary>
+    public string? ChineseName { get; set; }
 }
 
 public class CheckInResultDto
@@ -552,7 +808,11 @@ public class PlayerCheckInDto
 
 public class CreateWaiverRequest
 {
+    public int Id { get; set; } = 0; // 0 for new, >0 to update
+    public string DocumentType { get; set; } = "waiver";
     public string Title { get; set; } = string.Empty;
     public string Content { get; set; } = string.Empty;
     public bool IsRequired { get; set; } = true;
+    public bool RequiresMinorWaiver { get; set; } = false;
+    public int MinorAgeThreshold { get; set; } = 18;
 }

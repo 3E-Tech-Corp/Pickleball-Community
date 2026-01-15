@@ -4,13 +4,19 @@ using System.ComponentModel.DataAnnotations.Schema;
 namespace Pickleball.Community.Models.Entities;
 
 /// <summary>
-/// Event-specific waiver document that players must sign
+/// Event document (waiver, map, rules, contacts)
 /// </summary>
 public class EventWaiver
 {
     public int Id { get; set; }
 
     public int EventId { get; set; }
+
+    /// <summary>
+    /// Document type: waiver, map, rules, contacts
+    /// </summary>
+    [MaxLength(50)]
+    public string DocumentType { get; set; } = "waiver";
 
     [Required]
     [MaxLength(200)]
@@ -28,6 +34,16 @@ public class EventWaiver
     /// Whether signing this waiver is required to participate
     /// </summary>
     public bool IsRequired { get; set; } = true;
+
+    /// <summary>
+    /// Whether this waiver requires parent/guardian signature for minors
+    /// </summary>
+    public bool RequiresMinorWaiver { get; set; } = false;
+
+    /// <summary>
+    /// Age threshold below which parent/guardian signature is needed
+    /// </summary>
+    public int MinorAgeThreshold { get; set; } = 18;
 
     public bool IsActive { get; set; } = true;
 

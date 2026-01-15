@@ -944,10 +944,10 @@ export default function TournamentManage() {
                                   </tr>
                                 </thead>
                                 <tbody>
-                                  {pool.standings?.map((standing, idx) => {
+                                  {pool.standings?.filter(s => s != null).map((standing, idx) => {
                                     const willAdvance = selectedDivision?.playoffFromPools &&
                                       standing.rank <= selectedDivision.playoffFromPools;
-                                    const isEditing = editingRank?.unitId === standing.unitId;
+                                    const isEditing = editingRank && editingRank.unitId === standing.unitId;
 
                                     return (
                                       <tr
@@ -957,7 +957,7 @@ export default function TournamentManage() {
                                         } ${standing.advancedToPlayoff ? 'bg-green-100' : ''}`}
                                       >
                                         <td className="py-2 px-2">
-                                          {isEditing ? (
+                                          {isEditing && editingRank ? (
                                             <input
                                               type="number"
                                               min="1"
@@ -1001,7 +1001,7 @@ export default function TournamentManage() {
                                         </td>
                                         {isOrganizer && selectedDivision?.scheduleStatus !== 'PoolsFinalized' && (
                                           <td className="py-2 px-2 text-center">
-                                            {isEditing ? (
+                                            {isEditing && editingRank ? (
                                               <div className="flex items-center justify-center gap-1">
                                                 <button
                                                   onClick={() => handleOverrideRank(standing.unitId, editingRank.rank)}
@@ -1020,7 +1020,7 @@ export default function TournamentManage() {
                                               </div>
                                             ) : (
                                               <button
-                                                onClick={() => setEditingRank({ unitId: standing.unitId, rank: standing.rank })}
+                                                onClick={() => setEditingRank({ unitId: standing.unitId, rank: standing.rank || 1 })}
                                                 className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded"
                                                 title="Edit rank"
                                               >

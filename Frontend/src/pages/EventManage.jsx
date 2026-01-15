@@ -2,13 +2,13 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
   ArrowLeft, Users, Calendar, Clock, MapPin, Play, Check,
-  ChevronRight, AlertCircle, Loader2, Settings, FileText,
+  ChevronRight, AlertCircle, Loader2, Settings,
   LayoutGrid, UserCheck, DollarSign, Shuffle, Trophy, Zap,
   UserPlus, X, Plus, Search, ToggleLeft, ToggleRight
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
-import api, { eventsApi, getSharedAssetUrl } from '../services/api';
+import api, { eventsApi, checkInApi, getSharedAssetUrl } from '../services/api';
 
 // Scheduling API
 const schedulingApi = {

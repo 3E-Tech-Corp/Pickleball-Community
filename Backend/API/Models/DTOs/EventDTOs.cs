@@ -493,6 +493,10 @@ public class EventDocumentDto
 {
     public int Id { get; set; }
     public int EventId { get; set; }
+    /// <summary>
+    /// Document type: waiver, map, rules, contacts, other
+    /// </summary>
+    public string DocumentType { get; set; } = "other";
     public string Title { get; set; } = string.Empty;
     public string FileUrl { get; set; } = string.Empty;
     public string FileName { get; set; } = string.Empty;
@@ -508,6 +512,10 @@ public class EventDocumentDto
 // Create event document
 public class CreateEventDocumentDto
 {
+    /// <summary>
+    /// Document type: waiver, map, rules, contacts, other
+    /// </summary>
+    public string DocumentType { get; set; } = "other";
     public string Title { get; set; } = string.Empty;
     public string FileUrl { get; set; } = string.Empty;
     public string FileName { get; set; } = string.Empty;
@@ -520,6 +528,10 @@ public class CreateEventDocumentDto
 // Update event document
 public class UpdateEventDocumentDto
 {
+    /// <summary>
+    /// Document type: waiver, map, rules, contacts, other
+    /// </summary>
+    public string? DocumentType { get; set; }
     public string? Title { get; set; }
     public bool? IsPublic { get; set; }
     public int? SortOrder { get; set; }

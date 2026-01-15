@@ -9,7 +9,7 @@ import {
   Shield, GraduationCap, User, CheckCircle, XCircle, Save,
   Palette, Upload, RefreshCw, Image, Layers, Check, Award, Tags, UserCog, Video,
   Building2, HelpCircle, MessageSquare, MapPin, Network, Plus, Play, ArrowUp, ArrowDown,
-  Bell, Send, Megaphone, Mail, RotateCcw, ToggleLeft, ToggleRight, Copy, AlertCircle, Settings, LifeBuoy
+  Bell, Send, Megaphone, Mail, RotateCcw, ToggleLeft, ToggleRight, Copy, AlertCircle, Settings, LifeBuoy, FileText
 } from 'lucide-react'
 import VideoUploadModal from '../components/ui/VideoUploadModal'
 import PublicProfileModal from '../components/ui/PublicProfileModal'
@@ -30,6 +30,7 @@ import ReleaseNotesAdmin from './ReleaseNotesAdmin'
 import GameFormatsAdmin from './GameFormatsAdmin'
 import ScoreMethodsAdmin from './ScoreMethodsAdmin'
 import HelpTopicsAdmin from './HelpTopicsAdmin'
+import ObjectAssetTypesAdmin from './ObjectAssetTypesAdmin'
 
 const AdminDashboard = () => {
   const { user } = useAuth()
@@ -780,6 +781,7 @@ const AdminDashboard = () => {
       items: [
         { id: 'eventTypes', label: 'Event Types', icon: Tags },
         { id: 'venueTypes', label: 'Venue Types', icon: Building2 },
+        { id: 'assetTypes', label: 'Asset Types', icon: FileText },
         { id: 'clubRoles', label: 'Club Roles', icon: UserCog },
         { id: 'teamUnits', label: 'Team Units', icon: Users },
         { id: 'skillLevels', label: 'Skill Levels', icon: Award },
@@ -2354,6 +2356,9 @@ const AdminDashboard = () => {
 
           {/* Venue Types Admin */}
           {activeTab === 'venueTypes' && <VenueTypesAdmin embedded />}
+
+          {/* Asset Types Admin */}
+          {activeTab === 'assetTypes' && <ObjectAssetTypesAdmin />}
 
           {/* Club Roles Admin */}
           {activeTab === 'clubRoles' && <ClubMemberRolesAdmin embedded />}

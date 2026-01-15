@@ -1918,17 +1918,36 @@ export const checkInApi = {
   // Manual check-in by TD
   manualCheckIn: (eventId, userId, data = {}) => api.post(`/checkin/manual/${eventId}/${userId}`, data),
 
-  // Sign waiver
-  signWaiver: (eventId, waiverId) => api.post(`/checkin/waiver/${eventId}`, { waiverId }),
+  // Sign waiver with digital signature
+  signWaiver: (eventId, waiverId, signatureData = {}) => api.post(`/checkin/waiver/${eventId}`, {
+    waiverId,
+    signature: signatureData.signature,
+    signerRole: signatureData.signerRole || 'Participant',
+    parentGuardianName: signatureData.parentGuardianName,
+    emergencyPhone: signatureData.emergencyPhone,
+    chineseName: signatureData.chineseName
+  }),
 
   // Get event check-in summary (TD view)
   getEventCheckIns: (eventId) => api.get(`/checkin/event/${eventId}`),
 
-  // Get waivers for event
+  // Get waivers for event (legacy, still used for check-in flow)
   getWaivers: (eventId) => api.get(`/checkin/waivers/${eventId}`),
 
-  // Create waiver (TD)
-  createWaiver: (eventId, data) => api.post(`/checkin/waivers/${eventId}`, data)
+  // Create waiver (TD) - legacy
+  createWaiver: (eventId, data) => api.post(`/checkin/waivers/${eventId}`, data),
+
+  // Delete waiver (TD) - legacy
+  deleteWaiver: (eventId, waiverId) => api.delete(`/checkin/waivers/${eventId}/${waiverId}`),
+
+  // Get all event documents (waivers, maps, rules, contacts)
+  getDocuments: (eventId) => api.get(`/checkin/documents/${eventId}`),
+
+  // Create or update event document (TD)
+  createDocument: (eventId, data) => api.post(`/checkin/documents/${eventId}`, data),
+
+  // Delete event document (TD)
+  deleteDocument: (eventId, documentId) => api.delete(`/checkin/documents/${eventId}/${documentId}`)
 }
 
 // Tournament Game Day API
@@ -2030,6 +2049,51 @@ export const scoreboardApi = {
 
   // Get pools
   getPools: (eventId, divisionId) => api.get(`/scoreboard/pools/${eventId}/${divisionId}`)
+}
+
+// Object Types API (admin)
+export const objectTypesApi = {
+  getAll: (includeInactive = false) =>
+    api.get(`/objecttypes${includeInactive ? '?includeInactive=true' : ''}`),
+  getById: (id) => api.get(`/objecttypes/${id}`),
+  create: (data) => api.post('/objecttypes', data),
+  update: (id, data) => api.put(`/objecttypes/${id}`, data),
+  delete: (id) => api.delete(`/objecttypes/${id}`)
+}
+
+// Object Asset Types API (admin)
+export const objectAssetTypesApi = {
+  getAll: (params = {}) => {
+    const queryParams = new URLSearchParams()
+    if (params.objectTypeId) queryParams.append('objectTypeId', params.objectTypeId)
+    if (params.objectTypeName) queryParams.append('objectTypeName', params.objectTypeName)
+    if (params.includeInactive) queryParams.append('includeInactive', 'true')
+    const queryString = queryParams.toString()
+    return api.get(`/objectassettypes${queryString ? `?${queryString}` : ''}`)
+  },
+  getById: (id) => api.get(`/objectassettypes/${id}`),
+  create: (data) => api.post('/objectassettypes', data),
+  update: (id, data) => api.put(`/objectassettypes/${id}`, data),
+  delete: (id) => api.delete(`/objectassettypes/${id}`)
+}
+
+// Object Assets API (generalized assets for any object type)
+export const objectAssetsApi = {
+  // Get assets for an object
+  getAssets: (objectTypeName, objectId) =>
+    api.get(`/objectassets/${objectTypeName}/${objectId}`),
+
+  // Add asset to an object
+  addAsset: (objectTypeName, objectId, data) =>
+    api.post(`/objectassets/${objectTypeName}/${objectId}`, data),
+
+  // Update asset
+  updateAsset: (objectTypeName, objectId, assetId, data) =>
+    api.put(`/objectassets/${objectTypeName}/${objectId}/${assetId}`, data),
+
+  // Delete asset
+  deleteAsset: (objectTypeName, objectId, assetId) =>
+    api.delete(`/objectassets/${objectTypeName}/${objectId}/${assetId}`)
 }
 
 export default api

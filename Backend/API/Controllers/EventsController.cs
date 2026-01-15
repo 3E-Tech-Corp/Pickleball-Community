@@ -1803,6 +1803,7 @@ public class EventsController : ControllerBase
                 {
                     Id = d.Id,
                     EventId = d.EventId,
+                    DocumentType = d.DocumentType,
                     Title = d.Title,
                     FileUrl = d.FileUrl,
                     FileName = d.FileName,
@@ -1848,6 +1849,7 @@ public class EventsController : ControllerBase
             var document = new EventDocument
             {
                 EventId = id,
+                DocumentType = dto.DocumentType,
                 Title = dto.Title,
                 FileUrl = dto.FileUrl,
                 FileName = dto.FileName,
@@ -1871,6 +1873,7 @@ public class EventsController : ControllerBase
                 {
                     Id = document.Id,
                     EventId = document.EventId,
+                    DocumentType = document.DocumentType,
                     Title = document.Title,
                     FileUrl = document.FileUrl,
                     FileName = document.FileName,
@@ -1920,6 +1923,7 @@ public class EventsController : ControllerBase
                 return NotFound(new ApiResponse<EventDocumentDto> { Success = false, Message = "Document not found" });
 
             // Update fields if provided
+            if (dto.DocumentType != null) document.DocumentType = dto.DocumentType;
             if (dto.Title != null) document.Title = dto.Title;
             if (dto.IsPublic.HasValue) document.IsPublic = dto.IsPublic.Value;
             if (dto.SortOrder.HasValue) document.SortOrder = dto.SortOrder.Value;
@@ -1934,6 +1938,7 @@ public class EventsController : ControllerBase
                 {
                     Id = document.Id,
                     EventId = document.EventId,
+                    DocumentType = document.DocumentType,
                     Title = document.Title,
                     FileUrl = document.FileUrl,
                     FileName = document.FileName,
