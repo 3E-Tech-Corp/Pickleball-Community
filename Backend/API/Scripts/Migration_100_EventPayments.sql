@@ -90,7 +90,7 @@ SELECT
     m.ReferenceId,
     CASE
         WHEN m.HasPaid = 1 THEN 'Verified'
-        WHEN m.PaymentProofUrl IS NOT NULL THEN 'Pending'
+        WHEN m.PaymentProofUrl IS NOT NULL THEN 'PendingVerification'
         ELSE 'Pending'
     END AS Status,
     m.HasPaid AS IsApplied,
@@ -99,7 +99,7 @@ SELECT
     COALESCE(m.PaidAt, m.CreatedAt) AS UpdatedAt
 FROM EventUnitMembers m
 INNER JOIN EventUnits u ON m.UnitId = u.Id
-WHERE m.AmountPaid > 0 OR m.PaymentProofUrl IS NOT NULL OR m.PaymentReference IS NOT NULL
+WHERE (m.AmountPaid > 0 OR m.PaymentProofUrl IS NOT NULL OR m.PaymentReference IS NOT NULL)
   AND NOT EXISTS (
     SELECT 1 FROM EventPayments ep
     WHERE ep.MemberId = m.Id AND ep.UserId = m.UserId
@@ -107,5 +107,48 @@ WHERE m.AmountPaid > 0 OR m.PaymentProofUrl IS NOT NULL OR m.PaymentReference IS
 
 DECLARE @BackfilledCount INT = @@ROWCOUNT
 PRINT CONCAT('Backfilled ', @BackfilledCount, ' payment records from EventUnitMembers')
+
+-- Also backfill from EventUnits where unit-level payment exists but no member records
+-- This handles cases where payment was tracked at unit level only
+PRINT 'Backfilling unit-level payments that have no member payment records...'
+
+INSERT INTO EventPayments (EventId, UserId, UnitId, MemberId, Amount, PaymentProofUrl, PaymentReference, ReferenceId, Status, IsApplied, AppliedAt, CreatedAt, UpdatedAt)
+SELECT DISTINCT
+    u.EventId,
+    m.UserId,
+    u.Id AS UnitId,
+    m.Id AS MemberId,
+    CASE
+        WHEN u.AmountPaid > 0 AND (SELECT COUNT(*) FROM EventUnitMembers WHERE UnitId = u.Id) > 0
+        THEN u.AmountPaid / (SELECT COUNT(*) FROM EventUnitMembers WHERE UnitId = u.Id)
+        ELSE u.AmountPaid
+    END AS Amount,
+    u.PaymentProofUrl,
+    u.PaymentReference,
+    u.ReferenceId,
+    CASE
+        WHEN u.PaymentStatus = 'Paid' THEN 'Verified'
+        WHEN u.PaymentStatus = 'PendingVerification' THEN 'PendingVerification'
+        WHEN u.PaymentProofUrl IS NOT NULL THEN 'PendingVerification'
+        ELSE 'Pending'
+    END AS Status,
+    CASE WHEN u.PaymentStatus = 'Paid' THEN 1 ELSE 0 END AS IsApplied,
+    u.PaidAt AS AppliedAt,
+    COALESCE(u.PaidAt, u.CreatedAt) AS CreatedAt,
+    COALESCE(u.PaidAt, u.CreatedAt) AS UpdatedAt
+FROM EventUnits u
+INNER JOIN EventUnitMembers m ON m.UnitId = u.Id
+WHERE (u.AmountPaid > 0 OR u.PaymentProofUrl IS NOT NULL OR u.PaymentReference IS NOT NULL)
+  AND NOT EXISTS (
+    SELECT 1 FROM EventPayments ep
+    WHERE ep.UnitId = u.Id AND ep.UserId = m.UserId
+  )
+  -- Only for members who don't have their own payment record
+  AND (m.AmountPaid = 0 OR m.AmountPaid IS NULL)
+  AND m.PaymentProofUrl IS NULL
+  AND m.PaymentReference IS NULL
+
+DECLARE @UnitBackfilledCount INT = @@ROWCOUNT
+PRINT CONCAT('Backfilled ', @UnitBackfilledCount, ' unit-level payment records')
 
 PRINT 'Migration 100 completed successfully'
