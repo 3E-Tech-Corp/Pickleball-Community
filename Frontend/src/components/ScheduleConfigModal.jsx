@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { X, Calendar, Users, Grid, AlertCircle, Loader2, ChevronDown, ChevronUp, Plus, Settings, Trophy } from 'lucide-react';
 import { tournamentApi } from '../services/api';
+import HelpIcon from './ui/HelpIcon';
 
 const SCHEDULE_TYPES = [
   { value: 'RoundRobin', label: 'Round Robin', description: 'Every unit plays every other unit', hasPoolPhase: true, hasPlayoffPhase: false },
@@ -234,8 +235,9 @@ export default function ScheduleConfigModal({
       <div className="space-y-4">
         {/* Games per Match */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+          <label className="flex items-center gap-1 text-sm font-medium text-gray-700 mb-2">
             Games per Match
+            <HelpIcon topicCode="division.gamesPerMatch" size="sm" />
           </label>
           <div className="grid grid-cols-3 gap-2">
             {GAMES_PER_MATCH_OPTIONS.map(option => (
@@ -259,8 +261,9 @@ export default function ScheduleConfigModal({
         {/* Score Format */}
         <div>
           <div className="flex items-center justify-between mb-2">
-            <label className="block text-sm font-medium text-gray-700">
+            <label className="flex items-center gap-1 text-sm font-medium text-gray-700">
               Score Format
+              <HelpIcon topicCode="division.defaultScoreFormat" size="sm" />
             </label>
             <button
               type="button"
@@ -325,8 +328,9 @@ export default function ScheduleConfigModal({
 
           {/* Schedule Type */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="flex items-center gap-1 text-sm font-medium text-gray-700 mb-2">
               Schedule Type
+              <HelpIcon topicCode="division.scheduleType" size="sm" />
             </label>
             <div className="grid grid-cols-2 gap-2">
               {SCHEDULE_TYPES.map(type => (
@@ -389,8 +393,9 @@ export default function ScheduleConfigModal({
           {/* Pool Configuration */}
           {selectedType?.hasPoolPhase && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="flex items-center gap-1 text-sm font-medium text-gray-700 mb-2">
                 Number of Pools
+                <HelpIcon topicCode="division.pools" size="sm" />
               </label>
               <div className="flex items-center gap-3">
                 <select

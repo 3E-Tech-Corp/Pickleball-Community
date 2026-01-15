@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
-import { Calendar, MapPin, Clock, Users, Filter, Search, Plus, DollarSign, ChevronLeft, ChevronRight, X, UserPlus, Trophy, Layers, Check, AlertCircle, Navigation, Building2, Loader2, MessageCircle, CheckCircle, Edit3, ChevronDown, ChevronUp, Trash2, List, Map as MapIcon, Image, Upload, Play, Link2, QrCode, Download, ArrowRightLeft, FileText, Eye, EyeOff, ExternalLink, User, GitMerge, ArrowRight, Copy } from 'lucide-react';
+import { Calendar, MapPin, Clock, Users, Filter, Search, Plus, DollarSign, ChevronLeft, ChevronRight, X, UserPlus, Trophy, Layers, Check, AlertCircle, Navigation, Building2, Loader2, MessageCircle, CheckCircle, Edit3, ChevronDown, ChevronUp, Trash2, List, Map as MapIcon, Image, Upload, Play, Link2, QrCode, Download, ArrowRightLeft, FileText, Eye, EyeOff, ExternalLink, User, GitMerge, ArrowRight, Copy, Info, Grid, Shuffle, ClipboardList } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import { eventsApi, eventTypesApi, courtsApi, teamUnitsApi, skillLevelsApi, ageGroupsApi, tournamentApi, sharedAssetApi, getSharedAssetUrl } from '../services/api';
@@ -12,6 +12,7 @@ import PaymentModal from '../components/PaymentModal';
 import AdminPaymentModal from '../components/AdminPaymentModal';
 import MemberPaymentModal from '../components/MemberPaymentModal';
 import PublicProfileModal from '../components/ui/PublicProfileModal';
+import HelpIcon from '../components/ui/HelpIcon';
 
 export default function Events() {
   const { user, isAuthenticated } = useAuth();
@@ -3551,6 +3552,59 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
                 )}
               </div>
 
+              {/* Game Day Dashboard Buttons */}
+              {/* Admin sees all dashboards always; regular users see when event is started */}
+              {(isAdmin || (isRegistered && event.isStarted)) && (
+                <div className="border-t border-gray-200 pt-4">
+                  <h3 className="text-sm font-medium text-gray-700 mb-3 flex items-center gap-2">
+                    <Play className="w-4 h-4 text-blue-600" />
+                    Game Day Dashboards
+                    {isAdmin && !event.isStarted && (
+                      <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded">Admin Preview</span>
+                    )}
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    {/* TD Dashboard - Admin and Organizers only */}
+                    {(isAdmin || isOrganizer) && (
+                      <Link
+                        to={`/event/${event.id}/manage`}
+                        className="flex items-center gap-2 p-3 bg-orange-50 border border-orange-200 rounded-lg text-orange-700 hover:bg-orange-100 transition-colors"
+                      >
+                        <ClipboardList className="w-5 h-5" />
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium text-sm">TD Dashboard</div>
+                          <div className="text-xs text-orange-600 truncate">Manage games & courts</div>
+                        </div>
+                      </Link>
+                    )}
+                    {/* Player Dashboard - Registered users */}
+                    {(isAdmin || isRegistered) && (
+                      <Link
+                        to={`/event/${event.id}/gameday`}
+                        className="flex items-center gap-2 p-3 bg-blue-50 border border-blue-200 rounded-lg text-blue-700 hover:bg-blue-100 transition-colors"
+                      >
+                        <User className="w-5 h-5" />
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium text-sm">Player View</div>
+                          <div className="text-xs text-blue-600 truncate">Your games & schedule</div>
+                        </div>
+                      </Link>
+                    )}
+                    {/* Spectator Dashboard - Everyone */}
+                    <Link
+                      to={`/event/${event.id}/scoreboard`}
+                      className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-lg text-green-700 hover:bg-green-100 transition-colors"
+                    >
+                      <Eye className="w-5 h-5" />
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium text-sm">Spectator View</div>
+                        <div className="text-xs text-green-600 truncate">Live scores & courts</div>
+                      </div>
+                    </Link>
+                  </div>
+                </div>
+              )}
+
               {/* Description */}
               {event.description && (
                 <div>
@@ -4721,7 +4775,10 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
                       </select>
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Payment Model</label>
+                      <label className="flex items-center gap-1 text-sm font-medium text-gray-700 mb-1">
+                        Payment Model
+                        <HelpIcon topicCode="event.paymentModel" size="sm" />
+                      </label>
                       <select value={editFormData?.paymentModel || 'per_unit'} onChange={(e) => setEditFormData({ ...editFormData, paymentModel: e.target.value })} className="w-full border border-gray-300 rounded-lg p-2">
                         <option value="per_unit">Per Unit (team pays)</option>
                         <option value="per_person">Per Person (each pays)</option>
@@ -6476,16 +6533,63 @@ function CreateEventModal({ eventTypes, teamUnits = [], skillLevels = [], courtI
           {step === 2 && (
             <>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Event Type *</label>
-                <select
-                  value={formData.eventTypeId}
-                  onChange={(e) => setFormData({ ...formData, eventTypeId: parseInt(e.target.value) })}
-                  className="w-full border border-gray-300 rounded-lg p-2"
-                >
-                  {eventTypes.map(type => (
-                    <option key={type.id} value={type.id}>{type.name}</option>
-                  ))}
-                </select>
+                <label className="flex items-center gap-1 text-sm font-medium text-gray-700 mb-2">
+                  Event Type *
+                  <HelpIcon topicCode="event.eventTypes" size="sm" />
+                </label>
+
+                {/* Condensed Event Type Selection */}
+                <div className="space-y-2 mb-4">
+                  {eventTypes.map(type => {
+                    const isSelected = formData.eventTypeId === type.id;
+                    const TypeIcon = type.icon ? getIconByName(type.icon, Trophy) : Trophy;
+                    const colors = getColorValues(type.color);
+
+                    // Schedule type short labels
+                    const scheduleLabels = {
+                      'PrePlanned': 'Brackets/Pools',
+                      'Manual Only': 'Manual Games',
+                      'Dynamic': 'Auto-Schedule',
+                      'None': 'No Schedule'
+                    };
+
+                    return (
+                      <button
+                        key={type.id}
+                        type="button"
+                        onClick={() => setFormData({ ...formData, eventTypeId: type.id })}
+                        className={`w-full text-left p-3 rounded-lg border-2 transition-all flex items-center gap-3 ${
+                          isSelected
+                            ? 'border-blue-500 bg-blue-50'
+                            : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                        }`}
+                      >
+                        <div
+                          className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                          style={{ backgroundColor: colors.bg, color: colors.text }}
+                        >
+                          <TypeIcon className="w-4 h-4" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium text-gray-900">{type.name}</span>
+                            {type.scheduleType && (
+                              <span className="text-xs px-1.5 py-0.5 bg-gray-100 text-gray-600 rounded">
+                                {scheduleLabels[type.scheduleType] || type.scheduleType}
+                              </span>
+                            )}
+                          </div>
+                          {type.description && (
+                            <div className="text-xs text-gray-500 truncate">{type.description}</div>
+                          )}
+                        </div>
+                        {isSelected && (
+                          <CheckCircle className="w-5 h-5 text-blue-500 flex-shrink-0" />
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
 
               <div>
@@ -6663,7 +6767,10 @@ function CreateEventModal({ eventTypes, teamUnits = [], skillLevels = [], courtI
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Payment Model</label>
+                  <label className="flex items-center gap-1 text-sm font-medium text-gray-700 mb-1">
+                    Payment Model
+                    <HelpIcon topicCode="event.paymentModel" size="sm" />
+                  </label>
                   <select
                     value={formData.paymentModel}
                     onChange={(e) => setFormData({ ...formData, paymentModel: e.target.value })}

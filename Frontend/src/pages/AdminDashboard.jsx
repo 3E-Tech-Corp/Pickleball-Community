@@ -9,7 +9,7 @@ import {
   Shield, GraduationCap, User, CheckCircle, XCircle, Save,
   Palette, Upload, RefreshCw, Image, Layers, Check, Award, Tags, UserCog, Video,
   Building2, HelpCircle, MessageSquare, MapPin, Network, Plus, Play, ArrowUp, ArrowDown,
-  Bell, Send, Megaphone, Mail, RotateCcw, ToggleLeft, ToggleRight, Copy, AlertCircle, Settings
+  Bell, Send, Megaphone, Mail, RotateCcw, ToggleLeft, ToggleRight, Copy, AlertCircle, Settings, LifeBuoy
 } from 'lucide-react'
 import VideoUploadModal from '../components/ui/VideoUploadModal'
 import PublicProfileModal from '../components/ui/PublicProfileModal'
@@ -29,6 +29,7 @@ import LeagueRolesAdmin from './LeagueRolesAdmin'
 import ReleaseNotesAdmin from './ReleaseNotesAdmin'
 import GameFormatsAdmin from './GameFormatsAdmin'
 import ScoreMethodsAdmin from './ScoreMethodsAdmin'
+import HelpTopicsAdmin from './HelpTopicsAdmin'
 
 const AdminDashboard = () => {
   const { user } = useAuth()
@@ -761,6 +762,7 @@ const AdminDashboard = () => {
       items: [
         { id: 'blog', label: 'Blog', icon: BookOpen },
         { id: 'faq', label: 'FAQ', icon: HelpCircle },
+        { id: 'helpTopics', label: 'Help Topics', icon: LifeBuoy },
         { id: 'feedback', label: 'Feedback', icon: MessageSquare },
         { id: 'certification', label: 'Certification', icon: Award },
         { id: 'releaseNotes', label: 'Release Notes', icon: Megaphone }
@@ -2337,6 +2339,9 @@ const AdminDashboard = () => {
 
           {/* FAQ Admin */}
           {activeTab === 'faq' && <FaqAdmin embedded />}
+
+          {/* Help Topics Admin */}
+          {activeTab === 'helpTopics' && <HelpTopicsAdmin embedded />}
 
           {/* Feedback Admin */}
           {activeTab === 'feedback' && <FeedbackAdmin embedded />}

@@ -28,6 +28,19 @@ public class EventType
     /// </summary>
     public bool AllowMultipleDivisions { get; set; } = true;
 
+    /// <summary>
+    /// Maximum number of divisions allowed for this event type.
+    /// NULL means unlimited divisions.
+    /// </summary>
+    public int? DivisionMax { get; set; }
+
+    /// <summary>
+    /// The scheduling type for this event type.
+    /// Options: PrePlanned, Manual Only, Dynamic, None
+    /// </summary>
+    [MaxLength(50)]
+    public string? ScheduleType { get; set; }
+
     public int SortOrder { get; set; } = 0;
 
     public bool IsActive { get; set; } = true;

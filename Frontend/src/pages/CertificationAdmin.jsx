@@ -4,6 +4,7 @@ import {
   Settings, Plus, Edit2, Trash2, Save, X, ChevronDown, ChevronUp,
   GraduationCap, Target, AlertCircle, CheckCircle, Layers, Scale
 } from 'lucide-react';
+import HelpIcon from '../components/ui/HelpIcon';
 
 export default function CertificationAdmin({ embedded = false }) {
   const [knowledgeLevels, setKnowledgeLevels] = useState([]);
@@ -554,7 +555,10 @@ export default function CertificationAdmin({ embedded = false }) {
           <div className="flex items-center gap-4">
             <Settings className="w-12 h-12" />
             <div>
-              <h1 className="text-3xl font-bold">Certification Configuration</h1>
+              <h1 className="flex items-center gap-2 text-3xl font-bold">
+                Certification Configuration
+                <HelpIcon topicCode="admin.certification" size="md" className="text-white/80" />
+              </h1>
               <p className="text-primary-100 mt-1">
                 Manage skill groups, weights, and evaluation criteria
               </p>

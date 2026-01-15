@@ -569,15 +569,17 @@ public class TournamentController : ControllerBase
         if (existingInDivision != null)
             return BadRequest(new ApiResponse<UnitJoinRequestDto> { Success = false, Message = "You already have a pending request in this division. Cancel it first before requesting to join another team." });
 
-        // Check if already registered in this division (as accepted member)
-        var alreadyRegistered = await _context.EventUnitMembers
+        // Check if already registered in this division (as accepted member of a team where user is NOT captain)
+        // Captains of incomplete units CAN request to join other teams (to merge/find partners)
+        var alreadyRegisteredAsNonCaptain = await _context.EventUnitMembers
             .Include(m => m.Unit)
             .AnyAsync(m => m.UserId == userId.Value &&
                 m.Unit!.DivisionId == unit.DivisionId &&
                 m.Unit.Status != "Cancelled" &&
+                m.Unit.CaptainUserId != userId.Value && // Allow if user is captain (looking for partner)
                 m.InviteStatus == "Accepted");
 
-        if (alreadyRegistered)
+        if (alreadyRegisteredAsNonCaptain)
             return BadRequest(new ApiResponse<UnitJoinRequestDto> { Success = false, Message = "You are already registered in this division" });
 
         // Check for MUTUAL REQUEST scenario:
@@ -793,11 +795,14 @@ public class TournamentController : ControllerBase
         }
         else
         {
-            // Declined - remove the pending membership
+            // Declined - update membership status to Rejected (preserve payment info if any)
             if (membership != null)
             {
-                _context.EventUnitMembers.Remove(membership);
+                membership.InviteStatus = "Rejected";
+                membership.RespondedAt = DateTime.Now;
             }
+            // Remove the join request so the user can make a new request to another team
+            _context.EventUnitJoinRequests.Remove(joinRequest);
         }
 
         await _context.SaveChangesAsync();

@@ -453,7 +453,15 @@ export const userApi = {
   updateUser: (id, data) => api.put(`/users/${id}`, data),
 
   // Get recently joined players (public, for marquee)
-  getRecentPlayers: (count = 20, days = 30) => api.get(`/users/recent?count=${count}&days=${days}`)
+  getRecentPlayers: (count = 20, days = 30) => api.get(`/users/recent?count=${count}&days=${days}`),
+
+  // Social Links
+  getSocialLinks: () => api.get('/users/social-links'),
+  addSocialLink: (data) => api.post('/users/social-links', data),
+  updateSocialLink: (id, data) => api.put(`/users/social-links/${id}`, data),
+  deleteSocialLink: (id) => api.delete(`/users/social-links/${id}`),
+  bulkUpdateSocialLinks: (links) => api.put('/users/social-links/bulk', { links }),
+  getSocialPlatforms: () => api.get('/users/social-platforms')
 }
 
 // Content Types API
@@ -1952,6 +1960,16 @@ export const gameDayApi = {
 
   // Override rank (TD only)
   overrideRank: (unitId, data) => api.post(`/tournament-gameday/override-rank/${unitId}`, data),
+
+  // Pool management
+  calculatePoolRankings: (eventId, divisionId) =>
+    api.post(`/tournament-gameday/calculate-pool-rankings/${eventId}/${divisionId}`),
+
+  finalizePools: (eventId, divisionId, advancePerPool = null) =>
+    api.post(`/tournament-gameday/finalize-pools/${eventId}/${divisionId}`, { advancePerPool }),
+
+  resetPools: (eventId, divisionId) =>
+    api.post(`/tournament-gameday/reset-pools/${eventId}/${divisionId}`),
 
   // Send notification
   sendNotification: (eventId, data) => api.post(`/tournament-gameday/notify/${eventId}`, data)

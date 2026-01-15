@@ -10,8 +10,10 @@ import {
   User, Camera, Video, MapPin, Phone, Calendar,
   Edit2, Save, Upload, X, Play, Award, Target,
   Zap, Heart, Activity, TrendingUp, ChevronRight,
-  MessageCircle, Shield, Eye, Mail
+  MessageCircle, Shield, Eye, Mail, Link, Plus, Trash2,
+  Twitter, Instagram, Facebook, Linkedin, Youtube, Globe, ExternalLink
 } from 'lucide-react'
+import HelpIcon from '../components/ui/HelpIcon'
 
 const Profile = () => {
   const { user, updateUser } = useAuth()
@@ -48,6 +50,14 @@ const Profile = () => {
   const [allowDirectMessages, setAllowDirectMessages] = useState(true)
   const [allowClubMessages, setAllowClubMessages] = useState(true)
   const [savingMessagingSettings, setSavingMessagingSettings] = useState(false)
+
+  // Social links state
+  const [socialLinks, setSocialLinks] = useState([])
+  const [socialLinksLoading, setSocialLinksLoading] = useState(false)
+  const [addingSocialLink, setAddingSocialLink] = useState(false)
+  const [newSocialLink, setNewSocialLink] = useState({ platform: '', url: '', displayName: '' })
+  const [editingSocialLinkId, setEditingSocialLinkId] = useState(null)
+  const [editingSocialLinkData, setEditingSocialLinkData] = useState({ url: '', displayName: '' })
 
   // Separate forms for each section
   const basicInfoForm = useForm({
@@ -155,8 +165,32 @@ const Profile = () => {
         const isExternal = externalPatterns.some(pattern => user.introVideo.includes(pattern))
         setVideoPreview(isExternal ? user.introVideo : getSharedAssetUrl(user.introVideo))
       }
+
+      // Load social links from user data if available
+      if (user.socialLinks) {
+        setSocialLinks(user.socialLinks)
+      }
     }
   }, [user])
+
+  // Fetch social links
+  useEffect(() => {
+    const fetchSocialLinks = async () => {
+      if (!user?.id) return
+      try {
+        setSocialLinksLoading(true)
+        const response = await userApi.getSocialLinks()
+        if (response.success && response.data) {
+          setSocialLinks(response.data)
+        }
+      } catch (error) {
+        console.error('Error fetching social links:', error)
+      } finally {
+        setSocialLinksLoading(false)
+      }
+    }
+    fetchSocialLinks()
+  }, [user?.id])
 
   // Handle avatar upload directly (no edit mode needed)
   const handleAvatarChange = async (e) => {
@@ -376,6 +410,89 @@ const Profile = () => {
       setSavingMessagingSettings(false)
     }
   }
+
+  // Social link handlers
+  const handleAddSocialLink = async () => {
+    if (!newSocialLink.platform || !newSocialLink.url) {
+      toast.error('Please select a platform and enter a URL')
+      return
+    }
+    try {
+      const response = await userApi.addSocialLink(newSocialLink)
+      if (response.success && response.data) {
+        setSocialLinks([...socialLinks, response.data])
+        setNewSocialLink({ platform: '', url: '', displayName: '' })
+        setAddingSocialLink(false)
+        toast.success('Social link added')
+      }
+    } catch (error) {
+      console.error('Error adding social link:', error)
+      toast.error('Failed to add social link')
+    }
+  }
+
+  const handleUpdateSocialLink = async (id) => {
+    try {
+      const response = await userApi.updateSocialLink(id, editingSocialLinkData)
+      if (response.success && response.data) {
+        setSocialLinks(socialLinks.map(link => link.id === id ? response.data : link))
+        setEditingSocialLinkId(null)
+        setEditingSocialLinkData({ url: '', displayName: '' })
+        toast.success('Social link updated')
+      }
+    } catch (error) {
+      console.error('Error updating social link:', error)
+      toast.error('Failed to update social link')
+    }
+  }
+
+  const handleDeleteSocialLink = async (id) => {
+    try {
+      await userApi.deleteSocialLink(id)
+      setSocialLinks(socialLinks.filter(link => link.id !== id))
+      toast.success('Social link removed')
+    } catch (error) {
+      console.error('Error deleting social link:', error)
+      toast.error('Failed to remove social link')
+    }
+  }
+
+  const startEditingSocialLink = (link) => {
+    setEditingSocialLinkId(link.id)
+    setEditingSocialLinkData({ url: link.url, displayName: link.displayName || '' })
+  }
+
+  // Get icon for social platform
+  const getSocialIcon = (platform) => {
+    const iconClass = "w-5 h-5"
+    switch (platform?.toLowerCase()) {
+      case 'twitter':
+        return <Twitter className={iconClass} />
+      case 'instagram':
+        return <Instagram className={iconClass} />
+      case 'facebook':
+        return <Facebook className={iconClass} />
+      case 'linkedin':
+        return <Linkedin className={iconClass} />
+      case 'youtube':
+        return <Youtube className={iconClass} />
+      case 'tiktok':
+        return <span className={iconClass}>TT</span>
+      case 'twitch':
+        return <span className={iconClass}>TV</span>
+      case 'discord':
+        return <span className={iconClass}>DC</span>
+      case 'website':
+        return <Globe className={iconClass} />
+      default:
+        return <Link className={iconClass} />
+    }
+  }
+
+  const socialPlatforms = [
+    'Twitter', 'Instagram', 'Facebook', 'LinkedIn', 'YouTube',
+    'TikTok', 'Twitch', 'Discord', 'Website', 'Other'
+  ]
 
   // Save Basic Info
   const handleSaveBasicInfo = async (data) => {
@@ -743,6 +860,169 @@ const Profile = () => {
                   </div>
                 )}
               </div>
+
+              {/* Social Links Section */}
+              <div className="bg-gray-50 rounded-xl p-4">
+                <div className="flex justify-between items-center mb-3">
+                  <h3 className="text-sm font-semibold text-gray-700">Social Links</h3>
+                  {!addingSocialLink && (
+                    <button
+                      onClick={() => setAddingSocialLink(true)}
+                      className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+                    >
+                      + Add
+                    </button>
+                  )}
+                </div>
+
+                {/* Add new social link form */}
+                {addingSocialLink && (
+                  <div className="p-3 bg-white rounded-lg border border-gray-200 mb-3">
+                    <div className="space-y-2">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Platform</label>
+                        <select
+                          value={newSocialLink.platform}
+                          onChange={(e) => setNewSocialLink({ ...newSocialLink, platform: e.target.value })}
+                          className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        >
+                          <option value="">Select platform</option>
+                          {socialPlatforms.map(platform => (
+                            <option key={platform} value={platform}>{platform}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">URL</label>
+                        <input
+                          type="url"
+                          value={newSocialLink.url}
+                          onChange={(e) => setNewSocialLink({ ...newSocialLink, url: e.target.value })}
+                          className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          placeholder="https://..."
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Display Name (optional)</label>
+                        <input
+                          type="text"
+                          value={newSocialLink.displayName}
+                          onChange={(e) => setNewSocialLink({ ...newSocialLink, displayName: e.target.value })}
+                          className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          placeholder="@username"
+                        />
+                      </div>
+                      <div className="flex justify-end gap-2 pt-1">
+                        <button
+                          onClick={() => {
+                            setAddingSocialLink(false)
+                            setNewSocialLink({ platform: '', url: '', displayName: '' })
+                          }}
+                          className="px-2 py-1 text-xs text-gray-600 hover:bg-gray-100 rounded transition"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={handleAddSocialLink}
+                          className="px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition"
+                        >
+                          Add
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Social links list */}
+                {socialLinksLoading ? (
+                  <div className="flex items-center justify-center py-4">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                  </div>
+                ) : socialLinks.length === 0 && !addingSocialLink ? (
+                  <div className="text-center py-4 text-gray-500">
+                    <Globe className="w-8 h-8 mx-auto mb-2 text-gray-300" />
+                    <p className="text-xs">No social links yet</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {socialLinks.map((link) => (
+                      <div key={link.id} className="flex items-center justify-between p-2 bg-white rounded-lg border border-gray-200">
+                        {editingSocialLinkId === link.id ? (
+                          <div className="flex-1 space-y-2">
+                            <input
+                              type="url"
+                              value={editingSocialLinkData.url}
+                              onChange={(e) => setEditingSocialLinkData({ ...editingSocialLinkData, url: e.target.value })}
+                              className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                              placeholder="URL"
+                            />
+                            <input
+                              type="text"
+                              value={editingSocialLinkData.displayName}
+                              onChange={(e) => setEditingSocialLinkData({ ...editingSocialLinkData, displayName: e.target.value })}
+                              className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                              placeholder="Display Name"
+                            />
+                            <div className="flex justify-end gap-1">
+                              <button
+                                onClick={() => {
+                                  setEditingSocialLinkId(null)
+                                  setEditingSocialLinkData({ url: '', displayName: '' })
+                                }}
+                                className="px-2 py-0.5 text-xs text-gray-600 hover:bg-gray-100 rounded transition"
+                              >
+                                Cancel
+                              </button>
+                              <button
+                                onClick={() => handleUpdateSocialLink(link.id)}
+                                className="px-2 py-0.5 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition"
+                              >
+                                Save
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <>
+                            <div className="flex items-center gap-2 min-w-0 flex-1">
+                              <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center text-gray-600 flex-shrink-0">
+                                {getSocialIcon(link.platform)}
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <p className="text-xs font-medium text-gray-900">{link.platform}</p>
+                                <a
+                                  href={link.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-xs text-blue-600 hover:underline flex items-center gap-1 truncate"
+                                >
+                                  {link.displayName || link.url.substring(0, 25) + (link.url.length > 25 ? '...' : '')}
+                                  <ExternalLink className="w-3 h-3 flex-shrink-0" />
+                                </a>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-1 flex-shrink-0">
+                              <button
+                                onClick={() => startEditingSocialLink(link)}
+                                className="p-1 text-gray-400 hover:text-blue-600 rounded transition"
+                                title="Edit"
+                              >
+                                <Edit2 className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteSocialLink(link.id)}
+                                className="p-1 text-gray-400 hover:text-red-600 rounded transition"
+                                title="Delete"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* RIGHT SIDE - Basic Info and Pickleball Info Sections */}
@@ -936,6 +1216,7 @@ const Profile = () => {
                   <h3 className="text-lg font-semibold text-gray-900 flex items-center">
                     <Target className="w-5 h-5 mr-2 text-purple-500" />
                     Pickleball Information
+                    <HelpIcon topicCode="profile.skillRating" size="sm" className="ml-2" />
                   </h3>
                   {!isEditingPickleballInfo ? (
                     <button
@@ -1005,7 +1286,10 @@ const Profile = () => {
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Playing Style</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center">
+                        Playing Style
+                        <HelpIcon topicCode="profile.playStyle" size="sm" className="ml-1" />
+                      </label>
                       <select
                         {...pickleballForm.register('playingStyle')}
                         disabled={!isEditingPickleballInfo}
@@ -1044,7 +1328,10 @@ const Profile = () => {
                       </select>
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Paddle Brand</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center">
+                        Paddle Brand
+                        <HelpIcon topicCode="profile.equipment" size="sm" className="ml-1" />
+                      </label>
                       <input
                         {...pickleballForm.register('paddleBrand')}
                         type="text"
@@ -1137,6 +1424,7 @@ const Profile = () => {
                   )}
                 </div>
               </div>
+
             </div>
           </div>
         </div>
