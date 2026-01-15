@@ -6161,8 +6161,56 @@ function CreateEventModal({ eventTypes, teamUnits = [], skillLevels = [], courtI
   });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
+  const [fieldErrors, setFieldErrors] = useState({});
   const [uploadingImage, setUploadingImage] = useState(false);
   const [step, setStep] = useState(courtId ? 2 : 1); // Skip court selection if already provided
+
+  // Validation for each step
+  const validateStep = (stepNum) => {
+    const errors = {};
+
+    switch (stepNum) {
+      case 1:
+        if (!selectedCourt) {
+          errors.court = 'Please select a venue';
+        }
+        break;
+      case 2:
+        if (!formData.eventTypeId) {
+          errors.eventTypeId = 'Event Type is required';
+        }
+        if (!formData.name?.trim()) {
+          errors.name = 'Event Name is required';
+        }
+        break;
+      case 3:
+        if (!formData.startDate) {
+          errors.startDate = 'Start Date is required';
+        }
+        break;
+      case 4:
+        // Fees step - no required fields
+        break;
+      case 5:
+        // Divisions step - optional but warn if empty
+        break;
+      default:
+        break;
+    }
+
+    setFieldErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  // Get missing fields for current step
+  const getMissingFieldsList = () => {
+    const missing = [];
+    if (fieldErrors.court) missing.push('Venue');
+    if (fieldErrors.eventTypeId) missing.push('Event Type');
+    if (fieldErrors.name) missing.push('Event Name');
+    if (fieldErrors.startDate) missing.push('Start Date');
+    return missing;
+  };
 
   // Load top courts on mount
   useEffect(() => {
@@ -6226,6 +6274,8 @@ function CreateEventModal({ eventTypes, teamUnits = [], skillLevels = [], courtI
       country: court.country,
       address: court.address || court.addr1
     });
+    // Clear court validation error
+    if (fieldErrors.court) setFieldErrors(prev => ({ ...prev, court: undefined }));
     // Auto-fill location fields
     setFormData(prev => ({
       ...prev,
@@ -6365,14 +6415,53 @@ function CreateEventModal({ eventTypes, teamUnits = [], skillLevels = [], courtI
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-[1000] overflow-y-auto">
       <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-        <div className="sticky top-0 bg-white px-6 py-4 border-b flex items-center justify-between z-10">
-          <div>
+        <div className="sticky top-0 bg-white px-6 py-4 border-b z-10">
+          <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-semibold text-gray-900">Create New Event</h2>
-            <p className="text-sm text-gray-500">Step {step} of {totalSteps}: {stepLabels[step - 1]}</p>
+            <button onClick={onClose} className="p-2 text-gray-400 hover:text-gray-600">
+              <X className="w-5 h-5" />
+            </button>
           </div>
-          <button onClick={onClose} className="p-2 text-gray-400 hover:text-gray-600">
-            <X className="w-5 h-5" />
-          </button>
+
+          {/* Step Indicator */}
+          <div className="flex items-center justify-between">
+            {stepLabels.map((label, index) => {
+              const stepNum = index + 1;
+              const isActive = stepNum === step;
+              const isCompleted = stepNum < step;
+              return (
+                <div key={label} className="flex items-center flex-1">
+                  <div className="flex flex-col items-center">
+                    <div
+                      className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-colors ${
+                        isActive
+                          ? 'bg-orange-600 text-white'
+                          : isCompleted
+                            ? 'bg-green-500 text-white'
+                            : 'bg-gray-200 text-gray-500'
+                      }`}
+                    >
+                      {isCompleted ? <Check className="w-4 h-4" /> : stepNum}
+                    </div>
+                    <span
+                      className={`text-xs mt-1 ${
+                        isActive ? 'text-orange-600 font-medium' : 'text-gray-500'
+                      }`}
+                    >
+                      {label}
+                    </span>
+                  </div>
+                  {stepNum < totalSteps && (
+                    <div
+                      className={`flex-1 h-0.5 mx-2 ${
+                        isCompleted ? 'bg-green-500' : 'bg-gray-200'
+                      }`}
+                    />
+                  )}
+                </div>
+              );
+            })}
+          </div>
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
@@ -6382,13 +6471,28 @@ function CreateEventModal({ eventTypes, teamUnits = [], skillLevels = [], courtI
             </div>
           )}
 
+          {/* Field-level errors */}
+          {Object.keys(fieldErrors).length > 0 && (
+            <div className="p-3 bg-amber-50 border border-amber-200 text-amber-700 rounded-lg text-sm">
+              <div className="font-medium mb-1">Please complete the following required fields:</div>
+              <ul className="list-disc list-inside">
+                {getMissingFieldsList().map(field => (
+                  <li key={field}>{field}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           {/* Step 1: Venue Selection */}
           {step === 1 && (
             <>
-              <div className="flex items-center gap-2 text-gray-700 mb-4">
-                <Building2 className="w-5 h-5 text-orange-600" />
-                <span className="font-medium">Select a Venue for Your Event</span>
+              <div className={`flex items-center gap-2 mb-4 ${fieldErrors.court ? 'text-red-600' : 'text-gray-700'}`}>
+                <Building2 className={`w-5 h-5 ${fieldErrors.court ? 'text-red-600' : 'text-orange-600'}`} />
+                <span className="font-medium">Select a Venue for Your Event *</span>
               </div>
+              {fieldErrors.court && (
+                <p className="text-xs text-red-600 mb-4 -mt-2">{fieldErrors.court}</p>
+              )}
 
               {/* Search */}
               <div className="relative">
@@ -6533,10 +6637,13 @@ function CreateEventModal({ eventTypes, teamUnits = [], skillLevels = [], courtI
           {step === 2 && (
             <>
               <div>
-                <label className="flex items-center gap-1 text-sm font-medium text-gray-700 mb-2">
+                <label className={`flex items-center gap-1 text-sm font-medium mb-2 ${fieldErrors.eventTypeId ? 'text-red-600' : 'text-gray-700'}`}>
                   Event Type *
                   <HelpIcon topicCode="event.eventTypes" size="sm" />
                 </label>
+                {fieldErrors.eventTypeId && (
+                  <p className="text-xs text-red-600 mb-2">{fieldErrors.eventTypeId}</p>
+                )}
 
                 {/* Condensed Event Type Selection */}
                 <div className="space-y-2 mb-4">
@@ -6557,11 +6664,16 @@ function CreateEventModal({ eventTypes, teamUnits = [], skillLevels = [], courtI
                       <button
                         key={type.id}
                         type="button"
-                        onClick={() => setFormData({ ...formData, eventTypeId: type.id })}
+                        onClick={() => {
+                          setFormData({ ...formData, eventTypeId: type.id });
+                          if (fieldErrors.eventTypeId) setFieldErrors(prev => ({ ...prev, eventTypeId: undefined }));
+                        }}
                         className={`w-full text-left p-3 rounded-lg border-2 transition-all flex items-center gap-3 ${
                           isSelected
                             ? 'border-blue-500 bg-blue-50'
-                            : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                            : fieldErrors.eventTypeId
+                              ? 'border-red-300 hover:border-red-400 hover:bg-red-50'
+                              : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
                         }`}
                       >
                         <div
@@ -6593,14 +6705,24 @@ function CreateEventModal({ eventTypes, teamUnits = [], skillLevels = [], courtI
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Event Name *</label>
+                <label className={`block text-sm font-medium mb-1 ${fieldErrors.name ? 'text-red-600' : 'text-gray-700'}`}>
+                  Event Name *
+                </label>
                 <input
                   type="text"
                   value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full border border-gray-300 rounded-lg p-2"
+                  onChange={(e) => {
+                    setFormData({ ...formData, name: e.target.value });
+                    if (fieldErrors.name) setFieldErrors(prev => ({ ...prev, name: undefined }));
+                  }}
+                  className={`w-full border rounded-lg p-2 ${
+                    fieldErrors.name ? 'border-red-500 bg-red-50' : 'border-gray-300'
+                  }`}
                   placeholder="Summer Tournament 2025"
                 />
+                {fieldErrors.name && (
+                  <p className="text-xs text-red-600 mt-1">{fieldErrors.name}</p>
+                )}
               </div>
 
               <div>
@@ -6666,13 +6788,23 @@ function CreateEventModal({ eventTypes, teamUnits = [], skillLevels = [], courtI
             <>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Start Date *</label>
+                  <label className={`block text-sm font-medium mb-1 ${fieldErrors.startDate ? 'text-red-600' : 'text-gray-700'}`}>
+                    Start Date *
+                  </label>
                   <input
                     type="date"
                     value={formData.startDate}
-                    onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
-                    className="w-full border border-gray-300 rounded-lg p-2"
+                    onChange={(e) => {
+                      setFormData({ ...formData, startDate: e.target.value });
+                      if (fieldErrors.startDate) setFieldErrors(prev => ({ ...prev, startDate: undefined }));
+                    }}
+                    className={`w-full border rounded-lg p-2 ${
+                      fieldErrors.startDate ? 'border-red-500 bg-red-50' : 'border-gray-300'
+                    }`}
                   />
+                  {fieldErrors.startDate && (
+                    <p className="text-xs text-red-600 mt-1">{fieldErrors.startDate}</p>
+                  )}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Start Time</label>
@@ -6951,7 +7083,11 @@ function CreateEventModal({ eventTypes, teamUnits = [], skillLevels = [], courtI
             {step > 1 && (
               <button
                 type="button"
-                onClick={() => setStep(step - 1)}
+                onClick={() => {
+                  setFieldErrors({});
+                  setError(null);
+                  setStep(step - 1);
+                }}
                 className="flex-1 py-3 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50"
               >
                 Back
@@ -6961,12 +7097,10 @@ function CreateEventModal({ eventTypes, teamUnits = [], skillLevels = [], courtI
               <button
                 type="button"
                 onClick={() => {
-                  if (step === 1 && !selectedCourt) {
-                    setError('Please select a court first');
-                    return;
+                  if (validateStep(step)) {
+                    setError(null);
+                    setStep(step + 1);
                   }
-                  setError(null);
-                  setStep(step + 1);
                 }}
                 className="flex-1 py-3 bg-orange-600 text-white rounded-lg font-medium hover:bg-orange-700"
               >
@@ -6981,16 +7115,6 @@ function CreateEventModal({ eventTypes, teamUnits = [], skillLevels = [], courtI
                 {submitting ? 'Creating...' : 'Create Event'}
               </button>
             )}
-          </div>
-
-          {/* Step Indicators */}
-          <div className="flex justify-center gap-2">
-            {Array.from({ length: totalSteps }, (_, i) => i + 1).map(s => (
-              <div
-                key={s}
-                className={`w-2 h-2 rounded-full ${s === step ? 'bg-orange-600' : s < step ? 'bg-orange-300' : 'bg-gray-300'}`}
-              />
-            ))}
           </div>
         </form>
       </div>
