@@ -132,7 +132,7 @@ public class PlayerHistoryController : ControllerBase
 
         // Payment summary
         var payments = await _context.UserPayments
-            .Where(p => p.UserId == userId && p.PaymentType == "EventRegistration")
+            .Where(p => p.UserId == userId )
             .ToListAsync();
 
         var totalPayments = payments.Count;
