@@ -957,7 +957,7 @@ export default function TournamentManage() {
                                         } ${standing.advancedToPlayoff ? 'bg-green-100' : ''}`}
                                       >
                                         <td className="py-2 px-2">
-                                          {isEditing ? (
+                                          {isEditing && editingRank ? (
                                             <input
                                               type="number"
                                               min="1"
