@@ -4524,13 +4524,35 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
                           </div>
                           <div className="min-w-0">
                             {editingDocument?.id === doc.id ? (
-                              <input
-                                type="text"
-                                value={editingDocument.title}
-                                onChange={(e) => setEditingDocument({ ...editingDocument, title: e.target.value })}
-                                className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-                                autoFocus
-                              />
+                              <div className="space-y-2">
+                                <input
+                                  type="text"
+                                  value={editingDocument.title}
+                                  onChange={(e) => setEditingDocument({ ...editingDocument, title: e.target.value })}
+                                  className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                                  autoFocus
+                                />
+                                <div className="flex flex-wrap gap-1">
+                                  {assetTypes.map(type => {
+                                    const TypeIcon = getIconForAssetType(type.typeName);
+                                    return (
+                                      <button
+                                        key={type.id}
+                                        type="button"
+                                        onClick={() => setEditingDocument({ ...editingDocument, objectAssetTypeId: type.id })}
+                                        className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors ${
+                                          editingDocument.objectAssetTypeId === type.id
+                                            ? 'bg-orange-100 text-orange-700 border border-orange-300'
+                                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                        }`}
+                                      >
+                                        <TypeIcon className="w-3 h-3" />
+                                        {type.displayName}
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              </div>
                             ) : (
                               <div className="flex items-center gap-2 flex-wrap">
                                 {doc.assetTypeDisplayName && (
@@ -4569,7 +4591,7 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
                                 {editingDocument.isPublic ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
                               </button>
                               <button
-                                onClick={() => handleUpdateDocument(doc.id, { title: editingDocument.title, isPublic: editingDocument.isPublic })}
+                                onClick={() => handleUpdateDocument(doc.id, { title: editingDocument.title, isPublic: editingDocument.isPublic, objectAssetTypeId: editingDocument.objectAssetTypeId })}
                                 className="p-2 text-green-600 hover:bg-green-50 rounded"
                               >
                                 <Check className="w-4 h-4" />
@@ -4593,7 +4615,7 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
                                 <ExternalLink className="w-4 h-4" />
                               </a>
                               <button
-                                onClick={() => setEditingDocument({ id: doc.id, title: doc.title, isPublic: doc.isPublic })}
+                                onClick={() => setEditingDocument({ id: doc.id, title: doc.title, isPublic: doc.isPublic, objectAssetTypeId: doc.objectAssetTypeId })}
                                 className="p-2 text-gray-400 hover:bg-gray-100 rounded"
                                 title="Edit"
                               >
