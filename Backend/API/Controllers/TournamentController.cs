@@ -823,7 +823,7 @@ public class TournamentController : ControllerBase
         if (request.Accept && shouldWaitlist && joinRequest.Unit != null && joinRequest.Unit.Status != "Waitlisted")
         {
             joinRequest.Unit.Status = "Waitlisted";
-            joinRequest.Unit.WaitlistPosition = await GetNextWaitlistPosition(joinRequest.Unit.DivisionId ?? 0);
+            joinRequest.Unit.WaitlistPosition = await GetNextWaitlistPosition(joinRequest.Unit.DivisionId);
             joinRequest.Unit.UpdatedAt = DateTime.Now;
         }
 
