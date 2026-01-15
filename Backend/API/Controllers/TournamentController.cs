@@ -738,25 +738,35 @@ public class TournamentController : ControllerBase
         // If accepting, check MaxPlayers capacity first
         if (request.Accept)
         {
-            var division = await _context.EventDivisions
-                .FirstOrDefaultAsync(d => d.Id == joinRequest.Unit.DivisionId);
+            // Check if membership already exists (player already has a reserved spot)
+            var existingMembership = await _context.EventUnitMembers
+                .AnyAsync(m => m.UnitId == joinRequest.UnitId &&
+                    m.UserId == joinRequest.UserId &&
+                    (m.InviteStatus == "PendingJoinRequest" || m.InviteStatus == "PendingPartnerInvite"));
 
-            if (division?.MaxPlayers.HasValue == true)
+            // Only check capacity if this is a new member (no existing membership)
+            if (!existingMembership)
             {
-                var currentPlayerCount = await _context.EventUnitMembers
-                    .Include(m => m.Unit)
-                    .CountAsync(m => m.Unit!.DivisionId == division.Id &&
-                        m.Unit.EventId == joinRequest.Unit.EventId &&
-                        m.Unit.Status != "Cancelled" &&
-                        m.InviteStatus == "Accepted");
+                var division = await _context.EventDivisions
+                    .FirstOrDefaultAsync(d => d.Id == joinRequest.Unit.DivisionId);
 
-                if (currentPlayerCount >= division.MaxPlayers.Value)
+                if (division?.MaxPlayers.HasValue == true)
                 {
-                    return BadRequest(new ApiResponse<bool>
+                    var currentPlayerCount = await _context.EventUnitMembers
+                        .Include(m => m.Unit)
+                        .CountAsync(m => m.Unit!.DivisionId == division.Id &&
+                            m.Unit.EventId == joinRequest.Unit.EventId &&
+                            m.Unit.Status != "Cancelled" &&
+                            m.InviteStatus == "Accepted");
+
+                    if (currentPlayerCount >= division.MaxPlayers.Value)
                     {
-                        Success = false,
-                        Message = $"Cannot accept request. Division '{division.Name}' has reached its maximum player limit of {division.MaxPlayers.Value} players."
-                    });
+                        return BadRequest(new ApiResponse<bool>
+                        {
+                            Success = false,
+                            Message = $"Cannot accept request. Division '{division.Name}' has reached its maximum player limit of {division.MaxPlayers.Value} players."
+                        });
+                    }
                 }
             }
         }
