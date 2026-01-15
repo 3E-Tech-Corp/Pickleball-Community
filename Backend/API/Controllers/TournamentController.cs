@@ -2539,6 +2539,62 @@ public class TournamentController : ControllerBase
         });
     }
 
+    /// <summary>
+    /// Bulk create multiple courts at once
+    /// </summary>
+    [Authorize]
+    [HttpPost("events/{eventId}/courts/bulk")]
+    public async Task<ActionResult<ApiResponse<List<TournamentCourtDto>>>> BulkCreateCourts(int eventId, [FromBody] BulkCreateCourtsRequest request)
+    {
+        var evt = await _context.Events.FindAsync(eventId);
+        if (evt == null)
+            return NotFound(new ApiResponse<List<TournamentCourtDto>> { Success = false, Message = "Event not found" });
+
+        if (request.NumberOfCourts <= 0 || request.NumberOfCourts > 100)
+            return BadRequest(new ApiResponse<List<TournamentCourtDto>> { Success = false, Message = "Number of courts must be between 1 and 100" });
+
+        // Get the current max sort order
+        var maxSortOrder = await _context.TournamentCourts
+            .Where(c => c.EventId == eventId)
+            .MaxAsync(c => (int?)c.SortOrder) ?? 0;
+
+        var prefix = string.IsNullOrWhiteSpace(request.LabelPrefix) ? "Court" : request.LabelPrefix.Trim();
+        var courts = new List<TournamentCourt>();
+
+        for (int i = 0; i < request.NumberOfCourts; i++)
+        {
+            var courtNumber = request.StartingNumber + i;
+            var court = new TournamentCourt
+            {
+                EventId = eventId,
+                CourtLabel = $"{prefix} {courtNumber}",
+                SortOrder = maxSortOrder + i + 1,
+                Status = "Available",
+                IsActive = true
+            };
+            courts.Add(court);
+            _context.TournamentCourts.Add(court);
+        }
+
+        await _context.SaveChangesAsync();
+
+        var result = courts.Select(c => new TournamentCourtDto
+        {
+            Id = c.Id,
+            EventId = c.EventId,
+            CourtLabel = c.CourtLabel,
+            Status = c.Status,
+            SortOrder = c.SortOrder
+        }).ToList();
+
+        return Ok(new ApiResponse<List<TournamentCourtDto>>
+        {
+            Success = true,
+            Data = result,
+            Message = $"Created {courts.Count} court{(courts.Count > 1 ? "s" : "")}"
+        });
+    }
+
     // ============================================
     // Match Scheduling
     // ============================================

@@ -1420,6 +1420,8 @@ export const tournamentApi = {
   // Tournament Courts
   getTournamentCourts: (eventId) => api.get(`/tournament/events/${eventId}/courts`),
   createTournamentCourt: (eventId, data) => api.post(`/tournament/events/${eventId}/courts`, data),
+  bulkCreateCourts: (eventId, numberOfCourts, labelPrefix = 'Court', startingNumber = 1) =>
+    api.post(`/tournament/events/${eventId}/courts/bulk`, { numberOfCourts, labelPrefix, startingNumber }),
 
   // Match Scheduling
   generateSchedule: (divisionId, data) => api.post(`/tournament/divisions/${divisionId}/generate-schedule`, data),

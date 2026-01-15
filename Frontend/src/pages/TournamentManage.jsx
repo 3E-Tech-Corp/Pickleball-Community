@@ -4,11 +4,11 @@ import {
   ArrowLeft, Users, Trophy, Calendar, Clock, MapPin, Play, Check, X,
   ChevronDown, ChevronUp, RefreshCw, Shuffle, Settings, Target,
   AlertCircle, Loader2, Plus, Edit2, DollarSign, Eye, Share2, LayoutGrid,
-  Award, ArrowRight, Lock, Unlock, Save
+  Award, ArrowRight, Lock, Unlock, Save, Map, ExternalLink
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
-import { tournamentApi, gameDayApi, eventsApi, getSharedAssetUrl } from '../services/api';
+import { tournamentApi, gameDayApi, eventsApi, objectAssetsApi, getSharedAssetUrl } from '../services/api';
 import ScheduleConfigModal from '../components/ScheduleConfigModal';
 import DrawingModal from '../components/DrawingModal';
 
@@ -44,6 +44,12 @@ export default function TournamentManage() {
   const [scheduleConfigModal, setScheduleConfigModal] = useState({ isOpen: false, division: null });
   const [drawingModal, setDrawingModal] = useState({ isOpen: false, division: null });
   const [divisionUnits, setDivisionUnits] = useState([]);
+
+  // Add courts modal state
+  const [showAddCourtsModal, setShowAddCourtsModal] = useState(false);
+  const [numberOfCourts, setNumberOfCourts] = useState('');
+  const [addingCourts, setAddingCourts] = useState(false);
+  const [mapAsset, setMapAsset] = useState(null);
 
   // Status update state
   const [updatingStatus, setUpdatingStatus] = useState(false);
@@ -88,8 +94,42 @@ export default function TournamentManage() {
       if (response.success) {
         setEvent(response.data);
       }
+      // Load map asset for the event
+      const assetsResponse = await objectAssetsApi.getForObject('Event', eventId);
+      if (assetsResponse.success && assetsResponse.data) {
+        const map = assetsResponse.data.find(a => a.assetTypeName === 'Map');
+        setMapAsset(map || null);
+      }
     } catch (err) {
       console.error('Error loading event:', err);
+    }
+  };
+
+  const handleAddCourts = async () => {
+    const num = parseInt(numberOfCourts);
+    if (!num || num < 1 || num > 100) {
+      toast.error('Please enter a number between 1 and 100');
+      return;
+    }
+
+    setAddingCourts(true);
+    try {
+      // Calculate starting number based on existing courts
+      const existingCount = dashboard?.courts?.length || 0;
+      const response = await tournamentApi.bulkCreateCourts(eventId, num, 'Court', existingCount + 1);
+      if (response.success) {
+        toast.success(response.message || `Added ${num} court${num > 1 ? 's' : ''}`);
+        setShowAddCourtsModal(false);
+        setNumberOfCourts('');
+        loadDashboard(); // Refresh to show new courts
+      } else {
+        toast.error(response.message || 'Failed to add courts');
+      }
+    } catch (err) {
+      console.error('Error adding courts:', err);
+      toast.error('Failed to add courts');
+    } finally {
+      setAddingCourts(false);
     }
   };
 
@@ -733,11 +773,28 @@ export default function TournamentManage() {
         {activeTab === 'courts' && (
           <div className="space-y-6">
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-gray-900">Tournament Courts</h2>
+              <div className="flex items-center gap-4">
+                <h2 className="text-lg font-semibold text-gray-900">Tournament Courts</h2>
+                {mapAsset && (
+                  <a
+                    href={getSharedAssetUrl(mapAsset.fileUrl)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700"
+                  >
+                    <Map className="w-4 h-4" />
+                    View Court Map
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
+                )}
+              </div>
               {isOrganizer && (
-                <button className="px-3 py-2 text-sm font-medium text-white bg-orange-600 rounded-lg hover:bg-orange-700 flex items-center gap-2">
+                <button
+                  onClick={() => setShowAddCourtsModal(true)}
+                  className="px-3 py-2 text-sm font-medium text-white bg-orange-600 rounded-lg hover:bg-orange-700 flex items-center gap-2"
+                >
                   <Plus className="w-4 h-4" />
-                  Add Court
+                  Add Courts
                 </button>
               )}
             </div>
@@ -747,6 +804,15 @@ export default function TournamentManage() {
                 <MapPin className="w-12 h-12 text-gray-300 mx-auto mb-4" />
                 <h3 className="text-lg font-medium text-gray-900 mb-2">No Courts Configured</h3>
                 <p className="text-gray-500 mb-4">Add courts to start assigning games</p>
+                {isOrganizer && (
+                  <button
+                    onClick={() => setShowAddCourtsModal(true)}
+                    className="px-4 py-2 text-sm font-medium text-white bg-orange-600 rounded-lg hover:bg-orange-700 inline-flex items-center gap-2"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Add Courts
+                  </button>
+                )}
               </div>
             ) : (
               <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -769,6 +835,58 @@ export default function TournamentManage() {
                 ))}
               </div>
             )}
+          </div>
+        )}
+
+        {/* Add Courts Modal */}
+        {showAddCourtsModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-xl max-w-sm w-full p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Add Courts</h3>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Number of Courts
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  max="100"
+                  value={numberOfCourts}
+                  onChange={(e) => setNumberOfCourts(e.target.value)}
+                  placeholder="Enter number (1-100)"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                  autoFocus
+                />
+                <p className="mt-1 text-xs text-gray-500">
+                  Courts will be labeled "Court 1", "Court 2", etc.
+                  {dashboard?.courts?.length > 0 && ` (starting from Court ${dashboard.courts.length + 1})`}
+                </p>
+              </div>
+              <div className="flex gap-3">
+                <button
+                  onClick={handleAddCourts}
+                  disabled={addingCourts || !numberOfCourts}
+                  className="flex-1 py-2 bg-orange-600 text-white rounded-lg font-medium hover:bg-orange-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  {addingCourts ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Plus className="w-4 h-4" />
+                  )}
+                  Add Courts
+                </button>
+                <button
+                  onClick={() => {
+                    setShowAddCourtsModal(false);
+                    setNumberOfCourts('');
+                  }}
+                  disabled={addingCourts}
+                  className="px-4 py-2 border border-gray-300 rounded-lg font-medium hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
           </div>
         )}
 

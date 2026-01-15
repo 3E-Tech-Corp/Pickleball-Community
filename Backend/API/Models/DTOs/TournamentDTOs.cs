@@ -314,6 +314,22 @@ public class CreateTournamentCourtRequest
     public int SortOrder { get; set; }
 }
 
+public class BulkCreateCourtsRequest
+{
+    /// <summary>
+    /// Number of courts to create
+    /// </summary>
+    public int NumberOfCourts { get; set; }
+    /// <summary>
+    /// Optional prefix for court labels (default: "Court")
+    /// </summary>
+    public string? LabelPrefix { get; set; }
+    /// <summary>
+    /// Starting number for court labels (default: 1)
+    /// </summary>
+    public int StartingNumber { get; set; } = 1;
+}
+
 // ============================================
 // Event Match DTOs
 // ============================================
