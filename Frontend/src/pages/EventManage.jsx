@@ -732,34 +732,40 @@ export default function EventManage() {
               <div className="p-4 space-y-4">
                 {/* Document Type Selector */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Document Type</label>
-                  <div className="grid grid-cols-2 gap-2">
-                    {assetTypes.map(type => {
-                      const IconComponent = getIconForAssetType(type.typeName);
-                      return (
-                        <button
-                          key={type.id}
-                          type="button"
-                          onClick={() => setDocumentForm({ ...documentForm, objectAssetTypeId: type.id })}
-                          className={`p-3 rounded-lg border-2 text-left transition-all ${
-                            documentForm.objectAssetTypeId === type.id
-                              ? 'border-blue-500 bg-blue-50'
-                              : 'border-gray-200 hover:border-gray-300'
-                          }`}
-                        >
-                          <div className="flex items-center gap-2">
-                            <IconComponent className={`w-4 h-4 ${
-                              documentForm.objectAssetTypeId === type.id ? 'text-blue-600' : 'text-gray-400'
-                            }`} />
-                            <span className={`text-sm font-medium ${
-                              documentForm.objectAssetTypeId === type.id ? 'text-blue-900' : 'text-gray-700'
-                            }`}>{type.displayName}</span>
-                          </div>
-                          <p className="text-xs text-gray-500 mt-1">{type.description}</p>
-                        </button>
-                      );
-                    })}
-                  </div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Document Type *</label>
+                  {assetTypes.length === 0 ? (
+                    <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-700">
+                      No document types available. Please run Migration_098_ObjectAssets.sql to seed the asset types.
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-2">
+                      {assetTypes.map(type => {
+                        const IconComponent = getIconForAssetType(type.typeName);
+                        return (
+                          <button
+                            key={type.id}
+                            type="button"
+                            onClick={() => setDocumentForm({ ...documentForm, objectAssetTypeId: type.id })}
+                            className={`p-3 rounded-lg border-2 text-left transition-all ${
+                              documentForm.objectAssetTypeId === type.id
+                                ? 'border-blue-500 bg-blue-50'
+                                : 'border-gray-200 hover:border-gray-300'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2">
+                              <IconComponent className={`w-4 h-4 ${
+                                documentForm.objectAssetTypeId === type.id ? 'text-blue-600' : 'text-gray-400'
+                              }`} />
+                              <span className={`text-sm font-medium ${
+                                documentForm.objectAssetTypeId === type.id ? 'text-blue-900' : 'text-gray-700'
+                              }`}>{type.displayName}</span>
+                            </div>
+                            {type.description && <p className="text-xs text-gray-500 mt-1">{type.description}</p>}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
 
                 <div>
