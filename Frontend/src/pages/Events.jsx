@@ -338,6 +338,12 @@ export default function Events() {
           }
         }
         toast.success(accept ? 'Player added to your team!' : 'Request declined');
+        // Display any warnings (e.g., waitlist notification)
+        if (response.warnings && response.warnings.length > 0) {
+          response.warnings.forEach(warning => {
+            toast.warning(warning, { autoClose: 8000 });
+          });
+        }
       }
     } catch (err) {
       console.error('Error responding to join request:', err);
@@ -2706,6 +2712,12 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
           onUpdate(updatedEventResponse.data);
         }
         toast.success(accept ? 'Player added to your team!' : 'Request declined');
+        // Display any warnings (e.g., waitlist notification)
+        if (response.warnings && response.warnings.length > 0) {
+          response.warnings.forEach(warning => {
+            toast.warning(warning, { autoClose: 8000 });
+          });
+        }
       } else {
         toast.error(response.message || 'Failed to respond to join request');
       }
@@ -3054,6 +3066,12 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
         } else {
           toast.success('Join request sent!');
         }
+        // Display any warnings (e.g., waitlist notification)
+        if (response.warnings && response.warnings.length > 0) {
+          response.warnings.forEach(warning => {
+            toast.warning(warning, { autoClose: 8000 });
+          });
+        }
         setShowTeamRegistration(false);
         setSelectedDivisionForRegistration(null);
         // Refetch event data to update the view
@@ -3193,6 +3211,12 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
           toast.success(response.message || 'Teams merged automatically! You are now registered together.');
         } else {
           toast.success('Join request sent!');
+        }
+        // Display any warnings (e.g., waitlist notification)
+        if (response.warnings && response.warnings.length > 0) {
+          response.warnings.forEach(warning => {
+            toast.warning(warning, { autoClose: 8000 });
+          });
         }
         setFindingPartnerForReg(null);
         setAvailableUnits([]);

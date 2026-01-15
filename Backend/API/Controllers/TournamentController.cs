@@ -370,6 +370,7 @@ public class TournamentController : ControllerBase
             var isSingles = teamSize == 1;
 
             // Check MaxPlayers capacity (more accurate than MaxUnits for incomplete teams)
+            var isWaitlistedByPlayers = false;
             if (division.MaxPlayers.HasValue)
             {
                 var currentPlayerCount = await _context.EventUnitMembers
@@ -377,16 +378,10 @@ public class TournamentController : ControllerBase
                     .CountAsync(m => m.Unit!.DivisionId == divisionId &&
                         m.Unit.EventId == eventId &&
                         m.Unit.Status != "Cancelled" &&
+                        m.Unit.Status != "Waitlisted" &&
                         m.InviteStatus == "Accepted");
 
-                if (currentPlayerCount >= division.MaxPlayers.Value)
-                {
-                    return BadRequest(new ApiResponse<List<EventUnitDto>>
-                    {
-                        Success = false,
-                        Message = $"Division '{division.Name}' has reached its maximum player limit of {division.MaxPlayers.Value} players."
-                    });
-                }
+                isWaitlistedByPlayers = currentPlayerCount >= division.MaxPlayers.Value;
             }
 
             // Check MaxUnits capacity - only count completed units
@@ -397,7 +392,8 @@ public class TournamentController : ControllerBase
                     u.Status != "Waitlisted" &&
                     u.Members.Count(m => m.InviteStatus == "Accepted") >= teamSize);
 
-            var isWaitlisted = division.MaxUnits.HasValue && completedUnitCount >= division.MaxUnits.Value;
+            var isWaitlistedByUnits = division.MaxUnits.HasValue && completedUnitCount >= division.MaxUnits.Value;
+            var isWaitlisted = isWaitlistedByPlayers || isWaitlistedByUnits;
 
             // Create unit
             var unitName = isSingles
@@ -447,6 +443,15 @@ public class TournamentController : ControllerBase
 
             await _context.SaveChangesAsync();
             createdUnits.Add(unit);
+
+            // Add waitlist warning if applicable
+            if (isWaitlisted)
+            {
+                var waitlistReason = isWaitlistedByPlayers
+                    ? $"Division '{division.Name}' has reached its maximum player limit"
+                    : $"Division '{division.Name}' has reached its maximum team limit";
+                warnings.Add($"WAITLIST: {waitlistReason}. You have been placed on the waiting list (position #{unit.WaitlistPosition}). You will be notified if a spot becomes available.");
+            }
         }
 
         // Reload with members
@@ -532,7 +537,8 @@ public class TournamentController : ControllerBase
         if (currentMembers >= teamSize)
             return BadRequest(new ApiResponse<UnitJoinRequestDto> { Success = false, Message = "Unit is already full" });
 
-        // Check MaxPlayers capacity for the division
+        // Check MaxPlayers capacity for the division (warn but don't block - will be waitlisted if accepted)
+        string? waitlistWarning = null;
         if (unit.Division?.MaxPlayers.HasValue == true)
         {
             var currentPlayerCount = await _context.EventUnitMembers
@@ -540,15 +546,12 @@ public class TournamentController : ControllerBase
                 .CountAsync(m => m.Unit!.DivisionId == unit.DivisionId &&
                     m.Unit.EventId == unit.EventId &&
                     m.Unit.Status != "Cancelled" &&
+                    m.Unit.Status != "Waitlisted" &&
                     m.InviteStatus == "Accepted");
 
             if (currentPlayerCount >= unit.Division.MaxPlayers.Value)
             {
-                return BadRequest(new ApiResponse<UnitJoinRequestDto>
-                {
-                    Success = false,
-                    Message = $"Division '{unit.Division.Name}' has reached its maximum player limit of {unit.Division.MaxPlayers.Value} players."
-                });
+                waitlistWarning = $"Division '{unit.Division.Name}' has reached its maximum player limit. If your request is accepted, you will be placed on the waiting list.";
             }
         }
 
@@ -713,7 +716,8 @@ public class TournamentController : ControllerBase
                 Message = request.Message,
                 Status = "Pending",
                 CreatedAt = joinRequest.CreatedAt
-            }
+            },
+            Warnings = waitlistWarning != null ? new List<string> { waitlistWarning } : null
         });
     }
 
@@ -735,7 +739,9 @@ public class TournamentController : ControllerBase
         if (joinRequest.Unit?.CaptainUserId != userId.Value)
             return Forbid();
 
-        // If accepting, check MaxPlayers capacity first
+        // If accepting, check MaxPlayers capacity (allow but waitlist if over capacity)
+        bool shouldWaitlist = false;
+        string? waitlistMessage = null;
         if (request.Accept)
         {
             // Check if membership already exists (player already has a reserved spot)
@@ -757,15 +763,13 @@ public class TournamentController : ControllerBase
                         .CountAsync(m => m.Unit!.DivisionId == division.Id &&
                             m.Unit.EventId == joinRequest.Unit.EventId &&
                             m.Unit.Status != "Cancelled" &&
+                            m.Unit.Status != "Waitlisted" &&
                             m.InviteStatus == "Accepted");
 
                     if (currentPlayerCount >= division.MaxPlayers.Value)
                     {
-                        return BadRequest(new ApiResponse<bool>
-                        {
-                            Success = false,
-                            Message = $"Cannot accept request. Division '{division.Name}' has reached its maximum player limit of {division.MaxPlayers.Value} players."
-                        });
+                        shouldWaitlist = true;
+                        waitlistMessage = $"Division '{division.Name}' has reached its maximum player limit. Your team has been placed on the waiting list.";
                     }
                 }
             }
@@ -815,9 +819,22 @@ public class TournamentController : ControllerBase
             _context.EventUnitJoinRequests.Remove(joinRequest);
         }
 
+        // If accepting and should be waitlisted, update unit status
+        if (request.Accept && shouldWaitlist && joinRequest.Unit != null && joinRequest.Unit.Status != "Waitlisted")
+        {
+            joinRequest.Unit.Status = "Waitlisted";
+            joinRequest.Unit.WaitlistPosition = await GetNextWaitlistPosition(joinRequest.Unit.DivisionId ?? 0);
+            joinRequest.Unit.UpdatedAt = DateTime.Now;
+        }
+
         await _context.SaveChangesAsync();
 
-        return Ok(new ApiResponse<bool> { Success = true, Data = true });
+        return Ok(new ApiResponse<bool>
+        {
+            Success = true,
+            Data = true,
+            Warnings = waitlistMessage != null ? new List<string> { waitlistMessage } : null
+        });
     }
 
     /// <summary>
