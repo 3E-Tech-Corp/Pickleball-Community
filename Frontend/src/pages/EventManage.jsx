@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
-import api, { eventsApi, checkInApi } from '../services/api';
+import api, { eventsApi, checkInApi, getSharedAssetUrl } from '../services/api';
 
 // Scheduling API
 const schedulingApi = {
