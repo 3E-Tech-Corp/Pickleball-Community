@@ -13,15 +13,18 @@ public interface ISharedAssetService
 public class SharedAssetService : ISharedAssetService
 {
     private readonly HttpClient _httpClient;
+    private readonly IHttpContextAccessor _httpContextAccessor;
     private readonly ILogger<SharedAssetService> _logger;
     private readonly string _siteKey;
 
     public SharedAssetService(
         IHttpClientFactory httpClientFactory,
+        IHttpContextAccessor httpContextAccessor,
         IConfiguration configuration,
         ILogger<SharedAssetService> logger)
     {
         _httpClient = httpClientFactory.CreateClient("SharedAuth");
+        _httpContextAccessor = httpContextAccessor;
         _logger = logger;
         _siteKey = configuration["SharedAuth:SiteCode"] ?? "community";
     }
@@ -39,6 +42,14 @@ public class SharedAssetService : ISharedAssetService
     {
         try
         {
+            // Get the current user's auth token from the request
+            var authHeader = _httpContextAccessor.HttpContext?.Request.Headers["Authorization"].FirstOrDefault();
+            if (!string.IsNullOrEmpty(authHeader))
+            {
+                _httpClient.DefaultRequestHeaders.Authorization =
+                    AuthenticationHeaderValue.Parse(authHeader);
+            }
+
             using var content = new MultipartFormDataContent();
             var fileContent = new ByteArrayContent(fileData);
             fileContent.Headers.ContentType = new MediaTypeHeaderValue(contentType);
