@@ -61,14 +61,18 @@ public class CheckInController : ControllerBase
                 });
             }
 
-            // Get event check-in record
-            var checkIn = await _context.EventCheckIns
-                .FirstOrDefaultAsync(c => c.EventId == eventId && c.UserId == userId);
-
-            // Get event waivers
-            var waivers = await _context.EventWaivers
-                .Where(w => w.EventId == eventId && w.IsActive && w.IsRequired)
-                .ToListAsync();
+            // Get event waivers (wrap in try-catch in case table doesn't exist yet)
+            var waivers = new List<EventWaiver>();
+            try
+            {
+                waivers = await _context.EventWaivers
+                    .Where(w => w.EventId == eventId && w.IsActive && w.IsRequired)
+                    .ToListAsync();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Could not query EventWaivers table - it may not exist yet");
+            }
 
             var firstReg = registrations.First();
             var allWaiversSigned = !waivers.Any() || firstReg.WaiverSignedAt != null;
