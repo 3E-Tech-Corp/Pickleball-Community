@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { X, Mail, Lock, AlertCircle, CheckCircle } from 'lucide-react'
-import { sharedAdminApi } from '../../services/api'
+import { sharedAdminApi, userApi } from '../../services/api'
 
 /**
  * Admin modal for editing user email and password via Funtime-Shared admin endpoint
@@ -76,7 +76,18 @@ const AdminEditCredentialsModal = ({
       if (email) updateData.email = email
       if (password) updateData.password = password
 
+      // Update credentials on Funtime-Shared
       await sharedAdminApi.updateUser(userId, updateData)
+
+      // If email was updated, also sync to local community Users table
+      if (email) {
+        try {
+          await userApi.adminUpdateEmail(userId, email)
+        } catch (localErr) {
+          console.warn('Failed to sync email to local community database:', localErr)
+          // Continue anyway - the shared auth is the source of truth
+        }
+      }
 
       setSuccess('User credentials updated successfully')
       onSuccess?.()
