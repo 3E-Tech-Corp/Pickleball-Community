@@ -60,6 +60,17 @@ const AuthCallback = () => {
       localStorage.setItem('jwtToken', token)
       axios.defaults.headers.common['Authorization'] = `Bearer ${token}`
 
+      // Extract systemRole from JWT claims (cross-site super admin role, e.g., "SU")
+      let systemRole = null
+      try {
+        const payload = JSON.parse(atob(token.split('.')[1]))
+        // The role claim uses Microsoft's full claim URI
+        systemRole = payload.role || payload['http://schemas.microsoft.com/ws/2008/06/identity/claims/role'] || null
+        console.log('Extracted systemRole from JWT:', systemRole)
+      } catch (e) {
+        console.warn('Could not decode JWT to extract systemRole:', e.message)
+      }
+
       setMessage('Syncing user data...')
 
       // Determine role: isSiteAdmin takes precedence, then siteRole, then default
@@ -115,7 +126,8 @@ const AuthCallback = () => {
         firstName: userData.firstName || userData.FirstName,
         lastName: userData.lastName || userData.LastName,
         role: userData.role || userData.Role || effectiveRole,
-        profileImageUrl: userData.profileImageUrl || userData.ProfileImageUrl || null
+        profileImageUrl: userData.profileImageUrl || userData.ProfileImageUrl || null,
+        systemRole: systemRole || userData.systemRole || userData.SystemRole || null
       }
       localStorage.setItem('pickleball_user', JSON.stringify(userWithDefaults))
 
