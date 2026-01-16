@@ -646,8 +646,9 @@ export default function AdminPaymentModal({ isOpen, onClose, unit, event, onPaym
                             : (teammate.lastName || teammate.firstName || 'Player');
 
                           return (
-                            <label
+                            <div
                               key={teammate.userId}
+                              onClick={() => toggleTeammateSelection(teammate.userId)}
                               className={`flex items-center justify-between p-2 rounded-lg border cursor-pointer transition-colors ${
                                 isSelected
                                   ? 'bg-blue-100 border-blue-300'
@@ -658,7 +659,10 @@ export default function AdminPaymentModal({ isOpen, onClose, unit, event, onPaym
                                 <input
                                   type="checkbox"
                                   checked={isSelected}
-                                  onChange={() => toggleTeammateSelection(teammate.userId)}
+                                  onChange={(e) => {
+                                    e.stopPropagation();
+                                    toggleTeammateSelection(teammate.userId);
+                                  }}
                                   className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                                 />
                                 <span className="text-sm font-medium text-gray-900">{name}</span>
@@ -666,7 +670,7 @@ export default function AdminPaymentModal({ isOpen, onClose, unit, event, onPaym
                               <span className="text-sm font-medium text-gray-600">
                                 ${perPersonAmount.toFixed(2)}
                               </span>
-                            </label>
+                            </div>
                           );
                         })}
                       </div>
