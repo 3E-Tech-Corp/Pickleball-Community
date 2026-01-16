@@ -550,6 +550,7 @@ public class MyRegistrationUnitDto
 /// </summary>
 public class TeamMemberDto
 {
+    public int Id { get; set; } // EventUnitMember record ID
     public int UserId { get; set; }
     public string Name { get; set; } = string.Empty;
     public string? ProfileImageUrl { get; set; }

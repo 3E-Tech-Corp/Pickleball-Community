@@ -655,6 +655,7 @@ public class EventsController : ControllerBase
                                     Members = u.Members
                                         .Select(m => new TeamMemberDto
                                         {
+                                            Id = m.Id,
                                             UserId = m.UserId,
                                             Name = m.User != null ? Utility.FormatName(m.User.LastName, m.User.FirstName) : "Unknown",
                                             ProfileImageUrl = m.User?.ProfileImageUrl,
@@ -1552,6 +1553,7 @@ public class EventsController : ControllerBase
                                 .Select(grp => grp.First()) // Keep only one entry per user
                                 .Select(mem => new TeamMemberDto
                                 {
+                                    Id = mem.Id,
                                     UserId = mem.UserId,
                                     // Name format: "Last, First"
                                     Name = FormatName(mem.User?.LastName, mem.User?.FirstName),
