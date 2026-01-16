@@ -306,7 +306,10 @@ export default function EventView() {
             {event.description && (
               <div className="mb-6">
                 <h2 className="text-lg font-semibold text-gray-900 mb-2">About this Event</h2>
-                <p className="text-gray-600 whitespace-pre-wrap">{event.description}</p>
+                <div
+                  className="text-gray-600 prose prose-sm max-w-none"
+                  dangerouslySetInnerHTML={{ __html: event.description }}
+                />
               </div>
             )}
 
