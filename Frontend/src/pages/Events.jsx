@@ -3048,6 +3048,50 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
     }
   };
 
+  // Handle admin response to join request
+  const handleRespondToJoinRequestAdmin = async (joinRequestId, accept, divisionId) => {
+    try {
+      const response = await tournamentApi.respondToJoinRequest(joinRequestId, accept);
+      if (response.success) {
+        toast.showSuccess(accept ? 'Join request accepted' : 'Join request rejected');
+        // Refresh the registrations for this division
+        if (selectedDivisionForViewing) {
+          loadDivisionRegistrations(selectedDivisionForViewing);
+        }
+        // Also refresh the cache if viewing inline
+        if (divisionRegistrationsCache[divisionId]) {
+          setDivisionRegistrationsCache(prev => {
+            const updated = { ...prev };
+            delete updated[divisionId];
+            return updated;
+          });
+          // Reload if expanded
+          if (expandedDivisions[divisionId]) {
+            const divResponse = await tournamentApi.getEventUnits(event.id, divisionId);
+            if (divResponse.success) {
+              const sorted = (divResponse.data || []).sort((a, b) => {
+                if (a.isComplete && !b.isComplete) return -1;
+                if (!a.isComplete && b.isComplete) return 1;
+                return 0;
+              });
+              setDivisionRegistrationsCache(prev => ({ ...prev, [divisionId]: sorted }));
+            }
+          }
+        }
+        // Refresh event data
+        const updatedEventResponse = await eventsApi.getEvent(event.id);
+        if (updatedEventResponse.success) {
+          onUpdate(updatedEventResponse.data);
+        }
+      } else {
+        toast.showError(response.message || 'Failed to respond to join request');
+      }
+    } catch (err) {
+      console.error('Error responding to join request:', err);
+      toast.showError('Failed to respond to join request');
+    }
+  };
+
   // Toggle expand/collapse for division registrations (inline view)
   const toggleDivisionExpand = async (division) => {
     const divId = division.id;
@@ -5691,6 +5735,7 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
                     const teamSize = unit.requiredPlayers || 1;
                     const isComplete = unit.isComplete;
                     const acceptedMembers = unit.members?.filter(m => m.inviteStatus === 'Accepted') || [];
+                    const pendingJoinRequests = unit.members?.filter(m => m.joinRequestId) || [];
 
                     return (
                       <div
@@ -5716,26 +5761,60 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
 
                         {/* Doubles display */}
                         {teamSize === 2 && (
-                          <div className="flex items-center gap-3">
-                            <span className="text-gray-400 font-medium w-6">{index + 1}.</span>
-                            <div className="flex items-center gap-2">
-                              {acceptedMembers.map((member, mIndex) => (
-                                <div key={member.id} className="flex items-center gap-2">
-                                  {mIndex > 0 && <span className="text-gray-400">&</span>}
-                                  <img
-                                    src={member.profileImageUrl || '/default-avatar.png'}
-                                    alt=""
-                                    className="w-8 h-8 rounded-full object-cover"
-                                  />
-                                  <span className="text-gray-900">
-                                    {member.firstName} {member.lastName}
-                                  </span>
-                                </div>
-                              ))}
-                              {!isComplete && (
-                                <span className="text-yellow-600 text-sm ml-2">(looking for partner)</span>
-                              )}
+                          <div className="flex flex-col gap-2">
+                            <div className="flex items-center gap-3">
+                              <span className="text-gray-400 font-medium w-6">{index + 1}.</span>
+                              <div className="flex items-center gap-2 flex-wrap">
+                                {acceptedMembers.map((member, mIndex) => (
+                                  <div key={member.id} className="flex items-center gap-2">
+                                    {mIndex > 0 && <span className="text-gray-400">&</span>}
+                                    <img
+                                      src={member.profileImageUrl || '/default-avatar.png'}
+                                      alt=""
+                                      className="w-8 h-8 rounded-full object-cover"
+                                    />
+                                    <span className="text-gray-900">
+                                      {member.firstName} {member.lastName}
+                                    </span>
+                                  </div>
+                                ))}
+                                {!isComplete && pendingJoinRequests.length === 0 && (
+                                  <span className="text-yellow-600 text-sm ml-2">(looking for partner)</span>
+                                )}
+                              </div>
                             </div>
+                            {/* Pending Join Requests */}
+                            {pendingJoinRequests.length > 0 && (
+                              <div className="ml-9 flex flex-wrap gap-2">
+                                {pendingJoinRequests.map((member) => (
+                                  <div key={member.joinRequestId} className="flex items-center gap-2 bg-orange-50 border border-orange-200 rounded-full px-2 py-1">
+                                    <img
+                                      src={member.profileImageUrl || '/default-avatar.png'}
+                                      alt=""
+                                      className="w-6 h-6 rounded-full object-cover"
+                                    />
+                                    <span className="text-sm text-orange-700">
+                                      {member.firstName} {member.lastName}
+                                    </span>
+                                    <span className="text-xs text-orange-500">(pending)</span>
+                                    <button
+                                      onClick={() => handleRespondToJoinRequestAdmin(member.joinRequestId, true, selectedDivisionForViewing?.id)}
+                                      className="p-1 hover:bg-green-100 rounded-full text-green-600"
+                                      title="Accept"
+                                    >
+                                      <Check className="w-4 h-4" />
+                                    </button>
+                                    <button
+                                      onClick={() => handleRespondToJoinRequestAdmin(member.joinRequestId, false, selectedDivisionForViewing?.id)}
+                                      className="p-1 hover:bg-red-100 rounded-full text-red-600"
+                                      title="Reject"
+                                    >
+                                      <X className="w-4 h-4" />
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
                           </div>
                         )}
 
@@ -5762,6 +5841,34 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
                                   <span className="text-sm text-gray-700">
                                     {member.firstName} {member.lastName}
                                   </span>
+                                </div>
+                              ))}
+                              {/* Pending Join Requests for teams */}
+                              {pendingJoinRequests.map((member) => (
+                                <div key={member.joinRequestId} className="flex items-center gap-1 bg-orange-50 border border-orange-200 rounded-full px-2 py-1">
+                                  <img
+                                    src={member.profileImageUrl || '/default-avatar.png'}
+                                    alt=""
+                                    className="w-5 h-5 rounded-full object-cover"
+                                  />
+                                  <span className="text-sm text-orange-700">
+                                    {member.firstName} {member.lastName}
+                                  </span>
+                                  <span className="text-xs text-orange-500">(pending)</span>
+                                  <button
+                                    onClick={() => handleRespondToJoinRequestAdmin(member.joinRequestId, true, selectedDivisionForViewing?.id)}
+                                    className="p-0.5 hover:bg-green-100 rounded-full text-green-600"
+                                    title="Accept"
+                                  >
+                                    <Check className="w-3.5 h-3.5" />
+                                  </button>
+                                  <button
+                                    onClick={() => handleRespondToJoinRequestAdmin(member.joinRequestId, false, selectedDivisionForViewing?.id)}
+                                    className="p-0.5 hover:bg-red-100 rounded-full text-red-600"
+                                    title="Reject"
+                                  >
+                                    <X className="w-3.5 h-3.5" />
+                                  </button>
                                 </div>
                               ))}
                             </div>
