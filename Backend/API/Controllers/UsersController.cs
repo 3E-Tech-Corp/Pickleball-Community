@@ -1140,4 +1140,169 @@ public class UsersController : ControllerBase
             Data = SocialPlatforms.All
         });
     }
+
+    // ==================== Admin Credential Management ====================
+
+    /// <summary>
+    /// Admin: Send password reset email to a user via Funtime-Shared
+    /// </summary>
+    [HttpPost("{id}/admin-password-reset")]
+    [Authorize(Roles = "Admin")]
+    public async Task<ActionResult<ApiResponse<object>>> AdminSendPasswordReset(int id)
+    {
+        try
+        {
+            var user = await _context.Users.FindAsync(id);
+            if (user == null)
+            {
+                return NotFound(new ApiResponse<object>
+                {
+                    Success = false,
+                    Message = "User not found"
+                });
+            }
+
+            // Call Funtime-Shared API to trigger password reset email
+            var httpClientFactory = HttpContext.RequestServices.GetRequiredService<IHttpClientFactory>();
+            var httpClient = httpClientFactory.CreateClient("SharedAuth");
+
+            // Ensure trailing slash for proper URL resolution
+            var baseUrl = _configuration["SharedAuth:BaseUrl"];
+            if (!string.IsNullOrEmpty(baseUrl) && !baseUrl.EndsWith("/"))
+                baseUrl += "/";
+            httpClient.BaseAddress = new Uri(baseUrl ?? "https://shared.funtimepb.com/api/");
+
+            var response = await httpClient.PostAsJsonAsync("auth/forgot-password", new { email = user.Email });
+
+            if (response.IsSuccessStatusCode)
+            {
+                _logger.LogInformation("Admin triggered password reset for user {UserId} ({Email})", id, user.Email);
+                return Ok(new ApiResponse<object>
+                {
+                    Success = true,
+                    Message = $"Password reset email sent to {user.Email}"
+                });
+            }
+            else
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                _logger.LogWarning("Failed to send password reset for user {UserId}: {Error}", id, error);
+                return StatusCode((int)response.StatusCode, new ApiResponse<object>
+                {
+                    Success = false,
+                    Message = "Failed to send password reset email"
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error sending admin password reset for user {UserId}", id);
+            return StatusCode(500, new ApiResponse<object>
+            {
+                Success = false,
+                Message = "An error occurred while sending password reset"
+            });
+        }
+    }
+
+    /// <summary>
+    /// Admin: Update a user's email address
+    /// </summary>
+    [HttpPut("{id}/admin-email")]
+    [Authorize(Roles = "Admin")]
+    public async Task<ActionResult<ApiResponse<object>>> AdminUpdateEmail(int id, [FromBody] AdminUpdateEmailRequest request)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(request?.NewEmail))
+            {
+                return BadRequest(new ApiResponse<object>
+                {
+                    Success = false,
+                    Message = "New email is required"
+                });
+            }
+
+            var user = await _context.Users.FindAsync(id);
+            if (user == null)
+            {
+                return NotFound(new ApiResponse<object>
+                {
+                    Success = false,
+                    Message = "User not found"
+                });
+            }
+
+            // Check if email is already in use
+            var emailExists = await _context.Users.AnyAsync(u => u.Email == request.NewEmail && u.Id != id);
+            if (emailExists)
+            {
+                return BadRequest(new ApiResponse<object>
+                {
+                    Success = false,
+                    Message = "This email is already in use by another account"
+                });
+            }
+
+            // Call Funtime-Shared API to update email there too
+            var httpClientFactory = HttpContext.RequestServices.GetRequiredService<IHttpClientFactory>();
+            var httpClient = httpClientFactory.CreateClient("SharedAuth");
+
+            var baseUrl = _configuration["SharedAuth:BaseUrl"];
+            if (!string.IsNullOrEmpty(baseUrl) && !baseUrl.EndsWith("/"))
+                baseUrl += "/";
+            httpClient.BaseAddress = new Uri(baseUrl ?? "https://shared.funtimepb.com/api/");
+
+            // Pass auth token for admin operations
+            var authHeader = HttpContext.Request.Headers["Authorization"].FirstOrDefault();
+            if (!string.IsNullOrEmpty(authHeader))
+            {
+                httpClient.DefaultRequestHeaders.Authorization =
+                    System.Net.Http.Headers.AuthenticationHeaderValue.Parse(authHeader);
+            }
+
+            // Try to update on shared service (this may fail if endpoint doesn't exist yet)
+            try
+            {
+                var response = await httpClient.PutAsJsonAsync($"users/{id}/email", new { email = request.NewEmail });
+                if (!response.IsSuccessStatusCode)
+                {
+                    _logger.LogWarning("Shared auth email update returned {StatusCode} - updating local only", response.StatusCode);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Could not update email on shared service - updating local only");
+            }
+
+            // Update local database
+            var oldEmail = user.Email;
+            user.Email = request.NewEmail;
+            user.UpdatedAt = DateTime.Now;
+            await _context.SaveChangesAsync();
+
+            _logger.LogInformation("Admin updated email for user {UserId} from {OldEmail} to {NewEmail}",
+                id, oldEmail, request.NewEmail);
+
+            return Ok(new ApiResponse<object>
+            {
+                Success = true,
+                Message = $"Email updated from {oldEmail} to {request.NewEmail}"
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating email for user {UserId}", id);
+            return StatusCode(500, new ApiResponse<object>
+            {
+                Success = false,
+                Message = "An error occurred while updating email"
+            });
+        }
+    }
+}
+
+public class AdminUpdateEmailRequest
+{
+    public string NewEmail { get; set; } = string.Empty;
 }

@@ -50,6 +50,10 @@ public class ApplicationDbContext : DbContext
     public DbSet<FriendRequest> FriendRequests { get; set; }
     public DbSet<Friendship> Friendships { get; set; }
 
+    // Location Reference Data
+    public DbSet<Country> Countries { get; set; }
+    public DbSet<ProvinceState> ProvinceStates { get; set; }
+
     // Venues (places with pickleball courts)
     public DbSet<Venue> Venues { get; set; }
     public DbSet<VenueType> VenueTypes { get; set; }
@@ -489,6 +493,35 @@ public class ApplicationDbContext : DbContext
             entity.HasIndex(f => new { f.UserId1, f.UserId2 }).IsUnique();
             entity.HasIndex(f => f.UserId1);
             entity.HasIndex(f => f.UserId2);
+        });
+
+        // Country configuration
+        modelBuilder.Entity<Country>(entity =>
+        {
+            entity.Property(c => c.Name).IsRequired().HasMaxLength(100);
+            entity.Property(c => c.Code2).IsRequired().HasMaxLength(2).IsFixedLength();
+            entity.Property(c => c.Code3).IsRequired().HasMaxLength(3).IsFixedLength();
+            entity.Property(c => c.NumericCode).HasMaxLength(3).IsFixedLength();
+            entity.Property(c => c.PhoneCode).HasMaxLength(10);
+            entity.HasIndex(c => c.Code2).IsUnique();
+            entity.HasIndex(c => c.Code3).IsUnique();
+            entity.HasIndex(c => c.Name);
+        });
+
+        // ProvinceState configuration
+        modelBuilder.Entity<ProvinceState>(entity =>
+        {
+            entity.Property(s => s.Name).IsRequired().HasMaxLength(100);
+            entity.Property(s => s.Code).IsRequired().HasMaxLength(10);
+            entity.Property(s => s.Type).HasMaxLength(50);
+            entity.HasIndex(s => s.CountryId);
+            entity.HasIndex(s => new { s.CountryId, s.Code }).IsUnique();
+            entity.HasIndex(s => s.Name);
+
+            entity.HasOne(s => s.Country)
+                  .WithMany(c => c.ProvinceStates)
+                  .HasForeignKey(s => s.CountryId)
+                  .OnDelete(DeleteBehavior.Cascade);
         });
 
         // Venue configuration

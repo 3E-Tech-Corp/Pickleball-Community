@@ -461,7 +461,13 @@ export const userApi = {
   updateSocialLink: (id, data) => api.put(`/users/social-links/${id}`, data),
   deleteSocialLink: (id) => api.delete(`/users/social-links/${id}`),
   bulkUpdateSocialLinks: (links) => api.put('/users/social-links/bulk', { links }),
-  getSocialPlatforms: () => api.get('/users/social-platforms')
+  getSocialPlatforms: () => api.get('/users/social-platforms'),
+
+  // Admin: Send password reset email to a user
+  adminSendPasswordReset: (userId) => api.post(`/users/${userId}/admin-password-reset`),
+
+  // Admin: Update a user's email
+  adminUpdateEmail: (userId, newEmail) => api.put(`/users/${userId}/admin-email`, { newEmail })
 }
 
 // Content Types API
@@ -2132,6 +2138,22 @@ export const objectAssetsApi = {
   // Delete asset
   deleteAsset: (objectTypeName, objectId, assetId) =>
     api.delete(`/objectassets/${objectTypeName}/${objectId}/${assetId}`)
+}
+
+// Location Reference API (countries and states)
+export const locationApi = {
+  // Get all active countries
+  getCountries: () => api.get('/location/countries'),
+
+  // Get states/provinces for a country (by code or ID)
+  getStatesByCountry: (countryCode) => api.get(`/location/countries/${encodeURIComponent(countryCode)}/states`),
+
+  // Get all countries with their states
+  getCountriesWithStates: () => api.get('/location/countries-with-states'),
+
+  // Get a specific state by country and state code
+  getState: (countryCode, stateCode) =>
+    api.get(`/location/countries/${encodeURIComponent(countryCode)}/states/${encodeURIComponent(stateCode)}`)
 }
 
 export default api
