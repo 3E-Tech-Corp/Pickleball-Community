@@ -386,7 +386,9 @@ public class CheckInController : ControllerBase
             {
                 var pendingWaivers = await _context.ObjectAssets
                     .Include(a => a.AssetType)
-                    .Where(a => a.ObjectType == "Event"
+                    .Include(a => a.ObjectType)
+                    .Where(a => a.ObjectType != null
+                        && a.ObjectType.Name == "Event"
                         && a.ObjectId == eventId
                         && a.AssetType != null
                         && a.AssetType.TypeName.ToLower() == "waiver")
