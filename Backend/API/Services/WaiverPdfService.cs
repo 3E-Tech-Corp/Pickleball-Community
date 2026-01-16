@@ -58,6 +58,14 @@ public class WaiverPdfService : IWaiverPdfService
     {
         var result = new WaiverSigningResult();
 
+        // Defensive null checks
+        if (waiver == null)
+            throw new ArgumentNullException(nameof(waiver));
+        if (user == null)
+            throw new ArgumentNullException(nameof(user));
+        if (string.IsNullOrEmpty(signatureImageBase64))
+            throw new ArgumentNullException(nameof(signatureImageBase64));
+
         // 1. Upload signature image to shared asset service
         var signatureBytes = Convert.FromBase64String(
             signatureImageBase64.Contains(",")
