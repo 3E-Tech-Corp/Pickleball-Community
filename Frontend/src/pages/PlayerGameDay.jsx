@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
-  ArrowLeft, CheckCircle, XCircle, Play, Clock, MapPin,
+  CheckCircle, XCircle, Play, Clock, MapPin,
   RefreshCw, AlertCircle, FileText, Trophy, Calendar,
   ChevronRight, User
 } from 'lucide-react'
@@ -113,24 +113,22 @@ export default function PlayerGameDay() {
   if (!gameDay) return null
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-20">
-      {/* Header */}
-      <header className="bg-white border-b sticky top-0 z-10">
+    <div className="min-h-screen bg-gray-50 pb-20 flex flex-col">
+      {/* Clean Game Day Header - No back button */}
+      <header className="bg-gradient-to-r from-green-600 to-green-700 text-white sticky top-0 z-10">
         <div className="max-w-lg mx-auto px-4 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <button onClick={() => navigate(-1)} className="p-2 hover:bg-gray-100 rounded-lg">
-                <ArrowLeft className="w-5 h-5" />
-              </button>
+              <Trophy className="w-6 h-6" />
               <div>
-                <h1 className="text-lg font-semibold">{gameDay.eventName}</h1>
-                <p className="text-sm text-gray-500">Game Day</p>
+                <h1 className="text-base font-semibold">{gameDay.eventName}</h1>
+                <p className="text-xs text-green-100">Player Dashboard</p>
               </div>
             </div>
             <button
               onClick={loadData}
               disabled={refreshing}
-              className="p-2 hover:bg-gray-100 rounded-lg"
+              className="p-2 hover:bg-green-500 rounded-lg"
             >
               <RefreshCw className={`w-5 h-5 ${refreshing ? 'animate-spin' : ''}`} />
             </button>
