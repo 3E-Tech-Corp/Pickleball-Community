@@ -6503,6 +6503,25 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
             };
           };
 
+          // Update the modal's unit data immediately so changes reflect without closing
+          setSelectedAdminPaymentUnit(prev => {
+            if (!prev) return prev;
+            const updated = updateUnit(prev);
+            // Also update the selectedMember if it matches
+            if (updated.selectedMember?.userId === paymentInfo.userId) {
+              updated.selectedMember = {
+                ...updated.selectedMember,
+                hasPaid: paymentInfo.hasPaid,
+                paidAt: paymentInfo.paidAt,
+                amountPaid: paymentInfo.amountPaid,
+                paymentProofUrl: paymentInfo.paymentProofUrl,
+                paymentReference: paymentInfo.paymentReference,
+                referenceId: paymentInfo.referenceId
+              };
+            }
+            return updated;
+          });
+
           // Update allRegistrations
           setAllRegistrations(prev => prev.map(updateUnit));
 
@@ -6514,6 +6533,9 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
             });
             return updated;
           });
+
+          // Update divisionRegistrations (legacy modal state) if it contains this unit
+          setDivisionRegistrations(prev => prev.map(updateUnit));
 
           // Refresh from server to ensure consistency
           onUpdate();
