@@ -65,8 +65,16 @@ export const AuthProvider = ({ children }) => {
           const sharedUser = sharedData.user || sharedData.User
 
           if (sharedToken) {
-            // Capture systemRole from shared auth response (SU role for cross-site admin)
-            const sharedSystemRole = sharedUser?.systemRole || sharedUser?.SystemRole
+            // Extract systemRole from JWT token claims (authoritative source)
+            let sharedSystemRole = null
+            try {
+              const payload = JSON.parse(atob(sharedToken.split('.')[1]))
+              // The role claim in shared auth JWT contains the systemRole (e.g., "SU")
+              sharedSystemRole = payload.role || payload['http://schemas.microsoft.com/ws/2008/06/identity/claims/role'] || null
+              console.log('Extracted systemRole from JWT:', sharedSystemRole)
+            } catch (e) {
+              console.warn('Could not decode JWT to extract systemRole:', e.message)
+            }
 
             // Step 2: Sync user to local database (temporarily use shared token for sync call)
             localStorage.setItem('jwtToken', sharedToken)
