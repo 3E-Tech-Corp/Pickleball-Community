@@ -788,11 +788,10 @@ public class TournamentController : ControllerBase
         joinRequest.ResponseMessage = request.Message;
         joinRequest.RespondedAt = DateTime.Now;
 
-        // Find and update the existing membership (created when join request was submitted)
+        // Find ANY existing membership for this user and unit (regardless of status)
         var membership = await _context.EventUnitMembers
             .FirstOrDefaultAsync(m => m.UnitId == joinRequest.UnitId &&
-                m.UserId == joinRequest.UserId &&
-                m.InviteStatus == "PendingJoinRequest");
+                m.UserId == joinRequest.UserId);
 
         if (request.Accept)
         {
@@ -804,7 +803,7 @@ public class TournamentController : ControllerBase
             }
             else
             {
-                // Fallback: create new membership if not found (for legacy requests)
+                // Create new membership if not found (for legacy requests without membership record)
                 var member = new EventUnitMember
                 {
                     UnitId = joinRequest.UnitId,
