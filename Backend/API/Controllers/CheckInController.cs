@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Pickleball.Community.Database;
 using Pickleball.Community.Models.Entities;
 using Pickleball.Community.Models.DTOs;
+using Pickleball.Community.Services;
 using System.Security.Claims;
 
 namespace Pickleball.Community.Controllers;
@@ -14,11 +15,13 @@ public class CheckInController : ControllerBase
 {
     private readonly ApplicationDbContext _context;
     private readonly ILogger<CheckInController> _logger;
+    private readonly IWaiverPdfService _waiverPdfService;
 
-    public CheckInController(ApplicationDbContext context, ILogger<CheckInController> logger)
+    public CheckInController(ApplicationDbContext context, ILogger<CheckInController> logger, IWaiverPdfService waiverPdfService)
     {
         _context = context;
         _logger = logger;
+        _waiverPdfService = waiverPdfService;
     }
 
     private int GetUserId()
@@ -134,10 +137,16 @@ public class CheckInController : ControllerBase
 
         // Verify waiver exists and is active
         var waiver = await _context.EventWaivers
+            .Include(w => w.Event)
             .FirstOrDefaultAsync(w => w.Id == request.WaiverId && w.EventId == eventId && w.IsActive);
 
         if (waiver == null)
             return NotFound(new ApiResponse<object> { Success = false, Message = "Waiver not found" });
+
+        // Get user info for legal record
+        var user = await _context.Users.FindAsync(userId);
+        if (user == null)
+            return Unauthorized(new ApiResponse<object> { Success = false, Message = "User not found" });
 
         // Get user's registrations
         var registrations = await _context.EventUnitMembers
@@ -147,16 +156,48 @@ public class CheckInController : ControllerBase
         if (!registrations.Any())
             return BadRequest(new ApiResponse<object> { Success = false, Message = "Not registered for this event" });
 
-        // Validate signature
+        // Validate typed signature
         if (string.IsNullOrWhiteSpace(request.Signature))
-            return BadRequest(new ApiResponse<object> { Success = false, Message = "Signature is required" });
+            return BadRequest(new ApiResponse<object> { Success = false, Message = "Typed signature is required" });
+
+        // Validate drawn signature
+        if (string.IsNullOrWhiteSpace(request.SignatureImage))
+            return BadRequest(new ApiResponse<object> { Success = false, Message = "Drawn signature is required" });
+
+        // Get IP address for legal record
+        var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString();
+        var signedAt = DateTime.Now;
+
+        // Process signature: upload to S3, generate PDF, call notification SP
+        WaiverSigningResult? signingResult = null;
+        try
+        {
+            signingResult = await _waiverPdfService.ProcessWaiverSignatureAsync(
+                waiver,
+                user,
+                request.Signature.Trim(),
+                request.SignatureImage,
+                signedAt,
+                ipAddress,
+                request.SignerRole,
+                request.ParentGuardianName);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to process waiver signature for user {UserId} event {EventId}", userId, eventId);
+            // Continue - waiver can still be signed even if asset upload fails
+        }
 
         // Sign waiver for all registrations
         foreach (var reg in registrations)
         {
-            reg.WaiverSignedAt = DateTime.Now;
+            reg.WaiverSignedAt = signedAt;
             reg.WaiverDocumentId = waiver.Id;
             reg.WaiverSignature = request.Signature.Trim();
+            reg.SignatureAssetUrl = signingResult?.SignatureAssetUrl;
+            reg.SignedWaiverPdfUrl = signingResult?.SignedWaiverPdfUrl;
+            reg.SignerEmail = user.Email;
+            reg.SignerIpAddress = ipAddress;
             reg.WaiverSignerRole = request.SignerRole;
             reg.ParentGuardianName = request.ParentGuardianName?.Trim();
             reg.EmergencyPhone = request.EmergencyPhone?.Trim();
@@ -171,7 +212,11 @@ public class CheckInController : ControllerBase
         return Ok(new ApiResponse<object>
         {
             Success = true,
-            Message = "Waiver signed successfully"
+            Message = "Waiver signed successfully",
+            Data = new
+            {
+                SignedWaiverPdfUrl = signingResult?.SignedWaiverPdfUrl
+            }
         });
     }
 
@@ -796,6 +841,10 @@ public class SignWaiverRequest
     /// Digital signature (typed full name)
     /// </summary>
     public string Signature { get; set; } = string.Empty;
+    /// <summary>
+    /// Drawn signature image (base64 encoded PNG)
+    /// </summary>
+    public string? SignatureImage { get; set; }
     /// <summary>
     /// Who is signing: Participant, Parent, Guardian
     /// </summary>

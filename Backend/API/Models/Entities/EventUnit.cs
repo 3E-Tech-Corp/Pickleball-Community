@@ -202,6 +202,30 @@ public class EventUnitMember
     public string? WaiverSignature { get; set; }
 
     /// <summary>
+    /// URL to drawn signature image (stored in asset management)
+    /// </summary>
+    [MaxLength(500)]
+    public string? SignatureAssetUrl { get; set; }
+
+    /// <summary>
+    /// URL to generated PDF of signed waiver (stored in asset management)
+    /// </summary>
+    [MaxLength(500)]
+    public string? SignedWaiverPdfUrl { get; set; }
+
+    /// <summary>
+    /// Email address at time of signing (for legal record)
+    /// </summary>
+    [MaxLength(255)]
+    public string? SignerEmail { get; set; }
+
+    /// <summary>
+    /// IP address at time of signing (for legal record)
+    /// </summary>
+    [MaxLength(50)]
+    public string? SignerIpAddress { get; set; }
+
+    /// <summary>
     /// Who signed: Participant, Parent, Guardian
     /// </summary>
     [MaxLength(20)]

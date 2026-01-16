@@ -1951,10 +1951,11 @@ export const checkInApi = {
   // Manual check-in by TD
   manualCheckIn: (eventId, userId, data = {}) => api.post(`/checkin/manual/${eventId}/${userId}`, data),
 
-  // Sign waiver with digital signature
+  // Sign waiver with digital signature (typed + drawn)
   signWaiver: (eventId, waiverId, signatureData = {}) => api.post(`/checkin/waiver/${eventId}`, {
     waiverId,
     signature: signatureData.signature,
+    signatureImage: signatureData.signatureImage,
     signerRole: signatureData.signerRole || 'Participant',
     parentGuardianName: signatureData.parentGuardianName,
     emergencyPhone: signatureData.emergencyPhone,

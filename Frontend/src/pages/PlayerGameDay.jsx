@@ -6,6 +6,7 @@ import {
   ChevronRight, User
 } from 'lucide-react'
 import { gameDayApi, checkInApi } from '../services/api'
+import SignatureCanvas from '../components/SignatureCanvas'
 
 export default function PlayerGameDay() {
   const { eventId } = useParams()
@@ -366,6 +367,7 @@ function WaiverModal({ waivers, onSign, onClose }) {
   const [currentWaiver, setCurrentWaiver] = useState(waivers[0])
   const [agreed, setAgreed] = useState(false)
   const [signature, setSignature] = useState('')
+  const [signatureImage, setSignatureImage] = useState(null)
   const [signerRole, setSignerRole] = useState('Participant')
   const [parentGuardianName, setParentGuardianName] = useState('')
   const [emergencyPhone, setEmergencyPhone] = useState('')
@@ -377,6 +379,10 @@ function WaiverModal({ waivers, onSign, onClose }) {
   const handleSign = async () => {
     if (!signature.trim()) {
       alert('Please enter your signature (full legal name)')
+      return
+    }
+    if (!signatureImage) {
+      alert('Please draw your signature in the box below')
       return
     }
     if (isMinorWaiver && !parentGuardianName.trim()) {
@@ -392,6 +398,7 @@ function WaiverModal({ waivers, onSign, onClose }) {
     try {
       await onSign(currentWaiver.id, {
         signature: signature.trim(),
+        signatureImage,
         signerRole,
         parentGuardianName: isMinorWaiver ? parentGuardianName.trim() : null,
         emergencyPhone: emergencyPhone.trim() || null,
@@ -494,10 +501,10 @@ function WaiverModal({ waivers, onSign, onClose }) {
               />
             </div>
 
-            {/* Digital Signature */}
+            {/* Digital Signature - Typed */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                {isMinorWaiver ? "Participant's Full Legal Name *" : 'Digital Signature (Full Legal Name) *'}
+                {isMinorWaiver ? "Participant's Full Legal Name *" : 'Full Legal Name *'}
               </label>
               <input
                 type="text"
@@ -507,8 +514,23 @@ function WaiverModal({ waivers, onSign, onClose }) {
                 className="w-full px-3 py-2 border rounded-lg font-medium"
                 style={{ fontFamily: 'cursive, serif' }}
               />
-              <p className="text-xs text-gray-500 mt-1">
-                By typing your name above, you are signing this waiver electronically
+            </div>
+
+            {/* Drawn Signature */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Draw Your Signature *
+              </label>
+              <div className="flex justify-center">
+                <SignatureCanvas
+                  onSignatureChange={setSignatureImage}
+                  width={Math.min(350, window.innerWidth - 60)}
+                  height={150}
+                  disabled={signing}
+                />
+              </div>
+              <p className="text-xs text-gray-500 mt-1 text-center">
+                By signing above, you are electronically signing this waiver
               </p>
             </div>
 
@@ -554,7 +576,7 @@ function WaiverModal({ waivers, onSign, onClose }) {
             </button>
             <button
               onClick={handleSign}
-              disabled={!agreed || !signature.trim() || signing}
+              disabled={!agreed || !signature.trim() || !signatureImage || signing}
               className="flex-1 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
             >
               {signing ? 'Signing...' : 'Sign Waiver'}
