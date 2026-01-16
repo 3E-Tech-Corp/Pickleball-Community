@@ -140,8 +140,10 @@ const sharedAuthApi = axios.create({
 })
 
 // Add auth token to shared auth API requests
+// Use sharedAuthToken (original token from shared auth) if available,
+// otherwise fall back to jwtToken (which may be local token after sync)
 sharedAuthApi.interceptors.request.use((config) => {
-  const token = localStorage.getItem('jwtToken');
+  const token = localStorage.getItem('sharedAuthToken') || localStorage.getItem('jwtToken');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }

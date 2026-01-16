@@ -77,7 +77,9 @@ export const AuthProvider = ({ children }) => {
             }
 
             // Step 2: Sync user to local database (temporarily use shared token for sync call)
+            // Store shared token separately for admin API calls to Funtime-Shared
             localStorage.setItem('jwtToken', sharedToken)
+            localStorage.setItem('sharedAuthToken', sharedToken)
             axios.defaults.headers.common['Authorization'] = `Bearer ${sharedToken}`
 
             const syncResponse = await authApi.syncFromSharedAuth(sharedToken)
@@ -296,6 +298,7 @@ export const AuthProvider = ({ children }) => {
 
   const clearAuthData = () => {
     localStorage.removeItem('jwtToken')
+    localStorage.removeItem('sharedAuthToken') // Clear shared auth token for admin API calls
     localStorage.removeItem('pickleball_user')
     localStorage.removeItem('authToken') // Clear old if exists
     localStorage.removeItem('refreshToken') // Clear old if exists

@@ -57,8 +57,9 @@ const AuthCallback = () => {
 
       setMessage('Storing credentials...')
 
-      // Store the token
+      // Store the tokens - keep shared auth token separate for shared API calls
       localStorage.setItem('jwtToken', token)
+      localStorage.setItem('sharedAuthToken', token) // Keep original shared token for admin API calls
       axios.defaults.headers.common['Authorization'] = `Bearer ${token}`
 
       // Extract systemRole from JWT claims (cross-site super admin role, e.g., "SU")
