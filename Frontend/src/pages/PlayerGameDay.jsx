@@ -171,7 +171,7 @@ export default function PlayerGameDay() {
             )}
           </div>
 
-          {/* Waiver status */}
+          {/* Waiver status - unsigned */}
           {checkInStatus && !gameDay.waiverSigned && checkInStatus.pendingWaivers?.length > 0 && (
             <div className="mt-3 pt-3 border-t border-yellow-200">
               <button
@@ -182,6 +182,23 @@ export default function PlayerGameDay() {
                 <span className="text-sm">Waiver requires signature</span>
                 <ChevronRight className="w-4 h-4" />
               </button>
+            </div>
+          )}
+
+          {/* Waiver status - signed with PDF link */}
+          {checkInStatus?.waiverSigned && checkInStatus.signedWaiverPdfUrl && (
+            <div className="mt-3 pt-3 border-t border-green-200">
+              <a
+                href={checkInStatus.signedWaiverPdfUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 text-green-700 hover:text-green-800"
+              >
+                <CheckCircle className="w-4 h-4" />
+                <span className="text-sm">Waiver signed</span>
+                <FileText className="w-4 h-4" />
+                <span className="text-sm underline">View PDF</span>
+              </a>
             </div>
           )}
         </div>
@@ -276,6 +293,7 @@ export default function PlayerGameDay() {
       {showWaiverModal && checkInStatus?.pendingWaivers && (
         <WaiverModal
           waivers={checkInStatus.pendingWaivers}
+          playerName={checkInStatus.playerName}
           onSign={handleSignWaiver}
           onClose={() => setShowWaiverModal(false)}
         />
@@ -363,15 +381,13 @@ function GameCard({ game, onSubmitScore }) {
   )
 }
 
-function WaiverModal({ waivers, onSign, onClose }) {
+function WaiverModal({ waivers, playerName, onSign, onClose }) {
   const [currentWaiver, setCurrentWaiver] = useState(waivers[0])
   const [agreed, setAgreed] = useState(false)
-  const [signature, setSignature] = useState('')
+  const [signature, setSignature] = useState(playerName || '')
   const [signatureImage, setSignatureImage] = useState(null)
   const [signerRole, setSignerRole] = useState('Participant')
   const [parentGuardianName, setParentGuardianName] = useState('')
-  const [emergencyPhone, setEmergencyPhone] = useState('')
-  const [chineseName, setChineseName] = useState('')
   const [signing, setSigning] = useState(false)
   const [waiverContent, setWaiverContent] = useState('')
 
@@ -426,10 +442,6 @@ function WaiverModal({ waivers, onSign, onClose }) {
       alert('Please enter your name as parent/guardian')
       return
     }
-    if (isMinorWaiver && !emergencyPhone.trim()) {
-      alert('Please enter an emergency phone number')
-      return
-    }
 
     setSigning(true)
     try {
@@ -437,9 +449,7 @@ function WaiverModal({ waivers, onSign, onClose }) {
         signature: signature.trim(),
         signatureImage,
         signerRole,
-        parentGuardianName: isMinorWaiver ? parentGuardianName.trim() : null,
-        emergencyPhone: emergencyPhone.trim() || null,
-        chineseName: chineseName.trim() || null
+        parentGuardianName: isMinorWaiver ? parentGuardianName.trim() : null
       })
     } finally {
       setSigning(false)
@@ -525,48 +535,20 @@ function WaiverModal({ waivers, onSign, onClose }) {
                 <p className="text-sm text-amber-800 mb-3">
                   For participants under {currentWaiver.minorAgeThreshold || 18} years old:
                 </p>
-                <div className="space-y-2">
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">
-                      Parent/Guardian Full Name *
-                    </label>
-                    <input
-                      type="text"
-                      value={parentGuardianName}
-                      onChange={(e) => setParentGuardianName(e.target.value)}
-                      placeholder="Your full legal name"
-                      className="w-full px-3 py-2 border rounded-lg text-sm"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">
-                      Emergency Phone # *
-                    </label>
-                    <input
-                      type="tel"
-                      value={emergencyPhone}
-                      onChange={(e) => setEmergencyPhone(e.target.value)}
-                      placeholder="(555) 123-4567"
-                      className="w-full px-3 py-2 border rounded-lg text-sm"
-                    />
-                  </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    Parent/Guardian Full Name *
+                  </label>
+                  <input
+                    type="text"
+                    value={parentGuardianName}
+                    onChange={(e) => setParentGuardianName(e.target.value)}
+                    placeholder="Your full legal name"
+                    className="w-full px-3 py-2 border rounded-lg text-sm"
+                  />
                 </div>
               </div>
             )}
-
-            {/* Chinese Name (Optional) */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Chinese Name <span className="text-gray-400">(if applicable)</span>
-              </label>
-              <input
-                type="text"
-                value={chineseName}
-                onChange={(e) => setChineseName(e.target.value)}
-                placeholder="Your Chinese name"
-                className="w-full px-3 py-2 border rounded-lg"
-              />
-            </div>
 
             {/* Digital Signature - Typed */}
             <div>
@@ -600,22 +582,6 @@ function WaiverModal({ waivers, onSign, onClose }) {
                 By signing above, you are electronically signing this waiver
               </p>
             </div>
-
-            {/* Emergency Phone if not minor */}
-            {!isMinorWaiver && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Emergency Phone <span className="text-gray-400">(optional)</span>
-                </label>
-                <input
-                  type="tel"
-                  value={emergencyPhone}
-                  onChange={(e) => setEmergencyPhone(e.target.value)}
-                  placeholder="(555) 123-4567"
-                  className="w-full px-3 py-2 border rounded-lg"
-                />
-              </div>
-            )}
 
             {/* Agreement Checkbox */}
             <label className="flex items-start gap-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">

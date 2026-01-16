@@ -103,6 +103,7 @@ public class CheckInController : ControllerBase
             // Get user's registrations in this event
             var registrations = await _context.EventUnitMembers
                 .Where(m => m.Unit!.EventId == eventId && m.UserId == userId && m.InviteStatus == "Accepted")
+                .Include(m => m.User)
                 .Include(m => m.Unit)
                     .ThenInclude(u => u!.Division)
                 .ToListAsync();
@@ -208,6 +209,16 @@ public class CheckInController : ControllerBase
                     .ToList();
             }
 
+            // Get player name
+            var playerName = firstReg.User != null
+                ? $"{firstReg.User.FirstName} {firstReg.User.LastName}".Trim()
+                : null;
+
+            // Get signed waiver PDF URL (convert relative to full URL if needed)
+            var signedPdfUrl = !string.IsNullOrEmpty(firstReg.SignedWaiverPdfUrl)
+                ? GetFullUrl(firstReg.SignedWaiverPdfUrl)
+                : null;
+
             return Ok(new ApiResponse<PlayerCheckInStatusDto>
             {
                 Success = true,
@@ -218,6 +229,8 @@ public class CheckInController : ControllerBase
                     CheckedInAt = firstReg.CheckedInAt,
                     WaiverSigned = allWaiversSigned,
                     WaiverSignedAt = firstReg.WaiverSignedAt,
+                    SignedWaiverPdfUrl = signedPdfUrl,
+                    PlayerName = playerName,
                     PendingWaivers = pendingWaiverDtos,
                     Divisions = registrations.Select(r => new CheckInDivisionDto
                     {
@@ -925,6 +938,8 @@ public class PlayerCheckInStatusDto
     public DateTime? CheckedInAt { get; set; }
     public bool WaiverSigned { get; set; }
     public DateTime? WaiverSignedAt { get; set; }
+    public string? SignedWaiverPdfUrl { get; set; }
+    public string? PlayerName { get; set; }
     public List<WaiverDto> PendingWaivers { get; set; } = new();
     public List<CheckInDivisionDto> Divisions { get; set; } = new();
 }
