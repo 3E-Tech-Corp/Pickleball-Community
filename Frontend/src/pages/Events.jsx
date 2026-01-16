@@ -4485,7 +4485,7 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
                                             );
                                           })()}
                                           {/* Trash icon - only if no payment submitted */}
-                                          {canRemove && (
+                                          {canRemove && !isJoinRequest && (
                                             <button
                                               onClick={(e) => {
                                                 e.stopPropagation();
@@ -4496,6 +4496,31 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
                                             >
                                               <Trash2 className="w-4 h-4" />
                                             </button>
+                                          )}
+                                          {/* Admin: Accept/Reject join request - next to each join request member */}
+                                          {isOrganizer && isJoinRequest && member.joinRequestId && (
+                                            <>
+                                              <button
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  handleRespondToJoinRequestAdmin(member.joinRequestId, true, division.id);
+                                                }}
+                                                className="p-0.5 rounded text-green-600 hover:bg-green-100 transition-colors"
+                                                title={`Accept ${member.firstName || 'request'}`}
+                                              >
+                                                <Check className="w-4 h-4" />
+                                              </button>
+                                              <button
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  handleRespondToJoinRequestAdmin(member.joinRequestId, false, division.id);
+                                                }}
+                                                className="p-0.5 rounded text-red-600 hover:bg-red-100 transition-colors"
+                                                title={`Reject ${member.firstName || 'request'}`}
+                                              >
+                                                <X className="w-4 h-4" />
+                                              </button>
+                                            </>
                                           )}
                                         </div>
                                       );
@@ -4557,38 +4582,6 @@ function EventDetailModal({ event, isAuthenticated, currentUserId, user, formatD
                                       >
                                         <ArrowRight className="w-4 h-4" />
                                       </button>
-                                    )}
-
-                                    {/* Admin: Accept/Reject join requests */}
-                                    {isOrganizer && hasJoinRequest && (
-                                      <div className="flex items-center gap-1">
-                                        {unit.members?.filter(m => m.inviteStatus === 'Requested').map((reqMember, reqIdx) => (
-                                          <div key={reqIdx} className="flex items-center gap-0.5">
-                                            <button
-                                              onClick={() => {
-                                                if (reqMember.joinRequestId) {
-                                                  handleRespondToJoinRequest(reqMember.joinRequestId, true);
-                                                }
-                                              }}
-                                              className="p-1 text-green-600 hover:bg-green-100 rounded"
-                                              title={`Accept ${reqMember.firstName || 'request'}`}
-                                            >
-                                              <Check className="w-4 h-4" />
-                                            </button>
-                                            <button
-                                              onClick={() => {
-                                                if (reqMember.joinRequestId) {
-                                                  handleRespondToJoinRequest(reqMember.joinRequestId, false);
-                                                }
-                                              }}
-                                              className="p-1 text-red-600 hover:bg-red-100 rounded"
-                                              title={`Reject ${reqMember.firstName || 'request'}`}
-                                            >
-                                              <X className="w-4 h-4" />
-                                            </button>
-                                          </div>
-                                        ))}
-                                      </div>
                                     )}
 
                                     {/* Admin: Break unit apart (only for complete teams with 2+ members) */}
