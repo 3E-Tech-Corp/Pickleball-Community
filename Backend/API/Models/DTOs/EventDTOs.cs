@@ -35,6 +35,7 @@ public class EventPublicViewDto
     public int DivisionCount { get; set; }
     public int PrimaryTeamSize { get; set; } = 2;
     public string? OrganizerName { get; set; }
+    public int? OrganizedByUserId { get; set; }
     public int? OrganizedByClubId { get; set; }
     public string? ClubName { get; set; }
     public string? ContactName { get; set; }

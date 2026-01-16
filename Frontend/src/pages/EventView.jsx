@@ -3,9 +3,10 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
   Calendar, MapPin, Clock, Users, DollarSign, ChevronLeft,
   UserPlus, Building2, Phone, Mail, User, Image, ExternalLink,
-  Loader2, AlertCircle, FileText, Radio
+  Loader2, AlertCircle, FileText, Radio, Settings
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { useAdmin } from '../contexts/AdminContext';
 import { eventsApi, objectAssetsApi, getSharedAssetUrl } from '../services/api';
 import { getIconByName } from '../utils/iconMap';
 import { getColorValues } from '../utils/colorMap';
@@ -14,7 +15,8 @@ import PublicProfileModal from '../components/ui/PublicProfileModal';
 export default function EventView() {
   const { eventId } = useParams();
   const navigate = useNavigate();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
+  const { isAdmin } = useAdmin();
 
   const [event, setEvent] = useState(null);
   const [adAssets, setAdAssets] = useState([]);
@@ -196,21 +198,39 @@ export default function EventView() {
           </div>
 
           {/* Live Drawing Button - Show when event is in Drawing status */}
-          {event.tournamentStatus === 'Drawing' && (
-            <div className="p-4 bg-gradient-to-r from-orange-500 to-red-500">
-              <Link
-                to={`/event/${eventId}/drawing`}
-                className="w-full py-3 bg-white text-orange-600 rounded-lg font-semibold hover:bg-orange-50 transition-colors flex items-center justify-center gap-2 shadow-lg"
-              >
-                <div className="relative">
-                  <Radio className="w-5 h-5" />
-                  <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full animate-ping" />
-                  <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full" />
-                </div>
-                Live Drawing
-              </Link>
-            </div>
-          )}
+          {event.tournamentStatus === 'Drawing' && (() => {
+            const isEventOrganizer = isAuthenticated && user?.id === event.organizedByUserId;
+            const canManageDrawing = isEventOrganizer || isAdmin;
+
+            return (
+              <div className={`p-4 ${canManageDrawing ? 'bg-gradient-to-r from-purple-600 to-indigo-600' : 'bg-gradient-to-r from-orange-500 to-red-500'}`}>
+                <Link
+                  to={`/event/${eventId}/drawing`}
+                  className={`w-full py-3 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2 shadow-lg ${
+                    canManageDrawing
+                      ? 'bg-white text-purple-600 hover:bg-purple-50'
+                      : 'bg-white text-orange-600 hover:bg-orange-50'
+                  }`}
+                >
+                  {canManageDrawing ? (
+                    <>
+                      <Settings className="w-5 h-5" />
+                      Manage Drawing
+                    </>
+                  ) : (
+                    <>
+                      <div className="relative">
+                        <Radio className="w-5 h-5" />
+                        <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full animate-ping" />
+                        <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full" />
+                      </div>
+                      Live Drawing
+                    </>
+                  )}
+                </Link>
+              </div>
+            );
+          })()}
 
           {/* Event Header */}
           <div className="p-6">

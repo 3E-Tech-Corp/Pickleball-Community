@@ -450,6 +450,7 @@ public class EventsController : ControllerBase
                 DivisionCount = evt.Divisions.Count,
                 PrimaryTeamSize = primaryTeamSize,
                 OrganizerName = evt.OrganizedBy != null ? Utility.FormatName(evt.OrganizedBy.LastName, evt.OrganizedBy.FirstName) : null,
+                OrganizedByUserId = evt.OrganizedByUserId,
                 OrganizedByClubId = evt.OrganizedByClubId,
                 ClubName = evt.OrganizedByClub?.Name,
                 ContactName = evt.ContactName,
