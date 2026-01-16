@@ -24,6 +24,11 @@ const PublicProfile = () => {
   // Check if current user has SU role on shared auth (required for editing credentials)
   const hasSharedAdminRole = currentUser?.systemRole?.toLowerCase() === 'su'
 
+  // Debug logging for admin button visibility
+  useEffect(() => {
+    console.log('PublicProfile currentUser:', currentUser, 'systemRole:', currentUser?.systemRole, 'hasSharedAdminRole:', hasSharedAdminRole)
+  }, [currentUser, hasSharedAdminRole])
+
   useEffect(() => {
     const fetchProfile = async () => {
       try {
