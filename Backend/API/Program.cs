@@ -126,6 +126,7 @@ builder.Services.AddScoped<IPushNotificationService, PushNotificationService>();
 builder.Services.AddScoped<IActivityAwardService, ActivityAwardService>();
 builder.Services.AddScoped<IInstaGameService, InstaGameService>();
 builder.Services.AddScoped<IDrawingBroadcaster, DrawingBroadcaster>();
+builder.Services.AddScoped<ISharedAssetService, SharedAssetService>();
 builder.Services.AddScoped<IWaiverPdfService, WaiverPdfService>();
 
 // CORS - Load allowed origins from configuration

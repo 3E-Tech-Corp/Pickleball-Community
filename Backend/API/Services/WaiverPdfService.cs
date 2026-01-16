@@ -28,16 +28,16 @@ public class WaiverSigningResult
 
 public class WaiverPdfService : IWaiverPdfService
 {
-    private readonly IFileStorageService _fileStorage;
+    private readonly ISharedAssetService _sharedAssetService;
     private readonly ApplicationDbContext _context;
     private readonly ILogger<WaiverPdfService> _logger;
 
     public WaiverPdfService(
-        IFileStorageService fileStorage,
+        ISharedAssetService sharedAssetService,
         ApplicationDbContext context,
         ILogger<WaiverPdfService> logger)
     {
-        _fileStorage = fileStorage;
+        _sharedAssetService = sharedAssetService;
         _context = context;
         _logger = logger;
 
@@ -58,19 +58,21 @@ public class WaiverPdfService : IWaiverPdfService
         var result = new WaiverSigningResult();
         var eventName = waiver.Event?.Name ?? "Event";
 
-        // 1. Upload signature image to S3
+        // 1. Upload signature image to shared asset service
         var signatureBytes = Convert.FromBase64String(
             signatureImageBase64.Contains(",")
                 ? signatureImageBase64.Split(',')[1]  // Remove data:image/png;base64, prefix
                 : signatureImageBase64);
 
         var signatureFileName = $"signature_e{waiver.EventId}_u{user.Id}_{signedAt:yyyyMMddHHmmss}.png";
-        result.SignatureAssetUrl = await _fileStorage.UploadBytesAsync(
+        var signatureUrl = await _sharedAssetService.UploadFileAsync(
             signatureBytes,
             signatureFileName,
             "image/png",
+            "image",
             "waiver-signatures");
 
+        result.SignatureAssetUrl = signatureUrl ?? string.Empty;
         _logger.LogInformation("Uploaded signature image for user {UserId} event {EventId}: {Url}",
             user.Id, waiver.EventId, result.SignatureAssetUrl);
 
@@ -86,13 +88,16 @@ public class WaiverPdfService : IWaiverPdfService
             parentGuardianName,
             eventName);
 
+        // 3. Upload PDF to shared asset service
         var pdfFileName = $"waiver_e{waiver.EventId}_u{user.Id}_{signedAt:yyyyMMddHHmmss}.pdf";
-        result.SignedWaiverPdfUrl = await _fileStorage.UploadBytesAsync(
+        var pdfUrl = await _sharedAssetService.UploadFileAsync(
             pdfBytes,
             pdfFileName,
             "application/pdf",
+            "document",
             "signed-waivers");
 
+        result.SignedWaiverPdfUrl = pdfUrl ?? string.Empty;
         _logger.LogInformation("Uploaded signed waiver PDF for user {UserId} event {EventId}: {Url}",
             user.Id, waiver.EventId, result.SignedWaiverPdfUrl);
 
