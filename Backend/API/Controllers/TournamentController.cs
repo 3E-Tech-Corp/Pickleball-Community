@@ -4728,15 +4728,7 @@ public class TournamentController : ControllerBase
         if (!units.Any())
             return BadRequest(new ApiResponse<DrawingStateDto> { Success = false, Message = "No units to draw" });
 
-        var requiredMembers = division.TeamUnit?.TotalPlayers ?? division.TeamSize;
-        var incompleteUnits = units.Where(u =>
-            u.Members.Count(m => m.InviteStatus == "Accepted") < requiredMembers).ToList();
-
-        if (incompleteUnits.Any())
-        {
-            var unitNames = string.Join(", ", incompleteUnits.Take(3).Select(u => u.Name));
-            return BadRequest(new ApiResponse<DrawingStateDto> { Success = false, Message = $"Units not complete: {unitNames}. Each unit needs {requiredMembers} accepted member(s)." });
-        }
+        // Note: Team completion check removed - admin can draw even with incomplete teams for testing
 
         // Clear any existing unit numbers
         foreach (var unit in units)
@@ -5063,6 +5055,22 @@ public class TournamentController : ControllerBase
                 startedBy = await _context.Users.FindAsync(division.DrawingByUserId.Value);
             }
 
+            // Build units list with member info for display
+            var unitsWithMembers = units.Select(u => new DrawingUnitDto
+            {
+                UnitId = u.Id,
+                UnitName = u.Name,
+                UnitNumber = u.UnitNumber,
+                Members = u.Members
+                    .Where(m => m.InviteStatus == "Accepted" && m.User != null)
+                    .Select(m => new DrawingMemberDto
+                    {
+                        UserId = m.UserId,
+                        Name = Utility.FormatName(m.User!.LastName, m.User.FirstName) ?? "",
+                        AvatarUrl = m.User.ProfileImageUrl
+                    }).ToList()
+            }).ToList();
+
             divisionStates.Add(new DivisionDrawingStateDto
             {
                 DivisionId = division.Id,
@@ -5075,18 +5083,24 @@ public class TournamentController : ControllerBase
                 TotalUnits = units.Count,
                 DrawnCount = drawnUnits.Count,
                 DrawnUnits = drawnUnits,
-                RemainingUnitNames = remainingUnitNames
+                RemainingUnitNames = remainingUnitNames,
+                Units = unitsWithMembers
             });
         }
 
         // Get current viewers
         var viewers = DrawingHub.GetEventViewers(eventId);
 
+        // Check if current user is organizer
+        var userId = GetUserId();
+        var isOrganizer = userId.HasValue && (evt.OrganizedByUserId == userId.Value || await IsAdminAsync());
+
         var state = new EventDrawingStateDto
         {
             EventId = evt.Id,
             EventName = evt.Name,
             TournamentStatus = evt.TournamentStatus ?? "Draft",
+            IsOrganizer = isOrganizer,
             Divisions = divisionStates,
             Viewers = viewers,
             ViewerCount = viewers.Count
