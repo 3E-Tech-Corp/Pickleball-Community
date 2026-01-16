@@ -500,9 +500,9 @@ export default function PublicProfileModal({ userId, onClose, onFriendshipChange
         <AdminEditCredentialsModal
           isOpen={showAdminModal}
           onClose={() => setShowAdminModal(false)}
-          targetUserId={profile.id}
-          targetUserEmail={profile.email}
-          targetUserName={`${profile.firstName || ''} ${profile.lastName || ''}`.trim() || 'User'}
+          userId={profile.id}
+          currentEmail={profile.email}
+          userName={`${profile.firstName || ''} ${profile.lastName || ''}`.trim() || 'User'}
         />
       )}
     </div>
