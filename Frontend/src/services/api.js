@@ -181,6 +181,12 @@ export const sharedUserApi = {
   updateProfile: (data) => sharedAuthApi.put('/users/me', data),
 }
 
+// Shared Admin API (for Funtime-Shared admin operations - requires SU role)
+export const sharedAdminApi = {
+  // Update user credentials (email, password, etc.) - requires SU role on shared auth
+  updateUser: (userId, data) => sharedAuthApi.put(`/admin/users/${userId}`, data),
+}
+
 // Shared Asset API (for Funtime-Shared centralized asset management)
 // Use this for all asset uploads across pickleball.* sites
 const SITE_KEY = 'community' // Site identifier for multi-tenant asset storage
