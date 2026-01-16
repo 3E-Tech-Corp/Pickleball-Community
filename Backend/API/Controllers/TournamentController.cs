@@ -4576,7 +4576,7 @@ public class TournamentController : ControllerBase
                     PaymentReference = u.PaymentReference,
                     ReferenceId = u.ReferenceId,
                     PaidAt = u.PaidAt,
-                    Members = u.Members.Select(m => new MemberPaymentDto
+                    Members = u.Members.Select(m => new UnitMemberPaymentDto
                     {
                         UserId = m.UserId,
                         UserName = $"{m.User?.FirstName} {m.User?.LastName}".Trim(),

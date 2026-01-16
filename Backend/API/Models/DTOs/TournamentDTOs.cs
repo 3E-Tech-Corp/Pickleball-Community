@@ -772,10 +772,10 @@ public class UnitPaymentDto
     public string? PaymentReference { get; set; }
     public string? ReferenceId { get; set; }
     public DateTime? PaidAt { get; set; }
-    public List<MemberPaymentDto> Members { get; set; } = new();
+    public List<UnitMemberPaymentDto> Members { get; set; } = new();
 }
 
-public class MemberPaymentDto
+public class UnitMemberPaymentDto
 {
     public int UserId { get; set; }
     public string UserName { get; set; } = string.Empty;
