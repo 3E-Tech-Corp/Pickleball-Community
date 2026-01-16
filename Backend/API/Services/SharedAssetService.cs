@@ -56,7 +56,8 @@ public class SharedAssetService : ISharedAssetService
             content.Add(fileContent, "file", fileName);
 
             var queryParams = $"assetType={Uri.EscapeDataString(assetType)}&category={Uri.EscapeDataString(category)}&siteKey={Uri.EscapeDataString(_siteKey)}&isPublic=true";
-            var response = await _httpClient.PostAsync($"/asset/upload?{queryParams}", content);
+            // Note: Don't use leading slash - HttpClient would resolve it from domain root, bypassing /api base path
+            var response = await _httpClient.PostAsync($"asset/upload?{queryParams}", content);
 
             if (response.IsSuccessStatusCode)
             {
