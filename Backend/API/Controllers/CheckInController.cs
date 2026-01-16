@@ -389,7 +389,7 @@ public class CheckInController : ControllerBase
         }
 
         _logger.LogInformation("User {UserId} signed waiver {WaiverId} for event {EventId} with signature '{Signature}'",
-            userId, waiver.Id, eventId, request.Signature);
+            userId, waiverDocumentId, eventId, request.Signature);
 
         return Ok(new ApiResponse<object>
         {
