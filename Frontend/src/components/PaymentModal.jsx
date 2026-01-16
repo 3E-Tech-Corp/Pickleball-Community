@@ -434,8 +434,8 @@ export default function PaymentModal({ isOpen, onClose, registration, event, onP
                               type="checkbox"
                               checked={isSelected || alreadyPaid}
                               disabled={alreadyPaid}
+                              onClick={(e) => e.stopPropagation()}
                               onChange={(e) => {
-                                e.stopPropagation();
                                 if (!alreadyPaid) toggleMemberSelection(member.userId);
                               }}
                               className="w-4 h-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500 disabled:opacity-50"

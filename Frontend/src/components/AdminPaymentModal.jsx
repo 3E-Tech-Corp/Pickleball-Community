@@ -659,10 +659,8 @@ export default function AdminPaymentModal({ isOpen, onClose, unit, event, onPaym
                                 <input
                                   type="checkbox"
                                   checked={isSelected}
-                                  onChange={(e) => {
-                                    e.stopPropagation();
-                                    toggleTeammateSelection(teammate.userId);
-                                  }}
+                                  onClick={(e) => e.stopPropagation()}
+                                  onChange={() => toggleTeammateSelection(teammate.userId)}
                                   className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                                 />
                                 <span className="text-sm font-medium text-gray-900">{name}</span>
