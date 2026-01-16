@@ -104,7 +104,7 @@ public class WaiverPdfService : IWaiverPdfService
                 waiver.EventId,
                 user.Id,
                 user.Email ?? "",
-                user.DisplayName ?? user.Username ?? "User",
+                $"{user.FirstName} {user.LastName}".Trim() is { Length: > 0 } name ? name : "User",
                 eventName,
                 waiver.Title,
                 signedAt,
