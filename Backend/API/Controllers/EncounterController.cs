@@ -111,7 +111,7 @@ public class EncounterController : ControllerBase
             return Forbid();
 
         // Update division configuration
-        division.MatchesPerEncounter = dto.MatchesPerEncounter;
+        division.MatchesPerEncounter = dto.MatchesPerEncounter ?? 1;
         division.AllowPlayerReuseInEncounter = dto.AllowPlayerReuseInEncounter;
         division.AllowLineupChangePerEncounter = dto.AllowLineupChangePerEncounter;
         division.UpdatedAt = DateTime.UtcNow;

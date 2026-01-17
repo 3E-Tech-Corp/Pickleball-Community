@@ -462,20 +462,20 @@ public class CheckInController : ControllerBase
                     var unit = reg.Unit!;
                     // Find games where this unit is playing
                     var games = await _context.EventGames
-                        .Include(g => g.Match)
+                        .Include(g => g.Encounter)
                             .ThenInclude(m => m!.Unit1)
                                 .ThenInclude(u => u!.Members)
-                        .Include(g => g.Match)
+                        .Include(g => g.Encounter)
                             .ThenInclude(m => m!.Unit2)
                                 .ThenInclude(u => u!.Members)
                         .Where(g => g.Status == "New" &&
-                            (g.Match!.Unit1Id == unit.Id || g.Match.Unit2Id == unit.Id))
+                            (g.Encounter!.Unit1Id == unit.Id || g.Encounter.Unit2Id == unit.Id))
                         .ToListAsync();
 
                     foreach (var game in games)
                     {
-                        var unit1Members = game.Match!.Unit1?.Members.Where(m => m.InviteStatus == "Accepted").ToList() ?? new List<EventUnitMember>();
-                        var unit2Members = game.Match!.Unit2?.Members.Where(m => m.InviteStatus == "Accepted").ToList() ?? new List<EventUnitMember>();
+                        var unit1Members = game.Encounter!.Unit1?.Members.Where(m => m.InviteStatus == "Accepted").ToList() ?? new List<EventUnitMember>();
+                        var unit2Members = game.Encounter!.Unit2?.Members.Where(m => m.InviteStatus == "Accepted").ToList() ?? new List<EventUnitMember>();
 
                         var allUnit1CheckedIn = unit1Members.All(m => m.IsCheckedIn);
                         var allUnit2CheckedIn = unit2Members.All(m => m.IsCheckedIn);
