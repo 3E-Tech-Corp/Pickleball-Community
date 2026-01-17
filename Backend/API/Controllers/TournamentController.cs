@@ -4804,19 +4804,14 @@ public class TournamentController : ControllerBase
         {
             Direction = System.Data.ParameterDirection.Output
         };
-        var returnParam = new Microsoft.Data.SqlClient.SqlParameter("@ReturnValue", System.Data.SqlDbType.Int)
-        {
-            Direction = System.Data.ParameterDirection.ReturnValue
-        };
 
         try
         {
             await _context.Database.ExecuteSqlRawAsync(
-                "EXEC @ReturnValue = sp_DrawNextUnit @DivisionId, @DrawnUnitId OUTPUT, @AssignedNumber OUTPUT",
+                "EXEC sp_DrawNextUnit @DivisionId, @DrawnUnitId OUTPUT, @AssignedNumber OUTPUT",
                 new Microsoft.Data.SqlClient.SqlParameter("@DivisionId", divisionId),
                 drawnUnitIdParam,
-                assignedNumberParam,
-                returnParam
+                assignedNumberParam
             );
         }
         catch (Microsoft.Data.SqlClient.SqlException ex)
