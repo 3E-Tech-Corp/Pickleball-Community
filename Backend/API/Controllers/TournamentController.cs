@@ -4985,10 +4985,15 @@ public class TournamentController : ControllerBase
         // Allow cancelling both in-progress drawings and completed drawings (for redraw)
         // Check if there's anything to reset (either drawing in progress or units already assigned)
         var hasUnitsAssigned = await _context.EventUnits
-            .AnyAsync(u => u.DivisionId == divisionId && u.UnitNumber != null);
+            .AnyAsync(u => u.DivisionId == divisionId
+                && u.Status != "Cancelled" && u.Status != "Waitlisted"
+                && u.UnitNumber != null);
 
         if (!division.DrawingInProgress && !hasUnitsAssigned)
-            return BadRequest(new ApiResponse<bool> { Success = false, Message = "No drawing to cancel or reset" });
+        {
+            // Nothing to reset - return success anyway (idempotent operation)
+            return Ok(new ApiResponse<bool> { Success = true, Data = true, Message = "Already reset" });
+        }
 
         // Clear unit numbers assigned during this drawing
         var units = await _context.EventUnits
