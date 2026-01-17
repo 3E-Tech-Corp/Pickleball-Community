@@ -92,7 +92,6 @@ public class ApplicationDbContext : DbContext
     public DbSet<EventGameScoreHistory> EventGameScoreHistories { get; set; }
     public DbSet<TournamentCourt> TournamentCourts { get; set; }
     public DbSet<EventDocument> EventDocuments { get; set; }
-    public DbSet<EncounterMatchGame> EncounterMatchGames { get; set; }
 
     // Clubs
     public DbSet<Club> Clubs { get; set; }
@@ -1182,35 +1181,6 @@ public class ApplicationDbContext : DbContext
                   .WithMany()
                   .HasForeignKey(p => p.UnitId)
                   .OnDelete(DeleteBehavior.NoAction);
-        });
-
-        // Encounter Match Game configuration
-        modelBuilder.Entity<EncounterMatchGame>(entity =>
-        {
-            entity.Property(g => g.Status).HasMaxLength(20);
-            entity.HasIndex(g => g.MatchId);
-            entity.HasIndex(g => g.Status);
-            entity.HasIndex(g => new { g.MatchId, g.GameNumber }).IsUnique();
-
-            entity.HasOne(g => g.Match)
-                  .WithMany(m => m.Games)
-                  .HasForeignKey(g => g.MatchId)
-                  .OnDelete(DeleteBehavior.Cascade);
-
-            entity.HasOne(g => g.Winner)
-                  .WithMany()
-                  .HasForeignKey(g => g.WinnerUnitId)
-                  .OnDelete(DeleteBehavior.NoAction);
-
-            entity.HasOne(g => g.ScoreFormat)
-                  .WithMany()
-                  .HasForeignKey(g => g.ScoreFormatId)
-                  .OnDelete(DeleteBehavior.SetNull);
-
-            entity.HasOne(g => g.TournamentCourt)
-                  .WithMany()
-                  .HasForeignKey(g => g.TournamentCourtId)
-                  .OnDelete(DeleteBehavior.SetNull);
         });
 
         // Blog Category configuration
