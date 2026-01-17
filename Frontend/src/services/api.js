@@ -2016,7 +2016,14 @@ export const checkInApi = {
   createDocument: (eventId, data) => api.post(`/checkin/documents/${eventId}`, data),
 
   // Delete event document (TD)
-  deleteDocument: (eventId, documentId) => api.delete(`/checkin/documents/${eventId}/${documentId}`)
+  deleteDocument: (eventId, documentId) => api.delete(`/checkin/documents/${eventId}/${documentId}`),
+
+  // Admin override/void actions
+  voidCheckIn: (eventId, userId, notes = null) => api.post(`/checkin/void/${eventId}/${userId}`, { notes }),
+  overrideWaiver: (eventId, userId, notes = null) => api.post(`/checkin/waiver-override/${eventId}/${userId}`, { notes }),
+  voidWaiver: (eventId, userId, notes = null) => api.post(`/checkin/waiver-void/${eventId}/${userId}`, { notes }),
+  overridePayment: (eventId, userId, hasPaid, amountPaid = null, notes = null) =>
+    api.post(`/checkin/payment-override/${eventId}/${userId}`, { hasPaid, amountPaid, notes })
 }
 
 // Tournament Game Day API

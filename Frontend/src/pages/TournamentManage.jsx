@@ -4,11 +4,12 @@ import {
   ArrowLeft, Users, Trophy, Calendar, Clock, MapPin, Play, Check, X,
   ChevronDown, ChevronUp, RefreshCw, Shuffle, Settings, Target,
   AlertCircle, Loader2, Plus, Edit2, DollarSign, Eye, Share2, LayoutGrid,
-  Award, ArrowRight, Lock, Unlock, Save, Map, ExternalLink
+  Award, ArrowRight, Lock, Unlock, Save, Map, ExternalLink, FileText, User,
+  CheckCircle, XCircle, MoreVertical
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
-import { tournamentApi, gameDayApi, eventsApi, objectAssetsApi, getSharedAssetUrl } from '../services/api';
+import { tournamentApi, gameDayApi, eventsApi, objectAssetsApi, checkInApi, getSharedAssetUrl } from '../services/api';
 import ScheduleConfigModal from '../components/ScheduleConfigModal';
 
 export default function TournamentManage() {
@@ -54,6 +55,14 @@ export default function TournamentManage() {
 
   // Status update state
   const [updatingStatus, setUpdatingStatus] = useState(false);
+
+  // Check-in management state
+  const [checkInData, setCheckInData] = useState(null);
+  const [loadingCheckIns, setLoadingCheckIns] = useState(false);
+  const [checkInFilter, setCheckInFilter] = useState('all'); // all, pending, checked-in
+  const [checkInDivisionFilter, setCheckInDivisionFilter] = useState('all');
+  const [processingAction, setProcessingAction] = useState(null); // { userId, action }
+  const [actionMenuOpen, setActionMenuOpen] = useState(null); // userId
 
   useEffect(() => {
     if (eventId) {
@@ -263,6 +272,161 @@ export default function TournamentManage() {
       console.error('Error resetting pools:', err);
       toast.error('Failed to reset pools');
     }
+  };
+
+  // Check-in management functions
+  const loadCheckIns = async () => {
+    setLoadingCheckIns(true);
+    try {
+      const response = await checkInApi.getEventCheckIns(eventId);
+      if (response.success) {
+        setCheckInData(response.data);
+      } else {
+        toast.error(response.message || 'Failed to load check-in data');
+      }
+    } catch (err) {
+      console.error('Error loading check-ins:', err);
+      toast.error('Failed to load check-in data');
+    } finally {
+      setLoadingCheckIns(false);
+    }
+  };
+
+  const handleManualCheckIn = async (userId) => {
+    setProcessingAction({ userId, action: 'checkin' });
+    try {
+      const response = await checkInApi.manualCheckIn(eventId, userId, { signWaiver: false });
+      if (response.success) {
+        toast.success('Player checked in');
+        loadCheckIns();
+        loadDashboard();
+      } else {
+        toast.error(response.message || 'Failed to check in player');
+      }
+    } catch (err) {
+      console.error('Error checking in player:', err);
+      toast.error('Failed to check in player');
+    } finally {
+      setProcessingAction(null);
+      setActionMenuOpen(null);
+    }
+  };
+
+  const handleVoidCheckIn = async (userId) => {
+    if (!confirm('Are you sure you want to void this check-in?')) return;
+    setProcessingAction({ userId, action: 'void-checkin' });
+    try {
+      const response = await checkInApi.voidCheckIn(eventId, userId);
+      if (response.success) {
+        toast.success('Check-in voided');
+        loadCheckIns();
+        loadDashboard();
+      } else {
+        toast.error(response.message || 'Failed to void check-in');
+      }
+    } catch (err) {
+      console.error('Error voiding check-in:', err);
+      toast.error('Failed to void check-in');
+    } finally {
+      setProcessingAction(null);
+      setActionMenuOpen(null);
+    }
+  };
+
+  const handleOverrideWaiver = async (userId) => {
+    setProcessingAction({ userId, action: 'override-waiver' });
+    try {
+      const response = await checkInApi.overrideWaiver(eventId, userId);
+      if (response.success) {
+        toast.success('Waiver requirement overridden');
+        loadCheckIns();
+      } else {
+        toast.error(response.message || 'Failed to override waiver');
+      }
+    } catch (err) {
+      console.error('Error overriding waiver:', err);
+      toast.error('Failed to override waiver');
+    } finally {
+      setProcessingAction(null);
+      setActionMenuOpen(null);
+    }
+  };
+
+  const handleVoidWaiver = async (userId) => {
+    if (!confirm('Are you sure you want to void this waiver signature?')) return;
+    setProcessingAction({ userId, action: 'void-waiver' });
+    try {
+      const response = await checkInApi.voidWaiver(eventId, userId);
+      if (response.success) {
+        toast.success('Waiver signature voided');
+        loadCheckIns();
+      } else {
+        toast.error(response.message || 'Failed to void waiver');
+      }
+    } catch (err) {
+      console.error('Error voiding waiver:', err);
+      toast.error('Failed to void waiver');
+    } finally {
+      setProcessingAction(null);
+      setActionMenuOpen(null);
+    }
+  };
+
+  const handleOverridePayment = async (userId, hasPaid) => {
+    if (!hasPaid && !confirm('Are you sure you want to void this payment?')) return;
+    setProcessingAction({ userId, action: hasPaid ? 'mark-paid' : 'void-payment' });
+    try {
+      const response = await checkInApi.overridePayment(eventId, userId, hasPaid);
+      if (response.success) {
+        toast.success(hasPaid ? 'Payment marked as paid' : 'Payment voided');
+        loadCheckIns();
+      } else {
+        toast.error(response.message || 'Failed to update payment');
+      }
+    } catch (err) {
+      console.error('Error updating payment:', err);
+      toast.error('Failed to update payment');
+    } finally {
+      setProcessingAction(null);
+      setActionMenuOpen(null);
+    }
+  };
+
+  // Filter players for check-in tab
+  const getFilteredPlayers = () => {
+    if (!checkInData?.players) return [];
+    let filtered = checkInData.players;
+
+    // Apply division filter
+    if (checkInDivisionFilter !== 'all') {
+      filtered = filtered.filter(p => p.divisionId === parseInt(checkInDivisionFilter));
+    }
+
+    // Apply status filter
+    if (checkInFilter === 'pending') {
+      filtered = filtered.filter(p => !p.isCheckedIn);
+    } else if (checkInFilter === 'checked-in') {
+      filtered = filtered.filter(p => p.isCheckedIn);
+    }
+
+    return filtered;
+  };
+
+  // Group players by division
+  const getPlayersByDivision = () => {
+    const filtered = getFilteredPlayers();
+    const grouped = {};
+    filtered.forEach(player => {
+      if (!grouped[player.divisionId]) {
+        grouped[player.divisionId] = {
+          divisionId: player.divisionId,
+          divisionName: player.divisionName,
+          players: []
+        };
+      }
+      grouped[player.divisionId].players.push(player);
+    });
+    return Object.values(grouped);
   };
 
   const handleOverrideRank = async (unitId, poolRank) => {
@@ -1256,70 +1420,297 @@ export default function TournamentManage() {
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold text-gray-900">Player Check-in</h2>
               <button
-                onClick={loadDashboard}
-                className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100"
+                onClick={() => { loadCheckIns(); loadDashboard(); }}
+                disabled={loadingCheckIns}
+                className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 disabled:opacity-50"
               >
-                <RefreshCw className="w-5 h-5" />
+                <RefreshCw className={`w-5 h-5 ${loadingCheckIns ? 'animate-spin' : ''}`} />
               </button>
             </div>
 
             {/* Check-in stats */}
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="bg-white rounded-xl shadow-sm p-4">
-                <div className="text-2xl font-bold text-gray-900">
-                  {dashboard?.stats?.checkedInPlayers || 0}
+                <div className="flex items-center gap-2">
+                  <div className="p-2 bg-green-100 rounded-lg">
+                    <CheckCircle className="w-5 h-5 text-green-600" />
+                  </div>
+                  <div>
+                    <div className="text-2xl font-bold text-gray-900">
+                      {checkInData?.checkedInCount || dashboard?.stats?.checkedInPlayers || 0}
+                    </div>
+                    <div className="text-sm text-gray-500">Checked In</div>
+                  </div>
                 </div>
-                <div className="text-sm text-gray-500">Checked In</div>
               </div>
               <div className="bg-white rounded-xl shadow-sm p-4">
-                <div className="text-2xl font-bold text-gray-900">
-                  {(dashboard?.stats?.totalRegistrations || 0) - (dashboard?.stats?.checkedInPlayers || 0)}
+                <div className="flex items-center gap-2">
+                  <div className="p-2 bg-yellow-100 rounded-lg">
+                    <Clock className="w-5 h-5 text-yellow-600" />
+                  </div>
+                  <div>
+                    <div className="text-2xl font-bold text-gray-900">
+                      {(checkInData?.totalPlayers || dashboard?.stats?.totalRegistrations || 0) - (checkInData?.checkedInCount || dashboard?.stats?.checkedInPlayers || 0)}
+                    </div>
+                    <div className="text-sm text-gray-500">Pending</div>
+                  </div>
                 </div>
-                <div className="text-sm text-gray-500">Pending</div>
               </div>
               <div className="bg-white rounded-xl shadow-sm p-4">
-                <div className="text-2xl font-bold text-gray-900">
-                  {dashboard?.stats?.totalRegistrations || 0}
+                <div className="flex items-center gap-2">
+                  <div className="p-2 bg-blue-100 rounded-lg">
+                    <FileText className="w-5 h-5 text-blue-600" />
+                  </div>
+                  <div>
+                    <div className="text-2xl font-bold text-gray-900">
+                      {checkInData?.waiverSignedCount || 0}
+                    </div>
+                    <div className="text-sm text-gray-500">Waivers Signed</div>
+                  </div>
                 </div>
-                <div className="text-sm text-gray-500">Total Registered</div>
+              </div>
+              <div className="bg-white rounded-xl shadow-sm p-4">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 bg-emerald-100 rounded-lg">
+                    <DollarSign className="w-5 h-5 text-emerald-600" />
+                  </div>
+                  <div>
+                    <div className="text-2xl font-bold text-gray-900">
+                      {checkInData?.paidCount || 0}
+                    </div>
+                    <div className="text-sm text-gray-500">Paid</div>
+                  </div>
+                </div>
               </div>
             </div>
 
-            {/* Division check-in status */}
-            <div className="bg-white rounded-xl shadow-sm p-6">
-              <h3 className="font-medium text-gray-900 mb-4">Check-in by Division</h3>
-              <div className="space-y-4">
-                {dashboard?.divisions?.map(div => (
-                  <div key={div.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                    <div>
-                      <div className="font-medium text-gray-900">{div.name}</div>
-                      <div className="text-sm text-gray-500">
-                        {div.checkedInUnits} / {div.registeredUnits} teams checked in
-                      </div>
+            {/* Filters */}
+            <div className="bg-white rounded-xl shadow-sm p-4">
+              <div className="flex flex-wrap gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                  <select
+                    value={checkInFilter}
+                    onChange={(e) => setCheckInFilter(e.target.value)}
+                    className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-orange-500"
+                  >
+                    <option value="all">All Players</option>
+                    <option value="pending">Pending Check-in</option>
+                    <option value="checked-in">Checked In</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Division</label>
+                  <select
+                    value={checkInDivisionFilter}
+                    onChange={(e) => setCheckInDivisionFilter(e.target.value)}
+                    className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-orange-500"
+                  >
+                    <option value="all">All Divisions</option>
+                    {dashboard?.divisions?.map(div => (
+                      <option key={div.id} value={div.id}>{div.name}</option>
+                    ))}
+                  </select>
+                </div>
+                {!checkInData && (
+                  <div className="flex items-end">
+                    <button
+                      onClick={loadCheckIns}
+                      disabled={loadingCheckIns}
+                      className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50 flex items-center gap-2"
+                    >
+                      {loadingCheckIns ? <Loader2 className="w-4 h-4 animate-spin" /> : <Users className="w-4 h-4" />}
+                      Load Players
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Player list by division */}
+            {checkInData?.players ? (
+              <div className="space-y-6">
+                {getPlayersByDivision().map(divGroup => (
+                  <div key={divGroup.divisionId} className="bg-white rounded-xl shadow-sm overflow-hidden">
+                    <div className="px-4 py-3 bg-gray-50 border-b">
+                      <h3 className="font-semibold text-gray-900">{divGroup.divisionName}</h3>
+                      <p className="text-sm text-gray-500">
+                        {divGroup.players.filter(p => p.isCheckedIn).length} / {divGroup.players.length} checked in
+                      </p>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <div className="w-24 h-2 bg-gray-200 rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-green-500 transition-all"
-                          style={{ width: `${div.registeredUnits > 0 ? (div.checkedInUnits / div.registeredUnits) * 100 : 0}%` }}
-                        />
-                      </div>
-                      <span className="text-sm font-medium text-gray-600 w-12 text-right">
-                        {div.registeredUnits > 0 ? Math.round((div.checkedInUnits / div.registeredUnits) * 100) : 0}%
-                      </span>
+                    <div className="divide-y divide-gray-100">
+                      {divGroup.players.map(player => (
+                        <div key={`${player.divisionId}-${player.userId}`} className="p-4 hover:bg-gray-50">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              {/* Avatar */}
+                              {player.avatarUrl ? (
+                                <img
+                                  src={getSharedAssetUrl(player.avatarUrl)}
+                                  alt=""
+                                  className="w-10 h-10 rounded-full object-cover"
+                                />
+                              ) : (
+                                <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center">
+                                  <User className="w-5 h-5 text-gray-400" />
+                                </div>
+                              )}
+
+                              {/* Player info */}
+                              <div>
+                                <div className="font-medium text-gray-900">
+                                  {player.firstName} {player.lastName}
+                                </div>
+                                <div className="text-sm text-gray-500">
+                                  {player.unitName} • {player.email}
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Status indicators and actions */}
+                            <div className="flex items-center gap-4">
+                              {/* Status badges */}
+                              <div className="flex items-center gap-2">
+                                {/* Check-in status */}
+                                <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
+                                  player.isCheckedIn
+                                    ? 'bg-green-100 text-green-700'
+                                    : 'bg-yellow-100 text-yellow-700'
+                                }`}>
+                                  {player.isCheckedIn ? <CheckCircle className="w-3 h-3" /> : <Clock className="w-3 h-3" />}
+                                  {player.isCheckedIn ? 'Checked In' : 'Pending'}
+                                </span>
+
+                                {/* Waiver status */}
+                                <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
+                                  player.waiverSigned
+                                    ? 'bg-blue-100 text-blue-700'
+                                    : 'bg-gray-100 text-gray-600'
+                                }`}>
+                                  <FileText className="w-3 h-3" />
+                                  {player.waiverSigned ? 'Waiver' : 'No Waiver'}
+                                </span>
+
+                                {/* Payment status */}
+                                <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
+                                  player.hasPaid
+                                    ? 'bg-emerald-100 text-emerald-700'
+                                    : 'bg-red-100 text-red-600'
+                                }`}>
+                                  <DollarSign className="w-3 h-3" />
+                                  {player.hasPaid ? 'Paid' : 'Unpaid'}
+                                </span>
+                              </div>
+
+                              {/* Action menu */}
+                              <div className="relative">
+                                <button
+                                  onClick={() => setActionMenuOpen(actionMenuOpen === player.userId ? null : player.userId)}
+                                  disabled={processingAction?.userId === player.userId}
+                                  className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 disabled:opacity-50"
+                                >
+                                  {processingAction?.userId === player.userId ? (
+                                    <Loader2 className="w-5 h-5 animate-spin" />
+                                  ) : (
+                                    <MoreVertical className="w-5 h-5" />
+                                  )}
+                                </button>
+
+                                {/* Dropdown menu */}
+                                {actionMenuOpen === player.userId && (
+                                  <div className="absolute right-0 mt-1 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-10">
+                                    {/* Check-in actions */}
+                                    {!player.isCheckedIn ? (
+                                      <button
+                                        onClick={() => handleManualCheckIn(player.userId)}
+                                        className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
+                                      >
+                                        <CheckCircle className="w-4 h-4 text-green-600" />
+                                        Check In
+                                      </button>
+                                    ) : (
+                                      <button
+                                        onClick={() => handleVoidCheckIn(player.userId)}
+                                        className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
+                                      >
+                                        <XCircle className="w-4 h-4 text-red-600" />
+                                        Void Check-in
+                                      </button>
+                                    )}
+
+                                    <div className="border-t border-gray-100 my-1" />
+
+                                    {/* Waiver actions */}
+                                    {!player.waiverSigned ? (
+                                      <button
+                                        onClick={() => handleOverrideWaiver(player.userId)}
+                                        className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
+                                      >
+                                        <FileText className="w-4 h-4 text-blue-600" />
+                                        Override Waiver
+                                      </button>
+                                    ) : (
+                                      <button
+                                        onClick={() => handleVoidWaiver(player.userId)}
+                                        className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
+                                      >
+                                        <FileText className="w-4 h-4 text-red-600" />
+                                        Void Waiver
+                                      </button>
+                                    )}
+
+                                    <div className="border-t border-gray-100 my-1" />
+
+                                    {/* Payment actions */}
+                                    {!player.hasPaid ? (
+                                      <button
+                                        onClick={() => handleOverridePayment(player.userId, true)}
+                                        className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
+                                      >
+                                        <DollarSign className="w-4 h-4 text-green-600" />
+                                        Mark as Paid
+                                      </button>
+                                    ) : (
+                                      <button
+                                        onClick={() => handleOverridePayment(player.userId, false)}
+                                        className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
+                                      >
+                                        <DollarSign className="w-4 h-4 text-red-600" />
+                                        Void Payment
+                                      </button>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 ))}
+
+                {getPlayersByDivision().length === 0 && (
+                  <div className="bg-white rounded-xl shadow-sm p-8 text-center">
+                    <Users className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                    <p className="text-gray-500">No players match the current filters</p>
+                  </div>
+                )}
               </div>
-            </div>
+            ) : (
+              <div className="bg-white rounded-xl shadow-sm p-8 text-center">
+                <Users className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                <p className="text-gray-500 mb-4">Click "Load Players" to view individual check-in status</p>
+              </div>
+            )}
 
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-blue-700">
               <div className="flex items-center gap-2 mb-2">
                 <AlertCircle className="w-5 h-5" />
-                <span className="font-medium">Player Check-in</span>
+                <span className="font-medium">Player Self Check-in</span>
               </div>
               <p className="text-sm">
-                Players can check in from their Events page by viewing the event and clicking "Check In".
+                Players can check in from their Member Dashboard after signing the waiver and completing payment.
                 Check-in is typically enabled when the tournament status is set to "Running".
               </p>
             </div>

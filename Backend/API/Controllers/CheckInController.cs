@@ -923,6 +923,216 @@ public class CheckInController : ControllerBase
     }
 
     /// <summary>
+    /// Void a player's check-in (admin only)
+    /// </summary>
+    [HttpPost("void/{eventId}/{userId}")]
+    [Authorize]
+    public async Task<ActionResult<ApiResponse<object>>> VoidCheckIn(int eventId, int userId, [FromBody] AdminCheckInOverrideRequest? request = null)
+    {
+        var currentUserId = GetUserId();
+        if (currentUserId == 0) return Unauthorized();
+
+        // Verify current user is TD/organizer
+        var evt = await _context.Events.FindAsync(eventId);
+        if (evt == null)
+            return NotFound(new ApiResponse<object> { Success = false, Message = "Event not found" });
+
+        var currentUser = await _context.Users.FindAsync(currentUserId);
+        var isOrganizer = evt.OrganizedByUserId == currentUserId || currentUser?.Role == "Admin";
+
+        if (!isOrganizer)
+            return Forbid();
+
+        // Get user's registrations
+        var registrations = await _context.EventUnitMembers
+            .Where(m => m.Unit!.EventId == eventId && m.UserId == userId && m.InviteStatus == "Accepted")
+            .ToListAsync();
+
+        if (!registrations.Any())
+            return BadRequest(new ApiResponse<object> { Success = false, Message = "User is not registered for this event" });
+
+        // Void the check-in
+        foreach (var reg in registrations)
+        {
+            reg.IsCheckedIn = false;
+            reg.CheckedInAt = null;
+        }
+
+        // Remove event-level check-in record
+        var eventCheckIn = await _context.EventCheckIns
+            .FirstOrDefaultAsync(c => c.EventId == eventId && c.UserId == userId);
+        if (eventCheckIn != null)
+        {
+            _context.EventCheckIns.Remove(eventCheckIn);
+        }
+
+        await _context.SaveChangesAsync();
+
+        _logger.LogInformation("TD {TdUserId} voided check-in for user {UserId} at event {EventId}. Notes: {Notes}",
+            currentUserId, userId, eventId, request?.Notes);
+
+        return Ok(new ApiResponse<object>
+        {
+            Success = true,
+            Message = "Check-in voided successfully"
+        });
+    }
+
+    /// <summary>
+    /// Override waiver requirement for a player (admin only)
+    /// </summary>
+    [HttpPost("waiver-override/{eventId}/{userId}")]
+    [Authorize]
+    public async Task<ActionResult<ApiResponse<object>>> OverrideWaiver(int eventId, int userId, [FromBody] AdminWaiverOverrideRequest? request = null)
+    {
+        var currentUserId = GetUserId();
+        if (currentUserId == 0) return Unauthorized();
+
+        // Verify current user is TD/organizer
+        var evt = await _context.Events.FindAsync(eventId);
+        if (evt == null)
+            return NotFound(new ApiResponse<object> { Success = false, Message = "Event not found" });
+
+        var currentUser = await _context.Users.FindAsync(currentUserId);
+        var isOrganizer = evt.OrganizedByUserId == currentUserId || currentUser?.Role == "Admin";
+
+        if (!isOrganizer)
+            return Forbid();
+
+        // Get user's registrations
+        var registrations = await _context.EventUnitMembers
+            .Where(m => m.Unit!.EventId == eventId && m.UserId == userId && m.InviteStatus == "Accepted")
+            .ToListAsync();
+
+        if (!registrations.Any())
+            return BadRequest(new ApiResponse<object> { Success = false, Message = "User is not registered for this event" });
+
+        // Mark waiver as signed by admin
+        foreach (var reg in registrations)
+        {
+            reg.WaiverSignedAt = DateTime.Now;
+            reg.WaiverSignature = $"[Admin Override by {currentUser?.FirstName} {currentUser?.LastName}]";
+        }
+
+        await _context.SaveChangesAsync();
+
+        _logger.LogInformation("TD {TdUserId} overrode waiver for user {UserId} at event {EventId}. Notes: {Notes}",
+            currentUserId, userId, eventId, request?.Notes);
+
+        return Ok(new ApiResponse<object>
+        {
+            Success = true,
+            Message = "Waiver requirement overridden"
+        });
+    }
+
+    /// <summary>
+    /// Void waiver signature for a player (admin only)
+    /// </summary>
+    [HttpPost("waiver-void/{eventId}/{userId}")]
+    [Authorize]
+    public async Task<ActionResult<ApiResponse<object>>> VoidWaiver(int eventId, int userId, [FromBody] AdminWaiverOverrideRequest? request = null)
+    {
+        var currentUserId = GetUserId();
+        if (currentUserId == 0) return Unauthorized();
+
+        // Verify current user is TD/organizer
+        var evt = await _context.Events.FindAsync(eventId);
+        if (evt == null)
+            return NotFound(new ApiResponse<object> { Success = false, Message = "Event not found" });
+
+        var currentUser = await _context.Users.FindAsync(currentUserId);
+        var isOrganizer = evt.OrganizedByUserId == currentUserId || currentUser?.Role == "Admin";
+
+        if (!isOrganizer)
+            return Forbid();
+
+        // Get user's registrations
+        var registrations = await _context.EventUnitMembers
+            .Where(m => m.Unit!.EventId == eventId && m.UserId == userId && m.InviteStatus == "Accepted")
+            .ToListAsync();
+
+        if (!registrations.Any())
+            return BadRequest(new ApiResponse<object> { Success = false, Message = "User is not registered for this event" });
+
+        // Remove waiver signature
+        foreach (var reg in registrations)
+        {
+            reg.WaiverSignedAt = null;
+            reg.WaiverSignature = null;
+            reg.WaiverDocumentId = null;
+        }
+
+        await _context.SaveChangesAsync();
+
+        _logger.LogInformation("TD {TdUserId} voided waiver for user {UserId} at event {EventId}. Notes: {Notes}",
+            currentUserId, userId, eventId, request?.Notes);
+
+        return Ok(new ApiResponse<object>
+        {
+            Success = true,
+            Message = "Waiver signature voided"
+        });
+    }
+
+    /// <summary>
+    /// Override payment status for a player (admin only)
+    /// </summary>
+    [HttpPost("payment-override/{eventId}/{userId}")]
+    [Authorize]
+    public async Task<ActionResult<ApiResponse<object>>> OverridePayment(int eventId, int userId, [FromBody] AdminPaymentOverrideRequest request)
+    {
+        var currentUserId = GetUserId();
+        if (currentUserId == 0) return Unauthorized();
+
+        // Verify current user is TD/organizer
+        var evt = await _context.Events.FindAsync(eventId);
+        if (evt == null)
+            return NotFound(new ApiResponse<object> { Success = false, Message = "Event not found" });
+
+        var currentUser = await _context.Users.FindAsync(currentUserId);
+        var isOrganizer = evt.OrganizedByUserId == currentUserId || currentUser?.Role == "Admin";
+
+        if (!isOrganizer)
+            return Forbid();
+
+        // Get user's registrations
+        var registrations = await _context.EventUnitMembers
+            .Where(m => m.Unit!.EventId == eventId && m.UserId == userId && m.InviteStatus == "Accepted")
+            .ToListAsync();
+
+        if (!registrations.Any())
+            return BadRequest(new ApiResponse<object> { Success = false, Message = "User is not registered for this event" });
+
+        // Update payment status
+        foreach (var reg in registrations)
+        {
+            reg.HasPaid = request.HasPaid;
+            if (request.HasPaid)
+            {
+                reg.PaidAt = DateTime.Now;
+                reg.AmountPaid = request.AmountPaid ?? 0;
+            }
+            else
+            {
+                reg.PaidAt = null;
+                reg.AmountPaid = 0;
+            }
+        }
+
+        await _context.SaveChangesAsync();
+
+        _logger.LogInformation("TD {TdUserId} {Action} payment for user {UserId} at event {EventId}. Amount: {Amount}. Notes: {Notes}",
+            currentUserId, request.HasPaid ? "marked" : "voided", userId, eventId, request.AmountPaid, request.Notes);
+
+        return Ok(new ApiResponse<object>
+        {
+            Success = true,
+            Message = request.HasPaid ? "Payment marked as paid" : "Payment voided"
+        });
+    }
+
+    /// <summary>
     /// Delete an event document (TD only)
     /// </summary>
     [HttpDelete("documents/{eventId}/{documentId}")]
@@ -1078,4 +1288,30 @@ public class CreateWaiverRequest
     public bool IsRequired { get; set; } = true;
     public bool RequiresMinorWaiver { get; set; } = false;
     public int MinorAgeThreshold { get; set; } = 18;
+}
+
+/// <summary>
+/// Admin override request for check-in actions
+/// </summary>
+public class AdminCheckInOverrideRequest
+{
+    public string? Notes { get; set; }
+}
+
+/// <summary>
+/// Admin override request for payment
+/// </summary>
+public class AdminPaymentOverrideRequest
+{
+    public bool HasPaid { get; set; }
+    public decimal? AmountPaid { get; set; }
+    public string? Notes { get; set; }
+}
+
+/// <summary>
+/// Admin waiver override request
+/// </summary>
+public class AdminWaiverOverrideRequest
+{
+    public string? Notes { get; set; }
 }
