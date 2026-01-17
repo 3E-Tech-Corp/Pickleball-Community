@@ -86,6 +86,7 @@ export default function DrawingMonitor() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isOrganizer, setIsOrganizer] = useState(false);
+  const isAdmin = user?.role === 'Admin';
   const [selectedDivisionId, setSelectedDivisionId] = useState(null);
   const [drawingLoading, setDrawingLoading] = useState(false);
   const [showConfetti, setShowConfetti] = useState(false);
@@ -232,14 +233,14 @@ export default function DrawingMonitor() {
 
   // Start drawing with countdown
   const handleStartDrawing = async (divisionId) => {
-    if (!isOrganizer) return;
+    if (!isOrganizer && !isAdmin) return;
 
     try {
       setDrawingLoading(true);
       const response = await tournamentApi.startDrawing(divisionId);
       if (response.success) {
         // Start countdown
-        setCountdown(10);
+        setCountdown(3);
         const interval = setInterval(() => {
           setCountdown(prev => {
             if (prev <= 1) {
@@ -588,7 +589,7 @@ export default function DrawingMonitor() {
                 )}
 
                 {/* Admin Controls */}
-                {isOrganizer && (
+                {(isOrganizer || isAdmin) && (
                   <div className="space-y-6">
                     {/* Drawing Style Selector */}
                     {!selectedDivision.drawingInProgress && selectedDivision.scheduleStatus !== 'UnitsAssigned' && (
@@ -668,7 +669,7 @@ export default function DrawingMonitor() {
                 )}
 
                 {/* Non-organizer view during drawing */}
-                {!isOrganizer && selectedDivision.drawingInProgress && (
+                {!isOrganizer && !isAdmin && selectedDivision.drawingInProgress && (
                   <div className="text-center">
                     <Loader2 className="w-16 h-16 text-orange-500 animate-spin mx-auto mb-4" />
                     <p className="text-xl text-gray-400">Drawing in progress...</p>
