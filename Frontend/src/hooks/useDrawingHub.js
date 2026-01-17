@@ -12,6 +12,7 @@ export function useDrawingHub() {
   const [drawingState, setDrawingState] = useState(null);
   const [viewers, setViewers] = useState([]);
   const [divisionStates, setDivisionStates] = useState({});
+  const [countdownDivisionId, setCountdownDivisionId] = useState(null); // Division that just started drawing (for countdown)
   const connectionRef = useRef(null);
   const maxReconnectAttempts = 5;
 
@@ -26,10 +27,12 @@ export function useDrawingHub() {
     const hubUrl = getHubUrl();
     console.log('DrawingHub: Creating connection to', hubUrl);
 
-    const token = localStorage.getItem('jwtToken');
-
+    // Always provide accessTokenFactory that reads token at connection time
+    // This ensures auth works even if token is set after hook initialization
     const connectionBuilder = new signalR.HubConnectionBuilder()
-      .withUrl(hubUrl, token ? { accessTokenFactory: () => token } : {})
+      .withUrl(hubUrl, {
+        accessTokenFactory: () => localStorage.getItem('jwtToken') || ''
+      })
       .withAutomaticReconnect({
         nextRetryDelayInMilliseconds: (retryContext) => {
           if (retryContext.previousRetryCount >= maxReconnectAttempts) {
@@ -113,6 +116,8 @@ export function useDrawingHub() {
           drawingInProgress: true
         }
       }));
+      // Trigger countdown for all viewers
+      setCountdownDivisionId(data.divisionId);
     });
 
     newConnection.on('EventUnitDrawn', (data) => {
@@ -154,6 +159,7 @@ export function useDrawingHub() {
           drawingInProgress: false,
           drawnCount: 0,
           drawnUnits: [],
+          scheduleStatus: 'NotGenerated', // Reset so drawing can start again
           remainingUnitNames: prev[data.divisionId]?.remainingUnitNames || []
         }
       }));
@@ -279,6 +285,11 @@ export function useDrawingHub() {
     };
   }, []);
 
+  // Clear countdown (called after countdown finishes)
+  const clearCountdown = useCallback(() => {
+    setCountdownDivisionId(null);
+  }, []);
+
   return {
     connection,
     connectionState,
@@ -287,6 +298,8 @@ export function useDrawingHub() {
     viewers,
     divisionStates,
     initializeDivisionStates,
+    countdownDivisionId,
+    clearCountdown,
     connect,
     disconnect,
     joinDrawingRoom,
