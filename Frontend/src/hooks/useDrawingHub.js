@@ -159,6 +159,7 @@ export function useDrawingHub() {
           drawingInProgress: false,
           drawnCount: 0,
           drawnUnits: [],
+          scheduleStatus: 'NotGenerated', // Reset so drawing can start again
           remainingUnitNames: prev[data.divisionId]?.remainingUnitNames || []
         }
       }));

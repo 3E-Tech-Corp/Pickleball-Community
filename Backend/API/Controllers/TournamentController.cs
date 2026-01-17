@@ -4982,9 +4982,13 @@ public class TournamentController : ControllerBase
         if (evt.OrganizedByUserId != userId.Value && !await IsAdminAsync())
             return Forbid();
 
-        // Check if drawing is in progress
-        if (!division.DrawingInProgress)
-            return BadRequest(new ApiResponse<bool> { Success = false, Message = "No drawing in progress" });
+        // Allow cancelling both in-progress drawings and completed drawings (for redraw)
+        // Check if there's anything to reset (either drawing in progress or units already assigned)
+        var hasUnitsAssigned = await _context.EventUnits
+            .AnyAsync(u => u.DivisionId == divisionId && u.UnitNumber != null);
+
+        if (!division.DrawingInProgress && !hasUnitsAssigned)
+            return BadRequest(new ApiResponse<bool> { Success = false, Message = "No drawing to cancel or reset" });
 
         // Clear unit numbers assigned during this drawing
         var units = await _context.EventUnits
@@ -4998,11 +5002,12 @@ public class TournamentController : ControllerBase
             unit.PoolName = null;
         }
 
-        // End the drawing session
+        // End the drawing session and reset status
         division.DrawingInProgress = false;
         division.DrawingStartedAt = null;
         division.DrawingByUserId = null;
         division.DrawingSequence = 0;
+        division.ScheduleStatus = "NotGenerated"; // Reset so drawing can start again
         division.UpdatedAt = DateTime.Now;
 
         await _context.SaveChangesAsync();

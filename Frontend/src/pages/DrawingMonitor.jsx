@@ -601,6 +601,16 @@ export default function DrawingMonitor() {
                       <Trophy className="w-10 h-10 text-white" />
                     </div>
                     <p className="text-xl text-green-400 font-semibold">Drawing Complete!</p>
+                    {(isOrganizer || isAdmin) && (
+                      <button
+                        onClick={() => handleCancelDrawing(selectedDivision.divisionId)}
+                        disabled={drawingLoading}
+                        className="mt-4 px-6 py-3 bg-gray-700 text-gray-300 font-semibold rounded-xl hover:bg-gray-600 disabled:opacity-50 transition-colors flex items-center gap-2 mx-auto"
+                      >
+                        <RotateCcw className="w-5 h-5" />
+                        Redraw
+                      </button>
+                    )}
                   </div>
                 )}
 
