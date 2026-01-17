@@ -142,7 +142,7 @@ public class ScoreboardController : ControllerBase
             .Select(g => new LiveGameDto
             {
                 GameId = g.Id,
-                MatchId = g.EncounterId,
+                MatchId = g.MatchId,
                 GameNumber = g.GameNumber,
                 Status = g.Status,
                 Unit1Score = g.Unit1Score,
@@ -186,7 +186,7 @@ public class ScoreboardController : ControllerBase
             .OrderBy(u => u.DivisionId)
             .ThenBy(u => u.FinalPlacement ?? 999)
             .ThenBy(u => u.OverallRank ?? 999)
-            .ThenByDescending(u => u.EncounteresWon)
+            .ThenByDescending(u => u.MatchesWon)
             .ThenByDescending(u => u.GamesWon - u.GamesLost)
             .ThenByDescending(u => u.PointsScored - u.PointsAgainst)
             .Select(u => new UnitResultDto
@@ -205,9 +205,9 @@ public class ScoreboardController : ControllerBase
                 OverallRank = u.OverallRank,
                 FinalPlacement = u.FinalPlacement,
                 AdvancedToPlayoff = u.AdvancedToPlayoff,
-                MatchesPlayed = u.EncounteresPlayed,
-                MatchesWon = u.EncounteresWon,
-                MatchesLost = u.EncounteresLost,
+                MatchesPlayed = u.MatchesPlayed,
+                MatchesWon = u.MatchesWon,
+                MatchesLost = u.MatchesLost,
                 GamesWon = u.GamesWon,
                 GamesLost = u.GamesLost,
                 PointsFor = u.PointsScored,
@@ -259,7 +259,7 @@ public class ScoreboardController : ControllerBase
                 .ThenInclude(m => m.User)
             .OrderBy(u => u.DivisionId)
             .ThenBy(u => u.FinalPlacement ?? 999)
-            .ThenByDescending(u => u.EncounteresWon)
+            .ThenByDescending(u => u.MatchesWon)
             .ToListAsync();
 
         var csv = new StringBuilder();
@@ -271,7 +271,7 @@ public class ScoreboardController : ControllerBase
                 .Where(m => m.InviteStatus == "Accepted")
                 .Select(m => $"{m.User?.FirstName} {m.User?.LastName}"));
 
-            csv.AppendLine($"\"{unit.Division?.Name}\",{unit.FinalPlacement ?? unit.OverallRank},\"{unit.Name}\",\"{players}\",{unit.EncounteresWon},{unit.EncounteresLost},{unit.GamesWon},{unit.GamesLost},{unit.PointsScored},{unit.PointsAgainst},{unit.PointsScored - unit.PointsAgainst}");
+            csv.AppendLine($"\"{unit.Division?.Name}\",{unit.FinalPlacement ?? unit.OverallRank},\"{unit.Name}\",\"{players}\",{unit.MatchesWon},{unit.MatchesLost},{unit.GamesWon},{unit.GamesLost},{unit.PointsScored},{unit.PointsAgainst},{unit.PointsScored - unit.PointsAgainst}");
         }
 
         var fileName = $"{evt.Name.Replace(" ", "_")}_Results_{DateTime.Now:yyyyMMdd}.csv";
@@ -358,7 +358,7 @@ public class ScoreboardController : ControllerBase
             .Include(u => u.Members)
                 .ThenInclude(m => m.User)
             .OrderBy(u => u.PoolNumber)
-            .ThenByDescending(u => u.EncounteresWon)
+            .ThenByDescending(u => u.MatchesWon)
             .ThenByDescending(u => u.GamesWon - u.GamesLost)
             .ThenByDescending(u => u.PointsScored - u.PointsAgainst)
             .ToListAsync();
@@ -379,9 +379,9 @@ public class ScoreboardController : ControllerBase
                         .Where(m => m.InviteStatus == "Accepted")
                         .Select(m => m.User!.FirstName + " " + m.User.LastName)
                         .ToList(),
-                    MatchesPlayed = u.EncounteresPlayed,
-                    MatchesWon = u.EncounteresWon,
-                    MatchesLost = u.EncounteresLost,
+                    MatchesPlayed = u.MatchesPlayed,
+                    MatchesWon = u.MatchesWon,
+                    MatchesLost = u.MatchesLost,
                     GamesWon = u.GamesWon,
                     GamesLost = u.GamesLost,
                     PointsFor = u.PointsScored,
