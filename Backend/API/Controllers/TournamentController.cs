@@ -4795,36 +4795,53 @@ public class TournamentController : ControllerBase
         if (evt.OrganizedByUserId != userId.Value && !await IsAdminAsync())
             return Forbid();
 
-        // Check if drawing is in progress
-        if (!division.DrawingInProgress)
-            return BadRequest(new ApiResponse<DrawnUnitDto> { Success = false, Message = "No drawing in progress. Start a drawing first." });
+        // Use stored procedure for atomic drawing to prevent race conditions
+        var drawnUnitIdParam = new Microsoft.Data.SqlClient.SqlParameter("@DrawnUnitId", System.Data.SqlDbType.Int)
+        {
+            Direction = System.Data.ParameterDirection.Output
+        };
+        var assignedNumberParam = new Microsoft.Data.SqlClient.SqlParameter("@AssignedNumber", System.Data.SqlDbType.Int)
+        {
+            Direction = System.Data.ParameterDirection.Output
+        };
 
-        // Get remaining undrawn units
-        var remainingUnits = await _context.EventUnits
+        try
+        {
+            await _context.Database.ExecuteSqlRawAsync(
+                "EXEC sp_DrawNextUnit @DivisionId, @DrawnUnitId OUTPUT, @AssignedNumber OUTPUT",
+                new Microsoft.Data.SqlClient.SqlParameter("@DivisionId", divisionId),
+                drawnUnitIdParam,
+                assignedNumberParam
+            );
+        }
+        catch (Microsoft.Data.SqlClient.SqlException ex)
+        {
+            // Map stored procedure errors to appropriate HTTP responses
+            if (ex.Message.Contains("Division not found"))
+                return NotFound(new ApiResponse<DrawnUnitDto> { Success = false, Message = "Division not found" });
+            if (ex.Message.Contains("No drawing in progress"))
+                return BadRequest(new ApiResponse<DrawnUnitDto> { Success = false, Message = "No drawing in progress. Start a drawing first." });
+            if (ex.Message.Contains("No units remaining"))
+                return BadRequest(new ApiResponse<DrawnUnitDto> { Success = false, Message = "All units have been drawn. Complete the drawing." });
+            throw;
+        }
+
+        var drawnUnitId = (int)drawnUnitIdParam.Value;
+        var assignedNumber = (int)assignedNumberParam.Value;
+
+        // Fetch the drawn unit with member details for the response
+        var selectedUnit = await _context.EventUnits
             .Include(u => u.Members)
                 .ThenInclude(m => m.User)
-            .Where(u => u.DivisionId == divisionId && u.Status != "Cancelled" && u.Status != "Waitlisted" && u.UnitNumber == null)
-            .ToListAsync();
+            .FirstOrDefaultAsync(u => u.Id == drawnUnitId);
 
-        if (!remainingUnits.Any())
-            return BadRequest(new ApiResponse<DrawnUnitDto> { Success = false, Message = "All units have been drawn. Complete the drawing." });
-
-        // Randomly select next unit
-        var random = new Random();
-        var selectedUnit = remainingUnits[random.Next(remainingUnits.Count)];
-
-        // Assign the next unit number
-        division.DrawingSequence++;
-        selectedUnit.UnitNumber = division.DrawingSequence;
-        selectedUnit.UpdatedAt = DateTime.Now;
-        division.UpdatedAt = DateTime.Now;
-
-        await _context.SaveChangesAsync();
+        if (selectedUnit == null)
+            return StatusCode(500, new ApiResponse<DrawnUnitDto> { Success = false, Message = "Failed to retrieve drawn unit" });
 
         var drawnUnit = new DrawnUnitDto
         {
             UnitId = selectedUnit.Id,
-            UnitNumber = selectedUnit.UnitNumber.Value,
+            UnitNumber = assignedNumber,
             UnitName = selectedUnit.Name,
             MemberNames = selectedUnit.Members.Where(m => m.InviteStatus == "Accepted" && m.User != null)
                 .Select(m => Utility.FormatName(m.User!.LastName, m.User.FirstName)).ToList(),
@@ -4965,9 +4982,18 @@ public class TournamentController : ControllerBase
         if (evt.OrganizedByUserId != userId.Value && !await IsAdminAsync())
             return Forbid();
 
-        // Check if drawing is in progress
-        if (!division.DrawingInProgress)
-            return BadRequest(new ApiResponse<bool> { Success = false, Message = "No drawing in progress" });
+        // Allow cancelling both in-progress drawings and completed drawings (for redraw)
+        // Check if there's anything to reset (either drawing in progress or units already assigned)
+        var hasUnitsAssigned = await _context.EventUnits
+            .AnyAsync(u => u.DivisionId == divisionId
+                && u.Status != "Cancelled" && u.Status != "Waitlisted"
+                && u.UnitNumber != null);
+
+        if (!division.DrawingInProgress && !hasUnitsAssigned)
+        {
+            // Nothing to reset - return success anyway (idempotent operation)
+            return Ok(new ApiResponse<bool> { Success = true, Data = true, Message = "Already reset" });
+        }
 
         // Clear unit numbers assigned during this drawing
         var units = await _context.EventUnits
@@ -4981,11 +5007,12 @@ public class TournamentController : ControllerBase
             unit.PoolName = null;
         }
 
-        // End the drawing session
+        // End the drawing session and reset status
         division.DrawingInProgress = false;
         division.DrawingStartedAt = null;
         division.DrawingByUserId = null;
         division.DrawingSequence = 0;
+        division.ScheduleStatus = "NotGenerated"; // Reset so drawing can start again
         division.UpdatedAt = DateTime.Now;
 
         await _context.SaveChangesAsync();
