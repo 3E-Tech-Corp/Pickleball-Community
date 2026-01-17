@@ -6354,15 +6354,14 @@ function EventDetailModal({ event, isAuthenticated, isAdmin, currentUserId, user
               >
                 Cancel
               </button>
-                <button
-                  onClick={handleSaveDivision}
-                  disabled={savingDivision}
-                  className="px-4 py-2 bg-orange-600 text-white rounded-lg font-medium hover:bg-orange-700 disabled:opacity-50 flex items-center gap-2"
-                >
-                  {savingDivision && <Loader2 className="w-4 h-4 animate-spin" />}
-                  Save Changes
-                </button>
-              </div>
+              <button
+                onClick={handleSaveDivision}
+                disabled={savingDivision}
+                className="px-4 py-2 bg-orange-600 text-white rounded-lg font-medium hover:bg-orange-700 disabled:opacity-50 flex items-center gap-2"
+              >
+                {savingDivision && <Loader2 className="w-4 h-4 animate-spin" />}
+                Save Changes
+              </button>
             </div>
           </div>
         </div>
