@@ -82,6 +82,8 @@ public class ApplicationDbContext : DbContext
     public DbSet<EventUnitJoinRequest> EventUnitJoinRequests { get; set; }
     public DbSet<UserPayment> UserPayments { get; set; }
     public DbSet<EventEncounter> EventEncounters { get; set; }
+    // Backward-compatible alias for EventEncounters (was EventMatches)
+    public DbSet<EventEncounter> EventMatches => EventEncounters;
     public DbSet<EncounterMatchFormat> EncounterMatchFormats { get; set; }
     public DbSet<EncounterMatch> EncounterMatches { get; set; }
     public DbSet<EncounterMatchPlayer> EncounterMatchPlayers { get; set; }
@@ -90,12 +92,6 @@ public class ApplicationDbContext : DbContext
     public DbSet<EventGameScoreHistory> EventGameScoreHistories { get; set; }
     public DbSet<TournamentCourt> TournamentCourts { get; set; }
     public DbSet<EventDocument> EventDocuments { get; set; }
-
-    // Encounter System (Team League Format)
-    public DbSet<EncounterMatchFormat> EncounterMatchFormats { get; set; }
-    public DbSet<EventEncounter> EventEncounters { get; set; }
-    public DbSet<EncounterMatch> EncounterMatches { get; set; }
-    public DbSet<EncounterMatchPlayer> EncounterMatchPlayers { get; set; }
     public DbSet<EncounterMatchGame> EncounterMatchGames { get; set; }
 
     // Clubs

@@ -37,6 +37,16 @@ public class EventEncounter
     public int EncounterNumber { get; set; } = 1;
 
     /// <summary>
+    /// Backward-compatible alias for EncounterNumber
+    /// </summary>
+    [System.ComponentModel.DataAnnotations.Schema.NotMapped]
+    public int MatchNumber
+    {
+        get => EncounterNumber;
+        set => EncounterNumber = value;
+    }
+
+    /// <summary>
     /// Position in bracket (for elimination brackets)
     /// </summary>
     public int? BracketPosition { get; set; }

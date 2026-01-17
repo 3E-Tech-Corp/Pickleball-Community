@@ -1250,7 +1250,7 @@ public class EventRunningController : ControllerBase
         }
     }
 
-    private PlayerMatchDto MapToMatchDto(EventMatch m, List<int> myUnitIds)
+    private PlayerMatchDto MapToMatchDto(EventEncounter m, List<int> myUnitIds)
     {
         var currentGame = m.Games?.OrderBy(g => g.GameNumber).FirstOrDefault(g => g.Status != "Finished")
             ?? m.Games?.OrderByDescending(g => g.GameNumber).FirstOrDefault();
@@ -1297,7 +1297,7 @@ public class EventRunningController : ControllerBase
         };
     }
 
-    private AdminMatchDto MapToAdminMatchDto(EventMatch m)
+    private AdminMatchDto MapToAdminMatchDto(EventEncounter m)
     {
         var currentGame = m.Games?.OrderBy(g => g.GameNumber).FirstOrDefault(g => g.Status != "Finished")
             ?? m.Games?.OrderByDescending(g => g.GameNumber).FirstOrDefault();
