@@ -146,12 +146,4 @@ public class EventEncounter
     /// Always has at least 1 match - simple divisions auto-create 1 match.
     /// </summary>
     public ICollection<EncounterMatch> Matches { get; set; } = new List<EncounterMatch>();
-
-    /// <summary>
-    /// Computed property: All games across all matches in this encounter.
-    /// For simple divisions (1 match per encounter), returns games from the single match.
-    /// For multi-match encounters, returns games from all matches.
-    /// </summary>
-    [NotMapped]
-    public IEnumerable<EventGame> Games => Matches.SelectMany(m => m.Games);
 }

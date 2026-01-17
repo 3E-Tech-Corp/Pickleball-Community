@@ -90,7 +90,7 @@ public class ScoreboardController : ControllerBase
                 CompletedAt = m.CompletedAt,
                 CourtName = m.TournamentCourt != null ? m.TournamentCourt.CourtLabel : null,
                 CourtNumber = m.TournamentCourt != null ? m.TournamentCourt.SortOrder : null,
-                Games = m.Games.OrderBy(g => g.GameNumber).Select(g => new ScoreboardGameDto
+                Games = m.Matches.SelectMany(match => match.Games).OrderBy(g => g.GameNumber).Select(g => new ScoreboardGameDto
                 {
                     GameNumber = g.GameNumber,
                     Unit1Score = g.Unit1Score,
@@ -314,8 +314,8 @@ public class ScoreboardController : ControllerBase
                 Unit2Name = m.Unit2 != null ? m.Unit2.Name : null,
                 Unit2Seed = m.Unit2 != null ? m.Unit2.Seed : null,
                 WinnerUnitId = m.WinnerUnitId,
-                Unit1GamesWon = m.Games.Count(g => g.WinnerUnitId == m.Unit1Id),
-                Unit2GamesWon = m.Games.Count(g => g.WinnerUnitId == m.Unit2Id)
+                Unit1GamesWon = m.Matches.SelectMany(match => match.Games).Count(g => g.WinnerUnitId == m.Unit1Id),
+                Unit2GamesWon = m.Matches.SelectMany(match => match.Games).Count(g => g.WinnerUnitId == m.Unit2Id)
             })
             .ToListAsync();
 
@@ -413,7 +413,7 @@ public class ScoreboardController : ControllerBase
                 Unit2Name = m.Unit2 != null ? m.Unit2.Name : null,
                 Status = m.Status,
                 WinnerUnitId = m.WinnerUnitId,
-                Games = m.Games.OrderBy(g => g.GameNumber).Select(g => new ScoreboardGameDto
+                Games = m.Matches.SelectMany(match => match.Games).OrderBy(g => g.GameNumber).Select(g => new ScoreboardGameDto
                 {
                     GameNumber = g.GameNumber,
                     Unit1Score = g.Unit1Score,

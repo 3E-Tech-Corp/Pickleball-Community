@@ -3172,7 +3172,8 @@ public class TournamentController : ControllerBase
             var courtsWithGames = await _context.TournamentCourts
                 .Where(c => c.CurrentGameId != null &&
                     _context.EventGames.Any(g => g.Id == c.CurrentGameId &&
-                        _context.EventMatches.Any(m => m.Id == g.MatchId && m.DivisionId == divisionId)))
+                        _context.EncounterMatches.Any(em => em.Id == g.EncounterMatchId &&
+                            _context.EventMatches.Any(m => m.Id == em.EncounterId && m.DivisionId == divisionId))))
                 .ToListAsync();
 
             foreach (var court in courtsWithGames)
@@ -3182,9 +3183,11 @@ public class TournamentController : ControllerBase
             }
 
             // Delete games first, then matches
-            foreach (var match in existingMatches)
+            foreach (var encounter in existingMatches)
             {
-                _context.EventGames.RemoveRange(match.Games);
+                var allGames = encounter.Matches.SelectMany(m => m.Games).ToList();
+                _context.EventGames.RemoveRange(allGames);
+                _context.EncounterMatches.RemoveRange(encounter.Matches);
             }
             _context.EventMatches.RemoveRange(existingMatches);
             await _context.SaveChangesAsync();
@@ -3687,7 +3690,7 @@ public class TournamentController : ControllerBase
             }
 
             // Check if match is complete
-            await CheckMatchComplete(game.MatchId);
+            await CheckMatchComplete(game.EncounterMatch!.EncounterId);
         }
         else
         {
@@ -4050,9 +4053,9 @@ public class TournamentController : ControllerBase
             CompletedAt = m.CompletedAt,
             TournamentCourtId = m.TournamentCourtId,
             ScoreFormatId = m.ScoreFormatId,
-            Games = m.Games.OrderBy(g => g.GameNumber).Select(MapToGameDto).ToList(),
-            Unit1GamesWon = m.Games.Count(g => g.WinnerUnitId == m.Unit1Id),
-            Unit2GamesWon = m.Games.Count(g => g.WinnerUnitId == m.Unit2Id)
+            Games = m.Matches.SelectMany(match => match.Games).OrderBy(g => g.GameNumber).Select(MapToGameDto).ToList(),
+            Unit1GamesWon = m.Matches.SelectMany(match => match.Games).Count(g => g.WinnerUnitId == m.Unit1Id),
+            Unit2GamesWon = m.Matches.SelectMany(match => match.Games).Count(g => g.WinnerUnitId == m.Unit2Id)
         };
     }
 
@@ -4061,7 +4064,7 @@ public class TournamentController : ControllerBase
         return new EventGameDto
         {
             Id = g.Id,
-            MatchId = g.MatchId,
+            EncounterMatchId = g.EncounterMatchId,
             GameNumber = g.GameNumber,
             ScoreFormatId = g.ScoreFormatId,
             Unit1Score = g.Unit1Score,
@@ -4480,9 +4483,10 @@ public class TournamentController : ControllerBase
 
     private string? GetMatchScore(EventEncounter match)
     {
-        if (!match.Games.Any(g => g.Status == "Finished")) return null;
+        var allGames = match.Matches.SelectMany(m => m.Games);
+        if (!allGames.Any(g => g.Status == "Finished")) return null;
 
-        return string.Join(", ", match.Games
+        return string.Join(", ", allGames
             .Where(g => g.Status == "Finished")
             .OrderBy(g => g.GameNumber)
             .Select(g => $"{g.Unit1Score}-{g.Unit2Score}"));
@@ -4529,9 +4533,10 @@ public class TournamentController : ControllerBase
 
         if (match == null) return;
 
+        var allGames = match.Matches.SelectMany(m => m.Games);
         var gamesNeeded = (match.BestOf / 2) + 1;
-        var unit1Wins = match.Games.Count(g => g.WinnerUnitId == match.Unit1Id);
-        var unit2Wins = match.Games.Count(g => g.WinnerUnitId == match.Unit2Id);
+        var unit1Wins = allGames.Count(g => g.WinnerUnitId == match.Unit1Id);
+        var unit2Wins = allGames.Count(g => g.WinnerUnitId == match.Unit2Id);
 
         if (unit1Wins >= gamesNeeded || unit2Wins >= gamesNeeded)
         {

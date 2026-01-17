@@ -1203,62 +1203,65 @@ public class EventRunningController : ControllerBase
 
     private async Task UpdateMatchAfterGameComplete(EventGame game)
     {
-        var match = await _context.EventMatches
+        var encounterId = game.EncounterMatch?.EncounterId ?? 0;
+        var encounter = await _context.EventMatches
             .Include(m => m.Matches).ThenInclude(match => match.Games)
             .Include(m => m.TournamentCourt)
             .Include(m => m.Unit1)
             .Include(m => m.Unit2)
-            .FirstOrDefaultAsync(m => m.Id == game.MatchId);
+            .FirstOrDefaultAsync(m => m.Id == encounterId);
 
-        if (match == null) return;
+        if (encounter == null) return;
 
-        var unit1Wins = match.Games.Count(g => g.WinnerUnitId == match.Unit1Id);
-        var unit2Wins = match.Games.Count(g => g.WinnerUnitId == match.Unit2Id);
-        var winsNeeded = (match.BestOf / 2) + 1;
+        var allGames = encounter.Matches.SelectMany(m => m.Games);
+        var unit1Wins = allGames.Count(g => g.WinnerUnitId == encounter.Unit1Id);
+        var unit2Wins = allGames.Count(g => g.WinnerUnitId == encounter.Unit2Id);
+        var winsNeeded = (encounter.BestOf / 2) + 1;
 
         if (unit1Wins >= winsNeeded || unit2Wins >= winsNeeded)
         {
-            match.Status = "Completed";
-            match.WinnerUnitId = unit1Wins >= winsNeeded ? match.Unit1Id : match.Unit2Id;
-            match.CompletedAt = DateTime.Now;
-            match.UpdatedAt = DateTime.Now;
+            encounter.Status = "Completed";
+            encounter.WinnerUnitId = unit1Wins >= winsNeeded ? encounter.Unit1Id : encounter.Unit2Id;
+            encounter.CompletedAt = DateTime.Now;
+            encounter.UpdatedAt = DateTime.Now;
 
             // Free up the court
-            if (match.TournamentCourt != null)
+            if (encounter.TournamentCourt != null)
             {
-                match.TournamentCourt.Status = "Available";
-                match.TournamentCourt.CurrentGameId = null;
+                encounter.TournamentCourt.Status = "Available";
+                encounter.TournamentCourt.CurrentGameId = null;
             }
 
             // Update unit stats
-            if (match.Unit1 != null && match.Unit2 != null)
+            if (encounter.Unit1 != null && encounter.Unit2 != null)
             {
-                match.Unit1.MatchesPlayed++;
-                match.Unit2.MatchesPlayed++;
+                encounter.Unit1.MatchesPlayed++;
+                encounter.Unit2.MatchesPlayed++;
 
-                if (match.WinnerUnitId == match.Unit1Id)
+                if (encounter.WinnerUnitId == encounter.Unit1Id)
                 {
-                    match.Unit1.MatchesWon++;
-                    match.Unit2.MatchesLost++;
+                    encounter.Unit1.MatchesWon++;
+                    encounter.Unit2.MatchesLost++;
                 }
                 else
                 {
-                    match.Unit2.MatchesWon++;
-                    match.Unit1.MatchesLost++;
+                    encounter.Unit2.MatchesWon++;
+                    encounter.Unit1.MatchesLost++;
                 }
 
-                match.Unit1.GamesWon += unit1Wins;
-                match.Unit1.GamesLost += unit2Wins;
-                match.Unit2.GamesWon += unit2Wins;
-                match.Unit2.GamesLost += unit1Wins;
+                encounter.Unit1.GamesWon += unit1Wins;
+                encounter.Unit1.GamesLost += unit2Wins;
+                encounter.Unit2.GamesWon += unit2Wins;
+                encounter.Unit2.GamesLost += unit1Wins;
             }
         }
     }
 
     private PlayerMatchDto MapToMatchDto(EventEncounter m, List<int> myUnitIds)
     {
-        var currentGame = m.Games?.OrderBy(g => g.GameNumber).FirstOrDefault(g => g.Status != "Finished")
-            ?? m.Games?.OrderByDescending(g => g.GameNumber).FirstOrDefault();
+        var allGames = m.Matches?.SelectMany(match => match.Games).ToList() ?? new List<EventGame>();
+        var currentGame = allGames.OrderBy(g => g.GameNumber).FirstOrDefault(g => g.Status != "Finished")
+            ?? allGames.OrderByDescending(g => g.GameNumber).FirstOrDefault();
 
         var isMyMatch = myUnitIds.Contains(m.Unit1Id ?? 0) || myUnitIds.Contains(m.Unit2Id ?? 0);
         var myUnitId = myUnitIds.Contains(m.Unit1Id ?? 0) ? m.Unit1Id : m.Unit2Id;
@@ -1282,15 +1285,15 @@ public class EventRunningController : ControllerBase
             CurrentGameNumber = currentGame?.GameNumber ?? 1,
             Unit1Score = currentGame?.Unit1Score ?? 0,
             Unit2Score = currentGame?.Unit2Score ?? 0,
-            Unit1Wins = m.Games?.Count(g => g.WinnerUnitId == m.Unit1Id) ?? 0,
-            Unit2Wins = m.Games?.Count(g => g.WinnerUnitId == m.Unit2Id) ?? 0,
+            Unit1Wins = allGames.Count(g => g.WinnerUnitId == m.Unit1Id),
+            Unit2Wins = allGames.Count(g => g.WinnerUnitId == m.Unit2Id),
             WinnerUnitId = m.WinnerUnitId,
             NeedsScoreVerification = currentGame != null
                 && currentGame.ScoreSubmittedByUnitId.HasValue
                 && currentGame.ScoreSubmittedByUnitId != myUnitId
                 && !currentGame.ScoreConfirmedByUnitId.HasValue,
             IsDisputed = currentGame?.ScoreDisputedAt.HasValue ?? false,
-            Games = m.Games?.OrderBy(g => g.GameNumber).Select(g => new PlayerGameDto
+            Games = allGames.OrderBy(g => g.GameNumber).Select(g => new PlayerGameDto
             {
                 Id = g.Id,
                 GameNumber = g.GameNumber,
@@ -1298,14 +1301,15 @@ public class EventRunningController : ControllerBase
                 Unit2Score = g.Unit2Score,
                 Status = g.Status,
                 WinnerUnitId = g.WinnerUnitId
-            }).ToList() ?? new List<PlayerGameDto>()
+            }).ToList()
         };
     }
 
     private AdminMatchDto MapToAdminMatchDto(EventEncounter m)
     {
-        var currentGame = m.Games?.OrderBy(g => g.GameNumber).FirstOrDefault(g => g.Status != "Finished")
-            ?? m.Games?.OrderByDescending(g => g.GameNumber).FirstOrDefault();
+        var allGames = m.Matches?.SelectMany(match => match.Games).ToList() ?? new List<EventGame>();
+        var currentGame = allGames.OrderBy(g => g.GameNumber).FirstOrDefault(g => g.Status != "Finished")
+            ?? allGames.OrderByDescending(g => g.GameNumber).FirstOrDefault();
 
         return new AdminMatchDto
         {
@@ -1352,12 +1356,12 @@ public class EventRunningController : ControllerBase
             CurrentGameNumber = currentGame?.GameNumber ?? 1,
             Unit1Score = currentGame?.Unit1Score ?? 0,
             Unit2Score = currentGame?.Unit2Score ?? 0,
-            Unit1Wins = m.Games?.Count(g => g.WinnerUnitId == m.Unit1Id) ?? 0,
-            Unit2Wins = m.Games?.Count(g => g.WinnerUnitId == m.Unit2Id) ?? 0,
+            Unit1Wins = allGames.Count(g => g.WinnerUnitId == m.Unit1Id),
+            Unit2Wins = allGames.Count(g => g.WinnerUnitId == m.Unit2Id),
             WinnerUnitId = m.WinnerUnitId,
             IsDisputed = currentGame?.ScoreDisputedAt.HasValue ?? false,
             DisputeReason = currentGame?.ScoreDisputeReason,
-            Games = m.Games?.OrderBy(g => g.GameNumber).Select(g => new AdminGameDto
+            Games = allGames.OrderBy(g => g.GameNumber).Select(g => new AdminGameDto
             {
                 Id = g.Id,
                 GameNumber = g.GameNumber,
@@ -1368,7 +1372,7 @@ public class EventRunningController : ControllerBase
                 ScoreSubmittedByUnitId = g.ScoreSubmittedByUnitId,
                 ScoreConfirmedByUnitId = g.ScoreConfirmedByUnitId,
                 IsDisputed = g.ScoreDisputedAt.HasValue
-            }).ToList() ?? new List<AdminGameDto>()
+            }).ToList()
         };
     }
 }

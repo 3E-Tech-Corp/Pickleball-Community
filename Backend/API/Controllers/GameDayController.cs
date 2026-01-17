@@ -1559,8 +1559,9 @@ public class GameDayController : ControllerBase
 
     private GameDayGameDto MapToGameDto(EventEncounter m)
     {
-        var currentGame = m.Games?.OrderBy(g => g.GameNumber).FirstOrDefault(g => g.Status != "Finished")
-            ?? m.Games?.OrderByDescending(g => g.GameNumber).FirstOrDefault();
+        var allGames = m.Matches?.SelectMany(match => match.Games).ToList() ?? new List<EventGame>();
+        var currentGame = allGames.OrderBy(g => g.GameNumber).FirstOrDefault(g => g.Status != "Finished")
+            ?? allGames.OrderByDescending(g => g.GameNumber).FirstOrDefault();
 
         return new GameDayGameDto
         {
@@ -1598,18 +1599,18 @@ public class GameDayController : ControllerBase
             CurrentGameNumber = currentGame?.GameNumber ?? 1,
             Unit1Score = currentGame?.Unit1Score ?? 0,
             Unit2Score = currentGame?.Unit2Score ?? 0,
-            Unit1Wins = m.Games?.Count(g => g.WinnerUnitId == m.Unit1Id) ?? 0,
-            Unit2Wins = m.Games?.Count(g => g.WinnerUnitId == m.Unit2Id) ?? 0,
+            Unit1Wins = allGames.Count(g => g.WinnerUnitId == m.Unit1Id),
+            Unit2Wins = allGames.Count(g => g.WinnerUnitId == m.Unit2Id),
             WinnerUnitId = m.WinnerUnitId,
             CreatedAt = m.CreatedAt,
-            Games = m.Games?.OrderBy(g => g.GameNumber).Select(g => new GameScoreDto
+            Games = allGames.OrderBy(g => g.GameNumber).Select(g => new GameScoreDto
             {
                 GameNumber = g.GameNumber,
                 Unit1Score = g.Unit1Score,
                 Unit2Score = g.Unit2Score,
                 WinnerUnitId = g.WinnerUnitId,
                 Status = g.Status
-            }).ToList() ?? new List<GameScoreDto>()
+            }).ToList()
         };
     }
 }

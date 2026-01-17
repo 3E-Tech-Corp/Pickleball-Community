@@ -410,7 +410,7 @@ public class UnitAssignment
 public class EventGameDto
 {
     public int Id { get; set; }
-    public int MatchId { get; set; }
+    public int EncounterMatchId { get; set; }
     public int GameNumber { get; set; }
     public int? ScoreFormatId { get; set; }
     public ScoreFormatDto? ScoreFormat { get; set; }
