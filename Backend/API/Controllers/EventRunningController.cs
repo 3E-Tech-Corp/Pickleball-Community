@@ -624,12 +624,12 @@ public class EventRunningController : ControllerBase
                 Label = c.CourtLabel,
                 Status = c.Status,
                 CurrentGameId = c.CurrentGameId,
-                CurrentMatch = c.CurrentGame?.Encounter != null ? new AdminMatchSummaryDto
+                CurrentMatch = c.CurrentGame?.EncounterMatch?.Encounter != null ? new AdminMatchSummaryDto
                 {
-                    Id = c.CurrentGame.Encounter.Id,
-                    Unit1Name = c.CurrentGame.Encounter.Unit1?.Name ?? "TBD",
-                    Unit2Name = c.CurrentGame.Encounter.Unit2?.Name ?? "TBD",
-                    Status = c.CurrentGame.Encounter.Status
+                    Id = c.CurrentGame.EncounterMatch!.Encounter!.Id,
+                    Unit1Name = c.CurrentGame.EncounterMatch.Encounter.Unit1?.Name ?? "TBD",
+                    Unit2Name = c.CurrentGame.EncounterMatch.Encounter.Unit2?.Name ?? "TBD",
+                    Status = c.CurrentGame.EncounterMatch.Encounter.Status
                 } : null
             }).ToList(),
             Matches = matches.Select(m => MapToAdminMatchDto(m)).ToList(),
