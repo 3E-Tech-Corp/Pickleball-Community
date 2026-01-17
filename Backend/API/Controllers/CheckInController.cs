@@ -644,7 +644,12 @@ public class CheckInController : ControllerBase
                 CheckedInAt = m.CheckedInAt,
                 WaiverSigned = m.WaiverSignedAt != null,
                 WaiverSignedAt = m.WaiverSignedAt,
-                HasPaid = m.HasPaid
+                WaiverSignature = m.WaiverSignature,
+                HasPaid = m.HasPaid,
+                AmountPaid = m.AmountPaid,
+                PaidAt = m.PaidAt,
+                PaymentReference = m.PaymentReference,
+                PaymentProofUrl = m.PaymentProofUrl
             })
             .ToListAsync();
 
@@ -1274,9 +1279,18 @@ public class PlayerCheckInDto
     public string DivisionName { get; set; } = string.Empty;
     public bool IsCheckedIn { get; set; }
     public DateTime? CheckedInAt { get; set; }
+
+    // Waiver details
     public bool WaiverSigned { get; set; }
     public DateTime? WaiverSignedAt { get; set; }
+    public string? WaiverSignature { get; set; }
+
+    // Payment details
     public bool HasPaid { get; set; }
+    public decimal AmountPaid { get; set; }
+    public DateTime? PaidAt { get; set; }
+    public string? PaymentReference { get; set; }
+    public string? PaymentProofUrl { get; set; }
 }
 
 public class CreateWaiverRequest
