@@ -810,7 +810,7 @@ public class GameDayController : ControllerBase
         var shuffledPlayers = allPlayers.OrderBy(_ => random.Next()).ToList();
 
         // Create temporary units for ad-hoc games
-        var createdMatches = new List<EventMatch>();
+        var createdMatches = new List<EventEncounter>();
         var usedPlayerIds = new HashSet<int>();
         var divisionId = dto.DivisionId ?? evt.Divisions.FirstOrDefault()?.Id ?? 0;
 
@@ -1556,7 +1556,7 @@ public class GameDayController : ControllerBase
     // Helper Methods
     // ==========================================
 
-    private GameDayGameDto MapToGameDto(EventMatch m)
+    private GameDayGameDto MapToGameDto(EventEncounter m)
     {
         var currentGame = m.Games?.OrderBy(g => g.GameNumber).FirstOrDefault(g => g.Status != "Finished")
             ?? m.Games?.OrderByDescending(g => g.GameNumber).FirstOrDefault();

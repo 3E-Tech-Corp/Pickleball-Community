@@ -3198,7 +3198,7 @@ public class TournamentController : ControllerBase
             unit.PoolName = null;
         }
 
-        var matches = new List<EventMatch>();
+        var matches = new List<EventEncounter>();
 
         if (request.ScheduleType == "RoundRobin" || request.ScheduleType == "Hybrid")
         {
@@ -4024,7 +4024,7 @@ public class TournamentController : ControllerBase
         return "Unknown";
     }
 
-    private EventMatchDto MapToMatchDto(EventMatch m)
+    private EventMatchDto MapToMatchDto(EventEncounter m)
     {
         return new EventMatchDto
         {
@@ -4077,9 +4077,9 @@ public class TournamentController : ControllerBase
         };
     }
 
-    private List<EventMatch> GenerateRoundRobinMatches(EventDivision division, List<EventUnit> units, CreateMatchScheduleRequest request)
+    private List<EventEncounter> GenerateRoundRobinMatches(EventDivision division, List<EventUnit> units, CreateMatchScheduleRequest request)
     {
-        var matches = new List<EventMatch>();
+        var matches = new List<EventEncounter>();
         var poolCount = request.PoolCount ?? 1;
 
         // Distribute units to pools
@@ -4122,9 +4122,9 @@ public class TournamentController : ControllerBase
         return matches;
     }
 
-    private List<EventMatch> GenerateSingleEliminationMatches(EventDivision division, List<EventUnit> units, CreateMatchScheduleRequest request)
+    private List<EventEncounter> GenerateSingleEliminationMatches(EventDivision division, List<EventUnit> units, CreateMatchScheduleRequest request)
     {
-        var matches = new List<EventMatch>();
+        var matches = new List<EventEncounter>();
         var unitCount = units.Count;
 
         // Find next power of 2
@@ -4181,9 +4181,9 @@ public class TournamentController : ControllerBase
     }
 
     // New methods for generating schedules based on target unit count (with placeholders)
-    private List<EventMatch> GenerateRoundRobinMatchesForTarget(EventDivision division, int targetUnitCount, CreateMatchScheduleRequest request)
+    private List<EventEncounter> GenerateRoundRobinMatchesForTarget(EventDivision division, int targetUnitCount, CreateMatchScheduleRequest request)
     {
-        var matches = new List<EventMatch>();
+        var matches = new List<EventEncounter>();
         var poolCount = request.PoolCount ?? 1;
 
         // Generate round robin within each pool using placeholder numbers
@@ -4228,9 +4228,9 @@ public class TournamentController : ControllerBase
         return matches;
     }
 
-    private List<EventMatch> GeneratePlayoffMatchesForTarget(EventDivision division, int playoffUnits, CreateMatchScheduleRequest request)
+    private List<EventEncounter> GeneratePlayoffMatchesForTarget(EventDivision division, int playoffUnits, CreateMatchScheduleRequest request)
     {
-        var matches = new List<EventMatch>();
+        var matches = new List<EventEncounter>();
 
         // Find next power of 2 for bracket size
         var bracketSize = 1;
@@ -4273,9 +4273,9 @@ public class TournamentController : ControllerBase
         return matches;
     }
 
-    private List<EventMatch> GenerateSingleEliminationMatchesForTarget(EventDivision division, int targetUnitCount, CreateMatchScheduleRequest request)
+    private List<EventEncounter> GenerateSingleEliminationMatchesForTarget(EventDivision division, int targetUnitCount, CreateMatchScheduleRequest request)
     {
-        var matches = new List<EventMatch>();
+        var matches = new List<EventEncounter>();
 
         // Find next power of 2
         var bracketSize = 1;
@@ -4371,9 +4371,9 @@ public class TournamentController : ControllerBase
         return matchups;
     }
 
-    private List<EventMatch> GenerateDoubleEliminationMatchesForTarget(EventDivision division, int targetUnitCount, CreateMatchScheduleRequest request)
+    private List<EventEncounter> GenerateDoubleEliminationMatchesForTarget(EventDivision division, int targetUnitCount, CreateMatchScheduleRequest request)
     {
-        var matches = new List<EventMatch>();
+        var matches = new List<EventEncounter>();
 
         // Find next power of 2
         var bracketSize = 1;
@@ -4476,7 +4476,7 @@ public class TournamentController : ControllerBase
         return matches;
     }
 
-    private string? GetMatchScore(EventMatch match)
+    private string? GetMatchScore(EventEncounter match)
     {
         if (!match.Games.Any(g => g.Status == "Finished")) return null;
 

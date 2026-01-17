@@ -903,7 +903,7 @@ public class TournamentGameDayController : ControllerBase
         return Ok(new ApiResponse<object> { Success = true, Message = "Pool finalization reset" });
     }
 
-    private List<EventUnit> ApplyHeadToHeadTiebreaker(List<EventUnit> units, List<EventMatch> matches)
+    private List<EventUnit> ApplyHeadToHeadTiebreaker(List<EventUnit> units, List<EventEncounter> matches)
     {
         // Simple implementation: when two teams are tied, check head-to-head
         var result = new List<EventUnit>();
