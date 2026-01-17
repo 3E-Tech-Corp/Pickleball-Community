@@ -545,7 +545,7 @@ public class EventRunningController : ControllerBase
         // Get courts
         var courts = await _context.TournamentCourts
             .Include(c => c.CurrentGame)
-                .ThenInclude(g => g!.Match)
+                .ThenInclude(g => g!.Encounter)
             .Where(c => c.EventId == eventId && c.IsActive)
             .OrderBy(c => c.SortOrder)
             .ToListAsync();
@@ -621,7 +621,7 @@ public class EventRunningController : ControllerBase
                 Label = c.CourtLabel,
                 Status = c.Status,
                 CurrentGameId = c.CurrentGameId,
-                CurrentMatch = c.CurrentGame?.Match != null ? new AdminMatchSummaryDto
+                CurrentMatch = c.CurrentGame?.Encounter != null ? new AdminMatchSummaryDto
                 {
                     Id = c.CurrentGame.Encounter.Id,
                     Unit1Name = c.CurrentGame.Encounter.Unit1?.Name ?? "TBD",
@@ -1203,7 +1203,7 @@ public class EventRunningController : ControllerBase
             .Include(m => m.TournamentCourt)
             .Include(m => m.Unit1)
             .Include(m => m.Unit2)
-            .FirstOrDefaultAsync(m => m.Id == game.EncounterId);
+            .FirstOrDefaultAsync(m => m.Id == game.MatchId);
 
         if (match == null) return;
 

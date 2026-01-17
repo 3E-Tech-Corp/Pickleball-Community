@@ -312,7 +312,7 @@ public class GameDayController : ControllerBase
         }
 
         // Create match
-        var match = new EventMatch
+        var match = new EventEncounter
         {
             EventId = eventId,
             DivisionId = unit1.DivisionId,
@@ -923,7 +923,7 @@ public class GameDayController : ControllerBase
             }
 
             // Create the match
-            var match = new EventMatch
+            var match = new EventEncounter
             {
                 EventId = eventId,
                 DivisionId = divisionId,
@@ -1174,7 +1174,7 @@ public class GameDayController : ControllerBase
         }
 
         // Create the match
-        var match = new EventMatch
+        var match = new EventEncounter
         {
             EventId = eventId,
             DivisionId = divisionId,

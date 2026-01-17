@@ -185,11 +185,11 @@ public class PlayerHistoryController : ControllerBase
         // Base query: get all games where this player participated
         var query = _context.Set<EventGamePlayer>()
             .Include(gp => gp.Game)
-                .ThenInclude(g => g!.Match)
+                .ThenInclude(g => g!.Encounter)
                     .ThenInclude(m => m!.Event)
                         .ThenInclude(e => e!.EventType)
             .Include(gp => gp.Game)
-                .ThenInclude(g => g!.Match)
+                .ThenInclude(g => g!.Encounter)
                     .ThenInclude(m => m!.Division)
             .Include(gp => gp.Game)
                 .ThenInclude(g => g!.Players)
