@@ -2436,18 +2436,59 @@ public class TournamentController : ControllerBase
             }
 
             // No payment - safe to delete the unit entirely
-            // Also remove any pending join requests for this unit
-            var joinRequests = await _context.EventUnitJoinRequests
-                .Where(jr => jr.UnitId == unitId)
-                .ToListAsync();
-            _context.EventUnitJoinRequests.RemoveRange(joinRequests);
+            try
+            {
+                // Remove any game player assignments for this unit
+                var gamePlayers = await _context.EventGamePlayers
+                    .Where(p => p.UnitId == unitId)
+                    .ToListAsync();
+                if (gamePlayers.Any())
+                    _context.EventGamePlayers.RemoveRange(gamePlayers);
 
-            // Remove all members (including pending ones)
-            _context.EventUnitMembers.RemoveRange(unit.Members);
-            _context.EventUnits.Remove(unit);
+                // Remove any match player assignments for this unit
+                var matchPlayers = await _context.EncounterMatchPlayers
+                    .Where(p => p.UnitId == unitId)
+                    .ToListAsync();
+                if (matchPlayers.Any())
+                    _context.EncounterMatchPlayers.RemoveRange(matchPlayers);
 
-            await _context.SaveChangesAsync();
-            return Ok(new ApiResponse<bool> { Success = true, Data = true, Message = "Registration cancelled" });
+                // Check if unit is referenced in any encounters
+                var encountersWithUnit = await _context.EventEncounters
+                    .Where(e => e.Unit1Id == unitId || e.Unit2Id == unitId)
+                    .ToListAsync();
+                if (encountersWithUnit.Any())
+                {
+                    // Can't delete if unit is part of scheduled matches
+                    return BadRequest(new ApiResponse<bool>
+                    {
+                        Success = false,
+                        Message = "Cannot remove registration - unit has scheduled matches. Remove matches first or contact administrator."
+                    });
+                }
+
+                // Remove any pending join requests for this unit
+                var joinRequests = await _context.EventUnitJoinRequests
+                    .Where(jr => jr.UnitId == unitId)
+                    .ToListAsync();
+                if (joinRequests.Any())
+                    _context.EventUnitJoinRequests.RemoveRange(joinRequests);
+
+                // Remove all members (including pending ones)
+                _context.EventUnitMembers.RemoveRange(unit.Members);
+                _context.EventUnits.Remove(unit);
+
+                await _context.SaveChangesAsync();
+                return Ok(new ApiResponse<bool> { Success = true, Data = true, Message = "Registration cancelled" });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error removing registration for unit {UnitId} in event {EventId}", unitId, eventId);
+                return StatusCode(500, new ApiResponse<bool>
+                {
+                    Success = false,
+                    Message = "Failed to remove registration due to database constraints. The unit may have related records (games, matches) that need to be removed first."
+                });
+            }
         }
         else
         {
