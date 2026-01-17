@@ -3305,7 +3305,7 @@ public class TournamentController : ControllerBase
             .Include(m => m.Matches).ThenInclude(match => match.Games)
             .Where(m => m.DivisionId == divisionId)
             .OrderBy(m => m.RoundNumber)
-            .ThenBy(m => m.MatchNumber)
+            .ThenBy(m => m.EncounterNumber)
             .ToListAsync();
 
         return Ok(new ApiResponse<List<EventMatchDto>>
@@ -3472,7 +3472,7 @@ public class TournamentController : ControllerBase
             .Where(m => m.DivisionId == divisionId)
             .OrderBy(m => m.RoundType)
             .ThenBy(m => m.RoundNumber)
-            .ThenBy(m => m.MatchNumber)
+            .ThenBy(m => m.EncounterNumber)
             .ToListAsync();
 
         var units = await _context.EventUnits
@@ -3549,7 +3549,7 @@ public class TournamentController : ControllerBase
             .Where(m => m.DivisionId == divisionId)
             .OrderBy(m => m.RoundType)
             .ThenBy(m => m.RoundNumber)
-            .ThenBy(m => m.MatchNumber)
+            .ThenBy(m => m.EncounterNumber)
             .ToListAsync();
 
         var units = await _context.EventUnits
