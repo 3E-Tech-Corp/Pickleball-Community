@@ -231,12 +231,14 @@ public class TournamentGameDayController : ControllerBase
                 IsCheckedIn = firstUnit?.IsCheckedIn ?? false,
                 CheckedInAt = firstUnit?.CheckedInAt,
                 WaiverSigned = firstUnit?.WaiverSignedAt != null,
+                HasPaid = firstUnit?.HasPaid ?? false,
                 MyDivisions = units.Select(u => new PlayerDivisionDto
                 {
                     DivisionId = u.Unit!.DivisionId,
                     DivisionName = u.Unit.Division?.Name ?? "",
                     UnitId = u.UnitId,
-                    UnitName = u.Unit.Name
+                    UnitName = u.Unit.Name,
+                    HasPaid = u.HasPaid
                 }).ToList(),
                 MyGames = myGames,
                 UpcomingGame = myGames.FirstOrDefault(g => g.Status == "Queued" || g.Status == "Playing"),
@@ -1380,6 +1382,7 @@ public class PlayerGameDayDto
     public bool IsCheckedIn { get; set; }
     public DateTime? CheckedInAt { get; set; }
     public bool WaiverSigned { get; set; }
+    public bool HasPaid { get; set; }
     public List<PlayerDivisionDto> MyDivisions { get; set; } = new();
     public List<PlayerGameInfoDto> MyGames { get; set; } = new();
     public PlayerGameInfoDto? UpcomingGame { get; set; }
@@ -1392,6 +1395,7 @@ public class PlayerDivisionDto
     public string DivisionName { get; set; } = string.Empty;
     public int UnitId { get; set; }
     public string UnitName { get; set; } = string.Empty;
+    public bool HasPaid { get; set; }
 }
 
 public class PlayerGameInfoDto
