@@ -2,9 +2,10 @@ import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import {
   Calendar, Users, Trophy, ChevronLeft, Loader2,
-  AlertCircle, Printer, Download, Clock, MapPin
+  AlertCircle, Printer, Download, Clock, MapPin, User
 } from 'lucide-react';
-import { tournamentApi } from '../services/api';
+import { tournamentApi, getSharedAssetUrl } from '../services/api';
+import PublicProfileModal from '../components/ui/PublicProfileModal';
 
 export default function DivisionSchedule() {
   const { eventId, divisionId } = useParams();
@@ -12,6 +13,7 @@ export default function DivisionSchedule() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [downloadingExcel, setDownloadingExcel] = useState(false);
+  const [profileModalUserId, setProfileModalUserId] = useState(null);
 
   useEffect(() => {
     loadSchedule();
@@ -179,8 +181,34 @@ export default function DivisionSchedule() {
                         <div className="min-w-0">
                           <div className="font-medium text-gray-900 print:text-xs">{entry.unitName}</div>
                           {entry.members && entry.members.length > 0 && (
-                            <div className="text-xs text-gray-500 print:text-[10px]">
-                              {entry.members.join(', ')}
+                            <div className="flex flex-wrap gap-2 mt-1 print:gap-1">
+                              {entry.members.map((member) => (
+                                <button
+                                  key={member.userId}
+                                  onClick={() => setProfileModalUserId(member.userId)}
+                                  className="flex items-center gap-1.5 text-xs text-gray-600 hover:text-orange-600 transition-colors no-print"
+                                  title={`View ${member.firstName} ${member.lastName}'s profile`}
+                                >
+                                  {member.profileImageUrl ? (
+                                    <img
+                                      src={getSharedAssetUrl(member.profileImageUrl)}
+                                      alt=""
+                                      className="w-5 h-5 rounded-full object-cover border border-gray-200"
+                                    />
+                                  ) : (
+                                    <div className="w-5 h-5 rounded-full bg-gray-200 flex items-center justify-center">
+                                      <User className="w-3 h-3 text-gray-400" />
+                                    </div>
+                                  )}
+                                  <span className="hover:underline">
+                                    {member.firstName} {member.lastName}
+                                  </span>
+                                </button>
+                              ))}
+                              {/* Print-only version without interactivity */}
+                              <span className="hidden print:inline text-[10px] text-gray-500">
+                                {entry.members.map(m => `${m.firstName} ${m.lastName}`).join(', ')}
+                              </span>
                             </div>
                           )}
                         </div>
@@ -442,6 +470,14 @@ export default function DivisionSchedule() {
           <p>pickleball.community</p>
         </div>
       </div>
+
+      {/* Public Profile Modal */}
+      {profileModalUserId && (
+        <PublicProfileModal
+          userId={profileModalUserId}
+          onClose={() => setProfileModalUserId(null)}
+        />
+      )}
     </div>
   );
 }

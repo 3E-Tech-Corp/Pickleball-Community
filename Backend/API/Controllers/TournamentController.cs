@@ -3555,8 +3555,13 @@ public class TournamentController : ControllerBase
                         UnitName = u.Name,
                         Members = u.Members
                             .Where(m => m.User != null)
-                            .Select(m => $"{m.User!.FirstName} {m.User.LastName}".Trim())
-                            .Where(n => !string.IsNullOrEmpty(n))
+                            .Select(m => new TeamMemberInfoDto
+                            {
+                                UserId = m.UserId,
+                                FirstName = m.User!.FirstName,
+                                LastName = m.User.LastName,
+                                ProfileImageUrl = m.User.ProfileImageUrl
+                            })
                             .ToList(),
                         MatchesPlayed = u.MatchesPlayed,
                         MatchesWon = u.MatchesWon,

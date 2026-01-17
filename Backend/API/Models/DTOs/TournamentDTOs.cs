@@ -603,13 +603,26 @@ public class PoolStandingEntryDto
     public int Rank { get; set; }
     public int? UnitNumber { get; set; }
     public string? UnitName { get; set; }
-    public List<string> Members { get; set; } = new(); // Team member names
+    public List<TeamMemberInfoDto> Members { get; set; } = new(); // Team member details
     public int MatchesPlayed { get; set; }
     public int MatchesWon { get; set; }
     public int MatchesLost { get; set; }
     public int GamesWon { get; set; }
     public int GamesLost { get; set; }
     public int PointDifferential { get; set; }
+}
+
+/// <summary>
+/// Lightweight member info for display in schedule/drawing results
+/// </summary>
+public class TeamMemberInfoDto
+{
+    public int UserId { get; set; }
+    public string? FirstName { get; set; }
+    public string? LastName { get; set; }
+    public string? ProfileImageUrl { get; set; }
+
+    public string FullName => $"{FirstName} {LastName}".Trim();
 }
 
 // ============================================
