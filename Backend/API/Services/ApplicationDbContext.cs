@@ -91,6 +91,13 @@ public class ApplicationDbContext : DbContext
     public DbSet<TournamentCourt> TournamentCourts { get; set; }
     public DbSet<EventDocument> EventDocuments { get; set; }
 
+    // Encounter System (Team League Format)
+    public DbSet<EncounterMatchFormat> EncounterMatchFormats { get; set; }
+    public DbSet<EventEncounter> EventEncounters { get; set; }
+    public DbSet<EncounterMatch> EncounterMatches { get; set; }
+    public DbSet<EncounterMatchPlayer> EncounterMatchPlayers { get; set; }
+    public DbSet<EncounterMatchGame> EncounterMatchGames { get; set; }
+
     // Clubs
     public DbSet<Club> Clubs { get; set; }
     public DbSet<ClubMember> ClubMembers { get; set; }
@@ -1050,6 +1057,164 @@ public class ApplicationDbContext : DbContext
                   .WithMany()
                   .HasForeignKey(h => h.ChangedByUnitId)
                   .OnDelete(DeleteBehavior.NoAction);
+        });
+
+        // =========================================
+        // Encounter System Configuration
+        // =========================================
+
+        // Encounter Match Format configuration
+        modelBuilder.Entity<EncounterMatchFormat>(entity =>
+        {
+            entity.Property(f => f.Name).IsRequired().HasMaxLength(100);
+            entity.HasIndex(f => f.DivisionId);
+            entity.HasIndex(f => new { f.DivisionId, f.SortOrder });
+
+            entity.HasOne(f => f.Division)
+                  .WithMany(d => d.EncounterMatchFormats)
+                  .HasForeignKey(f => f.DivisionId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(f => f.ScoreFormat)
+                  .WithMany()
+                  .HasForeignKey(f => f.ScoreFormatId)
+                  .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        // Event Encounter configuration
+        modelBuilder.Entity<EventEncounter>(entity =>
+        {
+            entity.Property(e => e.RoundType).HasMaxLength(20);
+            entity.Property(e => e.Status).HasMaxLength(20);
+            entity.HasIndex(e => e.EventId);
+            entity.HasIndex(e => e.DivisionId);
+            entity.HasIndex(e => e.Status);
+            entity.HasIndex(e => e.Unit1Id);
+            entity.HasIndex(e => e.Unit2Id);
+            entity.HasIndex(e => new { e.DivisionId, e.RoundType, e.RoundNumber });
+
+            entity.HasOne(e => e.Event)
+                  .WithMany(ev => ev.Encounters)
+                  .HasForeignKey(e => e.EventId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.Division)
+                  .WithMany(d => d.Encounters)
+                  .HasForeignKey(e => e.DivisionId)
+                  .OnDelete(DeleteBehavior.NoAction);
+
+            entity.HasOne(e => e.Unit1)
+                  .WithMany()
+                  .HasForeignKey(e => e.Unit1Id)
+                  .OnDelete(DeleteBehavior.NoAction);
+
+            entity.HasOne(e => e.Unit2)
+                  .WithMany()
+                  .HasForeignKey(e => e.Unit2Id)
+                  .OnDelete(DeleteBehavior.NoAction);
+
+            entity.HasOne(e => e.Winner)
+                  .WithMany()
+                  .HasForeignKey(e => e.WinnerUnitId)
+                  .OnDelete(DeleteBehavior.NoAction);
+
+            entity.HasOne(e => e.TournamentCourt)
+                  .WithMany()
+                  .HasForeignKey(e => e.TournamentCourtId)
+                  .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        // Encounter Match configuration
+        modelBuilder.Entity<EncounterMatch>(entity =>
+        {
+            entity.Property(m => m.Status).HasMaxLength(20);
+            entity.HasIndex(m => m.EncounterId);
+            entity.HasIndex(m => m.FormatId);
+            entity.HasIndex(m => m.Status);
+            entity.HasIndex(m => m.TournamentCourtId);
+
+            entity.HasOne(m => m.Encounter)
+                  .WithMany(e => e.Matches)
+                  .HasForeignKey(m => m.EncounterId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(m => m.Format)
+                  .WithMany()
+                  .HasForeignKey(m => m.FormatId)
+                  .OnDelete(DeleteBehavior.NoAction);
+
+            entity.HasOne(m => m.Winner)
+                  .WithMany()
+                  .HasForeignKey(m => m.WinnerUnitId)
+                  .OnDelete(DeleteBehavior.NoAction);
+
+            entity.HasOne(m => m.TournamentCourt)
+                  .WithMany()
+                  .HasForeignKey(m => m.TournamentCourtId)
+                  .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasOne(m => m.ScoreSubmittedBy)
+                  .WithMany()
+                  .HasForeignKey(m => m.ScoreSubmittedByUnitId)
+                  .OnDelete(DeleteBehavior.NoAction);
+
+            entity.HasOne(m => m.ScoreConfirmedBy)
+                  .WithMany()
+                  .HasForeignKey(m => m.ScoreConfirmedByUnitId)
+                  .OnDelete(DeleteBehavior.NoAction);
+        });
+
+        // Encounter Match Player configuration
+        modelBuilder.Entity<EncounterMatchPlayer>(entity =>
+        {
+            entity.Property(p => p.Gender).HasMaxLength(10);
+            entity.HasIndex(p => p.MatchId);
+            entity.HasIndex(p => p.UserId);
+            entity.HasIndex(p => new { p.MatchId, p.UserId }).IsUnique();
+
+            entity.HasOne(p => p.Match)
+                  .WithMany(m => m.Players)
+                  .HasForeignKey(p => p.MatchId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(p => p.User)
+                  .WithMany()
+                  .HasForeignKey(p => p.UserId)
+                  .OnDelete(DeleteBehavior.NoAction);
+
+            entity.HasOne(p => p.Unit)
+                  .WithMany()
+                  .HasForeignKey(p => p.UnitId)
+                  .OnDelete(DeleteBehavior.NoAction);
+        });
+
+        // Encounter Match Game configuration
+        modelBuilder.Entity<EncounterMatchGame>(entity =>
+        {
+            entity.Property(g => g.Status).HasMaxLength(20);
+            entity.HasIndex(g => g.MatchId);
+            entity.HasIndex(g => g.Status);
+            entity.HasIndex(g => new { g.MatchId, g.GameNumber }).IsUnique();
+
+            entity.HasOne(g => g.Match)
+                  .WithMany(m => m.Games)
+                  .HasForeignKey(g => g.MatchId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(g => g.Winner)
+                  .WithMany()
+                  .HasForeignKey(g => g.WinnerUnitId)
+                  .OnDelete(DeleteBehavior.NoAction);
+
+            entity.HasOne(g => g.ScoreFormat)
+                  .WithMany()
+                  .HasForeignKey(g => g.ScoreFormatId)
+                  .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasOne(g => g.TournamentCourt)
+                  .WithMany()
+                  .HasForeignKey(g => g.TournamentCourtId)
+                  .OnDelete(DeleteBehavior.SetNull);
         });
 
         // Blog Category configuration
