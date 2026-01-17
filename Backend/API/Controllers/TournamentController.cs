@@ -3532,6 +3532,118 @@ public class TournamentController : ControllerBase
         return Ok(new ApiResponse<ScheduleExportDto> { Success = true, Data = schedule });
     }
 
+    [HttpGet("divisions/{divisionId}/scoresheet")]
+    public async Task<IActionResult> DownloadScoresheet(int divisionId)
+    {
+        var division = await _context.EventDivisions
+            .Include(d => d.Event)
+            .FirstOrDefaultAsync(d => d.Id == divisionId);
+
+        if (division == null)
+            return NotFound(new ApiResponse<bool> { Success = false, Message = "Division not found" });
+
+        var encounters = await _context.EventMatches
+            .Include(m => m.Unit1).ThenInclude(u => u!.Members).ThenInclude(m => m.User)
+            .Include(m => m.Unit2).ThenInclude(u => u!.Members).ThenInclude(m => m.User)
+            .Include(m => m.Matches).ThenInclude(match => match.Games)
+            .Where(m => m.DivisionId == divisionId)
+            .OrderBy(m => m.RoundType)
+            .ThenBy(m => m.RoundNumber)
+            .ThenBy(m => m.MatchNumber)
+            .ToListAsync();
+
+        var units = await _context.EventUnits
+            .Include(u => u.Members).ThenInclude(m => m.User)
+            .Where(u => u.DivisionId == divisionId && u.Status != "Cancelled")
+            .OrderBy(u => u.UnitNumber)
+            .ToListAsync();
+
+        // Generate Excel file using ClosedXML
+        using var workbook = new ClosedXML.Excel.XLWorkbook();
+
+        // Sheet 1: Drawing Results
+        var drawingSheet = workbook.Worksheets.Add("Drawing Results");
+        drawingSheet.Cell(1, 1).Value = division.Event?.Name ?? "Event";
+        drawingSheet.Cell(1, 1).Style.Font.Bold = true;
+        drawingSheet.Cell(1, 1).Style.Font.FontSize = 16;
+        drawingSheet.Cell(2, 1).Value = division.Name;
+        drawingSheet.Cell(2, 1).Style.Font.Bold = true;
+        drawingSheet.Cell(2, 1).Style.Font.FontSize = 14;
+        drawingSheet.Cell(3, 1).Value = $"Generated: {DateTime.Now:g}";
+
+        // Drawing results table
+        drawingSheet.Cell(5, 1).Value = "#";
+        drawingSheet.Cell(5, 2).Value = "Team Name";
+        drawingSheet.Cell(5, 3).Value = "Players";
+        drawingSheet.Range(5, 1, 5, 3).Style.Font.Bold = true;
+        drawingSheet.Range(5, 1, 5, 3).Style.Fill.BackgroundColor = ClosedXML.Excel.XLColor.LightGray;
+
+        int row = 6;
+        foreach (var unit in units)
+        {
+            drawingSheet.Cell(row, 1).Value = unit.UnitNumber ?? 0;
+            drawingSheet.Cell(row, 2).Value = unit.Name;
+            drawingSheet.Cell(row, 3).Value = string.Join(", ", unit.Members.Select(m =>
+                $"{m.User?.FirstName} {m.User?.LastName}".Trim()));
+            row++;
+        }
+        drawingSheet.Columns().AdjustToContents();
+
+        // Sheet 2: Match Schedule with scoresheet
+        var scheduleSheet = workbook.Worksheets.Add("Scoresheet");
+        scheduleSheet.Cell(1, 1).Value = division.Event?.Name ?? "Event";
+        scheduleSheet.Cell(1, 1).Style.Font.Bold = true;
+        scheduleSheet.Cell(2, 1).Value = $"{division.Name} - Scoresheet";
+        scheduleSheet.Cell(2, 1).Style.Font.Bold = true;
+
+        // Scoresheet headers
+        scheduleSheet.Cell(4, 1).Value = "Match #";
+        scheduleSheet.Cell(4, 2).Value = "Round";
+        scheduleSheet.Cell(4, 3).Value = "Team 1";
+        scheduleSheet.Cell(4, 4).Value = "Team 2";
+        scheduleSheet.Cell(4, 5).Value = "Game 1";
+        scheduleSheet.Cell(4, 6).Value = "Game 2";
+        scheduleSheet.Cell(4, 7).Value = "Game 3";
+        scheduleSheet.Cell(4, 8).Value = "Winner";
+        scheduleSheet.Range(4, 1, 4, 8).Style.Font.Bold = true;
+        scheduleSheet.Range(4, 1, 4, 8).Style.Fill.BackgroundColor = ClosedXML.Excel.XLColor.LightGray;
+
+        row = 5;
+        foreach (var encounter in encounters)
+        {
+            var unit1Name = encounter.Unit1?.Name ?? $"Position {encounter.Unit1Number}";
+            var unit2Name = encounter.Unit2?.Name ?? $"Position {encounter.Unit2Number}";
+            var roundLabel = encounter.RoundName ?? $"{encounter.RoundType} R{encounter.RoundNumber}";
+
+            scheduleSheet.Cell(row, 1).Value = encounter.MatchNumber;
+            scheduleSheet.Cell(row, 2).Value = roundLabel;
+            scheduleSheet.Cell(row, 3).Value = $"[{encounter.Unit1Number}] {unit1Name}";
+            scheduleSheet.Cell(row, 4).Value = $"[{encounter.Unit2Number}] {unit2Name}";
+
+            // Add borders for score entry cells
+            for (int col = 5; col <= 7; col++)
+            {
+                scheduleSheet.Cell(row, col).Style.Border.OutsideBorder = ClosedXML.Excel.XLBorderStyleValues.Thin;
+                scheduleSheet.Cell(row, col).Value = "__ - __";
+                scheduleSheet.Cell(row, col).Style.Alignment.Horizontal = ClosedXML.Excel.XLAlignmentHorizontalValues.Center;
+            }
+            scheduleSheet.Cell(row, 8).Style.Border.OutsideBorder = ClosedXML.Excel.XLBorderStyleValues.Thin;
+
+            row++;
+        }
+        scheduleSheet.Columns().AdjustToContents();
+
+        // Return as file download
+        using var stream = new MemoryStream();
+        workbook.SaveAs(stream);
+        stream.Position = 0;
+
+        var fileName = $"{division.Name.Replace(" ", "_")}_Scoresheet.xlsx";
+        return File(stream.ToArray(),
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            fileName);
+    }
+
     // ============================================
     // Game Management
     // ============================================

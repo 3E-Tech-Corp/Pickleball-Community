@@ -1458,6 +1458,7 @@ export const tournamentApi = {
   assignUnitNumbersWithDrawing: (divisionId, assignments) =>
     api.post(`/tournament/divisions/${divisionId}/assign-unit-numbers`, { assignments }),
   getSchedule: (divisionId) => api.get(`/tournament/divisions/${divisionId}/schedule`),
+  downloadScoresheet: (divisionId) => api.get(`/tournament/divisions/${divisionId}/scoresheet`, { responseType: 'blob' }),
 
   // Game Management
   assignGameToCourt: (gameId, courtId) =>

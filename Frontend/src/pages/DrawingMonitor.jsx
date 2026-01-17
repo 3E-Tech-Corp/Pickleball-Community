@@ -3,7 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import {
   Radio, Users, ChevronLeft, Play, Check, X, Loader2,
   AlertCircle, User, Wifi, WifiOff, Eye, Shuffle, Trophy, Clock,
-  RotateCcw, ChevronRight, StopCircle, PartyPopper
+  RotateCcw, ChevronRight, StopCircle, PartyPopper, Calendar, ExternalLink
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
@@ -743,16 +743,26 @@ export default function DrawingMonitor() {
                       <Trophy className="w-10 h-10 text-white" />
                     </div>
                     <p className="text-xl text-green-400 font-semibold">Drawing Complete!</p>
-                    {(isOrganizer || isAdmin) && (
+                    <div className="flex flex-wrap justify-center gap-3 mt-4">
                       <button
-                        onClick={() => handleCancelDrawing(selectedDivision.divisionId)}
-                        disabled={drawingLoading}
-                        className="mt-4 px-6 py-3 bg-gray-700 text-gray-300 font-semibold rounded-xl hover:bg-gray-600 disabled:opacity-50 transition-colors flex items-center gap-2 mx-auto"
+                        onClick={() => window.open(`/event/${eventId}/division/${selectedDivision.divisionId}/schedule`, '_blank')}
+                        className="px-6 py-3 bg-gradient-to-r from-orange-500 to-red-500 text-white font-semibold rounded-xl hover:from-orange-600 hover:to-red-600 transition-colors flex items-center gap-2"
                       >
-                        <RotateCcw className="w-5 h-5" />
-                        Redraw
+                        <Calendar className="w-5 h-5" />
+                        View Schedule
+                        <ExternalLink className="w-4 h-4" />
                       </button>
-                    )}
+                      {(isOrganizer || isAdmin) && (
+                        <button
+                          onClick={() => handleCancelDrawing(selectedDivision.divisionId)}
+                          disabled={drawingLoading}
+                          className="px-6 py-3 bg-gray-700 text-gray-300 font-semibold rounded-xl hover:bg-gray-600 disabled:opacity-50 transition-colors flex items-center gap-2"
+                        >
+                          <RotateCcw className="w-5 h-5" />
+                          Redraw
+                        </button>
+                      )}
+                    </div>
                   </div>
                 )}
 
