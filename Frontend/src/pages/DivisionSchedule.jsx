@@ -193,70 +193,247 @@ export default function DivisionSchedule() {
           </div>
         )}
 
-        {/* Schedule by Round */}
+        {/* Schedule by Round - Separate Pool and Playoff for RoundRobinPlayoff */}
         {schedule?.rounds && schedule.rounds.length > 0 && (
           <div className="mb-8 print:mb-4">
-            <h3 className="text-xl font-semibold text-gray-900 mb-4 flex items-center gap-2 print:text-lg">
-              <Calendar className="w-5 h-5 text-orange-500" />
-              Match Schedule
-            </h3>
-            {schedule.rounds.map((round, roundIdx) => (
-              <div key={roundIdx} className="mb-6 print:mb-3">
-                <h4 className="text-lg font-semibold text-gray-800 mb-3 bg-gray-100 px-4 py-2 rounded print:text-sm print:px-2 print:py-1">
-                  {round.roundName || `${round.roundType} Round ${round.roundNumber}`}
-                </h4>
-                <div className="overflow-x-auto">
-                  <table className="w-full border-collapse">
-                    <thead>
-                      <tr className="bg-gray-50 print:text-xs">
-                        <th className="border border-gray-300 px-3 py-2 text-left text-gray-700 print:px-1 print:py-1">#</th>
-                        <th className="border border-gray-300 px-3 py-2 text-left text-gray-700 print:px-1 print:py-1">Team 1</th>
-                        <th className="border border-gray-300 px-3 py-2 text-center text-gray-700 print:px-1 print:py-1">vs</th>
-                        <th className="border border-gray-300 px-3 py-2 text-left text-gray-700 print:px-1 print:py-1">Team 2</th>
-                        <th className="border border-gray-300 px-3 py-2 text-center text-gray-700 print:px-1 print:py-1">Score</th>
-                        <th className="border border-gray-300 px-3 py-2 text-left text-gray-700 print:px-1 print:py-1">Winner</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {round.matches.map((match, matchIdx) => (
-                        <tr key={matchIdx} className="hover:bg-gray-50 print:text-xs">
-                          <td className="border border-gray-300 px-3 py-2 text-gray-600 print:px-1 print:py-1">
-                            {match.matchNumber}
-                          </td>
-                          <td className="border border-gray-300 px-3 py-2 print:px-1 print:py-1">
-                            <div className="flex items-center gap-2">
-                              {match.unit1Number && (
-                                <span className="w-6 h-6 flex items-center justify-center bg-orange-100 text-orange-700 font-semibold rounded text-xs print:w-4 print:h-4">
-                                  {match.unit1Number}
-                                </span>
-                              )}
-                              <span className="text-gray-900">{match.unit1Name || `Position ${match.unit1Number}`}</span>
-                            </div>
-                          </td>
-                          <td className="border border-gray-300 px-3 py-2 text-center text-gray-400 print:px-1 print:py-1">vs</td>
-                          <td className="border border-gray-300 px-3 py-2 print:px-1 print:py-1">
-                            <div className="flex items-center gap-2">
-                              {match.unit2Number && (
-                                <span className="w-6 h-6 flex items-center justify-center bg-orange-100 text-orange-700 font-semibold rounded text-xs print:w-4 print:h-4">
-                                  {match.unit2Number}
-                                </span>
-                              )}
-                              <span className="text-gray-900">{match.unit2Name || `Position ${match.unit2Number}`}</span>
-                            </div>
-                          </td>
-                          <td className="border border-gray-300 px-3 py-2 text-center text-gray-600 print:px-1 print:py-1">
-                            {match.score || '—'}
-                          </td>
-                          <td className="border border-gray-300 px-3 py-2 text-gray-900 font-medium print:px-1 print:py-1">
-                            {match.winnerName || '—'}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+            {/* Pool Play Section */}
+            {schedule.rounds.filter(r => r.roundType === 'Pool').length > 0 && (
+              <div className="mb-8">
+                <h3 className="text-xl font-semibold text-gray-900 mb-4 flex items-center gap-2 print:text-lg">
+                  <Calendar className="w-5 h-5 text-orange-500" />
+                  Pool Play Schedule
+                </h3>
+                {schedule.rounds
+                  .filter(r => r.roundType === 'Pool')
+                  .map((round, roundIdx) => (
+                    <div key={roundIdx} className="mb-6 print:mb-3">
+                      <h4 className="text-lg font-semibold text-gray-800 mb-3 bg-gray-100 px-4 py-2 rounded print:text-sm print:px-2 print:py-1">
+                        {round.roundName || `Pool Round ${round.roundNumber}`}
+                      </h4>
+                      <div className="overflow-x-auto">
+                        <table className="w-full border-collapse">
+                          <thead>
+                            <tr className="bg-gray-50 print:text-xs">
+                              <th className="border border-gray-300 px-3 py-2 text-left text-gray-700 print:px-1 print:py-1">#</th>
+                              <th className="border border-gray-300 px-3 py-2 text-left text-gray-700 print:px-1 print:py-1">Team 1</th>
+                              <th className="border border-gray-300 px-3 py-2 text-center text-gray-700 print:px-1 print:py-1">vs</th>
+                              <th className="border border-gray-300 px-3 py-2 text-left text-gray-700 print:px-1 print:py-1">Team 2</th>
+                              <th className="border border-gray-300 px-3 py-2 text-center text-gray-700 print:px-1 print:py-1">Score</th>
+                              <th className="border border-gray-300 px-3 py-2 text-left text-gray-700 print:px-1 print:py-1">Winner</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {round.matches
+                              .filter(m => !m.isBye)
+                              .map((match, matchIdx) => (
+                                <tr key={matchIdx} className="hover:bg-gray-50 print:text-xs">
+                                  <td className="border border-gray-300 px-3 py-2 text-gray-600 print:px-1 print:py-1">
+                                    {match.matchNumber}
+                                  </td>
+                                  <td className="border border-gray-300 px-3 py-2 print:px-1 print:py-1">
+                                    <div className="flex items-center gap-2">
+                                      {match.unit1Number && (
+                                        <span className="w-6 h-6 flex items-center justify-center bg-orange-100 text-orange-700 font-semibold rounded text-xs print:w-4 print:h-4">
+                                          {match.unit1Number}
+                                        </span>
+                                      )}
+                                      <span className="text-gray-900">{match.unit1Name || `Position ${match.unit1Number}`}</span>
+                                    </div>
+                                  </td>
+                                  <td className="border border-gray-300 px-3 py-2 text-center text-gray-400 print:px-1 print:py-1">vs</td>
+                                  <td className="border border-gray-300 px-3 py-2 print:px-1 print:py-1">
+                                    <div className="flex items-center gap-2">
+                                      {match.unit2Number && (
+                                        <span className="w-6 h-6 flex items-center justify-center bg-orange-100 text-orange-700 font-semibold rounded text-xs print:w-4 print:h-4">
+                                          {match.unit2Number}
+                                        </span>
+                                      )}
+                                      <span className="text-gray-900">{match.unit2Name || `Position ${match.unit2Number}`}</span>
+                                    </div>
+                                  </td>
+                                  <td className="border border-gray-300 px-3 py-2 text-center text-gray-600 print:px-1 print:py-1">
+                                    {match.score || '—'}
+                                  </td>
+                                  <td className="border border-gray-300 px-3 py-2 text-gray-900 font-medium print:px-1 print:py-1">
+                                    {match.winnerName || '—'}
+                                  </td>
+                                </tr>
+                              ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  ))}
               </div>
-            ))}
+            )}
+
+            {/* Playoff/Bracket Section */}
+            {schedule.rounds.filter(r => r.roundType === 'Bracket').length > 0 && (
+              <div className="mb-8">
+                <h3 className="text-xl font-semibold text-gray-900 mb-4 flex items-center gap-2 print:text-lg">
+                  <Trophy className="w-5 h-5 text-yellow-500" />
+                  Playoff Bracket
+                  {schedule.playoffFromPools && (
+                    <span className="text-sm font-normal text-gray-500 ml-2">
+                      (Top {schedule.playoffFromPools} from each pool advance)
+                    </span>
+                  )}
+                </h3>
+                {schedule.rounds
+                  .filter(r => r.roundType === 'Bracket')
+                  .map((round, roundIdx) => (
+                    <div key={roundIdx} className="mb-6 print:mb-3">
+                      <h4 className="text-lg font-semibold text-gray-800 mb-3 bg-yellow-50 border border-yellow-200 px-4 py-2 rounded print:text-sm print:px-2 print:py-1">
+                        {round.roundName || `Playoff Round ${round.roundNumber}`}
+                      </h4>
+                      <div className="overflow-x-auto">
+                        <table className="w-full border-collapse">
+                          <thead>
+                            <tr className="bg-yellow-50 print:text-xs">
+                              <th className="border border-gray-300 px-3 py-2 text-left text-gray-700 print:px-1 print:py-1">#</th>
+                              <th className="border border-gray-300 px-3 py-2 text-left text-gray-700 print:px-1 print:py-1">Team 1</th>
+                              <th className="border border-gray-300 px-3 py-2 text-center text-gray-700 print:px-1 print:py-1">vs</th>
+                              <th className="border border-gray-300 px-3 py-2 text-left text-gray-700 print:px-1 print:py-1">Team 2</th>
+                              <th className="border border-gray-300 px-3 py-2 text-center text-gray-700 print:px-1 print:py-1">Score</th>
+                              <th className="border border-gray-300 px-3 py-2 text-left text-gray-700 print:px-1 print:py-1">Winner</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {round.matches.map((match, matchIdx) => (
+                              <tr
+                                key={matchIdx}
+                                className={`print:text-xs ${match.isBye ? 'bg-gray-100 text-gray-400' : 'hover:bg-yellow-50'}`}
+                              >
+                                <td className="border border-gray-300 px-3 py-2 text-gray-600 print:px-1 print:py-1">
+                                  {match.matchNumber}
+                                </td>
+                                <td className="border border-gray-300 px-3 py-2 print:px-1 print:py-1">
+                                  {match.isBye && !match.unit1Name ? (
+                                    <span className="italic text-gray-400">BYE</span>
+                                  ) : (
+                                    <div>
+                                      <div className="flex items-center gap-2">
+                                        {match.unit1Number && (
+                                          <span className="w-6 h-6 flex items-center justify-center bg-orange-100 text-orange-700 font-semibold rounded text-xs print:w-4 print:h-4">
+                                            {match.unit1Number}
+                                          </span>
+                                        )}
+                                        <span className="text-gray-900">{match.unit1Name || 'TBD'}</span>
+                                      </div>
+                                      {match.unit1SeedInfo && (
+                                        <div className="text-xs text-gray-500 ml-8 print:ml-5">{match.unit1SeedInfo}</div>
+                                      )}
+                                    </div>
+                                  )}
+                                </td>
+                                <td className="border border-gray-300 px-3 py-2 text-center text-gray-400 print:px-1 print:py-1">
+                                  {match.isBye ? '' : 'vs'}
+                                </td>
+                                <td className="border border-gray-300 px-3 py-2 print:px-1 print:py-1">
+                                  {match.isBye && !match.unit2Name ? (
+                                    <span className="italic text-gray-400">BYE</span>
+                                  ) : (
+                                    <div>
+                                      <div className="flex items-center gap-2">
+                                        {match.unit2Number && (
+                                          <span className="w-6 h-6 flex items-center justify-center bg-orange-100 text-orange-700 font-semibold rounded text-xs print:w-4 print:h-4">
+                                            {match.unit2Number}
+                                          </span>
+                                        )}
+                                        <span className="text-gray-900">{match.unit2Name || 'TBD'}</span>
+                                      </div>
+                                      {match.unit2SeedInfo && (
+                                        <div className="text-xs text-gray-500 ml-8 print:ml-5">{match.unit2SeedInfo}</div>
+                                      )}
+                                    </div>
+                                  )}
+                                </td>
+                                <td className="border border-gray-300 px-3 py-2 text-center text-gray-600 print:px-1 print:py-1">
+                                  {match.isBye ? '—' : (match.score || '—')}
+                                </td>
+                                <td className="border border-gray-300 px-3 py-2 text-gray-900 font-medium print:px-1 print:py-1">
+                                  {match.isBye ? (match.unit1Name || match.unit2Name || '—') : (match.winnerName || '—')}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            )}
+
+            {/* Other round types (not Pool or Bracket) */}
+            {schedule.rounds.filter(r => r.roundType !== 'Pool' && r.roundType !== 'Bracket').length > 0 && (
+              <div className="mb-8">
+                <h3 className="text-xl font-semibold text-gray-900 mb-4 flex items-center gap-2 print:text-lg">
+                  <Calendar className="w-5 h-5 text-orange-500" />
+                  Match Schedule
+                </h3>
+                {schedule.rounds
+                  .filter(r => r.roundType !== 'Pool' && r.roundType !== 'Bracket')
+                  .map((round, roundIdx) => (
+                    <div key={roundIdx} className="mb-6 print:mb-3">
+                      <h4 className="text-lg font-semibold text-gray-800 mb-3 bg-gray-100 px-4 py-2 rounded print:text-sm print:px-2 print:py-1">
+                        {round.roundName || `${round.roundType} Round ${round.roundNumber}`}
+                      </h4>
+                      <div className="overflow-x-auto">
+                        <table className="w-full border-collapse">
+                          <thead>
+                            <tr className="bg-gray-50 print:text-xs">
+                              <th className="border border-gray-300 px-3 py-2 text-left text-gray-700 print:px-1 print:py-1">#</th>
+                              <th className="border border-gray-300 px-3 py-2 text-left text-gray-700 print:px-1 print:py-1">Team 1</th>
+                              <th className="border border-gray-300 px-3 py-2 text-center text-gray-700 print:px-1 print:py-1">vs</th>
+                              <th className="border border-gray-300 px-3 py-2 text-left text-gray-700 print:px-1 print:py-1">Team 2</th>
+                              <th className="border border-gray-300 px-3 py-2 text-center text-gray-700 print:px-1 print:py-1">Score</th>
+                              <th className="border border-gray-300 px-3 py-2 text-left text-gray-700 print:px-1 print:py-1">Winner</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {round.matches
+                              .filter(m => !m.isBye)
+                              .map((match, matchIdx) => (
+                                <tr key={matchIdx} className="hover:bg-gray-50 print:text-xs">
+                                  <td className="border border-gray-300 px-3 py-2 text-gray-600 print:px-1 print:py-1">
+                                    {match.matchNumber}
+                                  </td>
+                                  <td className="border border-gray-300 px-3 py-2 print:px-1 print:py-1">
+                                    <div className="flex items-center gap-2">
+                                      {match.unit1Number && (
+                                        <span className="w-6 h-6 flex items-center justify-center bg-orange-100 text-orange-700 font-semibold rounded text-xs print:w-4 print:h-4">
+                                          {match.unit1Number}
+                                        </span>
+                                      )}
+                                      <span className="text-gray-900">{match.unit1Name || `Position ${match.unit1Number}`}</span>
+                                    </div>
+                                  </td>
+                                  <td className="border border-gray-300 px-3 py-2 text-center text-gray-400 print:px-1 print:py-1">vs</td>
+                                  <td className="border border-gray-300 px-3 py-2 print:px-1 print:py-1">
+                                    <div className="flex items-center gap-2">
+                                      {match.unit2Number && (
+                                        <span className="w-6 h-6 flex items-center justify-center bg-orange-100 text-orange-700 font-semibold rounded text-xs print:w-4 print:h-4">
+                                          {match.unit2Number}
+                                        </span>
+                                      )}
+                                      <span className="text-gray-900">{match.unit2Name || `Position ${match.unit2Number}`}</span>
+                                    </div>
+                                  </td>
+                                  <td className="border border-gray-300 px-3 py-2 text-center text-gray-600 print:px-1 print:py-1">
+                                    {match.score || '—'}
+                                  </td>
+                                  <td className="border border-gray-300 px-3 py-2 text-gray-900 font-medium print:px-1 print:py-1">
+                                    {match.winnerName || '—'}
+                                  </td>
+                                </tr>
+                              ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            )}
           </div>
         )}
 
