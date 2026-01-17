@@ -26,10 +26,12 @@ export function useDrawingHub() {
     const hubUrl = getHubUrl();
     console.log('DrawingHub: Creating connection to', hubUrl);
 
-    const token = localStorage.getItem('jwtToken');
-
+    // Always provide accessTokenFactory that reads token at connection time
+    // This ensures auth works even if token is set after hook initialization
     const connectionBuilder = new signalR.HubConnectionBuilder()
-      .withUrl(hubUrl, token ? { accessTokenFactory: () => token } : {})
+      .withUrl(hubUrl, {
+        accessTokenFactory: () => localStorage.getItem('jwtToken') || ''
+      })
       .withAutomaticReconnect({
         nextRetryDelayInMilliseconds: (retryContext) => {
           if (retryContext.previousRetryCount >= maxReconnectAttempts) {
