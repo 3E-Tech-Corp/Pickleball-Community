@@ -257,9 +257,7 @@ export default function PublicProfileModal({ userId, onClose, onFriendshipChange
                   {profile.email && (
                     <div className="flex items-center justify-center sm:justify-start gap-2 text-white/70 mt-1 text-sm">
                       <Mail className="w-4 h-4" />
-                      <a href={`mailto:${profile.email}`} className="hover:text-white hover:underline">
-                        {profile.email}
-                      </a>
+                      <span>{profile.email}</span>
                     </div>
                   )}
 
