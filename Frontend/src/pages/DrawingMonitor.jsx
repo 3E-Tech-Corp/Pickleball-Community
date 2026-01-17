@@ -112,7 +112,9 @@ export default function DrawingMonitor() {
     initializeDivisionStates,
     connectionState,
     isConnected,
-    connection
+    connection,
+    countdownDivisionId,
+    clearCountdown
   } = useDrawingHub();
 
   // Load event drawing state
@@ -231,30 +233,44 @@ export default function DrawingMonitor() {
     handleCompleteDrawing(divisionId);
   };
 
-  // Start drawing with countdown
+  // Handle countdown for ALL viewers when drawing starts (via SignalR)
+  useEffect(() => {
+    if (countdownDivisionId) {
+      // Auto-select the division that's starting
+      setSelectedDivisionId(countdownDivisionId);
+
+      // Start countdown for all viewers
+      setCountdown(3);
+      const interval = setInterval(() => {
+        setCountdown(prev => {
+          if (prev <= 1) {
+            clearInterval(interval);
+            clearCountdown();
+            // Only organizer/admin triggers auto-draw
+            if (isOrganizer || isAdmin) {
+              handleAutoDrawAll(countdownDivisionId);
+            }
+            return null;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+
+      return () => clearInterval(interval);
+    }
+  }, [countdownDivisionId, isOrganizer, isAdmin, clearCountdown]);
+
+  // Start drawing (organizer/admin only - countdown comes via SignalR for everyone)
   const handleStartDrawing = async (divisionId) => {
     if (!isOrganizer && !isAdmin) return;
 
     try {
       setDrawingLoading(true);
       const response = await tournamentApi.startDrawing(divisionId);
-      if (response.success) {
-        // Start countdown
-        setCountdown(3);
-        const interval = setInterval(() => {
-          setCountdown(prev => {
-            if (prev <= 1) {
-              clearInterval(interval);
-              // Auto-draw all units after countdown
-              handleAutoDrawAll(divisionId);
-              return null;
-            }
-            return prev - 1;
-          });
-        }, 1000);
-      } else {
+      if (!response.success) {
         toast.error(response.message || 'Failed to start drawing');
       }
+      // Countdown will be triggered via SignalR EventDrawingStarted for all viewers
     } catch (err) {
       toast.error(err?.response?.data?.message || 'Failed to start drawing');
     } finally {

@@ -12,6 +12,7 @@ export function useDrawingHub() {
   const [drawingState, setDrawingState] = useState(null);
   const [viewers, setViewers] = useState([]);
   const [divisionStates, setDivisionStates] = useState({});
+  const [countdownDivisionId, setCountdownDivisionId] = useState(null); // Division that just started drawing (for countdown)
   const connectionRef = useRef(null);
   const maxReconnectAttempts = 5;
 
@@ -115,6 +116,8 @@ export function useDrawingHub() {
           drawingInProgress: true
         }
       }));
+      // Trigger countdown for all viewers
+      setCountdownDivisionId(data.divisionId);
     });
 
     newConnection.on('EventUnitDrawn', (data) => {
@@ -281,6 +284,11 @@ export function useDrawingHub() {
     };
   }, []);
 
+  // Clear countdown (called after countdown finishes)
+  const clearCountdown = useCallback(() => {
+    setCountdownDivisionId(null);
+  }, []);
+
   return {
     connection,
     connectionState,
@@ -289,6 +297,8 @@ export function useDrawingHub() {
     viewers,
     divisionStates,
     initializeDivisionStates,
+    countdownDivisionId,
+    clearCountdown,
     connect,
     disconnect,
     joinDrawingRoom,
