@@ -553,8 +553,8 @@ public class TournamentGameDayController : ControllerBase
             return NotFound(new ApiResponse<object> { Success = false, Message = "Game encounter not found" });
 
         var isOrganizer = await IsEventOrganizer(encounter.EventId, userId);
-        var isUnit1Player = encounter.Unit1!.Members.Any(m => m.UserId == userId && m.InviteStatus == "Accepted");
-        var isUnit2Player = encounter.Unit2!.Members.Any(m => m.UserId == userId && m.InviteStatus == "Accepted");
+        var isUnit1Player = encounter.Unit1?.Members?.Any(m => m.UserId == userId && m.InviteStatus == "Accepted") ?? false;
+        var isUnit2Player = encounter.Unit2?.Members?.Any(m => m.UserId == userId && m.InviteStatus == "Accepted") ?? false;
         var playerUnitId = isUnit1Player ? encounter.Unit1Id : (isUnit2Player ? encounter.Unit2Id : null);
 
         if (!isOrganizer && !isUnit1Player && !isUnit2Player)
@@ -1177,9 +1177,10 @@ public class TournamentGameDayController : ControllerBase
             .FirstOrDefaultAsync(m => m.Id == encounterId);
 
         if (encounter == null) return;
+        if (encounter.Unit1?.Members == null || encounter.Unit2?.Members == null) return;
 
-        var playerIds = encounter.Unit1!.Members
-            .Concat(encounter.Unit2!.Members)
+        var playerIds = encounter.Unit1.Members
+            .Concat(encounter.Unit2.Members)
             .Where(m => m.InviteStatus == "Accepted")
             .Select(m => m.UserId)
             .Distinct();
@@ -1209,9 +1210,10 @@ public class TournamentGameDayController : ControllerBase
             .FirstOrDefaultAsync(m => m.Id == encounterId);
 
         if (encounter == null) return;
+        if (encounter.Unit1?.Members == null || encounter.Unit2?.Members == null) return;
 
-        var playerIds = encounter.Unit1!.Members
-            .Concat(encounter.Unit2!.Members)
+        var playerIds = encounter.Unit1.Members
+            .Concat(encounter.Unit2.Members)
             .Where(m => m.InviteStatus == "Accepted")
             .Select(m => m.UserId)
             .Distinct();
