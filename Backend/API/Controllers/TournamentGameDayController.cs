@@ -1327,8 +1327,10 @@ public class TournamentGameDayController : ControllerBase
             match.WinnerUnitId = unit1Wins > unit2Wins ? match.Unit1Id : match.Unit2Id;
 
             // Update match stats
-            var unit1 = match.Unit1!;
-            var unit2 = match.Unit2!;
+            var unit1 = match.Unit1;
+            var unit2 = match.Unit2;
+            if (unit1 == null || unit2 == null) return;
+
             unit1.MatchesPlayed++;
             unit2.MatchesPlayed++;
 
