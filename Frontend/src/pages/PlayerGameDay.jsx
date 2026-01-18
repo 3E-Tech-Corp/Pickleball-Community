@@ -540,19 +540,29 @@ function MyGamesTab({
       <div className="bg-gradient-to-br from-blue-600 to-blue-700 text-white rounded-xl p-5">
         {currentGame ? (
           <>
-            <div className="flex items-center gap-2 mb-3">
-              {currentGame.status === 'Playing' || currentGame.status === 'InProgress' ? (
-                <>
-                  <Play className="w-5 h-5" />
-                  <span className="font-semibold">Game In Progress</span>
-                </>
-              ) : (
-                <>
-                  <Clock className="w-5 h-5" />
-                  <span className="font-semibold">Next Up</span>
-                </>
-              )}
-              <span className={`ml-auto px-2 py-0.5 rounded text-xs font-medium ${
+            {/* Game Format - Top Center */}
+            <div className="text-center mb-3">
+              <span className="px-3 py-1 bg-white/20 rounded-full text-sm font-medium">
+                {currentGame.gameFormat || currentGame.divisionName}
+              </span>
+            </div>
+
+            {/* Status Row */}
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                {currentGame.status === 'Playing' || currentGame.status === 'InProgress' ? (
+                  <>
+                    <Play className="w-5 h-5" />
+                    <span className="font-semibold">Game In Progress</span>
+                  </>
+                ) : (
+                  <>
+                    <Clock className="w-5 h-5" />
+                    <span className="font-semibold">Next Up</span>
+                  </>
+                )}
+              </div>
+              <span className={`px-2 py-0.5 rounded text-xs font-medium ${
                 currentGame.status === 'Playing' || currentGame.status === 'InProgress'
                   ? 'bg-green-500'
                   : 'bg-yellow-500'
@@ -561,36 +571,109 @@ function MyGamesTab({
               </span>
             </div>
 
-            <div className="text-center py-4">
-              <div className="text-lg font-bold mb-2">
-                {currentGame.unit1Name} vs {currentGame.unit2Name}
-              </div>
-              {currentGame.courtName && (
-                <div className="flex items-center justify-center gap-1 text-blue-100 mb-2">
-                  <MapPin className="w-4 h-4" />
-                  <span className="font-medium">{currentGame.courtName}</span>
-                </div>
-              )}
-              <div className="text-sm text-blue-200">{currentGame.divisionName}</div>
-
-              {(currentGame.status === 'Playing' || currentGame.status === 'InProgress') && (
-                <div className="mt-4">
-                  <div className="text-4xl font-bold">
-                    {currentGame.unit1Score} - {currentGame.unit2Score}
-                  </div>
-                  <button
-                    onClick={() => onSubmitScore(currentGame)}
-                    className="mt-3 px-6 py-2 bg-white text-blue-600 rounded-lg font-semibold hover:bg-blue-50"
-                  >
-                    <CheckCircle className="w-4 h-4 inline mr-2" />
-                    {currentGame.needsConfirmation ? 'Confirm Score' : 'Submit Score'}
-                  </button>
-                  {currentGame.needsConfirmation && (
-                    <p className="text-xs text-blue-200 mt-2">Opponent submitted a score - confirm to finish</p>
+            {/* Players Display */}
+            <div className="flex items-center justify-between gap-4 py-4">
+              {/* Team 1 Players */}
+              <div className="flex-1 text-center">
+                <div className="flex justify-center gap-2 mb-2">
+                  {currentGame.unit1Players?.length > 0 ? (
+                    currentGame.unit1Players.map((player, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => onPlayerClick(player.userId)}
+                        className="flex flex-col items-center hover:opacity-80 transition-opacity"
+                      >
+                        {player.profileImageUrl ? (
+                          <img
+                            src={getSharedAssetUrl(player.profileImageUrl)}
+                            alt=""
+                            className="w-12 h-12 rounded-full object-cover border-2 border-white/50"
+                          />
+                        ) : (
+                          <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center border-2 border-white/50">
+                            <User className="w-6 h-6 text-white/70" />
+                          </div>
+                        )}
+                        <span className="text-xs mt-1 max-w-[80px] truncate">{player.name?.split(' ')[0]}</span>
+                      </button>
+                    ))
+                  ) : (
+                    <div className="text-sm font-medium">{currentGame.unit1Name}</div>
                   )}
                 </div>
-              )}
+                {currentGame.unit1Players?.length > 0 && (
+                  <div className="text-xs text-blue-200">{currentGame.unit1Name}</div>
+                )}
+              </div>
+
+              {/* VS / Score */}
+              <div className="flex flex-col items-center">
+                {(currentGame.status === 'Playing' || currentGame.status === 'InProgress') ? (
+                  <div className="text-3xl font-bold">
+                    {currentGame.unit1Score} - {currentGame.unit2Score}
+                  </div>
+                ) : (
+                  <div className="text-xl font-bold text-white/80">VS</div>
+                )}
+              </div>
+
+              {/* Team 2 Players */}
+              <div className="flex-1 text-center">
+                <div className="flex justify-center gap-2 mb-2">
+                  {currentGame.unit2Players?.length > 0 ? (
+                    currentGame.unit2Players.map((player, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => onPlayerClick(player.userId)}
+                        className="flex flex-col items-center hover:opacity-80 transition-opacity"
+                      >
+                        {player.profileImageUrl ? (
+                          <img
+                            src={getSharedAssetUrl(player.profileImageUrl)}
+                            alt=""
+                            className="w-12 h-12 rounded-full object-cover border-2 border-white/50"
+                          />
+                        ) : (
+                          <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center border-2 border-white/50">
+                            <User className="w-6 h-6 text-white/70" />
+                          </div>
+                        )}
+                        <span className="text-xs mt-1 max-w-[80px] truncate">{player.name?.split(' ')[0]}</span>
+                      </button>
+                    ))
+                  ) : (
+                    <div className="text-sm font-medium">{currentGame.unit2Name}</div>
+                  )}
+                </div>
+                {currentGame.unit2Players?.length > 0 && (
+                  <div className="text-xs text-blue-200">{currentGame.unit2Name}</div>
+                )}
+              </div>
             </div>
+
+            {/* Court Info */}
+            {currentGame.courtName && (
+              <div className="flex items-center justify-center gap-1 text-blue-100 mb-3">
+                <MapPin className="w-4 h-4" />
+                <span className="font-medium">{currentGame.courtName}</span>
+              </div>
+            )}
+
+            {/* Submit Score Button */}
+            {(currentGame.status === 'Playing' || currentGame.status === 'InProgress') && (
+              <div className="text-center">
+                <button
+                  onClick={() => onSubmitScore(currentGame)}
+                  className="px-6 py-2 bg-white text-blue-600 rounded-lg font-semibold hover:bg-blue-50"
+                >
+                  <CheckCircle className="w-4 h-4 inline mr-2" />
+                  {currentGame.needsConfirmation ? 'Confirm Score' : 'Submit Score'}
+                </button>
+                {currentGame.needsConfirmation && (
+                  <p className="text-xs text-blue-200 mt-2">Opponent submitted a score - confirm to finish</p>
+                )}
+              </div>
+            )}
           </>
         ) : (
           <div className="text-center py-8">

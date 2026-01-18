@@ -185,12 +185,17 @@ public class TournamentGameDayController : ControllerBase
                 .Include(g => g.EncounterMatch)
                     .ThenInclude(m => m!.Encounter)
                         .ThenInclude(e => e!.Unit1)
+                            .ThenInclude(u => u!.Members)
+                                .ThenInclude(m => m.User)
                 .Include(g => g.EncounterMatch)
                     .ThenInclude(m => m!.Encounter)
                         .ThenInclude(e => e!.Unit2)
+                            .ThenInclude(u => u!.Members)
+                                .ThenInclude(m => m.User)
                 .Include(g => g.EncounterMatch)
                     .ThenInclude(m => m!.Encounter)
                         .ThenInclude(e => e!.Division)
+                            .ThenInclude(d => d!.TeamUnit)
                 .Include(g => g.TournamentCourt)
                 .Where(g => g.EncounterMatch!.Encounter!.EventId == eventId)
                 .ToListAsync();
@@ -216,11 +221,30 @@ public class TournamentGameDayController : ControllerBase
                         RoundType = encounter.RoundType,
                         RoundName = encounter.RoundName,
                         DivisionName = encounter.Division?.Name ?? "",
+                        GameFormat = encounter.Division?.TeamUnit?.Name,
                         MyUnitId = myUnitId ?? 0,
                         Unit1Id = encounter.Unit1Id,
                         Unit1Name = encounter.Unit1?.Name,
+                        Unit1Players = encounter.Unit1?.Members?
+                            .Where(m => m.InviteStatus == "Accepted")
+                            .Select(m => new PlayerBriefDto
+                            {
+                                UserId = m.UserId,
+                                Name = m.User != null ? $"{m.User.FirstName} {m.User.LastName}" : "",
+                                ProfileImageUrl = m.User?.ProfileImageUrl,
+                                IsCheckedIn = m.IsCheckedIn
+                            }).ToList() ?? new List<PlayerBriefDto>(),
                         Unit2Id = encounter.Unit2Id,
                         Unit2Name = encounter.Unit2?.Name,
+                        Unit2Players = encounter.Unit2?.Members?
+                            .Where(m => m.InviteStatus == "Accepted")
+                            .Select(m => new PlayerBriefDto
+                            {
+                                UserId = m.UserId,
+                                Name = m.User != null ? $"{m.User.FirstName} {m.User.LastName}" : "",
+                                ProfileImageUrl = m.User?.ProfileImageUrl,
+                                IsCheckedIn = m.IsCheckedIn
+                            }).ToList() ?? new List<PlayerBriefDto>(),
                         CourtName = g.TournamentCourt?.CourtLabel,
                         CourtNumber = g.TournamentCourt?.SortOrder,
                         ScheduledTime = encounter.ScheduledTime,
@@ -376,6 +400,7 @@ public class TournamentGameDayController : ControllerBase
                     {
                         UserId = m.UserId,
                         Name = m.User!.FirstName + " " + m.User.LastName,
+                        ProfileImageUrl = m.User.ProfileImageUrl,
                         IsCheckedIn = m.IsCheckedIn
                     }).ToList(),
                 Unit2Id = g.EncounterMatch.Encounter.Unit2Id!.Value,
@@ -386,6 +411,7 @@ public class TournamentGameDayController : ControllerBase
                     {
                         UserId = m.UserId,
                         Name = m.User!.FirstName + " " + m.User.LastName,
+                        ProfileImageUrl = m.User.ProfileImageUrl,
                         IsCheckedIn = m.IsCheckedIn
                     }).ToList(),
                 AllPlayersCheckedIn = g.EncounterMatch.Encounter.Unit1.Members.All(m => m.InviteStatus != "Accepted" || m.IsCheckedIn)
@@ -1454,6 +1480,7 @@ public class PlayerBriefDto
 {
     public int UserId { get; set; }
     public string Name { get; set; } = string.Empty;
+    public string? ProfileImageUrl { get; set; }
     public bool IsCheckedIn { get; set; }
 }
 
@@ -1538,11 +1565,14 @@ public class PlayerGameInfoDto
     public string RoundType { get; set; } = string.Empty;
     public string? RoundName { get; set; }
     public string DivisionName { get; set; } = string.Empty;
+    public string? GameFormat { get; set; } // e.g., "Men's Doubles", "Mixed Doubles"
     public int MyUnitId { get; set; }
     public int? Unit1Id { get; set; }
     public string? Unit1Name { get; set; }
+    public List<PlayerBriefDto> Unit1Players { get; set; } = new();
     public int? Unit2Id { get; set; }
     public string? Unit2Name { get; set; }
+    public List<PlayerBriefDto> Unit2Players { get; set; } = new();
     public string? CourtName { get; set; }
     public int? CourtNumber { get; set; }
     public DateTime? ScheduledTime { get; set; }
