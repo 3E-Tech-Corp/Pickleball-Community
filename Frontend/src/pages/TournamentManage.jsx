@@ -143,7 +143,7 @@ export default function TournamentManage() {
 
     const refreshInterval = setInterval(() => {
       console.log('Auto-refresh: updating dashboard and schedule...');
-      loadDashboard();
+      loadDashboard(true); // silent refresh
       const currentDivision = selectedDivisionRef.current;
       if (currentDivision?.scheduleReady) {
         loadSchedule(currentDivision.id, true); // silent refresh
@@ -161,24 +161,29 @@ export default function TournamentManage() {
     }
   }, [selectedDivision]);
 
-  const loadDashboard = async () => {
+  const loadDashboard = async (silent = false) => {
     try {
       const response = await tournamentApi.getDashboard(eventId);
       if (response.success) {
         setDashboard(response.data);
-        if (!selectedDivision && response.data.divisions?.length > 0) {
+        // Only auto-select division on initial load, not on silent refresh
+        if (!silent && !selectedDivision && response.data.divisions?.length > 0) {
           // Select first division with registrations, or first division if none have registrations
           const divisionsWithRegs = response.data.divisions.filter(d => d.registeredUnits > 0);
           setSelectedDivision(divisionsWithRegs.length > 0 ? divisionsWithRegs[0] : response.data.divisions[0]);
         }
-      } else {
+      } else if (!silent) {
         setError(response.message || 'Failed to load tournament dashboard');
       }
     } catch (err) {
       console.error('Error loading dashboard:', err);
-      setError('Failed to load tournament dashboard');
+      if (!silent) {
+        setError('Failed to load tournament dashboard');
+      }
     } finally {
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      }
     }
   };
 
