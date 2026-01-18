@@ -574,13 +574,13 @@ public class TournamentGameDayController : ControllerBase
         await NotifyPlayersGameQueued(game, court);
 
         // Notify admin dashboard via SignalR
-        await _notificationService.SendEventUpdateAsync(encounter.EventId, "GameUpdate", new
+        await _notificationService.SendToEventAsync(encounter.EventId, new NotificationPayload
         {
-            GameId = game.Id,
-            Status = game.Status,
-            CourtId = request.CourtId,
-            CourtLabel = court.CourtLabel,
-            Action = "PlayerQueuedGame"
+            Type = "GameUpdate",
+            Title = "Game Queued",
+            Message = $"Game queued to {court.CourtLabel}",
+            ReferenceType = "Game",
+            ReferenceId = game.Id
         });
 
         _logger.LogInformation("Player {UserId} self-queued game {GameId} to court {CourtId}", userId, game.Id, request.CourtId);
@@ -961,6 +961,14 @@ public class TournamentGameDayController : ControllerBase
 
             if (unit1 == null || unit2 == null)
                 continue;
+
+            // Only process encounters where both units are in the same pool
+            if (unit1.PoolNumber != unit2.PoolNumber)
+            {
+                _logger.LogWarning("Skipping encounter {EncounterId} - units {Unit1Id} (Pool {Pool1}) and {Unit2Id} (Pool {Pool2}) are in different pools",
+                    encounter.Id, unit1.Id, unit1.PoolNumber, unit2.Id, unit2.PoolNumber);
+                continue;
+            }
 
             // Count games won/lost and points from all games in this encounter
             int unit1GamesWon = 0;
