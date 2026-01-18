@@ -3619,17 +3619,9 @@ public class TournamentController : ControllerBase
             return $"{info.PoolName} #{info.Rank}";
         }
 
-        // Build court lookup for games
-        var courtIds = matches
-            .SelectMany(m => m.Matches)
-            .SelectMany(em => em.Games)
-            .Where(g => g.TournamentCourtId.HasValue)
-            .Select(g => g.TournamentCourtId!.Value)
-            .Distinct()
-            .ToList();
-
+        // Build court lookup for games - load all courts for this event to avoid EF Core CTE issue with Contains()
         var courts = await _context.TournamentCourts
-            .Where(c => courtIds.Contains(c.Id))
+            .Where(c => c.EventId == division.EventId)
             .ToDictionaryAsync(c => c.Id, c => c.CourtLabel);
 
         // Helper to get court label for an encounter
