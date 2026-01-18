@@ -4030,17 +4030,22 @@ public class TournamentController : ControllerBase
         if (game == null)
             return NotFound(new ApiResponse<EventGameDto> { Success = false, Message = "Game not found" });
 
+        var encounter = game.EncounterMatch?.Encounter;
+        var wasAlreadyFinished = game.Status == "Finished";
+        var oldUnit1Score = game.Unit1Score;
+        var oldUnit2Score = game.Unit2Score;
+        var oldWinnerId = game.WinnerUnitId;
+
         game.Unit1Score = request.Unit1Score;
         game.Unit2Score = request.Unit2Score;
         game.UpdatedAt = DateTime.Now;
 
-        // If marking as finished, set winner and update stats
-        if (request.MarkAsFinished && game.Status != "Finished")
+        // If marking as finished (first time)
+        if (request.MarkAsFinished && !wasAlreadyFinished)
         {
             game.Status = "Finished";
             game.FinishedAt = DateTime.Now;
 
-            var encounter = game.EncounterMatch?.Encounter;
             if (encounter != null)
             {
                 game.WinnerUnitId = game.Unit1Score > game.Unit2Score ? encounter.Unit1Id : encounter.Unit2Id;
@@ -4062,6 +4067,17 @@ public class TournamentController : ControllerBase
                 // Check if match is complete (for best-of series)
                 await CheckMatchComplete(encounter.Id);
             }
+        }
+        // If already finished and score changed, update stats with delta
+        else if (wasAlreadyFinished && encounter != null &&
+                 (oldUnit1Score != request.Unit1Score || oldUnit2Score != request.Unit2Score))
+        {
+            // Update winner based on new scores
+            game.WinnerUnitId = game.Unit1Score > game.Unit2Score ? encounter.Unit1Id : encounter.Unit2Id;
+
+            // Adjust unit stats (subtract old, add new)
+            await AdjustUnitStats(encounter, oldUnit1Score, oldUnit2Score, oldWinnerId,
+                                  game.Unit1Score, game.Unit2Score, game.WinnerUnitId);
         }
 
         await _context.SaveChangesAsync();
@@ -5284,6 +5300,64 @@ public class TournamentController : ControllerBase
 
             unit2.PointsScored += game.Unit2Score;
             unit2.PointsAgainst += game.Unit1Score;
+            unit2.UpdatedAt = DateTime.Now;
+        }
+    }
+
+    /// <summary>
+    /// Adjusts unit stats when an already-finished game's score is changed.
+    /// Subtracts old values and adds new values.
+    /// </summary>
+    private async Task AdjustUnitStats(EventEncounter encounter,
+        int oldUnit1Score, int oldUnit2Score, int? oldWinnerId,
+        int newUnit1Score, int newUnit2Score, int? newWinnerId)
+    {
+        var unit1 = await _context.EventUnits.FindAsync(encounter.Unit1Id);
+        var unit2 = await _context.EventUnits.FindAsync(encounter.Unit2Id);
+
+        if (unit1 != null)
+        {
+            // Adjust games won/lost if winner changed
+            if (oldWinnerId != newWinnerId)
+            {
+                if (oldWinnerId == unit1.Id)
+                {
+                    unit1.GamesWon--;
+                    unit1.GamesLost++;
+                }
+                else if (newWinnerId == unit1.Id)
+                {
+                    unit1.GamesWon++;
+                    unit1.GamesLost--;
+                }
+            }
+
+            // Adjust points (subtract old, add new)
+            unit1.PointsScored = unit1.PointsScored - oldUnit1Score + newUnit1Score;
+            unit1.PointsAgainst = unit1.PointsAgainst - oldUnit2Score + newUnit2Score;
+            unit1.UpdatedAt = DateTime.Now;
+        }
+
+        if (unit2 != null)
+        {
+            // Adjust games won/lost if winner changed
+            if (oldWinnerId != newWinnerId)
+            {
+                if (oldWinnerId == unit2.Id)
+                {
+                    unit2.GamesWon--;
+                    unit2.GamesLost++;
+                }
+                else if (newWinnerId == unit2.Id)
+                {
+                    unit2.GamesWon++;
+                    unit2.GamesLost--;
+                }
+            }
+
+            // Adjust points (subtract old, add new)
+            unit2.PointsScored = unit2.PointsScored - oldUnit2Score + newUnit2Score;
+            unit2.PointsAgainst = unit2.PointsAgainst - oldUnit1Score + newUnit1Score;
             unit2.UpdatedAt = DateTime.Now;
         }
     }
