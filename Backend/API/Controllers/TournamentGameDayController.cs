@@ -1242,6 +1242,9 @@ public class TournamentGameDayController : ControllerBase
                     Unit2Name = unit2?.Name
                 });
             }
+
+            // Handle bye matches - auto-complete them and advance winners
+            await HandlePlayoffByes(divisionId);
         }
 
         await _context.SaveChangesAsync();
@@ -1439,6 +1442,9 @@ public class TournamentGameDayController : ControllerBase
                     Unit2Name = unit2?.Name
                 });
             }
+
+            // Handle bye matches - auto-complete them and advance winners
+            await HandlePlayoffByes(divisionId);
         }
 
         // Update division status
@@ -1564,6 +1570,116 @@ public class TournamentGameDayController : ControllerBase
         }
 
         return positions;
+    }
+
+    /// <summary>
+    /// Handle bye matches in playoff brackets - auto-complete them and advance winners
+    /// </summary>
+    private async Task HandlePlayoffByes(int divisionId)
+    {
+        // Get all bracket matches for this division, ordered by round
+        var allBracketMatches = await _context.EventMatches
+            .Where(m => m.DivisionId == divisionId && (m.RoundType == "Bracket" || m.RoundType == "Final" || m.RoundType == "ThirdPlace"))
+            .Include(m => m.Matches)
+                .ThenInclude(em => em.Games)
+            .OrderBy(m => m.RoundNumber)
+            .ThenBy(m => m.BracketPosition)
+            .ToListAsync();
+
+        // Process each round
+        var maxRound = allBracketMatches.Max(m => m.RoundNumber);
+
+        for (int round = 1; round <= maxRound; round++)
+        {
+            var roundMatches = allBracketMatches.Where(m => m.RoundNumber == round).ToList();
+
+            foreach (var match in roundMatches)
+            {
+                // Skip if already completed
+                if (match.Status == "Completed" || match.Status == "Finished")
+                    continue;
+
+                // Check for bye (one unit assigned, one null)
+                var isBye = (match.Unit1Id != null && match.Unit2Id == null) ||
+                            (match.Unit1Id == null && match.Unit2Id != null);
+
+                if (!isBye)
+                    continue;
+
+                // Determine winner (the non-null unit)
+                var winnerUnitId = match.Unit1Id ?? match.Unit2Id;
+
+                if (winnerUnitId == null)
+                    continue; // Both null, skip
+
+                // Mark match as completed with bye winner
+                match.WinnerUnitId = winnerUnitId;
+                match.Status = "Completed";
+                match.CompletedAt = DateTime.Now;
+                match.UpdatedAt = DateTime.Now;
+
+                // Delete any games for this bye match
+                var byeGames = match.Matches?.SelectMany(em => em.Games).ToList() ?? new List<EventGame>();
+                foreach (var game in byeGames)
+                {
+                    _context.EventGames.Remove(game);
+                }
+
+                _logger.LogInformation("Auto-completed bye match {MatchId} with winner unit {WinnerUnitId}",
+                    match.Id, winnerUnitId);
+
+                // Find and update the next round match
+                await AdvanceWinnerToNextRound(match, winnerUnitId.Value, allBracketMatches);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Advance a winner to their next bracket match
+    /// </summary>
+    private async Task AdvanceWinnerToNextRound(EventEncounter completedMatch, int winnerUnitId, List<EventEncounter> allMatches)
+    {
+        // Find the next round match this winner should go to
+        var nextRoundNumber = completedMatch.RoundNumber + 1;
+
+        // Calculate which match in the next round (bracket position / 2, rounded up)
+        var currentBracketPos = completedMatch.BracketPosition ?? 0;
+        var nextBracketPos = (currentBracketPos + 1) / 2; // 1,2->1, 3,4->2, etc.
+
+        // Handle finals and third place specially
+        if (completedMatch.RoundType == "Final" || completedMatch.RoundType == "ThirdPlace")
+            return; // No next round
+
+        var nextMatch = allMatches.FirstOrDefault(m =>
+            m.RoundNumber == nextRoundNumber &&
+            m.BracketPosition == nextBracketPos &&
+            m.RoundType != "ThirdPlace");
+
+        if (nextMatch == null)
+        {
+            // Check if this is a semifinal going to final
+            nextMatch = allMatches.FirstOrDefault(m =>
+                m.RoundNumber == nextRoundNumber &&
+                m.RoundType == "Final");
+        }
+
+        if (nextMatch == null)
+            return;
+
+        // Determine which slot (unit1 or unit2) based on bracket position
+        // Odd bracket positions go to Unit1, even go to Unit2
+        if (currentBracketPos % 2 == 1)
+        {
+            nextMatch.Unit1Id = winnerUnitId;
+        }
+        else
+        {
+            nextMatch.Unit2Id = winnerUnitId;
+        }
+        nextMatch.UpdatedAt = DateTime.Now;
+
+        _logger.LogInformation("Advanced unit {UnitId} from match {FromMatchId} to match {ToMatchId}",
+            winnerUnitId, completedMatch.Id, nextMatch.Id);
     }
 
     /// <summary>
