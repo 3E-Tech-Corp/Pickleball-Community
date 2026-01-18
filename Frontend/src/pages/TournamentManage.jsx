@@ -865,11 +865,11 @@ export default function TournamentManage() {
               </div>
             )}
 
-            {/* Division Summary */}
+            {/* Division Summary - only show divisions with registrations */}
             <div className="bg-white rounded-xl shadow-sm p-6">
               <h2 className="text-lg font-semibold text-gray-900 mb-4">Division Status</h2>
               <div className="space-y-4">
-                {dashboard?.divisions?.map(div => (
+                {dashboard?.divisions?.filter(d => d.registeredUnits > 0).map(div => (
                   <div key={div.id} className="border rounded-lg p-4">
                     <div className="flex items-center justify-between">
                       <div>
@@ -945,10 +945,10 @@ export default function TournamentManage() {
           </div>
         )}
 
-        {/* Divisions Tab */}
+        {/* Divisions Tab - only show divisions with registrations */}
         {activeTab === 'divisions' && (
           <div className="space-y-6">
-            {dashboard?.divisions?.map(div => (
+            {dashboard?.divisions?.filter(d => d.registeredUnits > 0).map(div => (
               <div key={div.id} className="bg-white rounded-xl shadow-sm p-6">
                 <div className="flex items-center justify-between mb-4">
                   <div>
@@ -1649,7 +1649,7 @@ export default function TournamentManage() {
                     className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-orange-500"
                   >
                     <option value="all">All Divisions</option>
-                    {dashboard?.divisions?.map(div => (
+                    {dashboard?.divisions?.filter(d => d.registeredUnits > 0).map(div => (
                       <option key={div.id} value={div.id}>{div.name}</option>
                     ))}
                   </select>
