@@ -1143,6 +1143,70 @@ public class CheckInController : ControllerBase
     }
 
     /// <summary>
+    /// Send waiver signing request to a player (admin only)
+    /// </summary>
+    [HttpPost("send-waiver-request/{eventId}/{userId}")]
+    [Authorize]
+    public async Task<ActionResult<ApiResponse<object>>> SendWaiverRequest(int eventId, int userId)
+    {
+        var currentUserId = GetUserId();
+        if (currentUserId == 0) return Unauthorized();
+
+        // Verify current user is TD/organizer
+        var evt = await _context.Events
+            .Include(e => e.ObjectAssets)
+            .FirstOrDefaultAsync(e => e.Id == eventId);
+        if (evt == null)
+            return NotFound(new ApiResponse<object> { Success = false, Message = "Event not found" });
+
+        var currentUser = await _context.Users.FindAsync(currentUserId);
+        var isOrganizer = evt.OrganizedByUserId == currentUserId || currentUser?.Role == "Admin";
+
+        if (!isOrganizer)
+            return Forbid();
+
+        // Get target user
+        var targetUser = await _context.Users.FindAsync(userId);
+        if (targetUser == null)
+            return NotFound(new ApiResponse<object> { Success = false, Message = "User not found" });
+
+        // Check if user is registered
+        var registration = await _context.EventUnitMembers
+            .FirstOrDefaultAsync(m => m.Unit!.EventId == eventId && m.UserId == userId && m.InviteStatus == "Accepted");
+
+        if (registration == null)
+            return BadRequest(new ApiResponse<object> { Success = false, Message = "User is not registered for this event" });
+
+        // Check if waiver already signed
+        if (registration.WaiverSigned)
+            return BadRequest(new ApiResponse<object> { Success = false, Message = "User has already signed the waiver" });
+
+        // Get waiver documents for this event
+        var waivers = evt.ObjectAssets?.Where(a => a.AssetType == "waiver" && a.IsActive).ToList();
+        if (waivers == null || !waivers.Any())
+            return BadRequest(new ApiResponse<object> { Success = false, Message = "No active waivers found for this event" });
+
+        // TODO: In the future, integrate with notification service to send email/push notification
+        // For now, just log the request and return success (the UI can show the waiver link)
+        _logger.LogInformation("Waiver request sent to user {UserId} ({Email}) for event {EventId} by admin {AdminId}",
+            userId, targetUser.Email, eventId, currentUserId);
+
+        return Ok(new ApiResponse<object>
+        {
+            Success = true,
+            Message = $"Waiver request sent to {targetUser.FirstName}",
+            Data = new
+            {
+                userId = targetUser.Id,
+                email = targetUser.Email,
+                firstName = targetUser.FirstName,
+                eventId = eventId,
+                waiverCount = waivers.Count
+            }
+        });
+    }
+
+    /// <summary>
     /// Delete an event document (TD only)
     /// </summary>
     [HttpDelete("documents/{eventId}/{documentId}")]

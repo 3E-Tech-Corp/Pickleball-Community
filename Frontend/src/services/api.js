@@ -2023,7 +2023,10 @@ export const checkInApi = {
   overrideWaiver: (eventId, userId, notes = null) => api.post(`/checkin/waiver-override/${eventId}/${userId}`, { notes }),
   voidWaiver: (eventId, userId, notes = null) => api.post(`/checkin/waiver-void/${eventId}/${userId}`, { notes }),
   overridePayment: (eventId, userId, hasPaid, amountPaid = null, notes = null) =>
-    api.post(`/checkin/payment-override/${eventId}/${userId}`, { hasPaid, amountPaid, notes })
+    api.post(`/checkin/payment-override/${eventId}/${userId}`, { hasPaid, amountPaid, notes }),
+
+  // Send waiver signing request to player
+  sendWaiverRequest: (eventId, userId) => api.post(`/checkin/send-waiver-request/${eventId}/${userId}`)
 }
 
 // Tournament Game Day API

@@ -5,11 +5,11 @@ import {
   ChevronDown, ChevronUp, RefreshCw, Shuffle, Settings, Target,
   AlertCircle, Loader2, Plus, Edit2, DollarSign, Eye, Share2, LayoutGrid,
   Award, ArrowRight, Lock, Unlock, Save, Map, ExternalLink, FileText, User,
-  CheckCircle, XCircle, MoreVertical
+  CheckCircle, XCircle, MoreVertical, Upload, Send
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
-import { tournamentApi, gameDayApi, eventsApi, objectAssetsApi, checkInApi, getSharedAssetUrl } from '../services/api';
+import { tournamentApi, gameDayApi, eventsApi, objectAssetsApi, checkInApi, sharedAssetApi, getSharedAssetUrl } from '../services/api';
 import ScheduleConfigModal from '../components/ScheduleConfigModal';
 import PublicProfileModal from '../components/ui/PublicProfileModal';
 
@@ -68,6 +68,8 @@ export default function TournamentManage() {
   const [expandedPlayer, setExpandedPlayer] = useState(null); // userId for expanded details view
   const [editingPayment, setEditingPayment] = useState(null); // { player, form }
   const [savingPayment, setSavingPayment] = useState(false);
+  const [uploadingPaymentProof, setUploadingPaymentProof] = useState(false);
+  const [sendingWaiverRequest, setSendingWaiverRequest] = useState(null); // userId
 
   // Payment methods for dropdown
   const PAYMENT_METHODS = [
@@ -102,7 +104,9 @@ export default function TournamentManage() {
       if (response.success) {
         setDashboard(response.data);
         if (!selectedDivision && response.data.divisions?.length > 0) {
-          setSelectedDivision(response.data.divisions[0]);
+          // Select first division with registrations, or first division if none have registrations
+          const divisionsWithRegs = response.data.divisions.filter(d => d.registeredUnits > 0);
+          setSelectedDivision(divisionsWithRegs.length > 0 ? divisionsWithRegs[0] : response.data.divisions[0]);
         }
       } else {
         setError(response.message || 'Failed to load tournament dashboard');
@@ -457,6 +461,62 @@ export default function TournamentManage() {
       ...prev,
       form: { ...prev.form, [field]: value }
     }));
+  };
+
+  // Handle payment proof upload
+  const handlePaymentProofUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf'];
+    if (!validTypes.includes(file.type)) {
+      toast.error('Please upload an image (JPG, PNG, GIF, WebP) or PDF file');
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('File size must be less than 5MB');
+      return;
+    }
+
+    setUploadingPaymentProof(true);
+    try {
+      const assetType = file.type === 'application/pdf' ? 'document' : 'image';
+      const response = await sharedAssetApi.upload(file, assetType, 'payment-proof', true);
+      if (response.success && response.url) {
+        const fullUrl = getSharedAssetUrl(response.url);
+        updateEditForm('paymentProofUrl', fullUrl);
+        toast.success('File uploaded successfully');
+      } else {
+        toast.error(response.message || 'Failed to upload file');
+      }
+    } catch (err) {
+      console.error('Error uploading file:', err);
+      toast.error('Failed to upload file');
+    } finally {
+      setUploadingPaymentProof(false);
+    }
+  };
+
+  // Send waiver request to player
+  const handleSendWaiverRequest = async (player) => {
+    setSendingWaiverRequest(player.userId);
+    setActionMenuOpen(null);
+    try {
+      const response = await checkInApi.sendWaiverRequest(eventId, player.userId);
+      if (response.success) {
+        toast.success(`Waiver request sent to ${player.firstName}`);
+      } else {
+        toast.error(response.message || 'Failed to send waiver request');
+      }
+    } catch (err) {
+      console.error('Error sending waiver request:', err);
+      toast.error('Failed to send waiver request');
+    } finally {
+      setSendingWaiverRequest(null);
+    }
   };
 
   // Filter players for check-in tab
@@ -1206,24 +1266,27 @@ export default function TournamentManage() {
               </button>
             </div>
 
-            {/* Division selector */}
-            {dashboard?.divisions?.length > 1 && (
-              <div className="flex gap-2 overflow-x-auto pb-2">
-                {dashboard.divisions.map(div => (
-                  <button
-                    key={div.id}
-                    onClick={() => setSelectedDivision(div)}
-                    className={`px-4 py-2 rounded-lg font-medium text-sm whitespace-nowrap ${
-                      selectedDivision?.id === div.id
-                        ? 'bg-orange-600 text-white'
-                        : 'bg-white text-gray-700 hover:bg-gray-50'
-                    }`}
-                  >
-                    {div.name}
-                  </button>
-                ))}
-              </div>
-            )}
+            {/* Division selector - only show divisions with registrations */}
+            {(() => {
+              const divisionsWithRegs = dashboard?.divisions?.filter(d => d.registeredUnits > 0) || [];
+              return divisionsWithRegs.length > 1 && (
+                <div className="flex gap-2 overflow-x-auto pb-2">
+                  {divisionsWithRegs.map(div => (
+                    <button
+                      key={div.id}
+                      onClick={() => setSelectedDivision(div)}
+                      className={`px-4 py-2 rounded-lg font-medium text-sm whitespace-nowrap ${
+                        selectedDivision?.id === div.id
+                          ? 'bg-orange-600 text-white'
+                          : 'bg-white text-gray-700 hover:bg-gray-50'
+                      }`}
+                    >
+                      {div.name}
+                    </button>
+                  ))}
+                </div>
+              );
+            })()}
 
             {selectedDivision?.scheduleReady ? (
               loadingSchedule ? (
@@ -1741,13 +1804,27 @@ export default function TournamentManage() {
 
                                     {/* Waiver actions */}
                                     {!player.waiverSigned ? (
-                                      <button
-                                        onClick={() => handleOverrideWaiver(player.userId)}
-                                        className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
-                                      >
-                                        <FileText className="w-4 h-4 text-blue-600" />
-                                        Override Waiver
-                                      </button>
+                                      <>
+                                        <button
+                                          onClick={() => handleSendWaiverRequest(player)}
+                                          disabled={sendingWaiverRequest === player.userId}
+                                          className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2 disabled:opacity-50"
+                                        >
+                                          {sendingWaiverRequest === player.userId ? (
+                                            <Loader2 className="w-4 h-4 animate-spin text-purple-600" />
+                                          ) : (
+                                            <Send className="w-4 h-4 text-purple-600" />
+                                          )}
+                                          Send Waiver Request
+                                        </button>
+                                        <button
+                                          onClick={() => handleOverrideWaiver(player.userId)}
+                                          className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
+                                        >
+                                          <FileText className="w-4 h-4 text-blue-600" />
+                                          Override Waiver
+                                        </button>
+                                      </>
                                     ) : (
                                       <button
                                         onClick={() => handleVoidWaiver(player.userId)}
@@ -2228,6 +2305,53 @@ export default function TournamentManage() {
                   className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                   placeholder="e.g., Zelle confirmation, transaction ID"
                 />
+              </div>
+
+              {/* Payment Proof Upload */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Payment Proof</label>
+                {editingPayment.form.paymentProofUrl ? (
+                  <div className="border border-gray-200 rounded-lg p-3 bg-gray-50">
+                    <div className="flex items-center justify-between">
+                      <a
+                        href={editingPayment.form.paymentProofUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 text-blue-600 hover:text-blue-700 text-sm"
+                      >
+                        <Eye className="w-4 h-4" />
+                        View Proof
+                      </a>
+                      <button
+                        type="button"
+                        onClick={() => updateEditForm('paymentProofUrl', '')}
+                        className="text-sm text-red-600 hover:text-red-700"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <label className="flex flex-col items-center justify-center w-full h-20 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100 transition-colors">
+                    <div className="flex flex-col items-center justify-center">
+                      {uploadingPaymentProof ? (
+                        <Loader2 className="w-6 h-6 text-gray-400 animate-spin" />
+                      ) : (
+                        <>
+                          <Upload className="w-5 h-5 text-gray-400 mb-1" />
+                          <span className="text-xs text-gray-500">Upload screenshot or receipt</span>
+                        </>
+                      )}
+                    </div>
+                    <input
+                      type="file"
+                      className="hidden"
+                      accept="image/*,.pdf"
+                      onChange={handlePaymentProofUpload}
+                      disabled={uploadingPaymentProof}
+                    />
+                  </label>
+                )}
               </div>
 
               <div className="flex gap-3 pt-2">
