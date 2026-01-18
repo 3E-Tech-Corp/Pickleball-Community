@@ -1692,6 +1692,7 @@ public class TournamentController : ControllerBase
             member.AmountPaid = perMemberAmount;
             member.PaymentProofUrl = request.PaymentProofUrl;
             member.PaymentReference = request.PaymentReference;
+            member.PaymentMethod = request.PaymentMethod;
             member.ReferenceId = referenceId;
             member.PaymentId = userPayment.Id; // Link to the UserPayment record
         }
@@ -2315,6 +2316,8 @@ public class TournamentController : ControllerBase
             member.PaymentReference = request.PaymentReference;
         if (request.PaymentProofUrl != null)
             member.PaymentProofUrl = request.PaymentProofUrl;
+        if (request.PaymentMethod != null)
+            member.PaymentMethod = request.PaymentMethod;
         if (request.AmountPaid.HasValue)
             member.AmountPaid = request.AmountPaid.Value;
         if (request.ReferenceId != null)
@@ -4227,6 +4230,7 @@ public class TournamentController : ControllerBase
                     AmountPaid = m.AmountPaid,
                     PaymentProofUrl = m.PaymentProofUrl,
                     PaymentReference = m.PaymentReference,
+                    PaymentMethod = m.PaymentMethod,
                     ReferenceId = m.ReferenceId
                 }).Concat(
                     pendingJoinRequests.Select(jr => new EventUnitMemberDto

@@ -199,6 +199,7 @@ public class EventUnitMemberDto
     public string? PaymentProofUrl { get; set; }
     public string? PaymentReference { get; set; }
     public string? ReferenceId { get; set; }
+    public string? PaymentMethod { get; set; }
 }
 
 public class CreateUnitRequest
@@ -731,6 +732,7 @@ public class UpdateMemberPaymentRequest
     public decimal? AmountPaid { get; set; }
     public string? PaymentProofUrl { get; set; }
     public string? PaymentReference { get; set; }
+    public string? PaymentMethod { get; set; }
     public string? ReferenceId { get; set; }
 }
 

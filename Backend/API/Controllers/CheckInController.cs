@@ -631,6 +631,7 @@ public class CheckInController : ControllerBase
                 .ThenInclude(u => u!.Division)
             .Select(m => new PlayerCheckInDto
             {
+                MemberId = m.Id,
                 UserId = m.UserId,
                 FirstName = m.User!.FirstName,
                 LastName = m.User.LastName,
@@ -645,11 +646,15 @@ public class CheckInController : ControllerBase
                 WaiverSigned = m.WaiverSignedAt != null,
                 WaiverSignedAt = m.WaiverSignedAt,
                 WaiverSignature = m.WaiverSignature,
+                SignedWaiverPdfUrl = m.SignedWaiverPdfUrl,
+                WaiverDocumentId = m.WaiverDocumentId,
                 HasPaid = m.HasPaid,
                 AmountPaid = m.AmountPaid,
                 PaidAt = m.PaidAt,
                 PaymentReference = m.PaymentReference,
-                PaymentProofUrl = m.PaymentProofUrl
+                PaymentProofUrl = m.PaymentProofUrl,
+                PaymentMethod = m.PaymentMethod,
+                ReferenceId = m.ReferenceId
             })
             .ToListAsync();
 
@@ -1284,6 +1289,8 @@ public class PlayerCheckInDto
     public bool WaiverSigned { get; set; }
     public DateTime? WaiverSignedAt { get; set; }
     public string? WaiverSignature { get; set; }
+    public string? SignedWaiverPdfUrl { get; set; }
+    public int? WaiverDocumentId { get; set; }
 
     // Payment details
     public bool HasPaid { get; set; }
@@ -1291,6 +1298,9 @@ public class PlayerCheckInDto
     public DateTime? PaidAt { get; set; }
     public string? PaymentReference { get; set; }
     public string? PaymentProofUrl { get; set; }
+    public string? PaymentMethod { get; set; }
+    public string? ReferenceId { get; set; }
+    public int MemberId { get; set; } // EventUnitMember ID for editing
 }
 
 public class CreateWaiverRequest

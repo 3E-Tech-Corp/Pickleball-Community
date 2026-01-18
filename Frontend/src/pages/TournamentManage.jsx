@@ -66,6 +66,20 @@ export default function TournamentManage() {
   const [actionMenuOpen, setActionMenuOpen] = useState(null); // userId
   const [profileModalUserId, setProfileModalUserId] = useState(null);
   const [expandedPlayer, setExpandedPlayer] = useState(null); // userId for expanded details view
+  const [editingPayment, setEditingPayment] = useState(null); // { player, form }
+  const [savingPayment, setSavingPayment] = useState(false);
+
+  // Payment methods for dropdown
+  const PAYMENT_METHODS = [
+    { value: '', label: 'Select method...' },
+    { value: 'Zelle', label: 'Zelle' },
+    { value: 'Cash', label: 'Cash' },
+    { value: 'Venmo', label: 'Venmo' },
+    { value: 'PayPal', label: 'PayPal' },
+    { value: 'CreditCard', label: 'Credit Card' },
+    { value: 'Check', label: 'Check' },
+    { value: 'Other', label: 'Other' },
+  ];
 
   useEffect(() => {
     if (eventId) {
@@ -395,6 +409,56 @@ export default function TournamentManage() {
     }
   };
 
+  // Start editing payment for a player
+  const startEditPayment = (player) => {
+    setEditingPayment({
+      player,
+      form: {
+        hasPaid: player.hasPaid,
+        amountPaid: player.amountPaid?.toString() || '',
+        paymentMethod: player.paymentMethod || '',
+        paymentReference: player.paymentReference || '',
+        paymentProofUrl: player.paymentProofUrl || '',
+      }
+    });
+  };
+
+  // Save edited payment
+  const saveEditedPayment = async () => {
+    if (!editingPayment) return;
+    setSavingPayment(true);
+    try {
+      const { player, form } = editingPayment;
+      const response = await tournamentApi.updateMemberPayment(eventId, player.unitId, player.userId, {
+        hasPaid: form.hasPaid,
+        amountPaid: form.amountPaid ? parseFloat(form.amountPaid) : 0,
+        paymentMethod: form.paymentMethod || null,
+        paymentReference: form.paymentReference || null,
+        paymentProofUrl: form.paymentProofUrl || null,
+      });
+      if (response.success) {
+        toast.success('Payment updated successfully');
+        setEditingPayment(null);
+        loadCheckIns();
+      } else {
+        toast.error(response.message || 'Failed to update payment');
+      }
+    } catch (err) {
+      console.error('Error updating payment:', err);
+      toast.error('Failed to update payment');
+    } finally {
+      setSavingPayment(false);
+    }
+  };
+
+  // Update edit form field
+  const updateEditForm = (field, value) => {
+    setEditingPayment(prev => ({
+      ...prev,
+      form: { ...prev.form, [field]: value }
+    }));
+  };
+
   // Filter players for check-in tab
   const getFilteredPlayers = () => {
     if (!checkInData?.players) return [];
@@ -574,8 +638,20 @@ export default function TournamentManage() {
               <Link to="/events" className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100">
                 <ArrowLeft className="w-5 h-5" />
               </Link>
+              {/* Event logo/image - links to event detail */}
+              {event?.posterImageUrl && (
+                <Link to={`/event/${eventId}`} className="shrink-0">
+                  <img
+                    src={getSharedAssetUrl(event.posterImageUrl)}
+                    alt={event.name || 'Event'}
+                    className="w-12 h-12 rounded-lg object-cover hover:opacity-80 transition-opacity"
+                  />
+                </Link>
+              )}
               <div>
-                <h1 className="text-xl font-bold text-gray-900">{dashboard?.eventName || 'Tournament'}</h1>
+                <Link to={`/event/${eventId}`} className="hover:text-orange-600 transition-colors">
+                  <h1 className="text-xl font-bold text-gray-900">{dashboard?.eventName || 'Tournament'}</h1>
+                </Link>
                 <div className="flex items-center gap-3 mt-1">
                   <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${statusColors[dashboard?.tournamentStatus] || 'bg-gray-100 text-gray-700'}`}>
                     {dashboard?.tournamentStatus?.replace(/([A-Z])/g, ' $1').trim() || 'Unknown'}
@@ -1736,6 +1812,17 @@ export default function TournamentManage() {
                                             Signature: {player.waiverSignature}
                                           </p>
                                         )}
+                                        {player.signedWaiverPdfUrl && (
+                                          <a
+                                            href={getSharedAssetUrl(player.signedWaiverPdfUrl)}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-700 mt-2"
+                                          >
+                                            <Eye className="w-4 h-4" />
+                                            View Signed Waiver
+                                          </a>
+                                        )}
                                       </div>
                                     ) : (
                                       <div className="text-sm">
@@ -1752,10 +1839,19 @@ export default function TournamentManage() {
 
                                   {/* Payment Details */}
                                   <div className="space-y-2">
-                                    <h4 className="font-medium text-gray-900 flex items-center gap-2">
-                                      <DollarSign className="w-4 h-4 text-emerald-600" />
-                                      Payment Status
-                                    </h4>
+                                    <div className="flex items-center justify-between">
+                                      <h4 className="font-medium text-gray-900 flex items-center gap-2">
+                                        <DollarSign className="w-4 h-4 text-emerald-600" />
+                                        Payment Status
+                                      </h4>
+                                      <button
+                                        onClick={() => startEditPayment(player)}
+                                        className="text-xs text-blue-600 hover:text-blue-700 flex items-center gap-1"
+                                      >
+                                        <Edit2 className="w-3 h-3" />
+                                        Edit
+                                      </button>
+                                    </div>
                                     {player.hasPaid ? (
                                       <div className="text-sm space-y-1">
                                         <div className="flex items-center gap-2 text-green-600">
@@ -1765,6 +1861,11 @@ export default function TournamentManage() {
                                         {player.amountPaid > 0 && (
                                           <p className="text-gray-500">
                                             Amount: ${player.amountPaid?.toFixed(2) || '0.00'}
+                                          </p>
+                                        )}
+                                        {player.paymentMethod && (
+                                          <p className="text-gray-500">
+                                            Method: {player.paymentMethod}
                                           </p>
                                         )}
                                         {player.paidAt && (
@@ -1777,6 +1878,17 @@ export default function TournamentManage() {
                                             Reference: {player.paymentReference}
                                           </p>
                                         )}
+                                        {player.paymentProofUrl && (
+                                          <a
+                                            href={getSharedAssetUrl(player.paymentProofUrl)}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-700 mt-1"
+                                          >
+                                            <Eye className="w-4 h-4" />
+                                            View Payment Proof
+                                          </a>
+                                        )}
                                       </div>
                                     ) : (
                                       <div className="text-sm">
@@ -1787,6 +1899,17 @@ export default function TournamentManage() {
                                         <p className="text-gray-500 mt-1">
                                           Player has not submitted payment
                                         </p>
+                                        {player.paymentProofUrl && (
+                                          <a
+                                            href={getSharedAssetUrl(player.paymentProofUrl)}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-700 mt-1"
+                                          >
+                                            <Eye className="w-4 h-4" />
+                                            View Payment Proof (Pending Verification)
+                                          </a>
+                                        )}
                                       </div>
                                     )}
                                   </div>
@@ -2030,6 +2153,111 @@ export default function TournamentManage() {
           userId={profileModalUserId}
           onClose={() => setProfileModalUserId(null)}
         />
+      )}
+
+      {/* Edit Payment Modal */}
+      {editingPayment && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl max-w-md w-full">
+            <div className="flex items-center justify-between p-4 border-b">
+              <div className="flex items-center gap-2">
+                <DollarSign className="w-5 h-5 text-orange-600" />
+                <h2 className="text-lg font-semibold">Edit Payment</h2>
+              </div>
+              <button
+                onClick={() => setEditingPayment(null)}
+                className="p-1 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-4 space-y-4">
+              <div className="bg-gray-50 rounded-lg p-3 text-sm">
+                <p className="font-medium text-gray-900">
+                  {editingPayment.player.firstName} {editingPayment.player.lastName}
+                </p>
+                <p className="text-gray-500">{editingPayment.player.divisionName}</p>
+              </div>
+
+              <div>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={editingPayment.form.hasPaid}
+                    onChange={(e) => updateEditForm('hasPaid', e.target.checked)}
+                    className="w-4 h-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500"
+                  />
+                  <span className="text-sm font-medium text-gray-700">Payment Received</span>
+                </label>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Amount Paid</label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={editingPayment.form.amountPaid}
+                    onChange={(e) => updateEditForm('amountPaid', e.target.value)}
+                    className="w-full border border-gray-300 rounded-lg p-2.5 pl-7 focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                    placeholder="0.00"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Payment Method</label>
+                <select
+                  value={editingPayment.form.paymentMethod}
+                  onChange={(e) => updateEditForm('paymentMethod', e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                >
+                  {PAYMENT_METHODS.map(method => (
+                    <option key={method.value} value={method.value}>{method.label}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Payment Reference</label>
+                <input
+                  type="text"
+                  value={editingPayment.form.paymentReference}
+                  onChange={(e) => updateEditForm('paymentReference', e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                  placeholder="e.g., Zelle confirmation, transaction ID"
+                />
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  onClick={() => setEditingPayment(null)}
+                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={saveEditedPayment}
+                  disabled={savingPayment}
+                  className="flex-1 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
+                >
+                  {savingPayment ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-4 h-4" />
+                      Save Changes
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
