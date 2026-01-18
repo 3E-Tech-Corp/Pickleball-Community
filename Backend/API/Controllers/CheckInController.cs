@@ -527,6 +527,89 @@ public class CheckInController : ControllerBase
     }
 
     /// <summary>
+    /// Player self-check-in request - sets status to "Requested" for admin approval
+    /// Requires waiver to be signed and payment info to be verified
+    /// </summary>
+    [HttpPost("request/{eventId}")]
+    [Authorize]
+    public async Task<ActionResult<ApiResponse<CheckInResultDto>>> RequestCheckIn(int eventId, [FromBody] RequestCheckInDto? request = null)
+    {
+        try
+        {
+            var userId = GetUserId();
+            if (userId == 0) return Unauthorized();
+
+            // Get event
+            var evt = await _context.Events.FindAsync(eventId);
+            if (evt == null)
+                return NotFound(new ApiResponse<CheckInResultDto> { Success = false, Message = "Event not found" });
+
+            // Get user's registrations
+            var registrations = await _context.EventUnitMembers
+                .Where(m => m.Unit!.EventId == eventId && m.UserId == userId && m.InviteStatus == "Accepted")
+                .Include(m => m.Unit)
+                .ToListAsync();
+
+            if (!registrations.Any())
+                return BadRequest(new ApiResponse<CheckInResultDto> { Success = false, Message = "Not registered for this event" });
+
+            var firstReg = registrations.First();
+
+            // Verify waiver is signed
+            if (firstReg.WaiverSignedAt == null)
+                return BadRequest(new ApiResponse<CheckInResultDto> { Success = false, Message = "Please sign the waiver first" });
+
+            // If payment is required, verify payment info is submitted
+            if (evt.RegistrationFee > 0 || (firstReg.Unit?.Division?.DivisionFee ?? 0) > 0)
+            {
+                // Payment info must be submitted (proof or reference)
+                var hasPaymentInfo = !string.IsNullOrEmpty(firstReg.PaymentProofUrl) ||
+                                     !string.IsNullOrEmpty(firstReg.PaymentReference) ||
+                                     firstReg.AmountPaid > 0;
+
+                if (!hasPaymentInfo && request?.ConfirmPaymentSubmitted != true)
+                    return BadRequest(new ApiResponse<CheckInResultDto>
+                    {
+                        Success = false,
+                        Message = "Please verify your payment information before checking in"
+                    });
+            }
+
+            // Update all registrations to "Requested" status
+            foreach (var reg in registrations)
+            {
+                if (reg.CheckInStatus != "Approved" && !reg.IsCheckedIn)
+                {
+                    reg.CheckInStatus = "Requested";
+                    reg.CheckInRequestedAt = DateTime.Now;
+                }
+            }
+
+            await _context.SaveChangesAsync();
+
+            _logger.LogInformation("User {UserId} requested check-in for event {EventId}", userId, eventId);
+
+            return Ok(new ApiResponse<CheckInResultDto>
+            {
+                Success = true,
+                Data = new CheckInResultDto
+                {
+                    Message = "Check-in requested! Please wait for admin approval."
+                }
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error requesting check-in for event {EventId}", eventId);
+            return StatusCode(500, new ApiResponse<CheckInResultDto>
+            {
+                Success = false,
+                Message = $"Error requesting check-in: {ex.Message}"
+            });
+        }
+    }
+
+    /// <summary>
     /// Manual check-in by TD (Tournament Director)
     /// </summary>
     [HttpPost("manual/{eventId}/{userId}")]
@@ -643,6 +726,8 @@ public class CheckInController : ControllerBase
                 DivisionName = m.Unit.Division!.Name,
                 IsCheckedIn = m.IsCheckedIn,
                 CheckedInAt = m.CheckedInAt,
+                CheckInStatus = m.CheckInStatus,
+                CheckInRequestedAt = m.CheckInRequestedAt,
                 WaiverSigned = m.WaiverSignedAt != null,
                 WaiverSignedAt = m.WaiverSignedAt,
                 WaiverSignature = m.WaiverSignature,
@@ -1329,6 +1414,14 @@ public class ManualCheckInRequest
     public bool SignWaiver { get; set; }
 }
 
+public class RequestCheckInDto
+{
+    /// <summary>
+    /// Player confirms they have submitted payment
+    /// </summary>
+    public bool ConfirmPaymentSubmitted { get; set; }
+}
+
 public class EventCheckInSummaryDto
 {
     public int TotalPlayers { get; set; }
@@ -1351,6 +1444,10 @@ public class PlayerCheckInDto
     public string DivisionName { get; set; } = string.Empty;
     public bool IsCheckedIn { get; set; }
     public DateTime? CheckedInAt { get; set; }
+
+    // Self check-in request status
+    public string CheckInStatus { get; set; } = "None"; // None, Requested, Approved, Rejected
+    public DateTime? CheckInRequestedAt { get; set; }
 
     // Waiver details
     public bool WaiverSigned { get; set; }

@@ -3520,12 +3520,14 @@ public class TournamentController : ControllerBase
             .ToListAsync();
 
         // Include members to show team composition
+        // Order: pool number, then by matches won (for standings after games), then by point differential, then by unit number (for drawing results)
         var units = await _context.EventUnits
             .Include(u => u.Members).ThenInclude(m => m.User)
             .Where(u => u.DivisionId == divisionId && u.Status != "Cancelled")
             .OrderBy(u => u.PoolNumber)
             .ThenByDescending(u => u.MatchesWon)
             .ThenByDescending(u => u.PointsScored - u.PointsAgainst)
+            .ThenBy(u => u.UnitNumber)
             .ToListAsync();
 
         // Build lookup for unit pool/rank info (for playoff seed descriptions)
@@ -4512,6 +4514,7 @@ public class TournamentController : ControllerBase
         for (int pool = 1; pool <= poolCount; pool++)
         {
             // Determine which unit numbers belong to this pool
+            // Seed evenly: unit 1 to pool 1, unit 2 to pool 2, unit 3 to pool 3, then unit 4 to pool 1, etc.
             var poolUnitNumbers = new List<int>();
             for (int i = 0; i < targetUnitCount; i++)
             {
@@ -4521,29 +4524,85 @@ public class TournamentController : ControllerBase
                 }
             }
 
-            var matchNum = 1;
+            // Use circle method for balanced round-robin scheduling
+            // This ensures each unit gets roughly equal wait time between matches
+            var roundRobinMatches = GenerateCircleMethodSchedule(poolUnitNumbers);
 
-            for (int i = 0; i < poolUnitNumbers.Count; i++)
+            var matchNum = 1;
+            foreach (var (unit1, unit2, roundNum) in roundRobinMatches)
             {
-                for (int j = i + 1; j < poolUnitNumbers.Count; j++)
+                matches.Add(new EventEncounter
                 {
-                    matches.Add(new EventEncounter
-                    {
-                        EventId = division.EventId,
-                        DivisionId = division.Id,
-                        RoundType = "Pool",
-                        RoundNumber = pool,
-                        RoundName = $"Pool {(char)('A' + pool - 1)}",
-                        MatchNumber = matchNum++,
-                        Unit1Number = poolUnitNumbers[i],
-                        Unit2Number = poolUnitNumbers[j],
-                        BestOf = request.BestOf,
-                        ScoreFormatId = request.ScoreFormatId,
-                        Status = "Scheduled",
-                        CreatedAt = DateTime.Now,
-                        UpdatedAt = DateTime.Now
-                    });
+                    EventId = division.EventId,
+                    DivisionId = division.Id,
+                    RoundType = "Pool",
+                    RoundNumber = pool,
+                    RoundName = $"Pool {(char)('A' + pool - 1)}",
+                    MatchNumber = matchNum++,
+                    EncounterNumber = roundNum, // Use encounter number to track round within pool
+                    Unit1Number = unit1,
+                    Unit2Number = unit2,
+                    BestOf = request.BestOf,
+                    ScoreFormatId = request.ScoreFormatId,
+                    Status = "Scheduled",
+                    CreatedAt = DateTime.Now,
+                    UpdatedAt = DateTime.Now
+                });
+            }
+        }
+
+        return matches;
+    }
+
+    /// <summary>
+    /// Generate round-robin matches using the circle method (polygon method)
+    /// This ensures balanced wait times - each unit plays once per round
+    /// </summary>
+    private List<(int unit1, int unit2, int round)> GenerateCircleMethodSchedule(List<int> unitNumbers)
+    {
+        var matches = new List<(int unit1, int unit2, int round)>();
+        var n = unitNumbers.Count;
+
+        if (n < 2) return matches;
+
+        // For odd number of units, add a dummy (BYE) position
+        var units = new List<int>(unitNumbers);
+        bool hasBye = (n % 2 == 1);
+        if (hasBye)
+        {
+            units.Add(-1); // -1 represents BYE (will be filtered out)
+            n++;
+        }
+
+        // Number of rounds = n-1 for even, n for odd (but we added dummy, so still n-1)
+        var rounds = n - 1;
+
+        // Circle method: fix position 0, rotate others
+        for (int round = 0; round < rounds; round++)
+        {
+            // In each round, pair units[i] with units[n-1-i]
+            for (int i = 0; i < n / 2; i++)
+            {
+                int pos1 = i;
+                int pos2 = n - 1 - i;
+
+                // Get actual indices after rotation
+                int idx1 = (pos1 == 0) ? 0 : ((pos1 + round - 1) % (n - 1)) + 1;
+                int idx2 = (pos2 == 0) ? 0 : ((pos2 + round - 1) % (n - 1)) + 1;
+
+                var unit1 = units[idx1];
+                var unit2 = units[idx2];
+
+                // Skip matches involving the BYE
+                if (unit1 == -1 || unit2 == -1) continue;
+
+                // Ensure lower unit number is always unit1 for consistency
+                if (unit1 > unit2)
+                {
+                    (unit1, unit2) = (unit2, unit1);
                 }
+
+                matches.Add((unit1, unit2, round + 1));
             }
         }
 

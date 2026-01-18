@@ -1743,10 +1743,18 @@ export default function TournamentManage() {
                                   <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
                                     player.isCheckedIn
                                       ? 'bg-green-100 text-green-700'
+                                      : player.checkInStatus === 'Requested'
+                                      ? 'bg-orange-100 text-orange-700'
                                       : 'bg-yellow-100 text-yellow-700'
                                   }`}>
-                                    {player.isCheckedIn ? <CheckCircle className="w-3 h-3" /> : <Clock className="w-3 h-3" />}
-                                    {player.isCheckedIn ? 'Checked In' : 'Pending'}
+                                    {player.isCheckedIn ? (
+                                      <CheckCircle className="w-3 h-3" />
+                                    ) : player.checkInStatus === 'Requested' ? (
+                                      <AlertCircle className="w-3 h-3" />
+                                    ) : (
+                                      <Clock className="w-3 h-3" />
+                                    )}
+                                    {player.isCheckedIn ? 'Checked In' : player.checkInStatus === 'Requested' ? 'Requested' : 'Pending'}
                                   </span>
 
                                   {/* Waiver status */}
@@ -1758,6 +1766,26 @@ export default function TournamentManage() {
                                     <FileText className="w-3 h-3" />
                                     {player.waiverSigned ? 'Waiver' : 'No Waiver'}
                                   </span>
+
+                                  {/* Send waiver request button - shown when waiver not signed */}
+                                  {!player.waiverSigned && (
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleSendWaiverRequest(player);
+                                      }}
+                                      disabled={sendingWaiverRequest === player.userId}
+                                      className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-700 hover:bg-purple-200 transition-colors disabled:opacity-50"
+                                      title="Send waiver signing request to player"
+                                    >
+                                      {sendingWaiverRequest === player.userId ? (
+                                        <Loader2 className="w-3 h-3 animate-spin" />
+                                      ) : (
+                                        <Send className="w-3 h-3" />
+                                      )}
+                                      Send
+                                    </button>
+                                  )}
 
                                   {/* Payment status */}
                                   <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${

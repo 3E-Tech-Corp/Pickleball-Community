@@ -2324,6 +2324,64 @@ public class EventsController : ControllerBase
         };
     }
 
+    /// <summary>
+    /// Get current user's active event registrations with event statuses
+    /// Used to show notices about Drawing or Running events
+    /// </summary>
+    [HttpGet("my-active-events")]
+    [Authorize]
+    public async Task<ActionResult<ApiResponse<List<UserActiveEventDto>>>> GetMyActiveEvents()
+    {
+        var userId = GetCurrentUserId();
+        if (!userId.HasValue)
+            return Unauthorized(new ApiResponse<List<UserActiveEventDto>> { Success = false, Message = "Unauthorized" });
+
+        // Get user's registrations in active events (Drawing, Running, ScheduleReady)
+        var activeStatuses = new[] { "Drawing", "Running", "ScheduleReady", "Started" };
+
+        var registrations = await _context.EventUnitMembers
+            .Include(m => m.Unit).ThenInclude(u => u!.Event)
+            .Include(m => m.Unit).ThenInclude(u => u!.Division)
+            .Where(m => m.UserId == userId.Value
+                && m.InviteStatus == "Accepted"
+                && m.Unit != null
+                && m.Unit.Event != null
+                && m.Unit.Event.IsActive
+                && activeStatuses.Contains(m.Unit.Event.TournamentStatus))
+            .ToListAsync();
+
+        var result = registrations
+            .GroupBy(r => r.Unit!.EventId)
+            .Select(g =>
+            {
+                var firstReg = g.First();
+                var evt = firstReg.Unit!.Event!;
+                return new UserActiveEventDto
+                {
+                    EventId = evt.Id,
+                    EventName = evt.Name,
+                    TournamentStatus = evt.TournamentStatus,
+                    StartDate = evt.StartDate,
+                    VenueName = evt.VenueName,
+                    IsCheckedIn = g.Any(r => r.IsCheckedIn),
+                    WaiverSigned = g.Any(r => r.WaiverSignedAt != null),
+                    HasPaid = g.Any(r => r.HasPaid),
+                    CheckInStatus = g.FirstOrDefault()?.CheckInStatus ?? "None",
+                    Divisions = g.Select(r => new UserEventDivisionDto
+                    {
+                        DivisionId = r.Unit!.DivisionId,
+                        DivisionName = r.Unit.Division?.Name ?? "Unknown",
+                        UnitId = r.UnitId,
+                        UnitName = r.Unit.Name
+                    }).ToList()
+                };
+            })
+            .OrderBy(e => e.StartDate)
+            .ToList();
+
+        return Ok(new ApiResponse<List<UserActiveEventDto>> { Success = true, Data = result });
+    }
+
     private static double CalculateDistance(double lat1, double lon1, double lat2, double lon2)
     {
         const double R = 3959; // Earth's radius in miles

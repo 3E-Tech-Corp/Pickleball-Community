@@ -929,7 +929,10 @@ export const eventsApi = {
     api.put(`/events/${eventId}/documents/${docId}`, data),
 
   deleteDocument: (eventId, docId) =>
-    api.delete(`/events/${eventId}/documents/${docId}`)
+    api.delete(`/events/${eventId}/documents/${docId}`),
+
+  // Get user's active event registrations (for dashboard notices)
+  getMyActiveEvents: () => api.get('/events/my-active-events')
 }
 
 // Clubs API
@@ -1984,6 +1987,10 @@ export const checkInApi = {
 
   // Self check-in
   checkIn: (eventId) => api.post(`/checkin/${eventId}`),
+
+  // Request check-in (player self-service, sets status to Requested)
+  requestCheckIn: (eventId, confirmPaymentSubmitted = false) =>
+    api.post(`/checkin/request/${eventId}`, { confirmPaymentSubmitted }),
 
   // Manual check-in by TD
   manualCheckIn: (eventId, userId, data = {}) => api.post(`/checkin/manual/${eventId}/${userId}`, data),
