@@ -3694,17 +3694,20 @@ public class TournamentController : ControllerBase
                         }).ToList()
                     }).ToList()
                 }).ToList(),
-            PoolStandings = units.GroupBy(u => u.PoolNumber ?? 0)
-                .OrderBy(g => g.Key)
+            // Group by PoolName first (if set), then by PoolNumber as fallback
+            // This handles cases where PoolName is set but PoolNumber is null
+            PoolStandings = units.GroupBy(u => u.PoolName ?? $"Pool {u.PoolNumber ?? 0}")
+                .OrderBy(g => g.First().PoolNumber ?? 0)
+                .ThenBy(g => g.Key)
                 .Select(g => new PoolStandingsDto
                 {
-                    PoolNumber = g.Key,
-                    PoolName = g.First().PoolName,
+                    PoolNumber = g.First().PoolNumber ?? 0,
+                    PoolName = g.Key,
                     Standings = g.Select((u, idx) => new PoolStandingEntryDto
                     {
                         Rank = idx + 1,
-                        PoolNumber = g.Key,
-                        PoolName = g.First().PoolName ?? $"Pool {g.Key}",
+                        PoolNumber = u.PoolNumber ?? 0,
+                        PoolName = u.PoolName ?? $"Pool {u.PoolNumber ?? 0}",
                         UnitId = u.Id,
                         UnitNumber = u.UnitNumber,
                         UnitName = Utility.FormatUnitDisplayName(u.Members, u.Name),
