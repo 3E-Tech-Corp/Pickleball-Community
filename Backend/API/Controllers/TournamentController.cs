@@ -5271,8 +5271,8 @@ public class TournamentController : ControllerBase
             else
                 unit1.GamesLost++;
 
-            unit1.PointsScored += game.Unit1Score;
-            unit1.PointsAgainst += game.Unit2Score;
+            unit1.PointsScored += game.Unit1Score ?? 0;
+            unit1.PointsAgainst += game.Unit2Score ?? 0;
             unit1.UpdatedAt = DateTime.Now;
         }
 
@@ -5283,8 +5283,8 @@ public class TournamentController : ControllerBase
             else
                 unit2.GamesLost++;
 
-            unit2.PointsScored += game.Unit2Score;
-            unit2.PointsAgainst += game.Unit1Score;
+            unit2.PointsScored += game.Unit2Score ?? 0;
+            unit2.PointsAgainst += game.Unit1Score ?? 0;
             unit2.UpdatedAt = DateTime.Now;
         }
     }
