@@ -2,12 +2,13 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom';
 import {
   ArrowLeft, CheckCircle, XCircle, FileText, DollarSign,
-  Loader2, AlertCircle, Trophy, Clock, Send, ChevronRight
+  Loader2, AlertCircle, Trophy, Clock, Send, ChevronRight, Edit3
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import { checkInApi, eventsApi } from '../services/api';
 import SignatureCanvas from '../components/SignatureCanvas';
+import PaymentModal from '../components/PaymentModal';
 
 export default function PlayerCheckIn() {
   const { eventId } = useParams();
@@ -27,6 +28,7 @@ export default function PlayerCheckIn() {
   const [checkInStatus, setCheckInStatus] = useState(null);
   const [step, setStep] = useState(1); // 1: Waiver, 2: Payment, 3: Submit
   const [showWaiverModal, setShowWaiverModal] = useState(false);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [confirmPayment, setConfirmPayment] = useState(false);
 
@@ -99,8 +101,8 @@ export default function PlayerCheckIn() {
 
       if (response.success) {
         toast.success('Check-in requested! Awaiting admin approval.');
-        // Redirect to player dashboard
-        navigate(`/event/${eventId}/game-day`);
+        // Reload data to show updated status
+        await loadData();
       } else {
         toast.error(response.message || 'Failed to request check-in');
       }
@@ -156,6 +158,7 @@ export default function PlayerCheckIn() {
   const waiverSigned = checkInStatus?.waiverSigned;
   const pendingWaivers = checkInStatus?.pendingWaivers || [];
   const isAlreadyCheckedIn = checkInStatus?.isCheckedIn;
+  const requestedStatus = checkInStatus?.checkInStatus;
 
   // Show "already checked in" unless redo mode or admin mode is enabled
   if (isAlreadyCheckedIn && !redoMode && !isAdminMode) {
@@ -170,6 +173,28 @@ export default function PlayerCheckIn() {
           <Link
             to={`/event/${eventId}/game-day`}
             className="inline-flex items-center gap-2 px-6 py-3 bg-green-600 text-white font-medium rounded-xl hover:bg-green-700 transition-colors"
+          >
+            <Trophy className="w-5 h-5" />
+            Go to Player Dashboard
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  // Show "Requested" status - waiting for admin approval
+  if (requestedStatus === 'Requested' && !redoMode && !isAdminMode) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="text-center max-w-md">
+          <Clock className="w-16 h-16 text-orange-500 mx-auto mb-4" />
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">Check-In Requested</h2>
+          <p className="text-gray-600 mb-6">
+            Your check-in request has been submitted. Please wait for admin approval.
+          </p>
+          <Link
+            to={`/event/${eventId}/gameday`}
+            className="inline-flex items-center gap-2 px-6 py-3 bg-orange-600 text-white font-medium rounded-xl hover:bg-orange-700 transition-colors"
           >
             <Trophy className="w-5 h-5" />
             Go to Player Dashboard
@@ -302,6 +327,19 @@ export default function PlayerCheckIn() {
                 </div>
               )}
 
+              {/* Edit Payment Button */}
+              {waiverSigned && checkInStatus?.registration && (
+                <button
+                  onClick={() => setShowPaymentModal(true)}
+                  className="mt-3 inline-flex items-center gap-2 px-4 py-2 bg-orange-100 text-orange-700 font-medium rounded-lg hover:bg-orange-200 transition-colors"
+                >
+                  <Edit3 className="w-4 h-4" />
+                  {checkInStatus.registration.members?.find(m => m.userId === (isAdminMode ? parseInt(targetUserId) : user?.id))?.hasPaid
+                    ? 'View/Edit Payment Info'
+                    : 'Submit Payment Info'}
+                </button>
+              )}
+
               {waiverSigned && (
                 <label className="flex items-start gap-3 mt-4 cursor-pointer">
                   <input
@@ -384,6 +422,33 @@ export default function PlayerCheckIn() {
           playerName={checkInStatus?.playerName || `${user?.firstName || ''} ${user?.lastName || ''}`.trim()}
           onSign={handleSignWaiver}
           onClose={() => setShowWaiverModal(false)}
+        />
+      )}
+
+      {/* Payment Modal */}
+      {showPaymentModal && checkInStatus?.registration && (
+        <PaymentModal
+          isOpen={showPaymentModal}
+          onClose={() => setShowPaymentModal(false)}
+          registration={{
+            unitId: checkInStatus.registration.unitId,
+            divisionName: checkInStatus.registration.divisionName,
+            teamUnitName: checkInStatus.registration.teamUnitName,
+            skillLevelName: checkInStatus.registration.skillLevelName,
+            amountDue: checkInStatus.registration.amountDue,
+            amountPaid: checkInStatus.registration.amountPaid,
+            paymentStatus: checkInStatus.registration.paymentStatus,
+            paymentReference: checkInStatus.registration.paymentReference,
+            paymentProofUrl: checkInStatus.registration.paymentProofUrl,
+            members: checkInStatus.registration.members,
+            partners: checkInStatus.registration.partners
+          }}
+          event={event}
+          userId={isAdminMode ? parseInt(targetUserId) : user?.id}
+          onPaymentUpdated={() => {
+            loadData();
+            setConfirmPayment(true);
+          }}
         />
       )}
     </div>

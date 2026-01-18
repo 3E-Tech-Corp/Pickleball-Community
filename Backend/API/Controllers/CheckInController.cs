@@ -109,6 +109,9 @@ public class CheckInController : ControllerBase
                 .Include(m => m.User)
                 .Include(m => m.Unit)
                     .ThenInclude(u => u!.Division)
+                .Include(m => m.Unit)
+                    .ThenInclude(u => u!.Members)
+                        .ThenInclude(mem => mem.User)
                 .ToListAsync();
 
             if (!registrations.Any())
@@ -195,6 +198,43 @@ public class CheckInController : ControllerBase
                 ? GetFullUrl(firstReg.SignedWaiverPdfUrl)
                 : null;
 
+            // Build registration info for payment modal (from first unit)
+            var firstUnit = firstReg.Unit!;
+            var registrationDto = new CheckInRegistrationDto
+            {
+                UnitId = firstUnit.Id,
+                DivisionName = firstUnit.Division?.Name,
+                TeamUnitName = firstUnit.Name,
+                SkillLevelName = firstUnit.Division?.SkillLevelName,
+                AmountDue = firstUnit.RegistrationFee ?? firstUnit.Division?.RegistrationFee ?? 0,
+                AmountPaid = firstUnit.Members?.Where(m => m.InviteStatus == "Accepted").Sum(m => m.AmountPaid) ?? 0,
+                PaymentStatus = firstUnit.PaymentStatus ?? "Pending",
+                PaymentReference = firstReg.PaymentReference,
+                PaymentProofUrl = firstReg.PaymentProofUrl,
+                Members = firstUnit.Members?
+                    .Where(m => m.InviteStatus == "Accepted")
+                    .Select(m => new CheckInMemberDto
+                    {
+                        Id = m.Id,
+                        UserId = m.UserId,
+                        Name = m.User != null ? $"{m.User.FirstName} {m.User.LastName}".Trim() : null,
+                        InviteStatus = m.InviteStatus,
+                        HasPaid = m.HasPaid,
+                        AmountPaid = m.AmountPaid,
+                        PaidAt = m.PaidAt,
+                        ReferenceId = m.ReferenceId,
+                        PaymentReference = m.PaymentReference,
+                        PaymentProofUrl = m.PaymentProofUrl
+                    }).ToList() ?? new List<CheckInMemberDto>(),
+                Partners = firstUnit.Members?
+                    .Where(m => m.InviteStatus == "Accepted" && m.UserId != userId)
+                    .Select(m => new CheckInPartnerDto
+                    {
+                        UserId = m.UserId,
+                        Name = m.User != null ? $"{m.User.FirstName} {m.User.LastName}".Trim() : null
+                    }).ToList() ?? new List<CheckInPartnerDto>()
+            };
+
             return Ok(new ApiResponse<PlayerCheckInStatusDto>
             {
                 Success = true,
@@ -216,7 +256,8 @@ public class CheckInController : ControllerBase
                         UnitName = r.Unit.Name,
                         IsCheckedIn = r.IsCheckedIn,
                         CheckedInAt = r.CheckedInAt
-                    }).ToList()
+                    }).ToList(),
+                    Registration = registrationDto
                 }
             });
         }
@@ -1226,6 +1267,9 @@ public class CheckInController : ControllerBase
                 .Include(m => m.User)
                 .Include(m => m.Unit)
                     .ThenInclude(u => u!.Division)
+                .Include(m => m.Unit)
+                    .ThenInclude(u => u!.Members)
+                        .ThenInclude(mem => mem.User)
                 .ToListAsync();
 
             if (!registrations.Any())
@@ -1299,6 +1343,43 @@ public class CheckInController : ControllerBase
                 ? GetFullUrl(firstReg.SignedWaiverPdfUrl)
                 : null;
 
+            // Build registration info for payment modal (from first unit)
+            var firstUnit = firstReg.Unit!;
+            var registrationDto = new CheckInRegistrationDto
+            {
+                UnitId = firstUnit.Id,
+                DivisionName = firstUnit.Division?.Name,
+                TeamUnitName = firstUnit.Name,
+                SkillLevelName = firstUnit.Division?.SkillLevelName,
+                AmountDue = firstUnit.RegistrationFee ?? firstUnit.Division?.RegistrationFee ?? 0,
+                AmountPaid = firstUnit.Members?.Where(m => m.InviteStatus == "Accepted").Sum(m => m.AmountPaid) ?? 0,
+                PaymentStatus = firstUnit.PaymentStatus ?? "Pending",
+                PaymentReference = firstReg.PaymentReference,
+                PaymentProofUrl = firstReg.PaymentProofUrl,
+                Members = firstUnit.Members?
+                    .Where(m => m.InviteStatus == "Accepted")
+                    .Select(m => new CheckInMemberDto
+                    {
+                        Id = m.Id,
+                        UserId = m.UserId,
+                        Name = m.User != null ? $"{m.User.FirstName} {m.User.LastName}".Trim() : null,
+                        InviteStatus = m.InviteStatus,
+                        HasPaid = m.HasPaid,
+                        AmountPaid = m.AmountPaid,
+                        PaidAt = m.PaidAt,
+                        ReferenceId = m.ReferenceId,
+                        PaymentReference = m.PaymentReference,
+                        PaymentProofUrl = m.PaymentProofUrl
+                    }).ToList() ?? new List<CheckInMemberDto>(),
+                Partners = firstUnit.Members?
+                    .Where(m => m.InviteStatus == "Accepted" && m.UserId != targetUserId)
+                    .Select(m => new CheckInPartnerDto
+                    {
+                        UserId = m.UserId,
+                        Name = m.User != null ? $"{m.User.FirstName} {m.User.LastName}".Trim() : null
+                    }).ToList() ?? new List<CheckInPartnerDto>()
+            };
+
             var statusData = new PlayerCheckInStatusDto
             {
                 IsRegistered = true,
@@ -1312,7 +1393,8 @@ public class CheckInController : ControllerBase
                 PaidAt = firstReg.PaidAt,
                 AmountPaid = firstReg.AmountPaid,
                 PlayerName = targetUser != null ? $"{targetUser.FirstName} {targetUser.LastName}".Trim() : null,
-                PlayerEmail = targetUser?.Email
+                PlayerEmail = targetUser?.Email,
+                Registration = registrationDto
             };
 
             return Ok(new ApiResponse<PlayerCheckInStatusDto>
@@ -1661,6 +1743,45 @@ public class PlayerCheckInStatusDto
     public decimal AmountPaid { get; set; }
     public List<WaiverDto> PendingWaivers { get; set; } = new();
     public List<CheckInDivisionDto> Divisions { get; set; } = new();
+    /// <summary>
+    /// Registration info for payment modal - includes first registration's unit/payment details
+    /// </summary>
+    public CheckInRegistrationDto? Registration { get; set; }
+}
+
+public class CheckInRegistrationDto
+{
+    public int UnitId { get; set; }
+    public string? DivisionName { get; set; }
+    public string? TeamUnitName { get; set; }
+    public string? SkillLevelName { get; set; }
+    public decimal AmountDue { get; set; }
+    public decimal AmountPaid { get; set; }
+    public string? PaymentStatus { get; set; }
+    public string? PaymentReference { get; set; }
+    public string? PaymentProofUrl { get; set; }
+    public List<CheckInMemberDto> Members { get; set; } = new();
+    public List<CheckInPartnerDto> Partners { get; set; } = new();
+}
+
+public class CheckInMemberDto
+{
+    public int Id { get; set; }
+    public int UserId { get; set; }
+    public string? Name { get; set; }
+    public string? InviteStatus { get; set; }
+    public bool HasPaid { get; set; }
+    public decimal AmountPaid { get; set; }
+    public DateTime? PaidAt { get; set; }
+    public string? ReferenceId { get; set; }
+    public string? PaymentReference { get; set; }
+    public string? PaymentProofUrl { get; set; }
+}
+
+public class CheckInPartnerDto
+{
+    public int UserId { get; set; }
+    public string? Name { get; set; }
 }
 
 public class CheckInDivisionDto
