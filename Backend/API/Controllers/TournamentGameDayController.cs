@@ -805,6 +805,7 @@ public class TournamentGameDayController : ControllerBase
 
     /// <summary>
     /// Calculate and assign pool rankings based on current statistics
+    /// Recalculates all stats from game scores - safe to run multiple times
     /// </summary>
     [HttpPost("calculate-pool-rankings/{eventId}/{divisionId}")]
     [Authorize]
@@ -827,10 +828,112 @@ public class TournamentGameDayController : ControllerBase
                 .ThenInclude(m => m.User)
             .ToListAsync();
 
-        // Get head-to-head results for tiebreakers
-        var poolMatches = await _context.EventMatches
+        // Reset all unit statistics to zero before recalculating
+        foreach (var unit in units)
+        {
+            unit.MatchesPlayed = 0;
+            unit.MatchesWon = 0;
+            unit.MatchesLost = 0;
+            unit.GamesWon = 0;
+            unit.GamesLost = 0;
+            unit.PointsScored = 0;
+            unit.PointsAgainst = 0;
+        }
+
+        // Get all completed pool encounters with their games
+        var poolEncounters = await _context.EventMatches
             .Where(m => m.DivisionId == divisionId && m.RoundType == "Pool" && m.Status == "Completed")
+            .Include(m => m.Matches)
+                .ThenInclude(em => em.Games)
             .ToListAsync();
+
+        // Create lookup for units
+        var unitLookup = units.ToDictionary(u => u.Id);
+
+        // Recalculate statistics from all completed pool encounters
+        foreach (var encounter in poolEncounters)
+        {
+            if (encounter.Unit1Id == null || encounter.Unit2Id == null)
+                continue;
+
+            var unit1 = unitLookup.GetValueOrDefault(encounter.Unit1Id.Value);
+            var unit2 = unitLookup.GetValueOrDefault(encounter.Unit2Id.Value);
+
+            if (unit1 == null || unit2 == null)
+                continue;
+
+            // Count games won/lost and points from all games in this encounter
+            int unit1GamesWon = 0;
+            int unit2GamesWon = 0;
+            int unit1Points = 0;
+            int unit2Points = 0;
+
+            // Get games either from EncounterMatches or directly from encounter
+            var games = encounter.Matches?.SelectMany(m => m.Games).ToList() ?? new List<EventGame>();
+
+            // If no games through matches, check for legacy direct games
+            if (!games.Any())
+            {
+                games = await _context.EventGames
+                    .Where(g => g.EncounterMatch != null && g.EncounterMatch.EncounterId == encounter.Id &&
+                           (g.Status == "Completed" || g.Status == "Finished"))
+                    .ToListAsync();
+            }
+
+            foreach (var game in games.Where(g => g.Status == "Completed" || g.Status == "Finished"))
+            {
+                unit1Points += game.Unit1Score;
+                unit2Points += game.Unit2Score;
+
+                if (game.Unit1Score > game.Unit2Score)
+                    unit1GamesWon++;
+                else if (game.Unit2Score > game.Unit1Score)
+                    unit2GamesWon++;
+            }
+
+            // Update game stats
+            unit1.GamesWon += unit1GamesWon;
+            unit1.GamesLost += unit2GamesWon;
+            unit2.GamesWon += unit2GamesWon;
+            unit2.GamesLost += unit1GamesWon;
+
+            // Update point stats
+            unit1.PointsScored += unit1Points;
+            unit1.PointsAgainst += unit2Points;
+            unit2.PointsScored += unit2Points;
+            unit2.PointsAgainst += unit1Points;
+
+            // Update match stats (encounter is the match)
+            unit1.MatchesPlayed++;
+            unit2.MatchesPlayed++;
+
+            // Determine match winner based on games won
+            if (unit1GamesWon > unit2GamesWon)
+            {
+                unit1.MatchesWon++;
+                unit2.MatchesLost++;
+            }
+            else if (unit2GamesWon > unit1GamesWon)
+            {
+                unit2.MatchesWon++;
+                unit1.MatchesLost++;
+            }
+            else
+            {
+                // Tie in games - use point differential or mark as tie
+                // For now, if games are tied, check encounter's explicit winner
+                if (encounter.WinnerUnitId == unit1.Id)
+                {
+                    unit1.MatchesWon++;
+                    unit2.MatchesLost++;
+                }
+                else if (encounter.WinnerUnitId == unit2.Id)
+                {
+                    unit2.MatchesWon++;
+                    unit1.MatchesLost++;
+                }
+            }
+        }
 
         var poolStandings = new List<PoolStandingsResultDto>();
 
@@ -849,7 +952,7 @@ public class TournamentGameDayController : ControllerBase
                 .ToList();
 
             // Handle tiebreakers with head-to-head
-            rankedUnits = ApplyHeadToHeadTiebreaker(rankedUnits, poolMatches);
+            rankedUnits = ApplyHeadToHeadTiebreaker(rankedUnits, poolEncounters);
 
             // Assign pool ranks
             for (int i = 0; i < rankedUnits.Count; i++)
@@ -889,7 +992,7 @@ public class TournamentGameDayController : ControllerBase
         {
             Success = true,
             Data = poolStandings,
-            Message = "Pool rankings calculated"
+            Message = "Pool rankings recalculated from all game scores"
         });
     }
 
