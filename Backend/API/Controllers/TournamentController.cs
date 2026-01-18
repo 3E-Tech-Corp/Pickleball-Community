@@ -7,6 +7,7 @@ using Pickleball.Community.Models.Constants;
 using Pickleball.Community.Models.Entities;
 using Pickleball.Community.Models.DTOs;
 using Pickleball.Community.Hubs;
+using Pickleball.Community.Services;
 
 namespace Pickleball.Community.API.Controllers;
 
@@ -17,12 +18,18 @@ public class TournamentController : ControllerBase
     private readonly ApplicationDbContext _context;
     private readonly ILogger<TournamentController> _logger;
     private readonly IDrawingBroadcaster _drawingBroadcaster;
+    private readonly INotificationService _notificationService;
 
-    public TournamentController(ApplicationDbContext context, ILogger<TournamentController> logger, IDrawingBroadcaster drawingBroadcaster)
+    public TournamentController(
+        ApplicationDbContext context,
+        ILogger<TournamentController> logger,
+        IDrawingBroadcaster drawingBroadcaster,
+        INotificationService notificationService)
     {
         _context = context;
         _logger = logger;
         _drawingBroadcaster = drawingBroadcaster;
+        _notificationService = notificationService;
     }
 
     private int? GetUserId()
@@ -3783,6 +3790,9 @@ public class TournamentController : ControllerBase
     {
         var game = await _context.EventGames
             .Include(g => g.EncounterMatch).ThenInclude(m => m!.Encounter)
+                .ThenInclude(e => e!.Unit1).ThenInclude(u => u!.Members)
+            .Include(g => g.EncounterMatch).ThenInclude(m => m!.Encounter)
+                .ThenInclude(e => e!.Unit2).ThenInclude(u => u!.Members)
             .FirstOrDefaultAsync(g => g.Id == request.GameId);
 
         if (game == null)
@@ -3809,6 +3819,47 @@ public class TournamentController : ControllerBase
         // Call stored procedure for notifications
         await CallGameStatusChangeSP(game.Id, oldStatus, "Queued");
 
+        // Send real-time notifications to players in this game
+        var encounter = game.EncounterMatch?.Encounter;
+        if (encounter != null)
+        {
+            var playerIds = new List<int>();
+            if (encounter.Unit1?.Members != null)
+                playerIds.AddRange(encounter.Unit1.Members.Where(m => m.InviteStatus == "Accepted").Select(m => m.UserId));
+            if (encounter.Unit2?.Members != null)
+                playerIds.AddRange(encounter.Unit2.Members.Where(m => m.InviteStatus == "Accepted").Select(m => m.UserId));
+
+            if (playerIds.Count > 0)
+            {
+                var unit1Name = encounter.Unit1?.Name ?? "Team 1";
+                var unit2Name = encounter.Unit2?.Name ?? "Team 2";
+                var actionUrl = $"/event/{encounter.EventId}/gameday";
+
+                foreach (var playerId in playerIds.Distinct())
+                {
+                    await _notificationService.CreateAndSendAsync(
+                        playerId,
+                        "GameUpdate",
+                        "Your game is ready!",
+                        $"{unit1Name} vs {unit2Name} - Court: {court.Name}",
+                        actionUrl,
+                        "Game",
+                        game.Id);
+                }
+            }
+
+            // Also broadcast to event group for admin dashboard refresh
+            await _notificationService.SendToEventAsync(encounter.EventId, new NotificationPayload
+            {
+                Type = "GameUpdate",
+                Title = "Game Queued",
+                Message = $"Game assigned to {court.Name}",
+                ReferenceType = "Game",
+                ReferenceId = game.Id,
+                CreatedAt = DateTime.Now
+            });
+        }
+
         return Ok(new ApiResponse<EventGameDto>
         {
             Success = true,
@@ -3822,6 +3873,9 @@ public class TournamentController : ControllerBase
     {
         var game = await _context.EventGames
             .Include(g => g.EncounterMatch).ThenInclude(m => m!.Encounter)
+                .ThenInclude(e => e!.Unit1).ThenInclude(u => u!.Members)
+            .Include(g => g.EncounterMatch).ThenInclude(m => m!.Encounter)
+                .ThenInclude(e => e!.Unit2).ThenInclude(u => u!.Members)
             .Include(g => g.TournamentCourt)
             .FirstOrDefaultAsync(g => g.Id == request.GameId);
 
@@ -3852,6 +3906,51 @@ public class TournamentController : ControllerBase
 
         // Call stored procedure for notifications
         await CallGameStatusChangeSP(game.Id, oldStatus, request.Status);
+
+        // Send real-time notifications to players if status changed significantly
+        var encounter = game.EncounterMatch?.Encounter;
+        if (encounter != null && (request.Status == "Started" || request.Status == "Playing"))
+        {
+            var playerIds = new List<int>();
+            if (encounter.Unit1?.Members != null)
+                playerIds.AddRange(encounter.Unit1.Members.Where(m => m.InviteStatus == "Accepted").Select(m => m.UserId));
+            if (encounter.Unit2?.Members != null)
+                playerIds.AddRange(encounter.Unit2.Members.Where(m => m.InviteStatus == "Accepted").Select(m => m.UserId));
+
+            if (playerIds.Count > 0)
+            {
+                var unit1Name = encounter.Unit1?.Name ?? "Team 1";
+                var unit2Name = encounter.Unit2?.Name ?? "Team 2";
+                var courtName = game.TournamentCourt?.Name ?? "assigned court";
+                var actionUrl = $"/event/{encounter.EventId}/gameday";
+
+                foreach (var playerId in playerIds.Distinct())
+                {
+                    await _notificationService.CreateAndSendAsync(
+                        playerId,
+                        "GameUpdate",
+                        "Game Starting!",
+                        $"{unit1Name} vs {unit2Name} - {courtName}",
+                        actionUrl,
+                        "Game",
+                        game.Id);
+                }
+            }
+        }
+
+        // Broadcast to event group for admin dashboard refresh
+        if (encounter != null)
+        {
+            await _notificationService.SendToEventAsync(encounter.EventId, new NotificationPayload
+            {
+                Type = "GameUpdate",
+                Title = $"Game {request.Status}",
+                Message = $"Game status updated to {request.Status}",
+                ReferenceType = "Game",
+                ReferenceId = game.Id,
+                CreatedAt = DateTime.Now
+            });
+        }
 
         return Ok(new ApiResponse<EventGameDto>
         {

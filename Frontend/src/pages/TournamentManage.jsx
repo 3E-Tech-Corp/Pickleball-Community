@@ -1,14 +1,16 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
   ArrowLeft, Users, Trophy, Calendar, Clock, MapPin, Play, Check, X,
   ChevronDown, ChevronUp, RefreshCw, Shuffle, Settings, Target,
   AlertCircle, Loader2, Plus, Edit2, DollarSign, Eye, Share2, LayoutGrid,
   Award, ArrowRight, Lock, Unlock, Save, Map, ExternalLink, FileText, User,
-  CheckCircle, XCircle, MoreVertical, Upload, Send, Info, Radio, ClipboardList
+  CheckCircle, XCircle, MoreVertical, Upload, Send, Info, Radio, ClipboardList,
+  Download
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
+import { useNotifications } from '../hooks/useNotifications';
 import { tournamentApi, gameDayApi, eventsApi, objectAssetsApi, checkInApi, sharedAssetApi, getSharedAssetUrl } from '../services/api';
 import ScheduleConfigModal from '../components/ScheduleConfigModal';
 import PublicProfileModal from '../components/ui/PublicProfileModal';
@@ -19,6 +21,7 @@ export default function TournamentManage() {
   const navigate = useNavigate();
   const { user, isAuthenticated } = useAuth();
   const toast = useToast();
+  const { connect, disconnect, joinEvent, leaveEvent, addListener, isConnected } = useNotifications();
 
   const [loading, setLoading] = useState(true);
   const [dashboard, setDashboard] = useState(null);
@@ -95,6 +98,34 @@ export default function TournamentManage() {
       loadEvent();
     }
   }, [eventId]);
+
+  // SignalR connection for real-time updates
+  useEffect(() => {
+    if (!eventId || !isAuthenticated) return;
+
+    const setupSignalR = async () => {
+      await connect();
+      await joinEvent(parseInt(eventId));
+    };
+
+    setupSignalR();
+
+    // Listen for game/score updates and refresh dashboard
+    const removeListener = addListener((notification) => {
+      if (notification.Type === 'ScoreUpdate' || notification.Type === 'GameUpdate') {
+        console.log('Admin dashboard: Received game update, refreshing...', notification);
+        loadDashboard();
+        if (selectedDivision?.scheduleReady) {
+          loadSchedule(selectedDivision.id);
+        }
+      }
+    });
+
+    return () => {
+      removeListener();
+      leaveEvent(parseInt(eventId));
+    };
+  }, [eventId, isAuthenticated, connect, joinEvent, leaveEvent, addListener]);
 
   useEffect(() => {
     if (selectedDivision?.scheduleReady) {
