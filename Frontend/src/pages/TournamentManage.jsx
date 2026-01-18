@@ -2546,8 +2546,6 @@ export default function TournamentManage() {
           onSaveScore={selectedGameForEdit.hasGames ? async (gameId, unit1Score, unit2Score, finish) => {
             await tournamentApi.adminUpdateScore(gameId, unit1Score, unit2Score, finish);
           } : undefined}
-          showCourtAssignment={false}
-          showStatusControl={false}
           readOnly={!selectedGameForEdit.hasGames}
         />
       )}
