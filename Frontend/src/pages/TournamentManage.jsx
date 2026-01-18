@@ -1533,8 +1533,210 @@ export default function TournamentManage() {
                     </div>
                   )}
 
-                  {/* Rounds and Matches */}
-                  {schedule.rounds?.map((round, roundIdx) => (
+                  {/* Pool Play Rounds */}
+                  {schedule.rounds?.filter(r => r.roundType === 'Pool').length > 0 && (
+                    <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+                      <div className="px-4 py-3 bg-gray-50 border-b">
+                        <h3 className="font-medium text-gray-900 flex items-center gap-2">
+                          <Calendar className="w-5 h-5 text-blue-500" />
+                          Pool Play Schedule
+                        </h3>
+                      </div>
+                      <div className="divide-y">
+                        {schedule.rounds.filter(r => r.roundType === 'Pool').map((round, roundIdx) => (
+                          <div key={roundIdx}>
+                            <div className="px-4 py-2 bg-gray-100 text-sm font-medium text-gray-700">
+                              {round.roundName || `Pool Round ${round.roundNumber}`}
+                            </div>
+                            {round.matches?.filter(m => !m.isBye).map((match, matchIdx) => (
+                              <div key={matchIdx} className="p-4 border-t border-gray-100">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-4 flex-1">
+                                    <div className="text-sm text-gray-400 w-8">#{match.matchNumber}</div>
+                                    <div className="flex-1 grid grid-cols-3 gap-4 items-center">
+                                      <div className={`text-right flex items-center justify-end gap-2 ${match.winnerName === match.unit1Name ? 'font-semibold text-green-600' : ''}`}>
+                                        {match.unit1Number && (
+                                          <span className="w-6 h-6 flex items-center justify-center bg-orange-100 text-orange-700 font-semibold rounded text-xs">
+                                            {match.unit1Number}
+                                          </span>
+                                        )}
+                                        <span className={match.unit1Name ? 'text-gray-900' : 'text-gray-600'}>
+                                          {match.unit1Name || match.unit1SeedInfo || (match.unit1Number ? `Unit #${match.unit1Number}` : '')}
+                                        </span>
+                                      </div>
+                                      <div className="text-center">
+                                        {match.score ? (
+                                          <span className="font-medium text-gray-700">{match.score}</span>
+                                        ) : (
+                                          <span className="text-gray-400">vs</span>
+                                        )}
+                                      </div>
+                                      <div className={`flex items-center gap-2 ${match.winnerName === match.unit2Name ? 'font-semibold text-green-600' : ''}`}>
+                                        {match.unit2Number && (
+                                          <span className="w-6 h-6 flex items-center justify-center bg-orange-100 text-orange-700 font-semibold rounded text-xs">
+                                            {match.unit2Number}
+                                          </span>
+                                        )}
+                                        <span className={match.unit2Name ? 'text-gray-900' : 'text-gray-600'}>
+                                          {match.unit2Name || match.unit2SeedInfo || (match.unit2Number ? `Unit #${match.unit2Number}` : '')}
+                                        </span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-2 ml-4">
+                                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                                      match.status === 'Completed' ? 'bg-green-100 text-green-700' :
+                                      match.status === 'InProgress' ? 'bg-orange-100 text-orange-700' :
+                                      'bg-gray-100 text-gray-700'
+                                    }`}>
+                                      {match.status || 'Scheduled'}
+                                    </span>
+                                    <button
+                                      onClick={() => setSelectedGameForEdit({
+                                        id: match.games?.[0]?.gameId || match.games?.[0]?.id || match.encounterId,
+                                        ...(match.games?.[0] || {}),
+                                        unit1: { id: match.unit1Id, name: match.unit1Name || match.unit1SeedInfo, members: match.unit1Members || [] },
+                                        unit2: { id: match.unit2Id, name: match.unit2Name || match.unit2SeedInfo, members: match.unit2Members || [] },
+                                        unit1Score: match.games?.[0]?.unit1Score ?? match.unit1Score ?? 0,
+                                        unit2Score: match.games?.[0]?.unit2Score ?? match.unit2Score ?? 0,
+                                        bestOf: match.bestOf || 1,
+                                        matchNumber: match.matchNumber,
+                                        status: match.games?.[0]?.status || match.status || 'New',
+                                        games: match.games || [],
+                                        courtLabel: match.courtLabel,
+                                        winnerUnitId: match.winnerUnitId,
+                                        hasGames: match.games?.length > 0
+                                      })}
+                                      className="p-1.5 text-gray-400 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition-colors"
+                                      title={match.games?.length > 0 ? "Edit game score" : "Match details"}
+                                    >
+                                      <Info className="w-4 h-4" />
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Playoff/Bracket Rounds */}
+                  {schedule.rounds?.filter(r => r.roundType === 'Bracket' || r.roundType === 'ThirdPlace').length > 0 && (
+                    <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+                      <div className="px-4 py-3 bg-yellow-50 border-b">
+                        <h3 className="font-medium text-gray-900 flex items-center gap-2">
+                          <Trophy className="w-5 h-5 text-yellow-500" />
+                          Playoff Bracket
+                          {schedule.playoffFromPools && (
+                            <span className="text-sm font-normal text-gray-500">
+                              (Top {schedule.playoffFromPools} from each pool advance)
+                            </span>
+                          )}
+                        </h3>
+                      </div>
+                      <div className="divide-y">
+                        {schedule.rounds.filter(r => r.roundType === 'Bracket' || r.roundType === 'ThirdPlace').map((round, roundIdx) => (
+                          <div key={roundIdx}>
+                            <div className={`px-4 py-2 text-sm font-medium text-gray-700 ${
+                              round.roundType === 'ThirdPlace' ? 'bg-amber-50' : 'bg-yellow-100'
+                            }`}>
+                              {round.roundType === 'ThirdPlace' ? '🥉 ' : ''}
+                              {round.roundName || `Playoff Round ${round.roundNumber}`}
+                            </div>
+                            {round.matches?.map((match, matchIdx) => (
+                              <div key={matchIdx} className="p-4 border-t border-gray-100">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-4 flex-1">
+                                    <div className="text-sm text-gray-400 w-8">#{match.matchNumber}</div>
+                                    <div className="flex-1 grid grid-cols-3 gap-4 items-center">
+                                      <div className={`text-right flex items-center justify-end gap-2 ${match.winnerName === match.unit1Name ? 'font-semibold text-green-600' : ''}`}>
+                                        {match.isBye && !match.unit1Name ? (
+                                          <span className="italic text-gray-400">BYE</span>
+                                        ) : (
+                                          <>
+                                            {match.unit1Number && (
+                                              <span className="w-6 h-6 flex items-center justify-center bg-orange-100 text-orange-700 font-semibold rounded text-xs">
+                                                {match.unit1Number}
+                                              </span>
+                                            )}
+                                            <span className={match.unit1Name ? 'text-gray-900' : 'text-blue-600 font-medium'}>
+                                              {match.unit1Name || match.unit1SeedInfo || (match.unit1Number ? `Unit #${match.unit1Number}` : '')}
+                                            </span>
+                                          </>
+                                        )}
+                                      </div>
+                                      <div className="text-center">
+                                        {match.isBye ? (
+                                          <span className="text-gray-300">—</span>
+                                        ) : match.score ? (
+                                          <span className="font-medium text-gray-700">{match.score}</span>
+                                        ) : (
+                                          <span className="text-gray-400">vs</span>
+                                        )}
+                                      </div>
+                                      <div className={`flex items-center gap-2 ${match.winnerName === match.unit2Name ? 'font-semibold text-green-600' : ''}`}>
+                                        {match.isBye && !match.unit2Name ? (
+                                          <span className="italic text-gray-400">BYE</span>
+                                        ) : (
+                                          <>
+                                            {match.unit2Number && (
+                                              <span className="w-6 h-6 flex items-center justify-center bg-orange-100 text-orange-700 font-semibold rounded text-xs">
+                                                {match.unit2Number}
+                                              </span>
+                                            )}
+                                            <span className={match.unit2Name ? 'text-gray-900' : 'text-blue-600 font-medium'}>
+                                              {match.unit2Name || match.unit2SeedInfo || (match.unit2Number ? `Unit #${match.unit2Number}` : '')}
+                                            </span>
+                                          </>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-2 ml-4">
+                                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                                      match.status === 'Completed' ? 'bg-green-100 text-green-700' :
+                                      match.status === 'InProgress' ? 'bg-orange-100 text-orange-700' :
+                                      'bg-gray-100 text-gray-700'
+                                    }`}>
+                                      {match.status || 'Scheduled'}
+                                    </span>
+                                    {!match.isBye && (
+                                      <button
+                                        onClick={() => setSelectedGameForEdit({
+                                          id: match.games?.[0]?.gameId || match.games?.[0]?.id || match.encounterId,
+                                          ...(match.games?.[0] || {}),
+                                          unit1: { id: match.unit1Id, name: match.unit1Name || match.unit1SeedInfo, members: match.unit1Members || [] },
+                                          unit2: { id: match.unit2Id, name: match.unit2Name || match.unit2SeedInfo, members: match.unit2Members || [] },
+                                          unit1Score: match.games?.[0]?.unit1Score ?? match.unit1Score ?? 0,
+                                          unit2Score: match.games?.[0]?.unit2Score ?? match.unit2Score ?? 0,
+                                          bestOf: match.bestOf || 1,
+                                          matchNumber: match.matchNumber,
+                                          status: match.games?.[0]?.status || match.status || 'New',
+                                          games: match.games || [],
+                                          courtLabel: match.courtLabel,
+                                          winnerUnitId: match.winnerUnitId,
+                                          hasGames: match.games?.length > 0
+                                        })}
+                                        className="p-1.5 text-gray-400 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition-colors"
+                                        title={match.games?.length > 0 ? "Edit game score" : "Match details"}
+                                      >
+                                        <Info className="w-4 h-4" />
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Other Round Types (not Pool, Bracket, or ThirdPlace) */}
+                  {schedule.rounds?.filter(r => r.roundType !== 'Pool' && r.roundType !== 'Bracket' && r.roundType !== 'ThirdPlace').map((round, roundIdx) => (
                     <div key={roundIdx} className="bg-white rounded-xl shadow-sm overflow-hidden">
                       <div className="px-4 py-3 bg-gray-50 border-b">
                         <h3 className="font-medium text-gray-900">
