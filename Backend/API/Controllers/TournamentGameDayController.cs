@@ -591,6 +591,43 @@ public class TournamentGameDayController : ControllerBase
         var previousUnit1Score = game.Unit1Score;
         var previousUnit2Score = game.Unit2Score;
 
+        // Player-specific validation (organizers can always override)
+        if (!isOrganizer && playerUnitId.HasValue)
+        {
+            // Check if score is already locked (both sides confirmed with matching scores)
+            if (game.Status == "Finished" && game.ScoreSubmittedByUnitId != null && game.ScoreConfirmedByUnitId != null)
+            {
+                return BadRequest(new ApiResponse<object>
+                {
+                    Success = false,
+                    Message = "Score is locked. Both teams have confirmed the final score. Contact a tournament director if you need to dispute."
+                });
+            }
+
+            // Check if other team already submitted a DIFFERENT score
+            if (game.ScoreSubmittedByUnitId != null && game.ScoreSubmittedByUnitId != playerUnitId)
+            {
+                // Other team already submitted - check if scores match
+                bool scoresMatch = game.Unit1Score == request.Unit1Score && game.Unit2Score == request.Unit2Score;
+
+                if (!scoresMatch)
+                {
+                    return BadRequest(new ApiResponse<object>
+                    {
+                        Success = false,
+                        Message = $"Score conflict! Opponent submitted {game.Unit1Score}-{game.Unit2Score}, but you entered {request.Unit1Score}-{request.Unit2Score}. Please verify with your opponent. If you cannot agree, contact a tournament director."
+                    });
+                }
+            }
+
+            // Check if this player's team already submitted and is trying to change
+            if (game.ScoreSubmittedByUnitId == playerUnitId && game.ScoreConfirmedByUnitId == null)
+            {
+                // Same team trying to update - allow it but warn if different
+                // (They might be correcting a mistake before opponent confirms)
+            }
+        }
+
         game.Unit1Score = request.Unit1Score;
         game.Unit2Score = request.Unit2Score;
         game.UpdatedAt = DateTime.Now;
@@ -606,17 +643,19 @@ public class TournamentGameDayController : ControllerBase
         {
             if (game.ScoreSubmittedByUnitId == null)
             {
+                // First submission
                 game.ScoreSubmittedByUnitId = playerUnitId;
                 game.ScoreSubmittedAt = DateTime.Now;
             }
             else if (game.ScoreSubmittedByUnitId != playerUnitId)
             {
-                // Other unit is confirming
+                // Other unit is confirming with matching score - lock it
                 game.ScoreConfirmedByUnitId = playerUnitId;
                 game.ScoreConfirmedAt = DateTime.Now;
                 game.Status = "Finished";
                 game.FinishedAt = DateTime.Now;
             }
+            // If same team is updating their own submission (before opponent confirms), just update the score
         }
         else if (isOrganizer)
         {

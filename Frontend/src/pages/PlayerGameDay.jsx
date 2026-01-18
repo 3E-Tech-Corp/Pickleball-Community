@@ -143,11 +143,17 @@ export default function PlayerGameDay() {
 
   const handleSubmitScore = async (gameId, unit1Score, unit2Score) => {
     try {
-      await gameDayApi.submitScore(gameId, unit1Score, unit2Score)
-      setShowScoreModal(null)
-      loadData()
+      const response = await gameDayApi.submitScore(gameId, unit1Score, unit2Score)
+      if (response.success) {
+        setShowScoreModal(null)
+        loadData()
+        return { success: true }
+      } else {
+        // Return error message to the modal
+        return { error: response.message || 'Failed to submit score' }
+      }
     } catch (err) {
-      alert('Failed to submit score: ' + (err.message || 'Unknown error'))
+      return { error: err.message || 'Failed to submit score' }
     }
   }
 
@@ -1340,17 +1346,24 @@ function WaiverModal({ waivers, playerName, onSign, onClose }) {
 }
 
 // ============================================
-// Score Modal (unchanged)
+// Score Modal
 // ============================================
 function ScoreModal({ game, onSubmit, onClose }) {
   const [unit1Score, setUnit1Score] = useState(game.unit1Score || 0)
   const [unit2Score, setUnit2Score] = useState(game.unit2Score || 0)
   const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState(null)
 
   const handleSubmit = async () => {
     setSubmitting(true)
-    await onSubmit(game.gameId, unit1Score, unit2Score)
-    setSubmitting(false)
+    setError(null)
+    const result = await onSubmit(game.gameId, unit1Score, unit2Score)
+    if (result?.error) {
+      setError(result.error)
+      setSubmitting(false)
+    } else {
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -1366,28 +1379,95 @@ function ScoreModal({ game, onSubmit, onClose }) {
         </div>
 
         <div className="p-6">
-          <div className="grid grid-cols-3 gap-4 items-center">
+          {/* Game Format */}
+          {(game.gameFormat || game.divisionName) && (
+            <div className="text-center mb-4">
+              <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm font-medium">
+                {game.gameFormat || game.divisionName}
+              </span>
+            </div>
+          )}
+
+          {/* Players and Score Input */}
+          <div className="grid grid-cols-3 gap-2 items-start">
+            {/* Team 1 */}
             <div className="text-center">
-              <div className="font-medium mb-2">{game.unit1Name}</div>
+              {/* Player Avatars */}
+              <div className="flex justify-center gap-1 mb-2">
+                {game.unit1Players?.length > 0 ? (
+                  game.unit1Players.map((player, idx) => (
+                    <div key={idx} className="flex flex-col items-center">
+                      {player.profileImageUrl ? (
+                        <img
+                          src={getSharedAssetUrl(player.profileImageUrl)}
+                          alt=""
+                          className="w-10 h-10 rounded-full object-cover border-2 border-gray-200"
+                        />
+                      ) : (
+                        <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center">
+                          <User className="w-5 h-5 text-gray-400" />
+                        </div>
+                      )}
+                      <span className="text-xs mt-1 max-w-[60px] truncate text-gray-600">
+                        {player.name?.split(' ')[0]}
+                      </span>
+                    </div>
+                  ))
+                ) : (
+                  <div className="font-medium text-sm text-gray-700">{game.unit1Name}</div>
+                )}
+              </div>
+              {game.unit1Players?.length > 0 && (
+                <div className="text-xs text-gray-500 mb-2">{game.unit1Name}</div>
+              )}
               <input
                 type="number"
                 min="0"
                 value={unit1Score}
                 onChange={(e) => setUnit1Score(parseInt(e.target.value) || 0)}
-                className="w-20 h-16 text-2xl font-bold text-center border rounded-lg mx-auto"
+                className="w-16 h-14 text-2xl font-bold text-center border rounded-lg mx-auto"
               />
             </div>
 
-            <div className="text-center text-2xl font-bold text-gray-400">vs</div>
+            {/* VS */}
+            <div className="text-center text-xl font-bold text-gray-400 pt-12">vs</div>
 
+            {/* Team 2 */}
             <div className="text-center">
-              <div className="font-medium mb-2">{game.unit2Name}</div>
+              {/* Player Avatars */}
+              <div className="flex justify-center gap-1 mb-2">
+                {game.unit2Players?.length > 0 ? (
+                  game.unit2Players.map((player, idx) => (
+                    <div key={idx} className="flex flex-col items-center">
+                      {player.profileImageUrl ? (
+                        <img
+                          src={getSharedAssetUrl(player.profileImageUrl)}
+                          alt=""
+                          className="w-10 h-10 rounded-full object-cover border-2 border-gray-200"
+                        />
+                      ) : (
+                        <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center">
+                          <User className="w-5 h-5 text-gray-400" />
+                        </div>
+                      )}
+                      <span className="text-xs mt-1 max-w-[60px] truncate text-gray-600">
+                        {player.name?.split(' ')[0]}
+                      </span>
+                    </div>
+                  ))
+                ) : (
+                  <div className="font-medium text-sm text-gray-700">{game.unit2Name}</div>
+                )}
+              </div>
+              {game.unit2Players?.length > 0 && (
+                <div className="text-xs text-gray-500 mb-2">{game.unit2Name}</div>
+              )}
               <input
                 type="number"
                 min="0"
                 value={unit2Score}
                 onChange={(e) => setUnit2Score(parseInt(e.target.value) || 0)}
-                className="w-20 h-16 text-2xl font-bold text-center border rounded-lg mx-auto"
+                className="w-16 h-14 text-2xl font-bold text-center border rounded-lg mx-auto"
               />
             </div>
           </div>
@@ -1396,6 +1476,12 @@ function ScoreModal({ game, onSubmit, onClose }) {
             <p className="text-sm text-gray-500 text-center mt-4">
               Opponent submitted: {game.unit1Score} - {game.unit2Score}
             </p>
+          )}
+
+          {error && (
+            <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+              {error}
+            </div>
           )}
         </div>
 
