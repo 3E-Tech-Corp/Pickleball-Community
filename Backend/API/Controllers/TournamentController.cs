@@ -3558,7 +3558,8 @@ public class TournamentController : ControllerBase
             PlayoffFromPools = division.PlayoffFromPools,
             ExportedAt = DateTime.Now,
             Rounds = matches
-                .Where(m => !(m.Unit1Id == null && m.Unit2Id == null)) // Filter out empty placeholder matches
+                // Include matches with units assigned OR with seed labels (playoff brackets before units assigned)
+                .Where(m => m.Unit1Id != null || m.Unit2Id != null || m.Unit1SeedLabel != null || m.Unit2SeedLabel != null)
                 .GroupBy(m => new { m.RoundType, m.RoundNumber, m.RoundName })
                 .OrderBy(g => g.Key.RoundType == "Pool" ? 0 : g.Key.RoundType == "Bracket" ? 1 : 2)
                 .ThenBy(g => g.Key.RoundNumber)
@@ -3575,8 +3576,13 @@ public class TournamentController : ControllerBase
                         Unit1Name = m.Unit1?.Name,
                         Unit2Name = m.Unit2?.Name,
                         // Add seed info for playoff (Bracket) matches
-                        Unit1SeedInfo = g.Key.RoundType == "Bracket" ? GetSeedInfo(m.Unit1Id) : null,
-                        Unit2SeedInfo = g.Key.RoundType == "Bracket" ? GetSeedInfo(m.Unit2Id) : null,
+                        // Use stored seed label if unit not assigned yet, otherwise calculate from pool position
+                        Unit1SeedInfo = g.Key.RoundType == "Bracket"
+                            ? (m.Unit1Id == null ? m.Unit1SeedLabel : GetSeedInfo(m.Unit1Id))
+                            : null,
+                        Unit2SeedInfo = g.Key.RoundType == "Bracket"
+                            ? (m.Unit2Id == null ? m.Unit2SeedLabel : GetSeedInfo(m.Unit2Id))
+                            : null,
                         IsBye = (m.Unit1Id == null) != (m.Unit2Id == null), // One but not both is null
                         Status = m.Status,
                         Score = GetMatchScore(m),
@@ -4469,6 +4475,17 @@ public class TournamentController : ControllerBase
         var rounds = (int)Math.Log2(bracketSize);
         var matchNum = 1;
 
+        // Get pool configuration
+        var poolCount = request.PoolCount ?? 1;
+        var playoffFromPools = request.PlayoffFromPools ?? 2;
+
+        // Generate seed labels for playoff positions
+        // Standard cross-pool seeding: Pool A #1 vs Pool B #2, Pool B #1 vs Pool A #2, etc.
+        var seedLabels = GeneratePlayoffSeedLabels(poolCount, playoffFromPools, bracketSize);
+
+        // Get seeded bracket positions for first round
+        var seedPositions = GetSeededBracketPositions(bracketSize);
+
         for (int round = 1; round <= rounds; round++)
         {
             var matchesInRound = bracketSize / (int)Math.Pow(2, round);
@@ -4476,9 +4493,53 @@ public class TournamentController : ControllerBase
                            round == rounds - 1 ? "Playoff Semifinal" :
                            round == rounds - 2 ? "Playoff Quarterfinal" :
                            $"Playoff Round {round}";
+            var roundAbbr = round == rounds ? "F" :
+                           round == rounds - 1 ? "SF" :
+                           round == rounds - 2 ? "QF" :
+                           $"R{round}";
 
             for (int m = 1; m <= matchesInRound; m++)
             {
+                var matchIdx = matchNum;
+                string? unit1Label = null;
+                string? unit2Label = null;
+
+                if (round == 1)
+                {
+                    // First round: use pool-based seed labels
+                    var matchup = seedPositions[m - 1];
+                    var seed1 = matchup.Item1;
+                    var seed2 = matchup.Item2;
+
+                    unit1Label = seed1 <= playoffUnits && seedLabels.ContainsKey(seed1) ? seedLabels[seed1] : null;
+                    unit2Label = seed2 <= playoffUnits && seedLabels.ContainsKey(seed2) ? seedLabels[seed2] : null;
+
+                    // Handle byes
+                    if (seed1 > playoffUnits) unit1Label = "BYE";
+                    if (seed2 > playoffUnits) unit2Label = "BYE";
+                }
+                else
+                {
+                    // Later rounds: reference winners from previous round
+                    // Calculate which matches from previous round feed into this one
+                    var prevRoundMatchBase = 0;
+                    for (int r = 1; r < round; r++)
+                    {
+                        prevRoundMatchBase += bracketSize / (int)Math.Pow(2, r);
+                    }
+                    var prevRoundMatchCount = bracketSize / (int)Math.Pow(2, round - 1);
+                    var prevRoundAbbr = round - 1 == rounds - 1 ? "SF" :
+                                        round - 1 == rounds - 2 ? "QF" :
+                                        $"R{round - 1}";
+
+                    // Match m in this round comes from matches (m*2-1) and (m*2) in previous round
+                    var prevMatch1 = prevRoundMatchBase - prevRoundMatchCount + (m * 2 - 1);
+                    var prevMatch2 = prevRoundMatchBase - prevRoundMatchCount + (m * 2);
+
+                    unit1Label = $"W {prevRoundAbbr}{m * 2 - 1}";
+                    unit2Label = $"W {prevRoundAbbr}{m * 2}";
+                }
+
                 matches.Add(new EventEncounter
                 {
                     EventId = division.EventId,
@@ -4490,6 +4551,8 @@ public class TournamentController : ControllerBase
                     BracketPosition = m,
                     BestOf = request.PlayoffGamesPerMatch ?? request.BestOf,
                     ScoreFormatId = request.PlayoffScoreFormatId ?? request.ScoreFormatId,
+                    Unit1SeedLabel = unit1Label,
+                    Unit2SeedLabel = unit2Label,
                     Status = "Scheduled",
                     CreatedAt = DateTime.Now,
                     UpdatedAt = DateTime.Now
@@ -4497,10 +4560,34 @@ public class TournamentController : ControllerBase
             }
         }
 
-        // Note: Playoff bracket positions are determined after pool play completes
-        // The unit assignments will be filled in based on pool standings
-
         return matches;
+    }
+
+    /// <summary>
+    /// Generate seed labels for playoff positions based on pool configuration.
+    /// Cross-pool seeding ensures pool winners face lower seeds from other pools.
+    /// </summary>
+    private Dictionary<int, string> GeneratePlayoffSeedLabels(int poolCount, int playoffFromPools, int bracketSize)
+    {
+        var labels = new Dictionary<int, string>();
+
+        // Pool names: A, B, C, D, etc.
+        var poolNames = Enumerable.Range(0, poolCount).Select(i => (char)('A' + i)).ToArray();
+
+        // Generate seeds by alternating pools for each rank position
+        // Seed 1: Pool A #1, Seed 2: Pool B #1, Seed 3: Pool C #1, ...
+        // Seed N+1: Pool A #2, Seed N+2: Pool B #2, ...
+        var seed = 1;
+        for (int rank = 1; rank <= playoffFromPools && seed <= bracketSize; rank++)
+        {
+            for (int pool = 0; pool < poolCount && seed <= bracketSize; pool++)
+            {
+                labels[seed] = $"Pool {poolNames[pool]} #{rank}";
+                seed++;
+            }
+        }
+
+        return labels;
     }
 
     private List<EventEncounter> GenerateSingleEliminationMatchesForTarget(EventDivision division, int targetUnitCount, CreateMatchScheduleRequest request)

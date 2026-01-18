@@ -58,6 +58,15 @@ public class EventEncounter
     public int? Unit2Number { get; set; }
 
     /// <summary>
+    /// Seed label for playoff brackets (e.g., "Pool A #1", "Winner SF1")
+    /// Shown before actual units are assigned
+    /// </summary>
+    [MaxLength(50)]
+    public string? Unit1SeedLabel { get; set; }
+    [MaxLength(50)]
+    public string? Unit2SeedLabel { get; set; }
+
+    /// <summary>
     /// Actual unit IDs (after drawing assignment)
     /// </summary>
     public int? Unit1Id { get; set; }

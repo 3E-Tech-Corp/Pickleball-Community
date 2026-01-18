@@ -374,7 +374,7 @@ export default function DivisionSchedule() {
                                 <td className="border border-gray-300 px-3 py-2 print:px-1 print:py-1">
                                   {match.isBye && !match.unit1Name ? (
                                     <span className="italic text-gray-400">BYE</span>
-                                  ) : (
+                                  ) : match.unit1Name ? (
                                     <div>
                                       <div className="flex items-center gap-2">
                                         {match.unit1Number && (
@@ -382,12 +382,16 @@ export default function DivisionSchedule() {
                                             {match.unit1Number}
                                           </span>
                                         )}
-                                        <span className="text-gray-900">{match.unit1Name || 'TBD'}</span>
+                                        <span className="text-gray-900">{match.unit1Name}</span>
                                       </div>
                                       {match.unit1SeedInfo && (
                                         <div className="text-xs text-gray-500 ml-8 print:ml-5">{match.unit1SeedInfo}</div>
                                       )}
                                     </div>
+                                  ) : match.unit1SeedInfo ? (
+                                    <span className="text-blue-600 font-medium">{match.unit1SeedInfo}</span>
+                                  ) : (
+                                    <span className="text-gray-400 italic">TBD</span>
                                   )}
                                 </td>
                                 <td className="border border-gray-300 px-3 py-2 text-center text-gray-400 print:px-1 print:py-1">
@@ -396,7 +400,7 @@ export default function DivisionSchedule() {
                                 <td className="border border-gray-300 px-3 py-2 print:px-1 print:py-1">
                                   {match.isBye && !match.unit2Name ? (
                                     <span className="italic text-gray-400">BYE</span>
-                                  ) : (
+                                  ) : match.unit2Name ? (
                                     <div>
                                       <div className="flex items-center gap-2">
                                         {match.unit2Number && (
@@ -404,12 +408,16 @@ export default function DivisionSchedule() {
                                             {match.unit2Number}
                                           </span>
                                         )}
-                                        <span className="text-gray-900">{match.unit2Name || 'TBD'}</span>
+                                        <span className="text-gray-900">{match.unit2Name}</span>
                                       </div>
                                       {match.unit2SeedInfo && (
                                         <div className="text-xs text-gray-500 ml-8 print:ml-5">{match.unit2SeedInfo}</div>
                                       )}
                                     </div>
+                                  ) : match.unit2SeedInfo ? (
+                                    <span className="text-blue-600 font-medium">{match.unit2SeedInfo}</span>
+                                  ) : (
+                                    <span className="text-gray-400 italic">TBD</span>
                                   )}
                                 </td>
                                 <td className="border border-gray-300 px-3 py-2 text-center text-gray-600 print:px-1 print:py-1">
