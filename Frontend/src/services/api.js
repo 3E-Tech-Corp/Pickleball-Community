@@ -2081,8 +2081,11 @@ export const gameDayApi = {
     return api.get(`/tournament-gameday/ready-games/${eventId}${params}`)
   },
 
-  // Queue a game to a court
+  // Queue a game to a court (admin)
   queueGame: (gameId, courtId) => api.post('/tournament-gameday/queue-game', { gameId, courtId }),
+
+  // Player self-assigns their game to a court
+  playerQueueGame: (gameId, courtId) => api.post('/tournament-gameday/player-queue-game', { gameId, courtId }),
 
   // Start a game
   startGame: (gameId) => api.post(`/tournament-gameday/start-game/${gameId}`),

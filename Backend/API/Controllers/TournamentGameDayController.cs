@@ -502,6 +502,106 @@ public class TournamentGameDayController : ControllerBase
     }
 
     /// <summary>
+    /// Player self-assigns their game to a court
+    /// </summary>
+    [HttpPost("player-queue-game")]
+    [Authorize]
+    public async Task<ActionResult<ApiResponse<GameQueueItemDto>>> PlayerQueueGame([FromBody] QueueGameRequest request)
+    {
+        var userId = GetUserId();
+
+        var game = await _context.EventGames
+            .Include(g => g.EncounterMatch)
+                .ThenInclude(m => m!.Encounter)
+                    .ThenInclude(e => e!.Unit1)
+                        .ThenInclude(u => u!.Members)
+            .Include(g => g.EncounterMatch)
+                .ThenInclude(m => m!.Encounter)
+                    .ThenInclude(e => e!.Unit2)
+                        .ThenInclude(u => u!.Members)
+            .FirstOrDefaultAsync(g => g.Id == request.GameId);
+
+        if (game == null)
+            return NotFound(new ApiResponse<GameQueueItemDto> { Success = false, Message = "Game not found" });
+
+        var encounter = game.EncounterMatch?.Encounter;
+        if (encounter == null)
+            return NotFound(new ApiResponse<GameQueueItemDto> { Success = false, Message = "Game encounter not found" });
+
+        // Verify player is part of one of the units in this game
+        var unit1PlayerIds = encounter.Unit1?.Members?.Where(m => m.InviteStatus == "Accepted").Select(m => m.UserId).ToList() ?? new List<int>();
+        var unit2PlayerIds = encounter.Unit2?.Members?.Where(m => m.InviteStatus == "Accepted").Select(m => m.UserId).ToList() ?? new List<int>();
+
+        if (!unit1PlayerIds.Contains(userId) && !unit2PlayerIds.Contains(userId))
+            return Forbid();
+
+        // Check game status - allow Scheduled, Pending, or Ready
+        if (game.Status != "Scheduled" && game.Status != "Pending" && game.Status != "Ready")
+            return BadRequest(new ApiResponse<GameQueueItemDto> { Success = false, Message = $"Game cannot be queued (current status: {game.Status})" });
+
+        var court = await _context.TournamentCourts.FindAsync(request.CourtId);
+        if (court == null || court.EventId != encounter.EventId)
+            return BadRequest(new ApiResponse<GameQueueItemDto> { Success = false, Message = "Invalid court" });
+
+        // Check court is available
+        if (court.Status != "Available")
+            return BadRequest(new ApiResponse<GameQueueItemDto> { Success = false, Message = $"Court {court.CourtLabel} is not available" });
+
+        // Update game
+        game.Status = "Queued";
+        game.TournamentCourtId = request.CourtId;
+        game.QueuedAt = DateTime.Now;
+        game.UpdatedAt = DateTime.Now;
+
+        // Update court
+        court.CurrentGameId = game.Id;
+        court.Status = "InUse";
+
+        // Create queue entry
+        var queueEntry = new GameQueue
+        {
+            EventId = encounter.EventId,
+            TournamentCourtId = request.CourtId,
+            GameId = game.Id,
+            QueuePosition = 0,
+            QueuedByUserId = userId
+        };
+        _context.GameQueues.Add(queueEntry);
+
+        await _context.SaveChangesAsync();
+
+        // Send notifications to players
+        await NotifyPlayersGameQueued(game, court);
+
+        // Notify admin dashboard via SignalR
+        await _notificationService.SendEventUpdateAsync(encounter.EventId, "GameUpdate", new
+        {
+            GameId = game.Id,
+            Status = game.Status,
+            CourtId = request.CourtId,
+            CourtLabel = court.CourtLabel,
+            Action = "PlayerQueuedGame"
+        });
+
+        _logger.LogInformation("Player {UserId} self-queued game {GameId} to court {CourtId}", userId, game.Id, request.CourtId);
+
+        return Ok(new ApiResponse<GameQueueItemDto>
+        {
+            Success = true,
+            Data = new GameQueueItemDto
+            {
+                GameId = game.Id,
+                Status = game.Status,
+                CourtId = request.CourtId,
+                CourtName = court.CourtLabel,
+                CourtNumber = court.SortOrder,
+                QueuedAt = game.QueuedAt
+            },
+            Message = $"Game queued to {court.CourtLabel}"
+        });
+    }
+
+    /// <summary>
     /// Start a game
     /// </summary>
     [HttpPost("start-game/{gameId}")]

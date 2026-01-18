@@ -98,9 +98,10 @@ export default function PlayerGameDay() {
 
   useEffect(() => {
     loadData()
+    loadCourts() // Load courts for self-assignment feature
     const interval = setInterval(loadData, 15000)
     return () => clearInterval(interval)
-  }, [loadData])
+  }, [loadData, loadCourts])
 
   // SignalR connection for real-time updates from admin (court assignments, status changes)
   useEffect(() => {
@@ -305,6 +306,16 @@ export default function PlayerGameDay() {
           onPlayerClick={setProfileModalUserId}
           mapAsset={mapAsset}
           onShowMap={() => setShowMapModal(true)}
+          courts={courts}
+          onAssignCourt={async (gameId, courtId) => {
+            const response = await gameDayApi.playerQueueGame(gameId, courtId)
+            if (response.success) {
+              loadData()
+              loadCourts(true)
+            } else {
+              alert(response.message || 'Failed to assign court')
+            }
+          }}
         />
       )}
       {activeTab === 'others' && (
@@ -400,10 +411,13 @@ function MyGamesTab({
   onSubmitScore,
   onPlayerClick,
   mapAsset,
-  onShowMap
+  onShowMap,
+  courts,
+  onAssignCourt
 }) {
   const myDiv = gameDay.myDivisions?.[0]
   const [selectedMatch, setSelectedMatch] = useState(null)
+  const [assigningCourt, setAssigningCourt] = useState(false)
 
   // Combine futureGames with scheduledMatches (avoid duplicates)
   const futureGameIds = new Set(futureGames.map(g => g.matchId))
@@ -795,6 +809,17 @@ function MyGamesTab({
           match={selectedMatch}
           onClose={() => setSelectedMatch(null)}
           onPlayerClick={onPlayerClick}
+          courts={courts}
+          onAssignCourt={async (gameId, courtId) => {
+            setAssigningCourt(true)
+            try {
+              await onAssignCourt(gameId, courtId)
+              setSelectedMatch(null)
+            } finally {
+              setAssigningCourt(false)
+            }
+          }}
+          assigningCourt={assigningCourt}
         />
       )}
     </div>
@@ -863,7 +888,8 @@ function FutureGameCard({ game, onClick }) {
 // ============================================
 // Match Detail Modal
 // ============================================
-function MatchDetailModal({ match, onClose, onPlayerClick }) {
+function MatchDetailModal({ match, onClose, onPlayerClick, courts = [], onAssignCourt, assigningCourt }) {
+  const [selectedCourtId, setSelectedCourtId] = useState('')
   const isMyUnit1 = match.myUnitId === match.unit1Id
   const myTeam = isMyUnit1 ? match.unit1Name : match.unit2Name
   const opponent = isMyUnit1 ? match.unit2Name : match.unit1Name
@@ -871,6 +897,13 @@ function MatchDetailModal({ match, onClose, onPlayerClick }) {
   const opponentScore = isMyUnit1 ? match.unit2Score : match.unit1Score
   const isFinished = match.status === 'Finished' || match.status === 'Completed'
   const won = isFinished && myScore > opponentScore
+
+  // Can assign court if game has a gameId and status allows it
+  const canAssignCourt = match.gameId &&
+    !match.courtName &&
+    (match.status === 'Scheduled' || match.status === 'Pending' || match.status === 'Ready' || !match.status)
+
+  const availableCourts = courts.filter(c => c.status === 'Available')
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-end md:items-center justify-center z-50">
@@ -938,6 +971,47 @@ function MatchDetailModal({ match, onClose, onPlayerClick }) {
                 Court
               </span>
               <span className="font-medium text-gray-900">{match.courtName}</span>
+            </div>
+          )}
+
+          {/* Court Assignment (if no court assigned and game can be assigned) */}
+          {canAssignCourt && availableCourts.length > 0 && onAssignCourt && (
+            <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <div className="flex items-center gap-2 mb-2">
+                <MapPin className="w-4 h-4 text-blue-600" />
+                <span className="text-sm font-medium text-blue-900">Assign Court</span>
+              </div>
+              <div className="flex gap-2">
+                <select
+                  value={selectedCourtId}
+                  onChange={(e) => setSelectedCourtId(e.target.value)}
+                  className="flex-1 px-3 py-2 border border-blue-300 rounded-lg text-sm bg-white"
+                >
+                  <option value="">Select a court...</option>
+                  {availableCourts.map(c => (
+                    <option key={c.id} value={c.id}>{c.courtLabel}</option>
+                  ))}
+                </select>
+                <button
+                  onClick={() => {
+                    if (selectedCourtId && match.gameId) {
+                      onAssignCourt(match.gameId, parseInt(selectedCourtId))
+                    }
+                  }}
+                  disabled={!selectedCourtId || assigningCourt}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {assigningCourt ? 'Assigning...' : 'Go'}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* No courts available message */}
+          {canAssignCourt && availableCourts.length === 0 && (
+            <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-600 flex items-center gap-2">
+              <MapPin className="w-4 h-4" />
+              No courts available right now
             </div>
           )}
 
