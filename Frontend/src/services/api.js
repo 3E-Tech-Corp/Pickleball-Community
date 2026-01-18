@@ -1982,8 +1982,8 @@ export const notificationTemplatesApi = {
 
 // Check-In API (Game Day)
 export const checkInApi = {
-  // Get check-in status for current user
-  getStatus: (eventId) => api.get(`/checkin/status/${eventId}`),
+  // Get check-in status for current user (redo param allows re-signing waiver)
+  getStatus: (eventId, redo = null) => api.get(`/checkin/status/${eventId}${redo ? `?redo=${redo}` : ''}`),
 
   // Self check-in
   checkIn: (eventId) => api.post(`/checkin/${eventId}`),

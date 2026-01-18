@@ -32,7 +32,7 @@ export default function PlayerCheckIn() {
       setLoading(true);
       const [eventRes, statusRes] = await Promise.all([
         eventsApi.getEvent(eventId),
-        checkInApi.getStatus(eventId)
+        checkInApi.getStatus(eventId, redoMode ? 'waiver' : null)
       ]);
 
       if (eventRes.success) {

@@ -93,12 +93,15 @@ public class CheckInController : ControllerBase
     /// </summary>
     [HttpGet("status/{eventId}")]
     [Authorize]
-    public async Task<ActionResult<ApiResponse<PlayerCheckInStatusDto>>> GetCheckInStatus(int eventId)
+    public async Task<ActionResult<ApiResponse<PlayerCheckInStatusDto>>> GetCheckInStatus(int eventId, [FromQuery] string? redo = null)
     {
         try
         {
             var userId = GetUserId();
             if (userId == 0) return Unauthorized();
+
+            // Check if redo mode is enabled (allows re-signing waiver)
+            var redoWaiver = redo?.ToLower() == "waiver";
 
             // Get user's registrations in this event
             var registrations = await _context.EventUnitMembers
@@ -174,8 +177,8 @@ public class CheckInController : ControllerBase
             var firstReg = registrations.First();
             var allWaiversSigned = !pendingWaiverDtos.Any() || firstReg.WaiverSignedAt != null;
 
-            // Filter out already signed waivers
-            if (firstReg.WaiverSignedAt != null)
+            // Filter out already signed waivers (unless in redo mode)
+            if (firstReg.WaiverSignedAt != null && !redoWaiver)
             {
                 pendingWaiverDtos = pendingWaiverDtos
                     .Where(w => firstReg.WaiverDocumentId != w.Id)
