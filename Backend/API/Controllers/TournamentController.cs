@@ -6523,11 +6523,21 @@ public class TournamentController : ControllerBase
                 court.Status = "Available";
             }
 
-            // Delete all score history
-            var scoreHistories = await _context.EventGameScoreHistories
-                .Where(h => h.Game!.EncounterMatch!.Encounter!.EventId == eventId)
-                .ToListAsync();
-            _context.EventGameScoreHistories.RemoveRange(scoreHistories);
+            // Delete all score history (wrapped in try-catch in case table doesn't exist)
+            try
+            {
+                var scoreHistories = await _context.EventGameScoreHistories
+                    .Where(h => h.Game!.EncounterMatch!.Encounter!.EventId == eventId)
+                    .ToListAsync();
+                if (scoreHistories.Any())
+                {
+                    _context.EventGameScoreHistories.RemoveRange(scoreHistories);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Could not delete score histories for event {EventId} - table may not exist", eventId);
+            }
 
             // Delete game-related notifications for this event
             var gameIds = games.Select(g => g.Id).ToList();
