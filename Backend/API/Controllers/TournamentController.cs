@@ -3397,10 +3397,14 @@ public class TournamentController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error generating schedule for division {DivisionId}", divisionId);
+            var innerMessage = ex.InnerException?.Message ?? "";
+            var fullMessage = string.IsNullOrEmpty(innerMessage)
+                ? ex.Message
+                : $"{ex.Message} Inner: {innerMessage}";
             return StatusCode(500, new ApiResponse<List<EventMatchDto>>
             {
                 Success = false,
-                Message = $"Error generating schedule: {ex.Message}",
+                Message = $"Error generating schedule: {fullMessage}",
                 Data = null
             });
         }
