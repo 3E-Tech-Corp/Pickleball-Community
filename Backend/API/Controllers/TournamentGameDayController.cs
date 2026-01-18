@@ -173,51 +173,66 @@ public class TournamentGameDayController : ControllerBase
                 .ThenInclude(u => u!.Division)
             .ToListAsync();
 
-        // Get player's games
-        var myGames = await _context.EventGamePlayers
-            .Where(p => p.UserId == userId && p.Game!.EncounterMatch!.Encounter!.EventId == eventId)
-            .Include(p => p.Game)
-                .ThenInclude(g => g!.EncounterMatch)
+        // Get player's unit IDs for game lookup
+        var unitIds = units.Select(u => u.UnitId).ToList();
+        var myGames = new List<PlayerGameInfoDto>();
+
+        if (unitIds.Any())
+        {
+            // Get games from encounters where player's unit is participating
+            // This is essential for simple tournaments where EventGamePlayers isn't populated
+            var allGames = await _context.EventGames
+                .Include(g => g.EncounterMatch)
                     .ThenInclude(m => m!.Encounter)
                         .ThenInclude(e => e!.Unit1)
-            .Include(p => p.Game)
-                .ThenInclude(g => g!.EncounterMatch)
+                .Include(g => g.EncounterMatch)
                     .ThenInclude(m => m!.Encounter)
                         .ThenInclude(e => e!.Unit2)
-            .Include(p => p.Game)
-                .ThenInclude(g => g!.EncounterMatch)
+                .Include(g => g.EncounterMatch)
                     .ThenInclude(m => m!.Encounter)
                         .ThenInclude(e => e!.Division)
-            .Include(p => p.Game)
-                .ThenInclude(g => g!.TournamentCourt)
-            .OrderBy(p => p.Game!.EncounterMatch!.Encounter!.RoundNumber)
-            .ThenBy(p => p.Game!.EncounterMatch!.Encounter!.EncounterNumber)
-            .Select(p => new PlayerGameInfoDto
-            {
-                GameId = p.GameId,
-                GameNumber = p.Game!.GameNumber,
-                Status = p.Game.Status,
-                Unit1Score = p.Game.Unit1Score,
-                Unit2Score = p.Game.Unit2Score,
-                MatchId = p.Game.EncounterMatch!.EncounterId,
-                RoundType = p.Game.EncounterMatch!.Encounter!.RoundType,
-                RoundName = p.Game.EncounterMatch.Encounter.RoundName,
-                DivisionName = p.Game.EncounterMatch.Encounter.Division != null ? p.Game.EncounterMatch.Encounter.Division.Name : "",
-                MyUnitId = p.UnitId,
-                Unit1Id = p.Game.EncounterMatch.Encounter.Unit1Id,
-                Unit1Name = p.Game.EncounterMatch.Encounter.Unit1 != null ? p.Game.EncounterMatch.Encounter.Unit1.Name : null,
-                Unit2Id = p.Game.EncounterMatch.Encounter.Unit2Id,
-                Unit2Name = p.Game.EncounterMatch.Encounter.Unit2 != null ? p.Game.EncounterMatch.Encounter.Unit2.Name : null,
-                CourtName = p.Game.TournamentCourt != null ? p.Game.TournamentCourt.CourtLabel : null,
-                CourtNumber = p.Game.TournamentCourt != null ? p.Game.TournamentCourt.SortOrder : null,
-                ScheduledTime = p.Game.EncounterMatch.Encounter.ScheduledTime,
-                QueuedAt = p.Game.QueuedAt,
-                StartedAt = p.Game.StartedAt,
-                FinishedAt = p.Game.FinishedAt,
-                CanSubmitScore = p.Game.Status == "Playing" && p.Game.ScoreSubmittedByUnitId != p.UnitId,
-                NeedsConfirmation = p.Game.ScoreSubmittedByUnitId != null && p.Game.ScoreSubmittedByUnitId != p.UnitId && p.Game.ScoreConfirmedByUnitId == null
-            })
-            .ToListAsync();
+                .Include(g => g.TournamentCourt)
+                .Where(g => g.EncounterMatch!.Encounter!.EventId == eventId)
+                .ToListAsync();
+
+            // Filter for player's units and project to DTO client-side
+            myGames = allGames
+                .Where(g => unitIds.Contains(g.EncounterMatch!.Encounter!.Unit1Id ?? 0) ||
+                            unitIds.Contains(g.EncounterMatch!.Encounter!.Unit2Id ?? 0))
+                .OrderBy(g => g.EncounterMatch!.Encounter!.RoundNumber)
+                .ThenBy(g => g.EncounterMatch!.Encounter!.EncounterNumber)
+                .ThenBy(g => g.GameNumber)
+                .Select(g => {
+                    var encounter = g.EncounterMatch!.Encounter!;
+                    var myUnitId = unitIds.Contains(encounter.Unit1Id ?? 0) ? encounter.Unit1Id : encounter.Unit2Id;
+                    return new PlayerGameInfoDto
+                    {
+                        GameId = g.Id,
+                        GameNumber = g.GameNumber,
+                        Status = g.Status,
+                        Unit1Score = g.Unit1Score,
+                        Unit2Score = g.Unit2Score,
+                        MatchId = g.EncounterMatch.EncounterId,
+                        RoundType = encounter.RoundType,
+                        RoundName = encounter.RoundName,
+                        DivisionName = encounter.Division?.Name ?? "",
+                        MyUnitId = myUnitId ?? 0,
+                        Unit1Id = encounter.Unit1Id,
+                        Unit1Name = encounter.Unit1?.Name,
+                        Unit2Id = encounter.Unit2Id,
+                        Unit2Name = encounter.Unit2?.Name,
+                        CourtName = g.TournamentCourt?.CourtLabel,
+                        CourtNumber = g.TournamentCourt?.SortOrder,
+                        ScheduledTime = encounter.ScheduledTime,
+                        QueuedAt = g.QueuedAt,
+                        StartedAt = g.StartedAt,
+                        FinishedAt = g.FinishedAt,
+                        CanSubmitScore = g.Status == "Playing" && g.ScoreSubmittedByUnitId != myUnitId,
+                        NeedsConfirmation = g.ScoreSubmittedByUnitId != null && g.ScoreSubmittedByUnitId != myUnitId && g.ScoreConfirmedByUnitId == null
+                    };
+                })
+                .ToList();
+        }
 
         var firstUnit = units.FirstOrDefault();
 
@@ -233,7 +248,7 @@ public class TournamentGameDayController : ControllerBase
             .ToListAsync();
 
         // Get scheduled matches for player's units (for Future Games section)
-        var unitIds = units.Select(u => u.UnitId).ToList();
+        // unitIds already defined above
         var scheduledMatches = new List<ScheduledMatchDto>();
 
         if (unitIds.Any())
