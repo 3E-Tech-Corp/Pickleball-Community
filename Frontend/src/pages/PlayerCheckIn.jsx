@@ -637,13 +637,13 @@ function WaiverModal({ waiver, playerName, onSign, onClose }) {
           {/* Typed Signature */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              {isGuardianSigning ? `Type ${signerRole.toLowerCase()}'s full legal name` : 'Type your full legal name'}
+              Type your full legal name to sign
             </label>
             <input
               type="text"
               value={signature}
               onChange={(e) => setSignature(e.target.value)}
-              placeholder={isGuardianSigning ? guardianName || `${signerRole}'s Full Name` : playerName || 'Your Full Name'}
+              placeholder={isGuardianSigning ? guardianName || 'Your Full Name' : playerName || 'Your Full Name'}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
             />
           </div>
