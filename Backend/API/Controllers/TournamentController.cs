@@ -3148,6 +3148,8 @@ public class TournamentController : ControllerBase
     [HttpPost("divisions/{divisionId}/generate-schedule")]
     public async Task<ActionResult<ApiResponse<List<EventMatchDto>>>> GenerateSchedule(int divisionId, [FromBody] CreateMatchScheduleRequest request)
     {
+        try
+        {
         var division = await _context.EventDivisions
             .Include(d => d.Event)
             .Include(d => d.TeamUnit)
@@ -3365,6 +3367,17 @@ public class TournamentController : ControllerBase
             Success = true,
             Data = result.Select(m => MapToMatchDto(m)).ToList()
         });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error generating schedule for division {DivisionId}", divisionId);
+            return StatusCode(500, new ApiResponse<List<EventMatchDto>>
+            {
+                Success = false,
+                Message = $"Error generating schedule: {ex.Message}",
+                Data = null
+            });
+        }
     }
 
     [Authorize]
