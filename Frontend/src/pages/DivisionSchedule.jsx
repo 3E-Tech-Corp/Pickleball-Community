@@ -278,14 +278,14 @@ export default function DivisionSchedule() {
               Drawing Results
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 print:grid-cols-3 print:gap-2">
-              {schedule.poolStandings.map((pool) => (
-                <div key={pool.poolNumber} className="bg-gray-50 rounded-lg p-4 border border-gray-200 print:p-2">
+              {schedule.poolStandings.map((pool, poolIdx) => (
+                <div key={pool.poolNumber ?? `pool-${poolIdx}`} className="bg-gray-50 rounded-lg p-4 border border-gray-200 print:p-2">
                   {pool.poolName && (
                     <h4 className="font-semibold text-gray-800 mb-3 print:text-sm">{pool.poolName}</h4>
                   )}
                   <div className="space-y-2">
-                    {pool.standings.map((entry) => (
-                      <div key={entry.unitNumber} className="flex items-start gap-2 text-sm">
+                    {pool.standings.map((entry, entryIdx) => (
+                      <div key={entry.unitNumber ?? `entry-${entryIdx}`} className="flex items-start gap-2 text-sm">
                         <span className="w-8 h-8 flex-shrink-0 flex items-center justify-center bg-orange-500 text-white font-bold rounded print:w-6 print:h-6 print:text-xs">
                           {entry.unitNumber}
                         </span>
@@ -293,9 +293,9 @@ export default function DivisionSchedule() {
                           <div className="font-medium text-gray-900 print:text-xs">{entry.unitName}</div>
                           {entry.members && entry.members.length > 0 && (
                             <div className="flex flex-wrap gap-2 mt-1 print:gap-1">
-                              {entry.members.map((member) => (
+                              {entry.members.map((member, memberIdx) => (
                                 <button
-                                  key={member.userId}
+                                  key={member.userId ?? `member-${memberIdx}`}
                                   onClick={() => setProfileModalUserId(member.userId)}
                                   className="flex items-center gap-1.5 text-xs text-gray-600 hover:text-orange-600 transition-colors no-print"
                                   title={`View ${member.firstName} ${member.lastName}'s profile`}
@@ -719,7 +719,7 @@ export default function DivisionSchedule() {
                   <h4 className="font-medium text-gray-900 mb-3">Games</h4>
                   <div className="space-y-3">
                     {selectedMatch.games.map((game, idx) => (
-                      <div key={game.gameId || idx} className="bg-gray-50 rounded-lg p-4">
+                      <div key={game.gameId ?? `game-${idx}`} className="bg-gray-50 rounded-lg p-4">
                         <div className="flex items-center justify-between mb-2">
                           <span className="font-medium text-gray-700">Game {game.gameNumber || idx + 1}</span>
                           <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${formatStatus(game.status)}`}>
