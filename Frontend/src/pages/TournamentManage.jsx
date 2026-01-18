@@ -6,7 +6,7 @@ import {
   AlertCircle, Loader2, Plus, Edit2, DollarSign, Eye, Share2, LayoutGrid,
   Award, ArrowRight, Lock, Unlock, Save, Map, ExternalLink, FileText, User,
   CheckCircle, XCircle, MoreVertical, Upload, Send, Info, Radio, ClipboardList,
-  Download
+  Download, Lightbulb
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
@@ -58,6 +58,8 @@ export default function TournamentManage() {
   const [addingCourts, setAddingCourts] = useState(false);
   const [mapAsset, setMapAsset] = useState(null);
   const [showMapModal, setShowMapModal] = useState(false);
+  const [suggestedGame, setSuggestedGame] = useState(null);
+  const [loadingSuggestion, setLoadingSuggestion] = useState(false);
 
   // Edit court modal state
   const [editingCourt, setEditingCourt] = useState(null);
@@ -1340,6 +1342,34 @@ export default function TournamentManage() {
                 </button>
                 {isOrganizer && (
                   <button
+                    onClick={async () => {
+                      setLoadingSuggestion(true);
+                      try {
+                        const response = await gameDayApi.suggestNextGame(eventId);
+                        if (response.success && response.data) {
+                          setSuggestedGame(response.data);
+                        } else {
+                          toast.info(response.message || 'No games available to suggest');
+                        }
+                      } catch (err) {
+                        toast.error('Failed to get suggestion');
+                      } finally {
+                        setLoadingSuggestion(false);
+                      }
+                    }}
+                    disabled={loadingSuggestion}
+                    className="px-3 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 flex items-center gap-2 disabled:opacity-50"
+                  >
+                    {loadingSuggestion ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Lightbulb className="w-4 h-4" />
+                    )}
+                    Suggest Next
+                  </button>
+                )}
+                {isOrganizer && (
+                  <button
                     onClick={() => setShowAddCourtsModal(true)}
                     className="px-3 py-2 text-sm font-medium text-white bg-orange-600 rounded-lg hover:bg-orange-700 flex items-center gap-2"
                   >
@@ -1349,6 +1379,63 @@ export default function TournamentManage() {
                 )}
               </div>
             </div>
+
+            {/* Suggested Game Card */}
+            {suggestedGame && (
+              <div className="mb-4 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 bg-blue-100 rounded-lg">
+                      <Lightbulb className="w-5 h-5 text-blue-600" />
+                    </div>
+                    <div>
+                      <h4 className="font-medium text-gray-900">Suggested Next Game</h4>
+                      <p className="text-sm text-blue-700 mt-0.5">{suggestedGame.reason}</p>
+                      <div className="mt-2 p-3 bg-white rounded-lg border border-blue-100">
+                        <div className="text-sm font-medium text-gray-900 mb-1">
+                          {suggestedGame.unit1Players} vs {suggestedGame.unit2Players}
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          {suggestedGame.divisionName} • {suggestedGame.poolName} • Match #{suggestedGame.matchNumber}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {dashboard?.courts?.filter(c => c.status === 'Available').length > 0 && suggestedGame.gameId && (
+                      <select
+                        onChange={async (e) => {
+                          const courtId = parseInt(e.target.value);
+                          if (courtId) {
+                            try {
+                              await gameDayApi.queueGame(suggestedGame.gameId, courtId);
+                              toast.success('Game queued to court');
+                              setSuggestedGame(null);
+                              loadDashboard();
+                            } catch (err) {
+                              toast.error('Failed to queue game');
+                            }
+                          }
+                        }}
+                        className="text-sm border border-gray-300 rounded-lg px-2 py-1"
+                        defaultValue=""
+                      >
+                        <option value="" disabled>Queue to court...</option>
+                        {dashboard?.courts?.filter(c => c.status === 'Available').map(c => (
+                          <option key={c.id} value={c.id}>{c.courtLabel}</option>
+                        ))}
+                      </select>
+                    )}
+                    <button
+                      onClick={() => setSuggestedGame(null)}
+                      className="p-1 text-gray-400 hover:text-gray-600"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {dashboard?.courts?.length === 0 ? (
               <div className="bg-white rounded-xl shadow-sm p-12 text-center">

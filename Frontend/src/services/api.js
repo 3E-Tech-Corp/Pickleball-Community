@@ -2087,6 +2087,9 @@ export const gameDayApi = {
   // Start a game
   startGame: (gameId) => api.post(`/tournament-gameday/start-game/${gameId}`),
 
+  // Suggest next game based on pool progress and player availability
+  suggestNextGame: (eventId) => api.get(`/tournament-gameday/suggest-next-game/${eventId}`),
+
   // Submit score
   submitScore: (gameId, unit1Score, unit2Score, finalize = false, reason = null) =>
     api.post(`/tournament-gameday/score/${gameId}`, { unit1Score, unit2Score, finalize, reason }),

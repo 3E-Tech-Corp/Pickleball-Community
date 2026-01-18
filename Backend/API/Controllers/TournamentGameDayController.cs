@@ -1568,6 +1568,147 @@ public class TournamentGameDayController : ControllerBase
 
         await _context.SaveChangesAsync();
     }
+
+    /// <summary>
+    /// Suggest the next game to play based on pool progress and player availability
+    /// </summary>
+    [HttpGet("suggest-next-game/{eventId}")]
+    [Authorize]
+    public async Task<ActionResult<ApiResponse<SuggestedGameDto>>> SuggestNextGame(int eventId)
+    {
+        var userId = GetUserId();
+        if (!await IsEventOrganizer(eventId, userId))
+            return Forbid();
+
+        // Get all player IDs currently playing (in active games)
+        var playersCurrentlyPlaying = await _context.EventGames
+            .Where(g => g.EncounterMatch != null &&
+                   g.EncounterMatch.Encounter != null &&
+                   g.EncounterMatch.Encounter.EventId == eventId &&
+                   (g.Status == "Playing" || g.Status == "InProgress"))
+            .SelectMany(g => g.EncounterMatch!.Encounter!.Unit1!.Members
+                .Concat(g.EncounterMatch.Encounter.Unit2!.Members)
+                .Where(m => m.InviteStatus == "Accepted")
+                .Select(m => m.UserId))
+            .Distinct()
+            .ToListAsync();
+
+        // Also include players in queued games on courts
+        var playersInQueue = await _context.EventGames
+            .Where(g => g.EncounterMatch != null &&
+                   g.EncounterMatch.Encounter != null &&
+                   g.EncounterMatch.Encounter.EventId == eventId &&
+                   (g.Status == "Queued" || g.Status == "Ready"))
+            .SelectMany(g => g.EncounterMatch!.Encounter!.Unit1!.Members
+                .Concat(g.EncounterMatch.Encounter.Unit2!.Members)
+                .Where(m => m.InviteStatus == "Accepted")
+                .Select(m => m.UserId))
+            .Distinct()
+            .ToListAsync();
+
+        var busyPlayerIds = playersCurrentlyPlaying.Concat(playersInQueue).Distinct().ToHashSet();
+
+        // Get all pool encounters for this event grouped by division and pool
+        var poolEncounters = await _context.EventMatches
+            .Where(m => m.EventId == eventId && m.RoundType == "Pool")
+            .Include(m => m.Division)
+            .Include(m => m.Unit1)
+                .ThenInclude(u => u!.Members)
+            .Include(m => m.Unit2)
+                .ThenInclude(u => u!.Members)
+            .Include(m => m.Matches)
+                .ThenInclude(em => em.Games)
+            .ToListAsync();
+
+        // Group by division and pool to find which is furthest behind
+        var poolProgress = poolEncounters
+            .Where(e => e.Unit1 != null && e.Unit2 != null)
+            .GroupBy(e => new { e.DivisionId, e.Unit1!.PoolNumber })
+            .Select(g => new
+            {
+                g.Key.DivisionId,
+                DivisionName = g.First().Division?.Name ?? "Unknown",
+                PoolNumber = g.Key.PoolNumber ?? 0,
+                PoolName = g.First().Unit1?.PoolName ?? $"Pool {g.Key.PoolNumber}",
+                TotalEncounters = g.Count(),
+                CompletedEncounters = g.Count(e => e.Status == "Completed"),
+                PendingEncounters = g.Where(e => e.Status != "Completed").ToList()
+            })
+            .OrderBy(p => (double)p.CompletedEncounters / Math.Max(1, p.TotalEncounters)) // Furthest behind first
+            .ToList();
+
+        // Find the best game from the furthest behind pools
+        foreach (var pool in poolProgress)
+        {
+            foreach (var encounter in pool.PendingEncounters.OrderBy(e => e.MatchNumber))
+            {
+                // Check if any games exist for this encounter
+                var games = encounter.Matches?.SelectMany(m => m.Games).ToList() ?? new List<EventGame>();
+
+                // Find games that are scheduled but not yet started
+                var availableGames = games
+                    .Where(g => g.Status == "Scheduled" || g.Status == "Pending")
+                    .ToList();
+
+                // If no games, check if the encounter itself is ready
+                if (!games.Any() || availableGames.Any())
+                {
+                    // Get player IDs for this encounter
+                    var unit1PlayerIds = encounter.Unit1?.Members
+                        .Where(m => m.InviteStatus == "Accepted")
+                        .Select(m => m.UserId)
+                        .ToList() ?? new List<int>();
+
+                    var unit2PlayerIds = encounter.Unit2?.Members
+                        .Where(m => m.InviteStatus == "Accepted")
+                        .Select(m => m.UserId)
+                        .ToList() ?? new List<int>();
+
+                    // Check if any of these players are busy
+                    var allPlayerIds = unit1PlayerIds.Concat(unit2PlayerIds).ToList();
+                    if (!allPlayerIds.Any(id => busyPlayerIds.Contains(id)))
+                    {
+                        // Found a good game! Return it
+                        var game = availableGames.FirstOrDefault();
+
+                        return Ok(new ApiResponse<SuggestedGameDto>
+                        {
+                            Success = true,
+                            Data = new SuggestedGameDto
+                            {
+                                GameId = game?.Id,
+                                EncounterId = encounter.Id,
+                                DivisionId = pool.DivisionId,
+                                DivisionName = pool.DivisionName,
+                                PoolNumber = pool.PoolNumber,
+                                PoolName = pool.PoolName,
+                                MatchNumber = encounter.MatchNumber,
+                                Unit1Id = encounter.Unit1Id ?? 0,
+                                Unit1Name = encounter.Unit1?.Name ?? "TBD",
+                                Unit1Players = string.Join(", ", encounter.Unit1?.Members
+                                    .Where(m => m.InviteStatus == "Accepted")
+                                    .Select(m => Utility.FormatName(m.User?.LastName, m.User?.FirstName)) ?? Array.Empty<string>()),
+                                Unit2Id = encounter.Unit2Id ?? 0,
+                                Unit2Name = encounter.Unit2?.Name ?? "TBD",
+                                Unit2Players = string.Join(", ", encounter.Unit2?.Members
+                                    .Where(m => m.InviteStatus == "Accepted")
+                                    .Select(m => Utility.FormatName(m.User?.LastName, m.User?.FirstName)) ?? Array.Empty<string>()),
+                                PoolProgress = $"{pool.CompletedEncounters}/{pool.TotalEncounters} completed",
+                                Reason = $"{pool.DivisionName} - {pool.PoolName} is furthest behind ({pool.CompletedEncounters}/{pool.TotalEncounters} matches completed)"
+                            },
+                            Message = "Suggested next game found"
+                        });
+                    }
+                }
+            }
+        }
+
+        return Ok(new ApiResponse<SuggestedGameDto>
+        {
+            Success = false,
+            Message = "No available games found. All players may be busy or all pool games completed."
+        });
+    }
 }
 
 // DTOs for Tournament Game Day
@@ -1830,4 +1971,23 @@ public class PlayoffMatchAssignmentDto
     public string? Unit1Name { get; set; }
     public int Unit2Seed { get; set; }
     public string? Unit2Name { get; set; }
+}
+
+public class SuggestedGameDto
+{
+    public int? GameId { get; set; }
+    public int EncounterId { get; set; }
+    public int DivisionId { get; set; }
+    public string DivisionName { get; set; } = string.Empty;
+    public int PoolNumber { get; set; }
+    public string PoolName { get; set; } = string.Empty;
+    public int MatchNumber { get; set; }
+    public int Unit1Id { get; set; }
+    public string Unit1Name { get; set; } = string.Empty;
+    public string Unit1Players { get; set; } = string.Empty;
+    public int Unit2Id { get; set; }
+    public string Unit2Name { get; set; } = string.Empty;
+    public string Unit2Players { get; set; } = string.Empty;
+    public string PoolProgress { get; set; } = string.Empty;
+    public string Reason { get; set; } = string.Empty;
 }
