@@ -4027,6 +4027,92 @@ public class TournamentController : ControllerBase
         });
     }
 
+    /// <summary>
+    /// Admin endpoint to update encounter units (teams)
+    /// </summary>
+    [Authorize]
+    [HttpPost("encounters/update-units")]
+    public async Task<ActionResult<ApiResponse<object>>> UpdateEncounterUnits([FromBody] UpdateEncounterUnitsRequest request)
+    {
+        var userId = GetUserId();
+        if (!userId.HasValue)
+            return Unauthorized(new ApiResponse<object> { Success = false, Message = "Unauthorized" });
+
+        // Check if user is admin
+        var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId.Value);
+        if (user?.Role != "Admin")
+            return Forbid();
+
+        var encounter = await _context.EventEncounters
+            .Include(e => e.Division)
+            .FirstOrDefaultAsync(e => e.Id == request.EncounterId);
+
+        if (encounter == null)
+            return NotFound(new ApiResponse<object> { Success = false, Message = "Encounter not found" });
+
+        // Validate units belong to same division
+        if (request.Unit1Id.HasValue)
+        {
+            var unit1 = await _context.EventUnits.FirstOrDefaultAsync(u => u.Id == request.Unit1Id.Value);
+            if (unit1 == null || unit1.DivisionId != encounter.DivisionId)
+                return BadRequest(new ApiResponse<object> { Success = false, Message = "Unit 1 not found or not in same division" });
+        }
+
+        if (request.Unit2Id.HasValue)
+        {
+            var unit2 = await _context.EventUnits.FirstOrDefaultAsync(u => u.Id == request.Unit2Id.Value);
+            if (unit2 == null || unit2.DivisionId != encounter.DivisionId)
+                return BadRequest(new ApiResponse<object> { Success = false, Message = "Unit 2 not found or not in same division" });
+        }
+
+        // Update encounter units
+        encounter.Unit1Id = request.Unit1Id;
+        encounter.Unit2Id = request.Unit2Id;
+        encounter.UpdatedAt = DateTime.Now;
+
+        await _context.SaveChangesAsync();
+
+        return Ok(new ApiResponse<object>
+        {
+            Success = true,
+            Message = "Encounter units updated successfully"
+        });
+    }
+
+    /// <summary>
+    /// Get all units in a division
+    /// </summary>
+    [Authorize]
+    [HttpGet("divisions/{divisionId}/units")]
+    public async Task<ActionResult<ApiResponse<List<EventUnitDto>>>> GetDivisionUnits(int divisionId)
+    {
+        var units = await _context.EventUnits
+            .Include(u => u.Members).ThenInclude(m => m.User)
+            .Where(u => u.DivisionId == divisionId)
+            .OrderBy(u => u.UnitNumber)
+            .Select(u => new EventUnitDto
+            {
+                Id = u.Id,
+                Name = u.Name,
+                UnitNumber = u.UnitNumber,
+                Status = u.Status,
+                Members = u.Members!.Where(m => m.InviteStatus == "Accepted").Select(m => new EventUnitMemberDto
+                {
+                    UserId = m.UserId,
+                    FirstName = m.User!.FirstName,
+                    LastName = m.User.LastName,
+                    ProfileImageUrl = m.User.ProfileImageUrl
+                }).ToList()
+            })
+            .ToListAsync();
+
+        return Ok(new ApiResponse<List<EventUnitDto>>
+        {
+            Success = true,
+            Data = units
+        });
+    }
+
     // ============================================
     // Check-in
     // ============================================

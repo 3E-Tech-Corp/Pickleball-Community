@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { X, CheckCircle, Play, User } from 'lucide-react';
+import { X, CheckCircle, Play, User, Edit2 } from 'lucide-react';
 import { getSharedAssetUrl } from '../../services/api';
 
 const STATUS_COLORS = {
@@ -17,33 +17,42 @@ const STATUS_COLORS = {
  * Props:
  * - game: The game object with unit1, unit2, scores, status, etc.
  * - courts: Array of available courts (optional)
+ * - divisionUnits: Array of available units in the division (for admin unit change)
  * - onClose: Close handler
  * - onSuccess: Success handler after save
  * - onPlayerClick: Handler when player avatar/name is clicked (receives userId)
  * - onSaveScore: Custom handler for saving score (gameId, unit1Score, unit2Score, finish) => Promise
  * - onAssignCourt: Custom handler for court assignment (gameId, courtId) => Promise
  * - onStatusChange: Custom handler for status change (gameId, status) => Promise
+ * - onChangeUnits: Custom handler for changing units (encounterId, unit1Id, unit2Id) => Promise
  * - showCourtAssignment: Whether to show court assignment (default true)
  * - showStatusControl: Whether to show status buttons (default true)
  * - readOnly: If true, disable all editing
+ * - isAdmin: If true, show admin-only features like unit changing
  */
 export default function GameScoreModal({
   game,
   courts = [],
+  divisionUnits = [],
   onClose,
   onSuccess,
   onPlayerClick,
   onSaveScore,
   onAssignCourt,
   onStatusChange,
+  onChangeUnits,
   showCourtAssignment = true,
   showStatusControl = true,
-  readOnly = false
+  readOnly = false,
+  isAdmin = false
 }) {
   const [unit1Score, setUnit1Score] = useState(game.unit1Score || 0);
   const [unit2Score, setUnit2Score] = useState(game.unit2Score || 0);
   const [courtId, setCourtId] = useState(game.courtId || '');
   const [submitting, setSubmitting] = useState(false);
+  const [editingUnits, setEditingUnits] = useState(false);
+  const [selectedUnit1Id, setSelectedUnit1Id] = useState(game.unit1?.id || '');
+  const [selectedUnit2Id, setSelectedUnit2Id] = useState(game.unit2?.id || '');
 
   const availableCourts = courts.filter(c => c.status === 'Available' || c.id === game.courtId);
   const isCompleted = game.status === 'Completed' || game.status === 'Finished';
@@ -99,6 +108,35 @@ export default function GameScoreModal({
       onSuccess?.();
     } catch (err) {
       console.error('Error starting game:', err);
+    }
+  };
+
+  const handleChangeUnits = async () => {
+    if (!onChangeUnits) return;
+
+    // Show confirmation warning
+    const hasScores = (game.unit1Score > 0 || game.unit2Score > 0);
+    const warningMsg = hasScores
+      ? 'WARNING: This match has scores recorded. Changing units will override the existing data. Are you sure you want to continue?'
+      : 'Are you sure you want to change the teams/units for this match?';
+
+    if (!confirm(warningMsg)) {
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      await onChangeUnits(
+        game.encounterId || game.id,
+        selectedUnit1Id || null,
+        selectedUnit2Id || null
+      );
+      setEditingUnits(false);
+      onSuccess?.();
+    } catch (err) {
+      console.error('Error changing units:', err);
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -207,6 +245,63 @@ export default function GameScoreModal({
           <div className="flex items-center px-2 text-gray-400 text-sm">vs</div>
           {renderUnit(game.unit2, isCompleted && game.winnerUnitId === game.unit2?.id)}
         </div>
+
+        {/* Admin: Edit Units */}
+        {isAdmin && onChangeUnits && divisionUnits.length > 0 && !readOnly && (
+          <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium text-amber-800">Admin: Change Teams</span>
+              <button
+                onClick={() => setEditingUnits(!editingUnits)}
+                className="text-xs text-amber-700 hover:text-amber-900 flex items-center gap-1"
+              >
+                <Edit2 className="w-3 h-3" />
+                {editingUnits ? 'Cancel' : 'Edit'}
+              </button>
+            </div>
+            {editingUnits && (
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs text-gray-600 mb-1">Team 1</label>
+                  <select
+                    value={selectedUnit1Id}
+                    onChange={(e) => setSelectedUnit1Id(e.target.value)}
+                    className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded"
+                  >
+                    <option value="">-- Select Team --</option>
+                    {divisionUnits.map(unit => (
+                      <option key={unit.id} value={unit.id}>
+                        #{unit.unitNumber} - {unit.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-600 mb-1">Team 2</label>
+                  <select
+                    value={selectedUnit2Id}
+                    onChange={(e) => setSelectedUnit2Id(e.target.value)}
+                    className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded"
+                  >
+                    <option value="">-- Select Team --</option>
+                    {divisionUnits.map(unit => (
+                      <option key={unit.id} value={unit.id}>
+                        #{unit.unitNumber} - {unit.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <button
+                  onClick={handleChangeUnits}
+                  disabled={submitting || (!selectedUnit1Id && !selectedUnit2Id)}
+                  className="w-full py-1.5 text-sm bg-amber-600 text-white rounded hover:bg-amber-700 disabled:opacity-50"
+                >
+                  {submitting ? 'Updating...' : 'Update Teams'}
+                </button>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Best-of series info */}
         {hasBestOf && (

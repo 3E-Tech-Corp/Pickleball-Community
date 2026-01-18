@@ -1475,6 +1475,12 @@ export const tournamentApi = {
   adminUpdateScore: (gameId, unit1Score, unit2Score, markAsFinished = false) =>
     api.post('/tournament/games/admin-update-score', { gameId, unit1Score, unit2Score, markAsFinished }),
 
+  // Encounter management
+  updateEncounterUnits: (encounterId, unit1Id, unit2Id) =>
+    api.post('/tournament/encounters/update-units', { encounterId, unit1Id, unit2Id }),
+  getDivisionUnits: (divisionId) =>
+    api.get(`/tournament/divisions/${divisionId}/units`),
+
   // Check-in
   checkIn: (eventId, divisionId = null) =>
     api.post(`/tournament/events/${eventId}/check-in`, { eventId, divisionId }),

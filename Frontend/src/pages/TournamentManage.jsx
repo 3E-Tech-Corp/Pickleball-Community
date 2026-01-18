@@ -43,6 +43,7 @@ export default function TournamentManage() {
   const [loadingSchedule, setLoadingSchedule] = useState(false);
   const [selectedGameForEdit, setSelectedGameForEdit] = useState(null); // Game object for score editing
   const [drawingResultsCollapsed, setDrawingResultsCollapsed] = useState(false); // Collapsible drawing results
+  const [divisionUnits, setDivisionUnits] = useState([]); // Units for admin unit change
 
   // Modal states
   const [scheduleConfigModal, setScheduleConfigModal] = useState({ isOpen: false, division: null });
@@ -222,10 +223,30 @@ export default function TournamentManage() {
       if (response.success) {
         setSchedule(response.data);
       }
+      // Also load division units for admin unit change feature
+      const unitsResponse = await tournamentApi.getDivisionUnits(divisionId);
+      if (unitsResponse.success) {
+        setDivisionUnits(unitsResponse.data || []);
+      }
     } catch (err) {
       console.error('Error loading schedule:', err);
     } finally {
       setLoadingSchedule(false);
+    }
+  };
+
+  const handleChangeEncounterUnits = async (encounterId, unit1Id, unit2Id) => {
+    try {
+      const response = await tournamentApi.updateEncounterUnits(encounterId, unit1Id, unit2Id);
+      if (response.success) {
+        toast.success('Teams updated successfully');
+      } else {
+        toast.error(response.message || 'Failed to update teams');
+      }
+    } catch (err) {
+      console.error('Error updating encounter units:', err);
+      toast.error('Failed to update teams');
+      throw err;
     }
   };
 
@@ -2781,6 +2802,7 @@ export default function TournamentManage() {
         <GameScoreModal
           game={selectedGameForEdit}
           courts={dashboard?.courts || []}
+          divisionUnits={divisionUnits}
           onClose={() => setSelectedGameForEdit(null)}
           onSuccess={() => {
             setSelectedGameForEdit(null);
@@ -2797,7 +2819,9 @@ export default function TournamentManage() {
           onStatusChange={selectedGameForEdit.hasGames ? async (gameId, status) => {
             await tournamentApi.updateGameStatus(gameId, status);
           } : undefined}
+          onChangeUnits={handleChangeEncounterUnits}
           readOnly={!selectedGameForEdit.hasGames}
+          isAdmin={user?.role === 'Admin'}
         />
       )}
 

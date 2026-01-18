@@ -504,6 +504,13 @@ public class AdminUpdateScoreRequest
     public bool MarkAsFinished { get; set; } = false;
 }
 
+public class UpdateEncounterUnitsRequest
+{
+    public int EncounterId { get; set; }
+    public int? Unit1Id { get; set; }
+    public int? Unit2Id { get; set; }
+}
+
 // ============================================
 // Check-in DTOs
 // ============================================
