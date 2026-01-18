@@ -41,6 +41,7 @@ export default function TournamentManage() {
   const [schedule, setSchedule] = useState(null);
   const [loadingSchedule, setLoadingSchedule] = useState(false);
   const [selectedGameForEdit, setSelectedGameForEdit] = useState(null); // Game object for score editing
+  const [drawingResultsCollapsed, setDrawingResultsCollapsed] = useState(false); // Collapsible drawing results
 
   // Modal states
   const [scheduleConfigModal, setScheduleConfigModal] = useState({ isOpen: false, division: null });
@@ -1453,6 +1454,85 @@ export default function TournamentManage() {
                 </div>
               ) : schedule ? (
                 <div className="space-y-6">
+                  {/* Drawing Results - Collapsible */}
+                  {schedule.poolStandings?.length > 0 && (
+                    <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+                      <button
+                        onClick={() => setDrawingResultsCollapsed(!drawingResultsCollapsed)}
+                        className="w-full px-4 py-3 bg-gray-50 border-b flex items-center justify-between hover:bg-gray-100 transition-colors"
+                      >
+                        <h3 className="font-medium text-gray-900 flex items-center gap-2">
+                          <Trophy className="w-5 h-5 text-orange-500" />
+                          Drawing Results
+                          <span className="text-sm font-normal text-gray-500">
+                            ({schedule.poolStandings.reduce((total, pool) => total + (pool.standings?.length || 0), 0)} teams in {schedule.poolStandings.length} pool{schedule.poolStandings.length > 1 ? 's' : ''})
+                          </span>
+                        </h3>
+                        {drawingResultsCollapsed ? (
+                          <ChevronDown className="w-5 h-5 text-gray-400" />
+                        ) : (
+                          <ChevronUp className="w-5 h-5 text-gray-400" />
+                        )}
+                      </button>
+                      {!drawingResultsCollapsed && (
+                        <div className="p-4">
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {schedule.poolStandings.map((pool, poolIdx) => (
+                              <div key={pool.poolNumber ?? `pool-${poolIdx}`} className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                                {pool.poolName && (
+                                  <h4 className="font-semibold text-gray-800 mb-3">{pool.poolName}</h4>
+                                )}
+                                <div className="space-y-2">
+                                  {pool.standings?.map((entry, entryIdx) => (
+                                    <div key={entry.unitNumber ?? `entry-${entryIdx}`} className="flex items-start gap-2 text-sm">
+                                      <span className="w-8 h-8 flex-shrink-0 flex items-center justify-center bg-orange-500 text-white font-bold rounded">
+                                        {entry.unitNumber}
+                                      </span>
+                                      <div className="min-w-0 flex-1">
+                                        <div className="font-medium text-gray-900">{entry.unitName}</div>
+                                        {entry.members && entry.members.length > 0 && (
+                                          <div className="flex flex-wrap gap-2 mt-1">
+                                            {entry.members.map((member, memberIdx) => (
+                                              <button
+                                                key={member.userId ?? `member-${memberIdx}`}
+                                                onClick={() => setProfileModalUserId(member.userId)}
+                                                className="flex items-center gap-1.5 text-xs text-gray-600 hover:text-orange-600 transition-colors"
+                                                title={`View ${member.firstName} ${member.lastName}'s profile`}
+                                              >
+                                                {member.profileImageUrl ? (
+                                                  <img
+                                                    src={getSharedAssetUrl(member.profileImageUrl)}
+                                                    alt=""
+                                                    className="w-5 h-5 rounded-full object-cover border border-gray-200"
+                                                  />
+                                                ) : (
+                                                  <div className="w-5 h-5 rounded-full bg-gray-200 flex items-center justify-center">
+                                                    <User className="w-3 h-3 text-gray-400" />
+                                                  </div>
+                                                )}
+                                                <span className="hover:underline">
+                                                  {member.firstName} {member.lastName}
+                                                </span>
+                                              </button>
+                                            ))}
+                                          </div>
+                                        )}
+                                        {/* Fallback: Show players string if members array not available */}
+                                        {(!entry.members || entry.members.length === 0) && entry.players && (
+                                          <div className="text-xs text-gray-500 mt-0.5">{entry.players}</div>
+                                        )}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   {/* Rounds and Matches */}
                   {schedule.rounds?.map((round, roundIdx) => (
                     <div key={roundIdx} className="bg-white rounded-xl shadow-sm overflow-hidden">
@@ -1510,18 +1590,26 @@ export default function TournamentManage() {
                                 }`}>
                                   {match.status}
                                 </span>
-                                {/* Edit button - only show if match has games/encounters */}
-                                {match.games?.length > 0 && (
+                                {/* Match details / Edit button - show for all matches */}
+                                {!match.isBye && (
                                   <button
                                     onClick={() => setSelectedGameForEdit({
-                                      ...match.games[0],
+                                      id: match.games?.[0]?.gameId || match.games?.[0]?.id || match.encounterId,
+                                      ...(match.games?.[0] || {}),
                                       unit1: { id: match.unit1Id, name: match.unit1Name, members: match.unit1Members || [] },
                                       unit2: { id: match.unit2Id, name: match.unit2Name, members: match.unit2Members || [] },
+                                      unit1Score: match.games?.[0]?.unit1Score ?? match.unit1Score ?? 0,
+                                      unit2Score: match.games?.[0]?.unit2Score ?? match.unit2Score ?? 0,
                                       bestOf: match.bestOf || 1,
-                                      matchNumber: match.matchNumber
+                                      matchNumber: match.matchNumber,
+                                      status: match.games?.[0]?.status || match.status || 'New',
+                                      games: match.games || [],
+                                      courtLabel: match.courtLabel,
+                                      winnerUnitId: match.winnerUnitId,
+                                      hasGames: match.games?.length > 0
                                     })}
                                     className="p-1.5 text-gray-400 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition-colors"
-                                    title="Edit game score"
+                                    title={match.games?.length > 0 ? "Edit game score" : "Match details"}
                                   >
                                     <Info className="w-4 h-4" />
                                   </button>
@@ -2455,11 +2543,12 @@ export default function TournamentManage() {
             loadSchedule(selectedDivision?.id);
           }}
           onPlayerClick={(userId) => setProfileModalUserId(userId)}
-          onSaveScore={async (gameId, unit1Score, unit2Score, finish) => {
+          onSaveScore={selectedGameForEdit.hasGames ? async (gameId, unit1Score, unit2Score, finish) => {
             await tournamentApi.adminUpdateScore(gameId, unit1Score, unit2Score, finish);
-          }}
+          } : undefined}
           showCourtAssignment={false}
           showStatusControl={false}
+          readOnly={!selectedGameForEdit.hasGames}
         />
       )}
 
