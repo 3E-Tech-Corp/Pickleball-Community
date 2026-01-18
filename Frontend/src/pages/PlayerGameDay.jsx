@@ -4,9 +4,9 @@ import {
   CheckCircle, XCircle, Play, Clock, MapPin,
   RefreshCw, AlertCircle, FileText, Trophy, Calendar,
   ChevronRight, User, DollarSign, Users, Bell, History,
-  ChevronDown, ChevronUp, Info
+  ChevronDown, ChevronUp, Info, Map, X
 } from 'lucide-react'
-import { gameDayApi, checkInApi, tournamentApi, getSharedAssetUrl } from '../services/api'
+import { gameDayApi, checkInApi, tournamentApi, objectAssetsApi, getSharedAssetUrl } from '../services/api'
 import { useNotifications } from '../hooks/useNotifications'
 import SignatureCanvas from '../components/SignatureCanvas'
 import PublicProfileModal from '../components/ui/PublicProfileModal'
@@ -27,13 +27,16 @@ export default function PlayerGameDay() {
   const [selectedDivisionId, setSelectedDivisionId] = useState(null)
   const [profileModalUserId, setProfileModalUserId] = useState(null)
   const [expandedRounds, setExpandedRounds] = useState({})
+  const [mapAsset, setMapAsset] = useState(null)
+  const [showMapModal, setShowMapModal] = useState(false)
 
   const loadData = useCallback(async () => {
     try {
       setRefreshing(true)
-      const [gameDayRes, checkInRes] = await Promise.all([
+      const [gameDayRes, checkInRes, assetsRes] = await Promise.all([
         gameDayApi.getPlayerGameDay(eventId),
-        checkInApi.getStatus(eventId)
+        checkInApi.getStatus(eventId),
+        objectAssetsApi.getAssets('Event', eventId)
       ])
       if (gameDayRes.success) {
         setGameDay(gameDayRes.data)
@@ -43,6 +46,11 @@ export default function PlayerGameDay() {
         }
       }
       if (checkInRes.success) setCheckInStatus(checkInRes.data)
+      // Load map asset
+      if (assetsRes.success && assetsRes.data) {
+        const map = assetsRes.data.find(a => a.assetTypeName?.toLowerCase() === 'map')
+        setMapAsset(map || null)
+      }
     } catch (err) {
       setError(err.message || 'Failed to load data')
     } finally {
@@ -251,6 +259,8 @@ export default function PlayerGameDay() {
           onShowWaiver={() => setShowWaiverModal(true)}
           onSubmitScore={setShowScoreModal}
           onPlayerClick={setProfileModalUserId}
+          mapAsset={mapAsset}
+          onShowMap={() => setShowMapModal(true)}
         />
       ) : (
         <OthersTab
@@ -290,6 +300,33 @@ export default function PlayerGameDay() {
           onClose={() => setProfileModalUserId(null)}
         />
       )}
+
+      {/* Court Map Modal */}
+      {showMapModal && mapAsset && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-50 p-4"
+          onClick={() => setShowMapModal(false)}
+        >
+          <div
+            className="relative w-full h-full flex flex-col items-center justify-center"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setShowMapModal(false)}
+              className="absolute top-4 right-4 text-white hover:text-gray-300 flex items-center gap-2 bg-black bg-opacity-50 px-4 py-2 rounded-lg z-10"
+            >
+              <X className="w-6 h-6" />
+              Close
+            </button>
+            <img
+              src={getSharedAssetUrl(mapAsset.fileUrl)}
+              alt="Court Map"
+              className="max-w-full max-h-[90vh] object-contain"
+              onClick={() => setShowMapModal(false)}
+            />
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -307,7 +344,9 @@ function MyGamesTab({
   onCheckIn,
   onShowWaiver,
   onSubmitScore,
-  onPlayerClick
+  onPlayerClick,
+  mapAsset,
+  onShowMap
 }) {
   const myDiv = gameDay.myDivisions?.[0]
   const [selectedMatch, setSelectedMatch] = useState(null)
@@ -332,6 +371,17 @@ function MyGamesTab({
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-4 space-y-4">
+      {/* Court Map Button - Prominent */}
+      {mapAsset && (
+        <button
+          onClick={onShowMap}
+          className="w-full bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl p-4 flex items-center justify-center gap-3 shadow-lg hover:from-blue-700 hover:to-blue-800 transition-all active:scale-[0.98]"
+        >
+          <Map className="w-6 h-6" />
+          <span className="text-lg font-semibold">View Court Map</span>
+        </button>
+      )}
+
       {/* Top Section: Division Info + Notifications */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Left: Division & Partner Info */}
