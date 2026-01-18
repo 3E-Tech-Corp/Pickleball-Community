@@ -1466,18 +1466,36 @@ export default function TournamentManage() {
                               <div className="flex items-center gap-4 flex-1">
                                 <div className="text-sm text-gray-400 w-8">#{match.matchNumber}</div>
                                 <div className="flex-1 grid grid-cols-3 gap-4 items-center">
-                                  <div className={`text-right ${match.winnerName === match.unit1Name ? 'font-semibold text-green-600' : 'text-gray-900'}`}>
-                                    {match.unit1Name || `Unit #${match.unit1Number || '?'}`}
+                                  <div className={`text-right ${match.winnerName === match.unit1Name ? 'font-semibold text-green-600' : ''}`}>
+                                    {match.isBye && !match.unit1Name ? (
+                                      <span className="italic text-gray-400">BYE</span>
+                                    ) : match.unit1Name ? (
+                                      <span className="text-gray-900">{match.unit1Name}</span>
+                                    ) : match.unit1SeedInfo ? (
+                                      <span className="text-blue-600 font-medium">{match.unit1SeedInfo}</span>
+                                    ) : (
+                                      <span className="text-gray-400 italic">TBD</span>
+                                    )}
                                   </div>
                                   <div className="text-center">
-                                    {match.score ? (
+                                    {match.isBye ? (
+                                      <span className="text-gray-300">—</span>
+                                    ) : match.score ? (
                                       <span className="font-medium text-gray-700">{match.score}</span>
                                     ) : (
                                       <span className="text-gray-400">vs</span>
                                     )}
                                   </div>
-                                  <div className={`${match.winnerName === match.unit2Name ? 'font-semibold text-green-600' : 'text-gray-900'}`}>
-                                    {match.unit2Name || `Unit #${match.unit2Number || '?'}`}
+                                  <div className={`${match.winnerName === match.unit2Name ? 'font-semibold text-green-600' : ''}`}>
+                                    {match.isBye && !match.unit2Name ? (
+                                      <span className="italic text-gray-400">BYE</span>
+                                    ) : match.unit2Name ? (
+                                      <span className="text-gray-900">{match.unit2Name}</span>
+                                    ) : match.unit2SeedInfo ? (
+                                      <span className="text-blue-600 font-medium">{match.unit2SeedInfo}</span>
+                                    ) : (
+                                      <span className="text-gray-400 italic">TBD</span>
+                                    )}
                                   </div>
                                 </div>
                               </div>
