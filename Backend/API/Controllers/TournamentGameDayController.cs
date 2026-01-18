@@ -623,7 +623,10 @@ public class TournamentGameDayController : ControllerBase
         if (game.Status == "Finished")
         {
             await UpdateStatsAfterGameFinish(game);
-            await CheckMatchCompletion(game.EncounterMatch!.EncounterId);
+            if (game.EncounterMatch != null)
+            {
+                await CheckMatchCompletion(game.EncounterMatch.EncounterId);
+            }
             await AdvanceCourtQueue(game);
         }
 
@@ -1314,7 +1317,8 @@ public class TournamentGameDayController : ControllerBase
 
         if (match == null) return;
 
-        var allGames = match.Matches.SelectMany(m => m.Games).ToList();
+        var allGames = match.Matches?.SelectMany(m => m.Games ?? Enumerable.Empty<EventGame>()).ToList()
+            ?? new List<EventGame>();
         var finishedGames = allGames.Where(g => g.Status == "Finished").ToList();
         var unit1Wins = finishedGames.Count(g => g.WinnerUnitId == match.Unit1Id);
         var unit2Wins = finishedGames.Count(g => g.WinnerUnitId == match.Unit2Id);
