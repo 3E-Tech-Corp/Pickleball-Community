@@ -1716,12 +1716,19 @@ export default function TournamentManage() {
                     <div className="divide-y divide-gray-100">
                       {divGroup.players.map(player => (
                         <div key={`${player.divisionId}-${player.userId}`} className="hover:bg-gray-50">
-                          <div className="p-4">
+                          {/* Clickable row - whole bar expands details */}
+                          <div
+                            className="p-4 cursor-pointer"
+                            onClick={() => setExpandedPlayer(expandedPlayer === player.userId ? null : player.userId)}
+                          >
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-3">
                                 {/* Avatar - clickable for profile */}
                                 <button
-                                  onClick={() => setProfileModalUserId(player.userId)}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setProfileModalUserId(player.userId);
+                                  }}
                                   className="focus:outline-none focus:ring-2 focus:ring-orange-500 rounded-full"
                                   title="View profile"
                                 >
@@ -1741,7 +1748,10 @@ export default function TournamentManage() {
                                 {/* Player info - clickable for profile */}
                                 <div>
                                   <button
-                                    onClick={() => setProfileModalUserId(player.userId)}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setProfileModalUserId(player.userId);
+                                    }}
                                     className="font-medium text-gray-900 hover:text-orange-600 text-left"
                                   >
                                     {player.firstName} {player.lastName}
@@ -1753,12 +1763,9 @@ export default function TournamentManage() {
                               </div>
 
                               {/* Status indicators and actions */}
-                              <div className="flex items-center gap-4">
-                                {/* Status badges - clickable to expand details */}
-                                <button
-                                  onClick={() => setExpandedPlayer(expandedPlayer === player.userId ? null : player.userId)}
-                                  className="flex items-center gap-2 hover:opacity-80"
-                                >
+                              <div className="flex items-center gap-2">
+                                {/* Status badges */}
+                                <div className="flex items-center gap-2">
                                   {/* Check-in status */}
                                   <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
                                     player.isCheckedIn
@@ -1787,27 +1794,25 @@ export default function TournamentManage() {
                                     {player.waiverSigned ? 'Waiver' : 'No Waiver'}
                                   </span>
 
-                                  {/* Send waiver request button - shown when waiver not signed */}
+                                  {/* Start waiver signing button - shown when waiver not signed */}
                                   {!player.waiverSigned && (
                                     <button
                                       onClick={(e) => {
                                         e.stopPropagation();
-                                        handleSendWaiverRequest(player);
+                                        // Copy check-in link to clipboard
+                                        const checkInUrl = `${window.location.origin}/event/${eventId}/check-in`;
+                                        navigator.clipboard.writeText(checkInUrl);
+                                        toast.success(`Check-in link copied! Share with ${player.firstName} to sign waiver`);
                                       }}
-                                      disabled={sendingWaiverRequest === player.userId}
-                                      className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-700 hover:bg-purple-200 transition-colors disabled:opacity-50"
-                                      title="Send waiver signing request to player"
+                                      className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-700 hover:bg-purple-200 transition-colors"
+                                      title="Copy check-in link for player to sign waiver"
                                     >
-                                      {sendingWaiverRequest === player.userId ? (
-                                        <Loader2 className="w-3 h-3 animate-spin" />
-                                      ) : (
-                                        <Send className="w-3 h-3" />
-                                      )}
-                                      Send
+                                      <ExternalLink className="w-3 h-3" />
+                                      Sign
                                     </button>
                                   )}
 
-                                  {/* Payment status */}
+                                  {/* Payment status with Edit button */}
                                   <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
                                     player.hasPaid
                                       ? 'bg-emerald-100 text-emerald-700'
@@ -1816,6 +1821,16 @@ export default function TournamentManage() {
                                     <DollarSign className="w-3 h-3" />
                                     {player.hasPaid ? 'Paid' : 'Unpaid'}
                                   </span>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      startEditPayment(player);
+                                    }}
+                                    className="p-1 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                                    title="Edit payment"
+                                  >
+                                    <Edit2 className="w-3.5 h-3.5" />
+                                  </button>
 
                                   {/* Expand indicator */}
                                   {expandedPlayer === player.userId ? (
@@ -1823,12 +1838,15 @@ export default function TournamentManage() {
                                   ) : (
                                     <ChevronDown className="w-4 h-4 text-gray-400" />
                                   )}
-                                </button>
+                                </div>
 
                                 {/* Action menu */}
                                 <div className="relative">
                                   <button
-                                    onClick={() => setActionMenuOpen(actionMenuOpen === player.userId ? null : player.userId)}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setActionMenuOpen(actionMenuOpen === player.userId ? null : player.userId);
+                                    }}
                                     disabled={processingAction?.userId === player.userId}
                                     className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 disabled:opacity-50"
                                   >
@@ -1841,7 +1859,10 @@ export default function TournamentManage() {
 
                                   {/* Dropdown menu */}
                                   {actionMenuOpen === player.userId && (
-                                    <div className="absolute right-0 mt-1 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-10">
+                                    <div
+                                      className="absolute right-0 mt-1 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-10"
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
                                       {/* Check-in actions */}
                                       {!player.isCheckedIn ? (
                                         <button
@@ -1857,66 +1878,77 @@ export default function TournamentManage() {
                                           className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
                                         >
                                           <XCircle className="w-4 h-4 text-red-600" />
-                                        Void Check-in
-                                      </button>
-                                    )}
-
-                                    <div className="border-t border-gray-100 my-1" />
-
-                                    {/* Waiver actions */}
-                                    {!player.waiverSigned ? (
-                                      <>
-                                        <button
-                                          onClick={() => handleSendWaiverRequest(player)}
-                                          disabled={sendingWaiverRequest === player.userId}
-                                          className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2 disabled:opacity-50"
-                                        >
-                                          {sendingWaiverRequest === player.userId ? (
-                                            <Loader2 className="w-4 h-4 animate-spin text-purple-600" />
-                                          ) : (
-                                            <Send className="w-4 h-4 text-purple-600" />
-                                          )}
-                                          Send Waiver Request
+                                          Void Check-in
                                         </button>
+                                      )}
+
+                                      <div className="border-t border-gray-100 my-1" />
+
+                                      {/* Waiver actions */}
+                                      {!player.waiverSigned ? (
+                                        <>
+                                          <button
+                                            onClick={() => {
+                                              const checkInUrl = `${window.location.origin}/event/${eventId}/check-in`;
+                                              window.open(checkInUrl, '_blank');
+                                              setActionMenuOpen(null);
+                                            }}
+                                            className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
+                                          >
+                                            <ExternalLink className="w-4 h-4 text-purple-600" />
+                                            Open Waiver Page
+                                          </button>
+                                          <button
+                                            onClick={() => handleSendWaiverRequest(player)}
+                                            disabled={sendingWaiverRequest === player.userId}
+                                            className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2 disabled:opacity-50"
+                                          >
+                                            {sendingWaiverRequest === player.userId ? (
+                                              <Loader2 className="w-4 h-4 animate-spin text-purple-600" />
+                                            ) : (
+                                              <Send className="w-4 h-4 text-purple-600" />
+                                            )}
+                                            Send Waiver Request
+                                          </button>
+                                          <button
+                                            onClick={() => handleOverrideWaiver(player.userId)}
+                                            className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
+                                          >
+                                            <FileText className="w-4 h-4 text-blue-600" />
+                                            Override Waiver
+                                          </button>
+                                        </>
+                                      ) : (
                                         <button
-                                          onClick={() => handleOverrideWaiver(player.userId)}
+                                          onClick={() => handleVoidWaiver(player.userId)}
                                           className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
                                         >
-                                          <FileText className="w-4 h-4 text-blue-600" />
-                                          Override Waiver
+                                          <FileText className="w-4 h-4 text-red-600" />
+                                          Void Waiver
                                         </button>
-                                      </>
-                                    ) : (
-                                      <button
-                                        onClick={() => handleVoidWaiver(player.userId)}
-                                        className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
-                                      >
-                                        <FileText className="w-4 h-4 text-red-600" />
-                                        Void Waiver
-                                      </button>
-                                    )}
+                                      )}
 
-                                    <div className="border-t border-gray-100 my-1" />
+                                      <div className="border-t border-gray-100 my-1" />
 
-                                    {/* Payment actions */}
-                                    {!player.hasPaid ? (
-                                      <button
-                                        onClick={() => handleOverridePayment(player.userId, true)}
-                                        className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
-                                      >
-                                        <DollarSign className="w-4 h-4 text-green-600" />
-                                        Mark as Paid
-                                      </button>
-                                    ) : (
-                                      <button
-                                        onClick={() => handleOverridePayment(player.userId, false)}
-                                        className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
-                                      >
-                                        <DollarSign className="w-4 h-4 text-red-600" />
-                                        Void Payment
-                                      </button>
-                                    )}
-                                  </div>
+                                      {/* Payment actions */}
+                                      {!player.hasPaid ? (
+                                        <button
+                                          onClick={() => handleOverridePayment(player.userId, true)}
+                                          className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
+                                        >
+                                          <DollarSign className="w-4 h-4 text-green-600" />
+                                          Mark as Paid
+                                        </button>
+                                      ) : (
+                                        <button
+                                          onClick={() => handleOverridePayment(player.userId, false)}
+                                          className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
+                                        >
+                                          <DollarSign className="w-4 h-4 text-red-600" />
+                                          Void Payment
+                                        </button>
+                                      )}
+                                    </div>
                                 )}
                               </div>
                             </div>
@@ -1977,19 +2009,10 @@ export default function TournamentManage() {
 
                                   {/* Payment Details */}
                                   <div className="space-y-2">
-                                    <div className="flex items-center justify-between">
-                                      <h4 className="font-medium text-gray-900 flex items-center gap-2">
-                                        <DollarSign className="w-4 h-4 text-emerald-600" />
-                                        Payment Status
-                                      </h4>
-                                      <button
-                                        onClick={() => startEditPayment(player)}
-                                        className="text-xs text-blue-600 hover:text-blue-700 flex items-center gap-1"
-                                      >
-                                        <Edit2 className="w-3 h-3" />
-                                        Edit
-                                      </button>
-                                    </div>
+                                    <h4 className="font-medium text-gray-900 flex items-center gap-2">
+                                      <DollarSign className="w-4 h-4 text-emerald-600" />
+                                      Payment Status
+                                    </h4>
                                     {player.hasPaid ? (
                                       <div className="text-sm space-y-1">
                                         <div className="flex items-center gap-2 text-green-600">
