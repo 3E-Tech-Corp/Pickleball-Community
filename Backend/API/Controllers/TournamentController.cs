@@ -3703,6 +3703,8 @@ public class TournamentController : ControllerBase
                     Standings = g.Select((u, idx) => new PoolStandingEntryDto
                     {
                         Rank = idx + 1,
+                        PoolNumber = g.Key,
+                        PoolName = g.First().PoolName ?? $"Pool {g.Key}",
                         UnitId = u.Id,
                         UnitNumber = u.UnitNumber,
                         UnitName = Utility.FormatUnitDisplayName(u.Members, u.Name),

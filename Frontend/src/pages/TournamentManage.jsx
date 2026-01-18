@@ -33,6 +33,8 @@ export default function TournamentManage() {
   const [downloadingStandings, setDownloadingStandings] = useState(false);
   const [editingRank, setEditingRank] = useState(null);
   const [showAdvancementPreview, setShowAdvancementPreview] = useState(false);
+  const [standingsViewMode, setStandingsViewMode] = useState('grouped'); // 'grouped' or 'flat'
+  const [standingsSortBy, setStandingsSortBy] = useState('pool'); // 'pool', 'rank', 'matchesWon', 'gameDiff', 'pointDiff'
   const [event, setEvent] = useState(null);
   const [activeTab, setActiveTab] = useState('overview');
   const [selectedDivision, setSelectedDivision] = useState(null);
@@ -2210,6 +2212,136 @@ export default function TournamentManage() {
                         </div>
                       )}
 
+                      {/* View Toggle */}
+                      <div className="px-4 py-2 border-b flex items-center gap-2">
+                        <span className="text-sm text-gray-500">View:</span>
+                        <button
+                          onClick={() => setStandingsViewMode('grouped')}
+                          className={`px-3 py-1 text-sm rounded-lg ${standingsViewMode === 'grouped' ? 'bg-orange-100 text-orange-700 font-medium' : 'text-gray-600 hover:bg-gray-100'}`}
+                        >
+                          By Pool
+                        </button>
+                        <button
+                          onClick={() => setStandingsViewMode('flat')}
+                          className={`px-3 py-1 text-sm rounded-lg ${standingsViewMode === 'flat' ? 'bg-orange-100 text-orange-700 font-medium' : 'text-gray-600 hover:bg-gray-100'}`}
+                        >
+                          All Teams
+                        </button>
+                      </div>
+
+                      {standingsViewMode === 'flat' ? (
+                        /* Flat view - all teams in one table with pool column */
+                        <div className="p-4">
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-sm">
+                              <thead className="text-gray-500 border-b bg-gray-50">
+                                <tr>
+                                  <th
+                                    className="text-left py-2 px-2 cursor-pointer hover:bg-gray-100"
+                                    onClick={() => setStandingsSortBy(standingsSortBy === 'pool' ? 'pool-desc' : 'pool')}
+                                    title="Sort by Pool"
+                                  >
+                                    Pool {standingsSortBy.startsWith('pool') && (standingsSortBy === 'pool' ? '↑' : '↓')}
+                                  </th>
+                                  <th
+                                    className="text-left py-2 px-2 cursor-pointer hover:bg-gray-100"
+                                    onClick={() => setStandingsSortBy(standingsSortBy === 'rank' ? 'rank-desc' : 'rank')}
+                                    title="Sort by Rank"
+                                  >
+                                    # {standingsSortBy.startsWith('rank') && (standingsSortBy === 'rank' ? '↑' : '↓')}
+                                  </th>
+                                  <th className="text-left py-2 px-2">Team</th>
+                                  <th
+                                    className="text-center py-2 px-2 cursor-pointer hover:bg-gray-100"
+                                    onClick={() => setStandingsSortBy(standingsSortBy === 'matchesWon' ? 'matchesWon-desc' : 'matchesWon')}
+                                    title="Sort by Matches Won"
+                                  >
+                                    MW {standingsSortBy.startsWith('matchesWon') && (standingsSortBy === 'matchesWon-desc' ? '↓' : '↑')}
+                                  </th>
+                                  <th className="text-center py-2 px-2" title="Matches Lost">ML</th>
+                                  <th className="text-center py-2 px-2" title="Games Won">GW</th>
+                                  <th className="text-center py-2 px-2" title="Games Lost">GL</th>
+                                  <th
+                                    className="text-center py-2 px-2 cursor-pointer hover:bg-gray-100"
+                                    onClick={() => setStandingsSortBy(standingsSortBy === 'gameDiff' ? 'gameDiff-desc' : 'gameDiff')}
+                                    title="Sort by Game Differential"
+                                  >
+                                    G+/- {standingsSortBy.startsWith('gameDiff') && (standingsSortBy === 'gameDiff-desc' ? '↓' : '↑')}
+                                  </th>
+                                  <th className="text-center py-2 px-2" title="Points For">PF</th>
+                                  <th className="text-center py-2 px-2" title="Points Against">PA</th>
+                                  <th
+                                    className="text-center py-2 px-2 cursor-pointer hover:bg-gray-100"
+                                    onClick={() => setStandingsSortBy(standingsSortBy === 'pointDiff' ? 'pointDiff-desc' : 'pointDiff')}
+                                    title="Sort by Point Differential"
+                                  >
+                                    P+/- {standingsSortBy.startsWith('pointDiff') && (standingsSortBy === 'pointDiff-desc' ? '↓' : '↑')}
+                                  </th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {(() => {
+                                  // Flatten all standings with pool info
+                                  const allStandings = schedule.poolStandings.flatMap(pool =>
+                                    (pool.standings || []).map(s => ({ ...s, poolNumber: pool.poolNumber, poolName: pool.poolName }))
+                                  );
+
+                                  // Sort based on current sort setting
+                                  const sorted = [...allStandings].sort((a, b) => {
+                                    switch (standingsSortBy) {
+                                      case 'pool': return (a.poolNumber || 0) - (b.poolNumber || 0);
+                                      case 'pool-desc': return (b.poolNumber || 0) - (a.poolNumber || 0);
+                                      case 'rank': return (a.rank || 0) - (b.rank || 0);
+                                      case 'rank-desc': return (b.rank || 0) - (a.rank || 0);
+                                      case 'matchesWon': return (a.matchesWon || 0) - (b.matchesWon || 0);
+                                      case 'matchesWon-desc': return (b.matchesWon || 0) - (a.matchesWon || 0);
+                                      case 'gameDiff': return ((a.gamesWon || 0) - (a.gamesLost || 0)) - ((b.gamesWon || 0) - (b.gamesLost || 0));
+                                      case 'gameDiff-desc': return ((b.gamesWon || 0) - (b.gamesLost || 0)) - ((a.gamesWon || 0) - (a.gamesLost || 0));
+                                      case 'pointDiff': return (a.pointDifferential || 0) - (b.pointDifferential || 0);
+                                      case 'pointDiff-desc': return (b.pointDifferential || 0) - (a.pointDifferential || 0);
+                                      default: return (a.poolNumber || 0) - (b.poolNumber || 0) || (a.rank || 0) - (b.rank || 0);
+                                    }
+                                  });
+
+                                  return sorted.map((standing, idx) => {
+                                    const willAdvance = selectedDivision?.playoffFromPools && standing.rank <= selectedDivision.playoffFromPools;
+                                    const gameDiff = (standing.gamesWon || 0) - (standing.gamesLost || 0);
+
+                                    return (
+                                      <tr key={idx} className={`border-b last:border-0 ${willAdvance ? 'bg-green-50' : ''}`}>
+                                        <td className="py-2 px-2 font-medium text-orange-600">
+                                          {standing.poolName || `Pool ${standing.poolNumber}`}
+                                        </td>
+                                        <td className="py-2 px-2">
+                                          <span className={`font-medium ${willAdvance ? 'text-green-600' : 'text-gray-400'}`}>
+                                            {standing.rank}
+                                          </span>
+                                        </td>
+                                        <td className="py-2 px-2">
+                                          <div className="text-gray-900 font-medium">{standing.unitName || `Unit #${standing.unitNumber}`}</div>
+                                        </td>
+                                        <td className="py-2 px-2 text-center font-medium text-green-600">{standing.matchesWon}</td>
+                                        <td className="py-2 px-2 text-center text-red-600">{standing.matchesLost}</td>
+                                        <td className="py-2 px-2 text-center text-gray-600">{standing.gamesWon}</td>
+                                        <td className="py-2 px-2 text-center text-gray-600">{standing.gamesLost}</td>
+                                        <td className={`py-2 px-2 text-center font-medium ${gameDiff > 0 ? 'text-green-600' : gameDiff < 0 ? 'text-red-600' : 'text-gray-400'}`}>
+                                          {gameDiff > 0 ? '+' : ''}{gameDiff}
+                                        </td>
+                                        <td className="py-2 px-2 text-center text-gray-600">{standing.pointsFor || 0}</td>
+                                        <td className="py-2 px-2 text-center text-gray-600">{standing.pointsAgainst || 0}</td>
+                                        <td className={`py-2 px-2 text-center font-medium ${(standing.pointDifferential || 0) > 0 ? 'text-green-600' : (standing.pointDifferential || 0) < 0 ? 'text-red-600' : 'text-gray-400'}`}>
+                                          {(standing.pointDifferential || 0) > 0 ? '+' : ''}{standing.pointDifferential || 0}
+                                        </td>
+                                      </tr>
+                                    );
+                                  });
+                                })()}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      ) : (
+                      /* Grouped view - separate tables per pool */
                       <div className="p-4 space-y-6">
                         {schedule.poolStandings.map((pool, poolIdx) => (
                           <div key={poolIdx}>
@@ -2331,6 +2463,7 @@ export default function TournamentManage() {
                           </div>
                         ))}
                       </div>
+                      )}
 
                       {/* Legend */}
                       <div className="px-4 py-2 bg-gray-50 border-t text-xs text-gray-500 flex items-center gap-4">
