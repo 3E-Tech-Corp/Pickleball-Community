@@ -3237,6 +3237,32 @@ public class TournamentController : ControllerBase
                 court.Status = "Available";
             }
 
+            // Get all game IDs for this division to delete score history first
+            var gameIds = existingMatches
+                .SelectMany(e => e.Matches)
+                .SelectMany(m => m.Games)
+                .Select(g => g.Id)
+                .ToList();
+
+            // Delete score history for these games (must be done before deleting games due to FK constraint)
+            if (gameIds.Any())
+            {
+                try
+                {
+                    var scoreHistories = await _context.EventGameScoreHistories
+                        .Where(h => gameIds.Contains(h.GameId))
+                        .ToListAsync();
+                    if (scoreHistories.Any())
+                    {
+                        _context.EventGameScoreHistories.RemoveRange(scoreHistories);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Could not delete score histories for division {DivisionId} - table may not exist", divisionId);
+                }
+            }
+
             // Delete games first, then matches
             foreach (var encounter in existingMatches)
             {
