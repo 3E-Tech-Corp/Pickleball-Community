@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import {
   Calendar, Users, Trophy, ChevronLeft, Loader2,
-  AlertCircle, Printer, Download, Clock, MapPin, User
+  AlertCircle, Printer, Download, Clock, MapPin, User, RotateCcw
 } from 'lucide-react';
 import { tournamentApi, getSharedAssetUrl } from '../services/api';
 import PublicProfileModal from '../components/ui/PublicProfileModal';
@@ -14,6 +14,7 @@ export default function DivisionSchedule() {
   const [error, setError] = useState(null);
   const [downloadingExcel, setDownloadingExcel] = useState(false);
   const [profileModalUserId, setProfileModalUserId] = useState(null);
+  const [resettingDrawing, setResettingDrawing] = useState(false);
 
   useEffect(() => {
     loadSchedule();
@@ -39,6 +40,28 @@ export default function DivisionSchedule() {
 
   const handlePrint = () => {
     window.print();
+  };
+
+  const handleResetDrawing = async () => {
+    if (!confirm('Are you sure you want to reset the drawing? This will clear all pool assignments and you will need to redraw.')) {
+      return;
+    }
+    try {
+      setResettingDrawing(true);
+      const response = await tournamentApi.cancelDrawing(divisionId);
+      if (response.success) {
+        alert('Drawing has been reset. You can now adjust registrations and redraw.');
+        // Navigate back to drawing page
+        window.location.href = `/event/${eventId}/drawing`;
+      } else {
+        alert(response.message || 'Failed to reset drawing');
+      }
+    } catch (err) {
+      console.error('Error resetting drawing:', err);
+      alert(err?.response?.data?.message || 'Failed to reset drawing');
+    } finally {
+      setResettingDrawing(false);
+    }
   };
 
   const handleDownloadExcel = async () => {
@@ -124,6 +147,19 @@ export default function DivisionSchedule() {
               </div>
             </div>
             <div className="flex items-center gap-3">
+              <button
+                onClick={handleResetDrawing}
+                disabled={resettingDrawing}
+                className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 transition-colors"
+                title="Reset drawing to adjust registrations and redraw"
+              >
+                {resettingDrawing ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <RotateCcw className="w-4 h-4" />
+                )}
+                Reset Drawing
+              </button>
               <button
                 onClick={handleDownloadExcel}
                 disabled={downloadingExcel}
