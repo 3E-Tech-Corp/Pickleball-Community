@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom';
 import {
   ArrowLeft, CheckCircle, XCircle, FileText, DollarSign,
   Loader2, AlertCircle, Trophy, Clock, Send, ChevronRight
@@ -11,9 +11,13 @@ import SignatureCanvas from '../components/SignatureCanvas';
 
 export default function PlayerCheckIn() {
   const { eventId } = useParams();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { user, isAuthenticated } = useAuth();
   const toast = useToast();
+
+  // Check if redo mode is enabled (allows re-signing waiver even if checked in)
+  const redoMode = searchParams.get('redo') === 'waiver';
 
   const [loading, setLoading] = useState(true);
   const [event, setEvent] = useState(null);
@@ -38,7 +42,10 @@ export default function PlayerCheckIn() {
       if (statusRes.success) {
         setCheckInStatus(statusRes.data);
         // Determine current step based on status
-        if (!statusRes.data.waiverSigned && statusRes.data.pendingWaivers?.length > 0) {
+        // In redo mode, always show waiver step (step 1) if there are pending waivers
+        if (redoMode && statusRes.data.pendingWaivers?.length > 0) {
+          setStep(1);
+        } else if (!statusRes.data.waiverSigned && statusRes.data.pendingWaivers?.length > 0) {
           setStep(1);
         } else if (!statusRes.data.isCheckedIn) {
           setStep(2);
@@ -52,7 +59,7 @@ export default function PlayerCheckIn() {
     } finally {
       setLoading(false);
     }
-  }, [eventId, toast]);
+  }, [eventId, toast, redoMode]);
 
   useEffect(() => {
     if (isAuthenticated && eventId) {
@@ -137,8 +144,8 @@ export default function PlayerCheckIn() {
   const pendingWaivers = checkInStatus?.pendingWaivers || [];
   const isAlreadyCheckedIn = checkInStatus?.isCheckedIn;
 
-  // Redirect if already checked in
-  if (isAlreadyCheckedIn) {
+  // Show "already checked in" unless redo mode is enabled (admin sent link to re-sign waiver)
+  if (isAlreadyCheckedIn && !redoMode) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
         <div className="text-center max-w-md">
@@ -209,15 +216,19 @@ export default function PlayerCheckIn() {
         </div>
 
         {/* Step 1: Waiver */}
-        <div className={`bg-white rounded-xl border p-6 ${step === 1 && !waiverSigned ? 'ring-2 ring-orange-500' : ''}`}>
+        <div className={`bg-white rounded-xl border p-6 ${step === 1 && (!waiverSigned || redoMode) ? 'ring-2 ring-orange-500' : ''}`}>
           <div className="flex items-start gap-4">
-            <div className={`p-3 rounded-xl ${waiverSigned ? 'bg-green-100' : 'bg-orange-100'}`}>
-              <FileText className={`w-6 h-6 ${waiverSigned ? 'text-green-600' : 'text-orange-600'}`} />
+            <div className={`p-3 rounded-xl ${waiverSigned && !redoMode ? 'bg-green-100' : 'bg-orange-100'}`}>
+              <FileText className={`w-6 h-6 ${waiverSigned && !redoMode ? 'text-green-600' : 'text-orange-600'}`} />
             </div>
             <div className="flex-1">
-              <h3 className="font-semibold text-gray-900">Sign Waiver</h3>
+              <h3 className="font-semibold text-gray-900">
+                {redoMode ? 'Re-Sign Waiver' : 'Sign Waiver'}
+              </h3>
               <p className="text-sm text-gray-500 mt-1">
-                {waiverSigned
+                {redoMode
+                  ? 'Please re-sign the event waiver as requested by the organizer'
+                  : waiverSigned
                   ? 'You have signed the event waiver'
                   : 'Please read and sign the event waiver to continue'}
               </p>
@@ -234,17 +245,18 @@ export default function PlayerCheckIn() {
                 </a>
               )}
 
-              {!waiverSigned && pendingWaivers.length > 0 && (
+              {/* Show sign button if waiver not signed OR in redo mode */}
+              {((!waiverSigned || redoMode) && pendingWaivers.length > 0) && (
                 <button
                   onClick={() => setShowWaiverModal(true)}
                   className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-orange-600 text-white font-medium rounded-lg hover:bg-orange-700 transition-colors"
                 >
-                  Sign Waiver
+                  {redoMode && waiverSigned ? 'Re-Sign Waiver' : 'Sign Waiver'}
                   <ChevronRight className="w-4 h-4" />
                 </button>
               )}
             </div>
-            {waiverSigned && (
+            {waiverSigned && !redoMode && (
               <CheckCircle className="w-6 h-6 text-green-500 flex-shrink-0" />
             )}
           </div>
