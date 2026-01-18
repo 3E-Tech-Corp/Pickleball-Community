@@ -5,7 +5,7 @@ import {
   ChevronDown, ChevronUp, RefreshCw, Shuffle, Settings, Target,
   AlertCircle, Loader2, Plus, Edit2, DollarSign, Eye, Share2, LayoutGrid,
   Award, ArrowRight, Lock, Unlock, Save, Map, ExternalLink, FileText, User,
-  CheckCircle, XCircle, MoreVertical, Upload, Send, Info
+  CheckCircle, XCircle, MoreVertical, Upload, Send, Info, Radio, ClipboardList
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
@@ -703,7 +703,7 @@ export default function TournamentManage() {
               </Link>
               {/* Event logo/image - links to event detail */}
               {event?.posterImageUrl && (
-                <Link to={`/event/${eventId}`} className="shrink-0">
+                <Link to={`/events/${eventId}`} className="shrink-0">
                   <img
                     src={getSharedAssetUrl(event.posterImageUrl)}
                     alt={event.name || 'Event'}
@@ -712,7 +712,7 @@ export default function TournamentManage() {
                 </Link>
               )}
               <div>
-                <Link to={`/event/${eventId}`} className="hover:text-orange-600 transition-colors">
+                <Link to={`/events/${eventId}`} className="hover:text-orange-600 transition-colors">
                   <h1 className="text-xl font-bold text-gray-900">{dashboard?.eventName || 'Tournament'}</h1>
                 </Link>
                 <div className="flex items-center gap-3 mt-1">
@@ -727,8 +727,67 @@ export default function TournamentManage() {
                 </div>
               </div>
             </div>
-            {isOrganizer && (
-              <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2">
+              {/* Status-based action buttons */}
+              {(dashboard?.tournamentStatus === 'Draft' || dashboard?.tournamentStatus === 'RegistrationOpen') && (
+                <Link
+                  to={`/events/${eventId}`}
+                  className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors font-medium text-sm flex items-center gap-2"
+                >
+                  <Users className="w-4 h-4" />
+                  Register for Event
+                </Link>
+              )}
+              {dashboard?.tournamentStatus === 'Drawing' && (
+                <Link
+                  to={`/event/${eventId}/drawing`}
+                  className={`px-4 py-2 rounded-lg font-medium text-sm flex items-center gap-2 transition-colors ${
+                    isOrganizer
+                      ? 'bg-purple-600 text-white hover:bg-purple-700'
+                      : 'bg-orange-600 text-white hover:bg-orange-700'
+                  }`}
+                >
+                  {isOrganizer ? (
+                    <>
+                      <Settings className="w-4 h-4" />
+                      Manage Drawing
+                    </>
+                  ) : (
+                    <>
+                      <div className="relative">
+                        <Radio className="w-4 h-4" />
+                        <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-red-400 rounded-full animate-ping" />
+                        <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-red-400 rounded-full" />
+                      </div>
+                      Live Drawing
+                    </>
+                  )}
+                </Link>
+              )}
+              {(dashboard?.tournamentStatus === 'Running' || dashboard?.tournamentStatus === 'Started') && (
+                <Link
+                  to={isOrganizer
+                    ? `/tournament/${eventId}/manage`
+                    : `/event/${eventId}/gameday`
+                  }
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium text-sm flex items-center gap-2"
+                >
+                  {isOrganizer ? (
+                    <>
+                      <ClipboardList className="w-4 h-4" />
+                      Admin Dashboard
+                    </>
+                  ) : (
+                    <>
+                      <Play className="w-4 h-4" />
+                      Dashboard
+                    </>
+                  )}
+                </Link>
+              )}
+
+              {/* Status dropdown - organizers only */}
+              {isOrganizer && (
                 <select
                   value={dashboard?.tournamentStatus || ''}
                   onChange={(e) => handleUpdateStatus(e.target.value)}
@@ -743,8 +802,8 @@ export default function TournamentManage() {
                   <option value="Running">Running</option>
                   <option value="Completed">Completed</option>
                 </select>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </div>
       </div>
