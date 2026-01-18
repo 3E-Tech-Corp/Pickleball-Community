@@ -660,6 +660,7 @@ public class PoolStandingEntryDto
 {
     public int Rank { get; set; }
     public int? UnitNumber { get; set; }
+    public int? UnitId { get; set; }
     public string? UnitName { get; set; }
     public List<TeamMemberInfoDto> Members { get; set; } = new(); // Team member details
     public int MatchesPlayed { get; set; }
@@ -667,6 +668,8 @@ public class PoolStandingEntryDto
     public int MatchesLost { get; set; }
     public int GamesWon { get; set; }
     public int GamesLost { get; set; }
+    public int PointsFor { get; set; }
+    public int PointsAgainst { get; set; }
     public int PointDifferential { get; set; }
 }
 

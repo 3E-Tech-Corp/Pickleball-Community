@@ -3644,6 +3644,7 @@ public class TournamentController : ControllerBase
                     Standings = g.Select((u, idx) => new PoolStandingEntryDto
                     {
                         Rank = idx + 1,
+                        UnitId = u.Id,
                         UnitNumber = u.UnitNumber,
                         UnitName = Utility.FormatUnitDisplayName(u.Members, u.Name),
                         Members = u.Members
@@ -3661,6 +3662,8 @@ public class TournamentController : ControllerBase
                         MatchesLost = u.MatchesLost,
                         GamesWon = u.GamesWon,
                         GamesLost = u.GamesLost,
+                        PointsFor = u.PointsScored,
+                        PointsAgainst = u.PointsAgainst,
                         PointDifferential = u.PointsScored - u.PointsAgainst
                     }).ToList()
                 }).ToList()
@@ -5223,12 +5226,17 @@ public class TournamentController : ControllerBase
     private string? GetMatchScore(EventEncounter match)
     {
         var allGames = match.Matches.SelectMany(m => m.Games);
-        if (!allGames.Any(g => g.Status == "Finished")) return null;
-
-        return string.Join(", ", allGames
-            .Where(g => g.Status == "Finished")
+        // Show scores for any game that has been scored (has non-zero scores or is finished/completed)
+        var scoredGames = allGames
+            .Where(g => g.Status == "Finished" || g.Status == "Completed" ||
+                        (g.Unit1Score.HasValue && g.Unit1Score > 0) ||
+                        (g.Unit2Score.HasValue && g.Unit2Score > 0))
             .OrderBy(g => g.GameNumber)
-            .Select(g => $"{g.Unit1Score}-{g.Unit2Score}"));
+            .ToList();
+
+        if (!scoredGames.Any()) return null;
+
+        return string.Join(", ", scoredGames.Select(g => $"{g.Unit1Score ?? 0}-{g.Unit2Score ?? 0}"));
     }
 
     private async Task UpdateUnitStats(EventGame game)
