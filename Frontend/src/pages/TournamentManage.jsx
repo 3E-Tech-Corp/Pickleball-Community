@@ -1460,12 +1460,32 @@ export default function TournamentManage() {
                         <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
                           <div className="flex items-center justify-between mb-1">
                             <span className="text-xs font-semibold text-blue-700 uppercase">Next Game</span>
-                            {court.nextGame.queuedAt && (
-                              <span className="text-xs text-blue-600 flex items-center gap-1">
-                                <Clock className="w-3 h-3" />
-                                Queued {formatTimeElapsed(court.nextGame.queuedAt)}
-                              </span>
-                            )}
+                            <div className="flex items-center gap-2">
+                              {court.nextGame.queuedAt && (
+                                <span className="text-xs text-blue-600 flex items-center gap-1">
+                                  <Clock className="w-3 h-3" />
+                                  Queued {formatTimeElapsed(court.nextGame.queuedAt)}
+                                </span>
+                              )}
+                              {isOrganizer && (
+                                <button
+                                  onClick={async () => {
+                                    try {
+                                      await gameDayApi.startGame(court.nextGame.gameId);
+                                      loadDashboard();
+                                      toast.success('Game started');
+                                    } catch (err) {
+                                      toast.error('Failed to start game');
+                                    }
+                                  }}
+                                  className="text-xs bg-green-600 text-white px-2 py-1 rounded hover:bg-green-700 flex items-center gap-1"
+                                  title="Start game"
+                                >
+                                  <Play className="w-3 h-3" />
+                                  Start
+                                </button>
+                              )}
+                            </div>
                           </div>
                           <div className="text-sm font-medium text-gray-900">
                             {court.nextGame.unit1Players || 'TBD'} vs {court.nextGame.unit2Players || 'TBD'}
