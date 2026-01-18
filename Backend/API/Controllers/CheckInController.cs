@@ -1046,11 +1046,25 @@ public class CheckInController : ControllerBase
         if (!registrations.Any())
             return BadRequest(new ApiResponse<object> { Success = false, Message = "User is not registered for this event" });
 
-        // Void the check-in
+        // Void the check-in, waiver, and payment so player can redo
         foreach (var reg in registrations)
         {
             reg.IsCheckedIn = false;
             reg.CheckedInAt = null;
+
+            // Void waiver
+            reg.WaiverSigned = false;
+            reg.WaiverSignedAt = null;
+            reg.WaiverSignature = null;
+            reg.SignedWaiverPdfUrl = null;
+
+            // Void payment
+            reg.HasPaid = false;
+            reg.AmountPaid = 0;
+            reg.PaymentMethod = null;
+            reg.PaymentReference = null;
+            reg.PaidAt = null;
+            reg.PaymentProofUrl = null;
         }
 
         // Remove event-level check-in record
@@ -1063,13 +1077,13 @@ public class CheckInController : ControllerBase
 
         await _context.SaveChangesAsync();
 
-        _logger.LogInformation("TD {TdUserId} voided check-in for user {UserId} at event {EventId}. Notes: {Notes}",
+        _logger.LogInformation("TD {TdUserId} voided check-in, waiver, and payment for user {UserId} at event {EventId}. Notes: {Notes}",
             currentUserId, userId, eventId, request?.Notes);
 
         return Ok(new ApiResponse<object>
         {
             Success = true,
-            Message = "Check-in voided successfully"
+            Message = "Check-in voided - player can now re-sign waiver and re-submit payment"
         });
     }
 

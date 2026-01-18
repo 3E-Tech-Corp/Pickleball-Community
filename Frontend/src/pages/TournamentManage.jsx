@@ -337,12 +337,12 @@ export default function TournamentManage() {
   };
 
   const handleVoidCheckIn = async (userId) => {
-    if (!confirm('Are you sure you want to void this check-in?')) return;
+    if (!confirm('Are you sure you want to void this check-in? This will also void the waiver and payment, allowing the player to re-sign and re-pay.')) return;
     setProcessingAction({ userId, action: 'void-checkin' });
     try {
       const response = await checkInApi.voidCheckIn(eventId, userId);
       if (response.success) {
-        toast.success('Check-in voided');
+        toast.success(response.message || 'Check-in voided - player can now re-sign waiver and re-submit payment');
         loadCheckIns();
         loadDashboard();
       } else {
@@ -1853,25 +1853,7 @@ export default function TournamentManage() {
                                     {player.waiverSigned ? 'Waiver' : 'No Waiver'}
                                   </span>
 
-                                  {/* Start waiver signing button - shown when waiver not signed */}
-                                  {!player.waiverSigned && (
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        // Copy check-in link to clipboard
-                                        const checkInUrl = `${window.location.origin}/event/${eventId}/check-in`;
-                                        navigator.clipboard.writeText(checkInUrl);
-                                        toast.success(`Check-in link copied! Share with ${player.firstName} to sign waiver`);
-                                      }}
-                                      className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-700 hover:bg-purple-200 transition-colors"
-                                      title="Copy check-in link for player to sign waiver"
-                                    >
-                                      <ExternalLink className="w-3 h-3" />
-                                      Sign
-                                    </button>
-                                  )}
-
-                                  {/* Payment status with Edit button */}
+                                  {/* Payment status */}
                                   <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
                                     player.hasPaid
                                       ? 'bg-emerald-100 text-emerald-700'
@@ -1880,16 +1862,6 @@ export default function TournamentManage() {
                                     <DollarSign className="w-3 h-3" />
                                     {player.hasPaid ? 'Paid' : 'Unpaid'}
                                   </span>
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      startEditPayment(player);
-                                    }}
-                                    className="p-1 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                                    title="Edit payment"
-                                  >
-                                    <Edit2 className="w-3.5 h-3.5" />
-                                  </button>
 
                                   {/* Expand indicator */}
                                   {expandedPlayer === player.userId ? (
@@ -1898,117 +1870,6 @@ export default function TournamentManage() {
                                     <ChevronDown className="w-4 h-4 text-gray-400" />
                                   )}
                                 </div>
-
-                                {/* Action menu */}
-                                <div className="relative">
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setActionMenuOpen(actionMenuOpen === player.userId ? null : player.userId);
-                                    }}
-                                    disabled={processingAction?.userId === player.userId}
-                                    className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 disabled:opacity-50"
-                                  >
-                                    {processingAction?.userId === player.userId ? (
-                                      <Loader2 className="w-5 h-5 animate-spin" />
-                                    ) : (
-                                      <MoreVertical className="w-5 h-5" />
-                                    )}
-                                  </button>
-
-                                  {/* Dropdown menu */}
-                                  {actionMenuOpen === player.userId && (
-                                    <div
-                                      className="absolute right-0 mt-1 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-10"
-                                      onClick={(e) => e.stopPropagation()}
-                                    >
-                                      {/* Check-in actions */}
-                                      {!player.isCheckedIn ? (
-                                        <button
-                                          onClick={() => handleManualCheckIn(player.userId)}
-                                          className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
-                                        >
-                                          <CheckCircle className="w-4 h-4 text-green-600" />
-                                          Check In
-                                        </button>
-                                      ) : (
-                                        <button
-                                          onClick={() => handleVoidCheckIn(player.userId)}
-                                          className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
-                                        >
-                                          <XCircle className="w-4 h-4 text-red-600" />
-                                          Void Check-in
-                                        </button>
-                                      )}
-
-                                      <div className="border-t border-gray-100 my-1" />
-
-                                      {/* Waiver actions */}
-                                      {!player.waiverSigned ? (
-                                        <>
-                                          <button
-                                            onClick={() => {
-                                              const checkInUrl = `${window.location.origin}/event/${eventId}/check-in`;
-                                              window.open(checkInUrl, '_blank');
-                                              setActionMenuOpen(null);
-                                            }}
-                                            className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
-                                          >
-                                            <ExternalLink className="w-4 h-4 text-purple-600" />
-                                            Open Waiver Page
-                                          </button>
-                                          <button
-                                            onClick={() => handleSendWaiverRequest(player)}
-                                            disabled={sendingWaiverRequest === player.userId}
-                                            className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2 disabled:opacity-50"
-                                          >
-                                            {sendingWaiverRequest === player.userId ? (
-                                              <Loader2 className="w-4 h-4 animate-spin text-purple-600" />
-                                            ) : (
-                                              <Send className="w-4 h-4 text-purple-600" />
-                                            )}
-                                            Send Waiver Request
-                                          </button>
-                                          <button
-                                            onClick={() => handleOverrideWaiver(player.userId)}
-                                            className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
-                                          >
-                                            <FileText className="w-4 h-4 text-blue-600" />
-                                            Override Waiver
-                                          </button>
-                                        </>
-                                      ) : (
-                                        <button
-                                          onClick={() => handleVoidWaiver(player.userId)}
-                                          className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
-                                        >
-                                          <FileText className="w-4 h-4 text-red-600" />
-                                          Void Waiver
-                                        </button>
-                                      )}
-
-                                      <div className="border-t border-gray-100 my-1" />
-
-                                      {/* Payment actions */}
-                                      {!player.hasPaid ? (
-                                        <button
-                                          onClick={() => handleOverridePayment(player.userId, true)}
-                                          className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
-                                        >
-                                          <DollarSign className="w-4 h-4 text-green-600" />
-                                          Mark as Paid
-                                        </button>
-                                      ) : (
-                                        <button
-                                          onClick={() => handleOverridePayment(player.userId, false)}
-                                          className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
-                                        >
-                                          <DollarSign className="w-4 h-4 text-red-600" />
-                                          Void Payment
-                                        </button>
-                                      )}
-                                    </div>
-                                )}
                               </div>
                             </div>
                           </div>
@@ -2018,9 +1879,9 @@ export default function TournamentManage() {
                         {expandedPlayer === player.userId && (
                           <div className="px-4 pb-4">
                               <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                  {/* Waiver Details */}
-                                  <div className="space-y-2">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                  {/* Waiver Section with Actions */}
+                                  <div className="space-y-3">
                                     <h4 className="font-medium text-gray-900 flex items-center gap-2">
                                       <FileText className="w-4 h-4 text-blue-600" />
                                       Waiver Status
@@ -2046,7 +1907,7 @@ export default function TournamentManage() {
                                             href={getSharedAssetUrl(player.signedWaiverPdfUrl)}
                                             target="_blank"
                                             rel="noopener noreferrer"
-                                            className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-700 mt-2"
+                                            className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-700"
                                           >
                                             <Eye className="w-4 h-4" />
                                             View Signed Waiver
@@ -2064,10 +1925,56 @@ export default function TournamentManage() {
                                         </p>
                                       </div>
                                     )}
+                                    {/* Waiver Action Buttons */}
+                                    <div className="flex flex-wrap gap-2 pt-2">
+                                      {!player.waiverSigned ? (
+                                        <>
+                                          <button
+                                            onClick={() => {
+                                              const checkInUrl = `${window.location.origin}/event/${eventId}/check-in`;
+                                              window.open(checkInUrl, '_blank');
+                                            }}
+                                            className="px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm font-medium flex items-center gap-2"
+                                          >
+                                            <ExternalLink className="w-4 h-4" />
+                                            Open Waiver Page
+                                          </button>
+                                          <button
+                                            onClick={() => handleSendWaiverRequest(player)}
+                                            disabled={sendingWaiverRequest === player.userId}
+                                            className="px-3 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm font-medium flex items-center gap-2 disabled:opacity-50"
+                                          >
+                                            {sendingWaiverRequest === player.userId ? (
+                                              <Loader2 className="w-4 h-4 animate-spin" />
+                                            ) : (
+                                              <Send className="w-4 h-4" />
+                                            )}
+                                            Send Request
+                                          </button>
+                                          <button
+                                            onClick={() => handleOverrideWaiver(player.userId)}
+                                            disabled={processingAction?.userId === player.userId}
+                                            className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium flex items-center gap-2 disabled:opacity-50"
+                                          >
+                                            <CheckCircle className="w-4 h-4" />
+                                            Override Waiver
+                                          </button>
+                                        </>
+                                      ) : (
+                                        <button
+                                          onClick={() => handleVoidWaiver(player.userId)}
+                                          disabled={processingAction?.userId === player.userId}
+                                          className="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm font-medium flex items-center gap-2 disabled:opacity-50"
+                                        >
+                                          <XCircle className="w-4 h-4" />
+                                          Void Waiver
+                                        </button>
+                                      )}
+                                    </div>
                                   </div>
 
-                                  {/* Payment Details */}
-                                  <div className="space-y-2">
+                                  {/* Payment Section with Actions */}
+                                  <div className="space-y-3">
                                     <h4 className="font-medium text-gray-900 flex items-center gap-2">
                                       <DollarSign className="w-4 h-4 text-emerald-600" />
                                       Payment Status
@@ -2103,7 +2010,7 @@ export default function TournamentManage() {
                                             href={getSharedAssetUrl(player.paymentProofUrl)}
                                             target="_blank"
                                             rel="noopener noreferrer"
-                                            className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-700 mt-1"
+                                            className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-700"
                                           >
                                             <Eye className="w-4 h-4" />
                                             View Payment Proof
@@ -2124,23 +2031,65 @@ export default function TournamentManage() {
                                             href={getSharedAssetUrl(player.paymentProofUrl)}
                                             target="_blank"
                                             rel="noopener noreferrer"
-                                            className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-700 mt-1"
+                                            className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-700"
                                           >
                                             <Eye className="w-4 h-4" />
-                                            View Payment Proof (Pending Verification)
+                                            View Payment Proof (Pending)
                                           </a>
                                         )}
                                       </div>
                                     )}
+                                    {/* Payment Action Buttons */}
+                                    <div className="flex flex-wrap gap-2 pt-2">
+                                      {!player.hasPaid ? (
+                                        <>
+                                          <button
+                                            onClick={() => handleOverridePayment(player.userId, true)}
+                                            disabled={processingAction?.userId === player.userId}
+                                            className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm font-medium flex items-center gap-2 disabled:opacity-50"
+                                          >
+                                            <DollarSign className="w-4 h-4" />
+                                            Mark as Paid
+                                          </button>
+                                          <button
+                                            onClick={() => startEditPayment(player)}
+                                            className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium flex items-center gap-2"
+                                          >
+                                            <Edit2 className="w-4 h-4" />
+                                            Edit Payment
+                                          </button>
+                                        </>
+                                      ) : (
+                                        <>
+                                          <button
+                                            onClick={() => handleOverridePayment(player.userId, false)}
+                                            disabled={processingAction?.userId === player.userId}
+                                            className="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm font-medium flex items-center gap-2 disabled:opacity-50"
+                                          >
+                                            <XCircle className="w-4 h-4" />
+                                            Void Payment
+                                          </button>
+                                          <button
+                                            onClick={() => startEditPayment(player)}
+                                            className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium flex items-center gap-2"
+                                          >
+                                            <Edit2 className="w-4 h-4" />
+                                            Edit Payment
+                                          </button>
+                                        </>
+                                      )}
+                                    </div>
                                   </div>
                                 </div>
 
-                                {/* Check-in Requirements Summary */}
-                                <div className="mt-4 pt-4 border-t border-gray-200">
+                                {/* Check-in Actions */}
+                                <div className="mt-6 pt-4 border-t border-gray-200">
                                   <div className="flex items-center justify-between">
                                     <div className="text-sm">
-                                      <span className="font-medium text-gray-700">Check-in Eligibility: </span>
-                                      {player.waiverSigned && player.hasPaid ? (
+                                      <span className="font-medium text-gray-700">Check-in Status: </span>
+                                      {player.isCheckedIn ? (
+                                        <span className="text-green-600 font-medium">Checked In</span>
+                                      ) : player.waiverSigned && player.hasPaid ? (
                                         <span className="text-green-600">Ready for check-in</span>
                                       ) : (
                                         <span className="text-yellow-600">
@@ -2151,21 +2100,41 @@ export default function TournamentManage() {
                                         </span>
                                       )}
                                     </div>
-                                    {!player.isCheckedIn && (
-                                      <button
-                                        onClick={() => handleManualCheckIn(player.userId)}
-                                        disabled={processingAction?.userId === player.userId}
-                                        className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50 text-sm font-medium flex items-center gap-2"
-                                      >
-                                        {processingAction?.userId === player.userId ? (
-                                          <Loader2 className="w-4 h-4 animate-spin" />
-                                        ) : (
-                                          <CheckCircle className="w-4 h-4" />
-                                        )}
-                                        Check In Player
-                                      </button>
-                                    )}
+                                    <div className="flex gap-2">
+                                      {!player.isCheckedIn ? (
+                                        <button
+                                          onClick={() => handleManualCheckIn(player.userId)}
+                                          disabled={processingAction?.userId === player.userId}
+                                          className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50 font-medium flex items-center gap-2"
+                                        >
+                                          {processingAction?.userId === player.userId && processingAction?.action === 'checkin' ? (
+                                            <Loader2 className="w-4 h-4 animate-spin" />
+                                          ) : (
+                                            <CheckCircle className="w-4 h-4" />
+                                          )}
+                                          Check In Player
+                                        </button>
+                                      ) : (
+                                        <button
+                                          onClick={() => handleVoidCheckIn(player.userId)}
+                                          disabled={processingAction?.userId === player.userId}
+                                          className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 font-medium flex items-center gap-2"
+                                        >
+                                          {processingAction?.userId === player.userId && processingAction?.action === 'void-checkin' ? (
+                                            <Loader2 className="w-4 h-4 animate-spin" />
+                                          ) : (
+                                            <XCircle className="w-4 h-4" />
+                                          )}
+                                          Void Check-in
+                                        </button>
+                                      )}
+                                    </div>
                                   </div>
+                                  {player.isCheckedIn && (
+                                    <p className="text-xs text-gray-500 mt-2">
+                                      <strong>Note:</strong> Voiding check-in will also void the waiver signature and payment record, allowing the player to start the check-in process over.
+                                    </p>
+                                  )}
                                 </div>
                               </div>
                             </div>
