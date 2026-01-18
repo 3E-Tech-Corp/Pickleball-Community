@@ -1596,8 +1596,8 @@ export default function TournamentManage() {
                                     onClick={() => setSelectedGameForEdit({
                                       id: match.games?.[0]?.gameId || match.games?.[0]?.id || match.encounterId,
                                       ...(match.games?.[0] || {}),
-                                      unit1: { id: match.unit1Id, name: match.unit1Name, members: match.unit1Members || [] },
-                                      unit2: { id: match.unit2Id, name: match.unit2Name, members: match.unit2Members || [] },
+                                      unit1: { id: match.unit1Id, name: match.unit1Name || match.unit1SeedInfo, members: match.unit1Members || [] },
+                                      unit2: { id: match.unit2Id, name: match.unit2Name || match.unit2SeedInfo, members: match.unit2Members || [] },
                                       unit1Score: match.games?.[0]?.unit1Score ?? match.unit1Score ?? 0,
                                       unit2Score: match.games?.[0]?.unit2Score ?? match.unit2Score ?? 0,
                                       bestOf: match.bestOf || 1,
