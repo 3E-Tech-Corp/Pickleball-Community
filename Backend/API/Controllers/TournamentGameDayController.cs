@@ -531,6 +531,8 @@ public class TournamentGameDayController : ControllerBase
     [Authorize]
     public async Task<ActionResult<ApiResponse<object>>> SubmitScore(int gameId, [FromBody] GameDaySubmitScoreRequest request)
     {
+        try
+        {
         var userId = GetUserId();
 
         var game = await _context.EventGames
@@ -638,6 +640,17 @@ public class TournamentGameDayController : ControllerBase
             Success = true,
             Message = game.Status == "Finished" ? "Game completed" : "Score updated"
         });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error submitting score for game {GameId}", gameId);
+            return StatusCode(500, new ApiResponse<object>
+            {
+                Success = false,
+                Message = $"Error: {ex.Message}",
+                Data = new { InnerException = ex.InnerException?.Message, StackTrace = ex.StackTrace?.Substring(0, Math.Min(500, ex.StackTrace?.Length ?? 0)) }
+            });
+        }
     }
 
     /// <summary>
