@@ -3610,7 +3610,7 @@ public class TournamentController : ControllerBase
                         CompletedAt = m.CompletedAt,
                         Status = m.Status,
                         Score = GetMatchScore(m),
-                        WinnerName = GetUnitDisplayName(m.WinnerId) ?? m.Winner?.Name,
+                        WinnerName = GetUnitDisplayName(m.WinnerUnitId) ?? m.Winner?.Name,
                         Games = m.Matches.SelectMany(match => match.Games).OrderBy(game => game.GameNumber).Select(game => new ScheduleGameDto
                         {
                             GameId = game.Id,

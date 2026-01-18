@@ -1154,7 +1154,6 @@ public class CheckInController : ControllerBase
 
         // Verify current user is TD/organizer
         var evt = await _context.Events
-            .Include(e => e.ObjectAssets)
             .FirstOrDefaultAsync(e => e.Id == eventId);
         if (evt == null)
             return NotFound(new ApiResponse<object> { Success = false, Message = "Event not found" });
@@ -1178,12 +1177,16 @@ public class CheckInController : ControllerBase
             return BadRequest(new ApiResponse<object> { Success = false, Message = "User is not registered for this event" });
 
         // Check if waiver already signed
-        if (registration.WaiverSigned)
+        if (registration.WaiverSignedAt != null)
             return BadRequest(new ApiResponse<object> { Success = false, Message = "User has already signed the waiver" });
 
-        // Get waiver documents for this event
-        var waivers = evt.ObjectAssets?.Where(a => a.AssetType == "waiver" && a.IsActive).ToList();
-        if (waivers == null || !waivers.Any())
+        // Get waiver documents for this event (ObjectAssets with AssetType "waiver")
+        var eventObjectTypeId = await _context.ObjectTypes.Where(t => t.Name == "Event").Select(t => t.Id).FirstOrDefaultAsync();
+        var waiverAssetTypeId = await _context.ObjectAssetTypes.Where(t => t.Name == "waiver").Select(t => t.Id).FirstOrDefaultAsync();
+        var waivers = await _context.ObjectAssets
+            .Where(a => a.ObjectTypeId == eventObjectTypeId && a.ObjectId == eventId && a.ObjectAssetTypeId == waiverAssetTypeId)
+            .ToListAsync();
+        if (!waivers.Any())
             return BadRequest(new ApiResponse<object> { Success = false, Message = "No active waivers found for this event" });
 
         // TODO: In the future, integrate with notification service to send email/push notification
