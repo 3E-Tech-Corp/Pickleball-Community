@@ -238,15 +238,20 @@ public class TournamentGameDayController : ControllerBase
 
         if (unitIds.Any())
         {
-            // Fetch matches without complex ordering - sort client-side to avoid EF Core SQL generation issues
-            var rawMatches = await _context.EventMatches
+            // Fetch all non-completed matches for event, then filter client-side
+            // This avoids EF Core SQL generation issues with Contains() + OR in WHERE clause
+            var allEventMatches = await _context.EventMatches
                 .Include(m => m.Unit1)
                 .Include(m => m.Unit2)
                 .Include(m => m.Division)
                 .Where(m => m.EventId == eventId &&
-                    m.Status != "Completed" && m.Status != "Finished" &&
-                    (unitIds.Contains(m.Unit1Id ?? 0) || unitIds.Contains(m.Unit2Id ?? 0)))
+                    m.Status != "Completed" && m.Status != "Finished")
                 .ToListAsync();
+
+            // Filter for player's units client-side
+            var rawMatches = allEventMatches
+                .Where(m => unitIds.Contains(m.Unit1Id ?? 0) || unitIds.Contains(m.Unit2Id ?? 0))
+                .ToList();
 
             // Sort and project to DTO client-side to avoid EF Core translation issues
             scheduledMatches = rawMatches
