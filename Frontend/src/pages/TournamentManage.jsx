@@ -1024,23 +1024,25 @@ export default function TournamentManage() {
                   </div>
                   {isOrganizer && (
                     <div className="flex items-center gap-2 flex-wrap justify-end">
-                      {/* Generate/Re-generate Schedule */}
-                      <button
-                        onClick={() => handleOpenScheduleConfig(div)}
-                        disabled={generatingSchedule}
-                        className={`px-3 py-2 text-sm font-medium rounded-lg flex items-center gap-2 disabled:opacity-50 ${
-                          div.scheduleReady
-                            ? 'text-gray-700 border border-gray-300 hover:bg-gray-50'
-                            : 'text-white bg-orange-600 hover:bg-orange-700'
-                        }`}
-                      >
-                        {generatingSchedule ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : (
-                          <Calendar className="w-4 h-4" />
-                        )}
-                        {div.scheduleReady ? 'Re-configure' : 'Configure Schedule'}
-                      </button>
+                      {/* Generate/Re-generate Schedule - disabled after event starts */}
+                      {!['Running', 'Started'].includes(dashboard?.tournamentStatus) && (
+                        <button
+                          onClick={() => handleOpenScheduleConfig(div)}
+                          disabled={generatingSchedule}
+                          className={`px-3 py-2 text-sm font-medium rounded-lg flex items-center gap-2 disabled:opacity-50 ${
+                            div.scheduleReady
+                              ? 'text-gray-700 border border-gray-300 hover:bg-gray-50'
+                              : 'text-white bg-orange-600 hover:bg-orange-700'
+                          }`}
+                        >
+                          {generatingSchedule ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Calendar className="w-4 h-4" />
+                          )}
+                          {div.scheduleReady ? 'Re-configure' : 'Configure Schedule'}
+                        </button>
+                      )}
 
                       {/* View Schedule - links to printable schedule page */}
                       {div.scheduleReady && (
