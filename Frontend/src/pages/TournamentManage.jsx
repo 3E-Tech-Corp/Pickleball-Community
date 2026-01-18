@@ -1550,69 +1550,66 @@ export default function TournamentManage() {
                             </div>
                             {round.matches?.filter(m => !m.isBye).map((match, matchIdx) => (
                               <div key={matchIdx} className="p-4 border-t border-gray-100">
-                                <div className="flex items-center justify-between">
-                                  <div className="flex items-center gap-4 flex-1">
-                                    <div className="text-sm text-gray-400 w-8">#{match.matchNumber}</div>
-                                    <div className="flex-1 grid grid-cols-3 gap-4 items-center">
-                                      <div className={`text-right flex items-center justify-end gap-2 ${match.winnerName === match.unit1Name ? 'font-semibold text-green-600' : ''}`}>
-                                        {match.unit1Number && (
-                                          <span className="w-6 h-6 flex items-center justify-center bg-orange-100 text-orange-700 font-semibold rounded text-xs">
-                                            {match.unit1Number}
-                                          </span>
-                                        )}
-                                        <span className={match.unit1Name ? 'text-gray-900' : 'text-gray-600'}>
-                                          {match.unit1Name || match.unit1SeedInfo || (match.unit1Number ? `Unit #${match.unit1Number}` : '')}
+                                <div className="flex items-center gap-3">
+                                  {/* Edit button on far left */}
+                                  <button
+                                    onClick={() => setSelectedGameForEdit({
+                                      id: match.games?.[0]?.gameId || match.games?.[0]?.id || match.encounterId,
+                                      ...(match.games?.[0] || {}),
+                                      unit1: { id: match.unit1Id, name: match.unit1Name || match.unit1SeedInfo, members: match.unit1Members || [] },
+                                      unit2: { id: match.unit2Id, name: match.unit2Name || match.unit2SeedInfo, members: match.unit2Members || [] },
+                                      unit1Score: match.games?.[0]?.unit1Score ?? match.unit1Score ?? 0,
+                                      unit2Score: match.games?.[0]?.unit2Score ?? match.unit2Score ?? 0,
+                                      bestOf: match.bestOf || 1,
+                                      matchNumber: match.matchNumber,
+                                      status: match.games?.[0]?.status || match.status || 'New',
+                                      games: match.games || [],
+                                      courtLabel: match.courtLabel,
+                                      winnerUnitId: match.winnerUnitId,
+                                      hasGames: match.games?.length > 0
+                                    })}
+                                    className="p-2 bg-blue-100 text-blue-700 hover:bg-blue-200 rounded-lg transition-colors"
+                                    title="Edit match"
+                                  >
+                                    <Edit2 className="w-5 h-5" />
+                                  </button>
+                                  <div className="text-sm text-gray-400 w-8">#{match.matchNumber}</div>
+                                  <div className="flex-1 grid grid-cols-3 gap-4 items-center">
+                                    <div className={`text-right flex items-center justify-end gap-2 ${match.winnerName === match.unit1Name ? 'font-semibold text-green-600' : ''}`}>
+                                      {match.unit1Number && (
+                                        <span className="w-6 h-6 flex items-center justify-center bg-orange-100 text-orange-700 font-semibold rounded text-xs">
+                                          {match.unit1Number}
                                         </span>
-                                      </div>
-                                      <div className="text-center">
-                                        {match.score ? (
-                                          <span className="font-medium text-gray-700">{match.score}</span>
-                                        ) : (
-                                          <span className="text-gray-400">vs</span>
-                                        )}
-                                      </div>
-                                      <div className={`flex items-center gap-2 ${match.winnerName === match.unit2Name ? 'font-semibold text-green-600' : ''}`}>
-                                        {match.unit2Number && (
-                                          <span className="w-6 h-6 flex items-center justify-center bg-orange-100 text-orange-700 font-semibold rounded text-xs">
-                                            {match.unit2Number}
-                                          </span>
-                                        )}
-                                        <span className={match.unit2Name ? 'text-gray-900' : 'text-gray-600'}>
-                                          {match.unit2Name || match.unit2SeedInfo || (match.unit2Number ? `Unit #${match.unit2Number}` : '')}
+                                      )}
+                                      <span className={match.unit1Name ? 'text-gray-900' : 'text-gray-600'}>
+                                        {match.unit1Name || match.unit1SeedInfo || (match.unit1Number ? `Unit #${match.unit1Number}` : '')}
+                                      </span>
+                                    </div>
+                                    <div className="text-center">
+                                      {match.score ? (
+                                        <span className="font-medium text-gray-700">{match.score}</span>
+                                      ) : (
+                                        <span className="text-gray-400">vs</span>
+                                      )}
+                                    </div>
+                                    <div className={`flex items-center gap-2 ${match.winnerName === match.unit2Name ? 'font-semibold text-green-600' : ''}`}>
+                                      {match.unit2Number && (
+                                        <span className="w-6 h-6 flex items-center justify-center bg-orange-100 text-orange-700 font-semibold rounded text-xs">
+                                          {match.unit2Number}
                                         </span>
-                                      </div>
+                                      )}
+                                      <span className={match.unit2Name ? 'text-gray-900' : 'text-gray-600'}>
+                                        {match.unit2Name || match.unit2SeedInfo || (match.unit2Number ? `Unit #${match.unit2Number}` : '')}
+                                      </span>
                                     </div>
                                   </div>
-                                  <div className="flex items-center gap-2 ml-4">
-                                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                                      match.status === 'Completed' ? 'bg-green-100 text-green-700' :
-                                      match.status === 'InProgress' ? 'bg-orange-100 text-orange-700' :
-                                      'bg-gray-100 text-gray-700'
-                                    }`}>
-                                      {match.status || 'Scheduled'}
-                                    </span>
-                                    <button
-                                      onClick={() => setSelectedGameForEdit({
-                                        id: match.games?.[0]?.gameId || match.games?.[0]?.id || match.encounterId,
-                                        ...(match.games?.[0] || {}),
-                                        unit1: { id: match.unit1Id, name: match.unit1Name || match.unit1SeedInfo, members: match.unit1Members || [] },
-                                        unit2: { id: match.unit2Id, name: match.unit2Name || match.unit2SeedInfo, members: match.unit2Members || [] },
-                                        unit1Score: match.games?.[0]?.unit1Score ?? match.unit1Score ?? 0,
-                                        unit2Score: match.games?.[0]?.unit2Score ?? match.unit2Score ?? 0,
-                                        bestOf: match.bestOf || 1,
-                                        matchNumber: match.matchNumber,
-                                        status: match.games?.[0]?.status || match.status || 'New',
-                                        games: match.games || [],
-                                        courtLabel: match.courtLabel,
-                                        winnerUnitId: match.winnerUnitId,
-                                        hasGames: match.games?.length > 0
-                                      })}
-                                      className="p-1.5 text-gray-400 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition-colors"
-                                      title={match.games?.length > 0 ? "Edit game score" : "Match details"}
-                                    >
-                                      <Info className="w-4 h-4" />
-                                    </button>
-                                  </div>
+                                  <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                                    match.status === 'Completed' ? 'bg-green-100 text-green-700' :
+                                    match.status === 'InProgress' ? 'bg-orange-100 text-orange-700' :
+                                    'bg-gray-100 text-gray-700'
+                                  }`}>
+                                    {match.status || 'Scheduled'}
+                                  </span>
                                 </div>
                               </div>
                             ))}
@@ -1647,85 +1644,83 @@ export default function TournamentManage() {
                             </div>
                             {round.matches?.map((match, matchIdx) => (
                               <div key={matchIdx} className="p-4 border-t border-gray-100">
-                                <div className="flex items-center justify-between">
-                                  <div className="flex items-center gap-4 flex-1">
-                                    <div className="text-sm text-gray-400 w-8">#{match.matchNumber}</div>
-                                    <div className="flex-1 grid grid-cols-3 gap-4 items-center">
-                                      <div className={`text-right flex items-center justify-end gap-2 ${match.winnerName === match.unit1Name ? 'font-semibold text-green-600' : ''}`}>
-                                        {match.isBye && !match.unit1Name ? (
-                                          <span className="italic text-gray-400">BYE</span>
-                                        ) : (
-                                          <>
-                                            {match.unit1Number && (
-                                              <span className="w-6 h-6 flex items-center justify-center bg-orange-100 text-orange-700 font-semibold rounded text-xs">
-                                                {match.unit1Number}
-                                              </span>
-                                            )}
-                                            <span className={match.unit1Name ? 'text-gray-900' : 'text-blue-600 font-medium'}>
-                                              {match.unit1Name || match.unit1SeedInfo || (match.unit1Number ? `Unit #${match.unit1Number}` : '')}
+                                <div className="flex items-center gap-3">
+                                  {/* Edit button on far left */}
+                                  {!match.isBye && (
+                                    <button
+                                      onClick={() => setSelectedGameForEdit({
+                                        id: match.games?.[0]?.gameId || match.games?.[0]?.id || match.encounterId,
+                                        ...(match.games?.[0] || {}),
+                                        unit1: { id: match.unit1Id, name: match.unit1Name || match.unit1SeedInfo, members: match.unit1Members || [] },
+                                        unit2: { id: match.unit2Id, name: match.unit2Name || match.unit2SeedInfo, members: match.unit2Members || [] },
+                                        unit1Score: match.games?.[0]?.unit1Score ?? match.unit1Score ?? 0,
+                                        unit2Score: match.games?.[0]?.unit2Score ?? match.unit2Score ?? 0,
+                                        bestOf: match.bestOf || 1,
+                                        matchNumber: match.matchNumber,
+                                        status: match.games?.[0]?.status || match.status || 'New',
+                                        games: match.games || [],
+                                        courtLabel: match.courtLabel,
+                                        winnerUnitId: match.winnerUnitId,
+                                        hasGames: match.games?.length > 0
+                                      })}
+                                      className="p-2 bg-blue-100 text-blue-700 hover:bg-blue-200 rounded-lg transition-colors"
+                                      title="Edit match"
+                                    >
+                                      <Edit2 className="w-5 h-5" />
+                                    </button>
+                                  )}
+                                  {match.isBye && <div className="w-9" />}
+                                  <div className="text-sm text-gray-400 w-8">#{match.matchNumber}</div>
+                                  <div className="flex-1 grid grid-cols-3 gap-4 items-center">
+                                    <div className={`text-right flex items-center justify-end gap-2 ${match.winnerName === match.unit1Name ? 'font-semibold text-green-600' : ''}`}>
+                                      {match.isBye && !match.unit1Name ? (
+                                        <span className="italic text-gray-400">BYE</span>
+                                      ) : (
+                                        <>
+                                          {match.unit1Number && (
+                                            <span className="w-6 h-6 flex items-center justify-center bg-orange-100 text-orange-700 font-semibold rounded text-xs">
+                                              {match.unit1Number}
                                             </span>
-                                          </>
-                                        )}
-                                      </div>
-                                      <div className="text-center">
-                                        {match.isBye ? (
-                                          <span className="text-gray-300">—</span>
-                                        ) : match.score ? (
-                                          <span className="font-medium text-gray-700">{match.score}</span>
-                                        ) : (
-                                          <span className="text-gray-400">vs</span>
-                                        )}
-                                      </div>
-                                      <div className={`flex items-center gap-2 ${match.winnerName === match.unit2Name ? 'font-semibold text-green-600' : ''}`}>
-                                        {match.isBye && !match.unit2Name ? (
-                                          <span className="italic text-gray-400">BYE</span>
-                                        ) : (
-                                          <>
-                                            {match.unit2Number && (
-                                              <span className="w-6 h-6 flex items-center justify-center bg-orange-100 text-orange-700 font-semibold rounded text-xs">
-                                                {match.unit2Number}
-                                              </span>
-                                            )}
-                                            <span className={match.unit2Name ? 'text-gray-900' : 'text-blue-600 font-medium'}>
-                                              {match.unit2Name || match.unit2SeedInfo || (match.unit2Number ? `Unit #${match.unit2Number}` : '')}
+                                          )}
+                                          <span className={match.unit1Name ? 'text-gray-900' : 'text-blue-600 font-medium'}>
+                                            {match.unit1Name || match.unit1SeedInfo || (match.unit1Number ? `Unit #${match.unit1Number}` : '')}
+                                          </span>
+                                        </>
+                                      )}
+                                    </div>
+                                    <div className="text-center">
+                                      {match.isBye ? (
+                                        <span className="text-gray-300">—</span>
+                                      ) : match.score ? (
+                                        <span className="font-medium text-gray-700">{match.score}</span>
+                                      ) : (
+                                        <span className="text-gray-400">vs</span>
+                                      )}
+                                    </div>
+                                    <div className={`flex items-center gap-2 ${match.winnerName === match.unit2Name ? 'font-semibold text-green-600' : ''}`}>
+                                      {match.isBye && !match.unit2Name ? (
+                                        <span className="italic text-gray-400">BYE</span>
+                                      ) : (
+                                        <>
+                                          {match.unit2Number && (
+                                            <span className="w-6 h-6 flex items-center justify-center bg-orange-100 text-orange-700 font-semibold rounded text-xs">
+                                              {match.unit2Number}
                                             </span>
-                                          </>
-                                        )}
-                                      </div>
+                                          )}
+                                          <span className={match.unit2Name ? 'text-gray-900' : 'text-blue-600 font-medium'}>
+                                            {match.unit2Name || match.unit2SeedInfo || (match.unit2Number ? `Unit #${match.unit2Number}` : '')}
+                                          </span>
+                                        </>
+                                      )}
                                     </div>
                                   </div>
-                                  <div className="flex items-center gap-2 ml-4">
-                                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                                      match.status === 'Completed' ? 'bg-green-100 text-green-700' :
-                                      match.status === 'InProgress' ? 'bg-orange-100 text-orange-700' :
-                                      'bg-gray-100 text-gray-700'
-                                    }`}>
-                                      {match.status || 'Scheduled'}
-                                    </span>
-                                    {!match.isBye && (
-                                      <button
-                                        onClick={() => setSelectedGameForEdit({
-                                          id: match.games?.[0]?.gameId || match.games?.[0]?.id || match.encounterId,
-                                          ...(match.games?.[0] || {}),
-                                          unit1: { id: match.unit1Id, name: match.unit1Name || match.unit1SeedInfo, members: match.unit1Members || [] },
-                                          unit2: { id: match.unit2Id, name: match.unit2Name || match.unit2SeedInfo, members: match.unit2Members || [] },
-                                          unit1Score: match.games?.[0]?.unit1Score ?? match.unit1Score ?? 0,
-                                          unit2Score: match.games?.[0]?.unit2Score ?? match.unit2Score ?? 0,
-                                          bestOf: match.bestOf || 1,
-                                          matchNumber: match.matchNumber,
-                                          status: match.games?.[0]?.status || match.status || 'New',
-                                          games: match.games || [],
-                                          courtLabel: match.courtLabel,
-                                          winnerUnitId: match.winnerUnitId,
-                                          hasGames: match.games?.length > 0
-                                        })}
-                                        className="p-1.5 text-gray-400 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition-colors"
-                                        title={match.games?.length > 0 ? "Edit game score" : "Match details"}
-                                      >
-                                        <Info className="w-4 h-4" />
-                                      </button>
-                                    )}
-                                  </div>
+                                  <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                                    match.status === 'Completed' ? 'bg-green-100 text-green-700' :
+                                    match.status === 'InProgress' ? 'bg-orange-100 text-orange-700' :
+                                    'bg-gray-100 text-gray-700'
+                                  }`}>
+                                    {match.status || 'Scheduled'}
+                                  </span>
                                 </div>
                               </div>
                             ))}
@@ -1746,98 +1741,86 @@ export default function TournamentManage() {
                       <div className="divide-y">
                         {round.matches?.map((match, matchIdx) => (
                           <div key={matchIdx} className="p-4">
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-4 flex-1">
-                                <div className="text-sm text-gray-400 w-8">#{match.matchNumber}</div>
-                                <div className="flex-1 grid grid-cols-3 gap-4 items-center">
-                                  <div className={`text-right flex items-center justify-end gap-2 ${match.winnerName === match.unit1Name ? 'font-semibold text-green-600' : ''}`}>
-                                    {match.isBye && !match.unit1Name ? (
-                                      <span className="italic text-gray-400">BYE</span>
-                                    ) : (
-                                      <>
-                                        {match.unit1Number && (
-                                          <span className="w-6 h-6 flex items-center justify-center bg-orange-100 text-orange-700 font-semibold rounded text-xs">
-                                            {match.unit1Number}
-                                          </span>
-                                        )}
-                                        {match.unit1Name ? (
-                                          <span className="text-gray-900">{match.unit1Name}</span>
-                                        ) : match.unit1SeedInfo ? (
-                                          <span className="text-blue-600 font-medium">{match.unit1SeedInfo}</span>
-                                        ) : match.unit1Number ? (
-                                          <span className="text-gray-600">Unit #{match.unit1Number}</span>
-                                        ) : null}
-                                      </>
-                                    )}
-                                  </div>
-                                  <div className="text-center">
-                                    {match.isBye ? (
-                                      <span className="text-gray-300">—</span>
-                                    ) : match.score ? (
-                                      <span className="font-medium text-gray-700">{match.score}</span>
-                                    ) : (
-                                      <span className="text-gray-400">vs</span>
-                                    )}
-                                  </div>
-                                  <div className={`flex items-center gap-2 ${match.winnerName === match.unit2Name ? 'font-semibold text-green-600' : ''}`}>
-                                    {match.isBye && !match.unit2Name ? (
-                                      <span className="italic text-gray-400">BYE</span>
-                                    ) : (
-                                      <>
-                                        {match.unit2Number && (
-                                          <span className="w-6 h-6 flex items-center justify-center bg-orange-100 text-orange-700 font-semibold rounded text-xs">
-                                            {match.unit2Number}
-                                          </span>
-                                        )}
-                                        {match.unit2Name ? (
-                                          <span className="text-gray-900">{match.unit2Name}</span>
-                                        ) : match.unit2SeedInfo ? (
-                                          <span className="text-blue-600 font-medium">{match.unit2SeedInfo}</span>
-                                        ) : match.unit2Number ? (
-                                          <span className="text-gray-600">Unit #{match.unit2Number}</span>
-                                        ) : null}
-                                      </>
-                                    )}
-                                  </div>
+                            <div className="flex items-center gap-3">
+                              {/* Edit button on far left */}
+                              {!match.isBye && (
+                                <button
+                                  onClick={() => setSelectedGameForEdit({
+                                    id: match.games?.[0]?.gameId || match.games?.[0]?.id || match.encounterId,
+                                    ...(match.games?.[0] || {}),
+                                    unit1: { id: match.unit1Id, name: match.unit1Name || match.unit1SeedInfo, members: match.unit1Members || [] },
+                                    unit2: { id: match.unit2Id, name: match.unit2Name || match.unit2SeedInfo, members: match.unit2Members || [] },
+                                    unit1Score: match.games?.[0]?.unit1Score ?? match.unit1Score ?? 0,
+                                    unit2Score: match.games?.[0]?.unit2Score ?? match.unit2Score ?? 0,
+                                    bestOf: match.bestOf || 1,
+                                    matchNumber: match.matchNumber,
+                                    status: match.games?.[0]?.status || match.status || 'New',
+                                    games: match.games || [],
+                                    courtLabel: match.courtLabel,
+                                    winnerUnitId: match.winnerUnitId,
+                                    hasGames: match.games?.length > 0
+                                  })}
+                                  className="p-2 bg-blue-100 text-blue-700 hover:bg-blue-200 rounded-lg transition-colors"
+                                  title="Edit match"
+                                >
+                                  <Edit2 className="w-5 h-5" />
+                                </button>
+                              )}
+                              {match.isBye && <div className="w-9" />}
+                              <div className="text-sm text-gray-400 w-8">#{match.matchNumber}</div>
+                              <div className="flex-1 grid grid-cols-3 gap-4 items-center">
+                                <div className={`text-right flex items-center justify-end gap-2 ${match.winnerName === match.unit1Name ? 'font-semibold text-green-600' : ''}`}>
+                                  {match.isBye && !match.unit1Name ? (
+                                    <span className="italic text-gray-400">BYE</span>
+                                  ) : (
+                                    <>
+                                      {match.unit1Number && (
+                                        <span className="w-6 h-6 flex items-center justify-center bg-orange-100 text-orange-700 font-semibold rounded text-xs">
+                                          {match.unit1Number}
+                                        </span>
+                                      )}
+                                      <span className={match.unit1Name ? 'text-gray-900' : 'text-blue-600 font-medium'}>
+                                        {match.unit1Name || match.unit1SeedInfo || (match.unit1Number ? `Unit #${match.unit1Number}` : '')}
+                                      </span>
+                                    </>
+                                  )}
+                                </div>
+                                <div className="text-center">
+                                  {match.isBye ? (
+                                    <span className="text-gray-300">—</span>
+                                  ) : match.score ? (
+                                    <span className="font-medium text-gray-700">{match.score}</span>
+                                  ) : (
+                                    <span className="text-gray-400">vs</span>
+                                  )}
+                                </div>
+                                <div className={`flex items-center gap-2 ${match.winnerName === match.unit2Name ? 'font-semibold text-green-600' : ''}`}>
+                                  {match.isBye && !match.unit2Name ? (
+                                    <span className="italic text-gray-400">BYE</span>
+                                  ) : (
+                                    <>
+                                      {match.unit2Number && (
+                                        <span className="w-6 h-6 flex items-center justify-center bg-orange-100 text-orange-700 font-semibold rounded text-xs">
+                                          {match.unit2Number}
+                                        </span>
+                                      )}
+                                      <span className={match.unit2Name ? 'text-gray-900' : 'text-blue-600 font-medium'}>
+                                        {match.unit2Name || match.unit2SeedInfo || (match.unit2Number ? `Unit #${match.unit2Number}` : '')}
+                                      </span>
+                                    </>
+                                  )}
                                 </div>
                               </div>
-                              <div className="flex items-center gap-2 ml-4">
-                                <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                                  match.status === 'Completed' ? 'bg-green-100 text-green-700' :
-                                  match.status === 'InProgress' ? 'bg-orange-100 text-orange-700' :
-                                  match.status === 'Scheduled' ? 'bg-blue-100 text-blue-700' :
-                                  'bg-gray-100 text-gray-700'
-                                }`}>
-                                  {match.status}
-                                </span>
-                                {/* Match details / Edit button - show for all matches */}
-                                {!match.isBye && (
-                                  <button
-                                    onClick={() => setSelectedGameForEdit({
-                                      id: match.games?.[0]?.gameId || match.games?.[0]?.id || match.encounterId,
-                                      ...(match.games?.[0] || {}),
-                                      unit1: { id: match.unit1Id, name: match.unit1Name || match.unit1SeedInfo, members: match.unit1Members || [] },
-                                      unit2: { id: match.unit2Id, name: match.unit2Name || match.unit2SeedInfo, members: match.unit2Members || [] },
-                                      unit1Score: match.games?.[0]?.unit1Score ?? match.unit1Score ?? 0,
-                                      unit2Score: match.games?.[0]?.unit2Score ?? match.unit2Score ?? 0,
-                                      bestOf: match.bestOf || 1,
-                                      matchNumber: match.matchNumber,
-                                      status: match.games?.[0]?.status || match.status || 'New',
-                                      games: match.games || [],
-                                      courtLabel: match.courtLabel,
-                                      winnerUnitId: match.winnerUnitId,
-                                      hasGames: match.games?.length > 0
-                                    })}
-                                    className="p-1.5 text-gray-400 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition-colors"
-                                    title={match.games?.length > 0 ? "Edit game score" : "Match details"}
-                                  >
-                                    <Info className="w-4 h-4" />
-                                  </button>
-                                )}
-                              </div>
+                              <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                                match.status === 'Completed' ? 'bg-green-100 text-green-700' :
+                                match.status === 'InProgress' ? 'bg-orange-100 text-orange-700' :
+                                'bg-gray-100 text-gray-700'
+                              }`}>
+                                {match.status || 'Scheduled'}
+                              </span>
                             </div>
                             {match.courtLabel && (
-                              <div className="mt-2 text-sm text-gray-500 flex items-center gap-2">
+                              <div className="mt-2 ml-12 text-sm text-gray-500 flex items-center gap-2">
                                 <MapPin className="w-3 h-3" />
                                 {match.courtLabel}
                               </div>
