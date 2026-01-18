@@ -2012,7 +2012,7 @@ export default function TournamentManage() {
                                         <>
                                           <button
                                             onClick={() => {
-                                              const checkInUrl = `${window.location.origin}/event/${eventId}/check-in?redo=waiver`;
+                                              const checkInUrl = `${window.location.origin}/event/${eventId}/check-in?redo=waiver&userId=${player.userId}`;
                                               window.open(checkInUrl, '_blank');
                                             }}
                                             className="px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm font-medium flex items-center gap-2"

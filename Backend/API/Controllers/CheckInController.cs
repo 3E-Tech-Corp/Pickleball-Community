@@ -1195,6 +1195,292 @@ public class CheckInController : ControllerBase
     }
 
     /// <summary>
+    /// Get check-in status for a specific user (admin only) - for admin-initiated waiver signing
+    /// </summary>
+    [HttpGet("admin/status/{eventId}/{targetUserId}")]
+    [Authorize]
+    public async Task<ActionResult<ApiResponse<PlayerCheckInStatusDto>>> GetAdminCheckInStatus(int eventId, int targetUserId, [FromQuery] string? redo = null)
+    {
+        try
+        {
+            var currentUserId = GetUserId();
+            if (currentUserId == 0) return Unauthorized();
+
+            // Verify current user is TD/organizer
+            var evt = await _context.Events.FindAsync(eventId);
+            if (evt == null)
+                return NotFound(new ApiResponse<PlayerCheckInStatusDto> { Success = false, Message = "Event not found" });
+
+            var currentUser = await _context.Users.FindAsync(currentUserId);
+            var isOrganizer = evt.OrganizedByUserId == currentUserId || currentUser?.Role == "Admin";
+
+            if (!isOrganizer)
+                return Forbid();
+
+            // Check if redo mode is enabled (allows re-signing waiver)
+            var redoWaiver = redo?.ToLower() == "waiver";
+
+            // Get target user's registrations in this event
+            var registrations = await _context.EventUnitMembers
+                .Where(m => m.Unit!.EventId == eventId && m.UserId == targetUserId && m.InviteStatus == "Accepted")
+                .Include(m => m.User)
+                .Include(m => m.Unit)
+                    .ThenInclude(u => u!.Division)
+                .ToListAsync();
+
+            if (!registrations.Any())
+            {
+                return Ok(new ApiResponse<PlayerCheckInStatusDto>
+                {
+                    Success = true,
+                    Data = new PlayerCheckInStatusDto
+                    {
+                        IsRegistered = false,
+                        IsCheckedIn = false,
+                        WaiverSigned = false
+                    }
+                });
+            }
+
+            // Get waivers from ObjectAssets
+            var pendingWaiverDtos = new List<WaiverDto>();
+            try
+            {
+                var eventObjectType = await _context.ObjectTypes
+                    .FirstOrDefaultAsync(ot => ot.Name == "Event");
+
+                if (eventObjectType != null)
+                {
+                    var waiverAssets = await _context.ObjectAssets
+                        .Include(a => a.AssetType)
+                        .Where(a => a.ObjectTypeId == eventObjectType.Id
+                            && a.ObjectId == eventId
+                            && a.AssetType != null
+                            && a.AssetType.TypeName.ToLower() == "waiver")
+                        .ToListAsync();
+
+                    foreach (var asset in waiverAssets)
+                    {
+                        string content = "";
+                        if (!string.IsNullOrEmpty(asset.FileUrl) && IsRenderableFile(asset.FileName))
+                        {
+                            content = await FetchFileContentAsync(asset.FileUrl);
+                        }
+
+                        pendingWaiverDtos.Add(new WaiverDto
+                        {
+                            Id = asset.Id,
+                            Title = asset.Title,
+                            FileName = asset.FileName,
+                            FileUrl = GetFullUrl(asset.FileUrl),
+                            Content = content
+                        });
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Error fetching waivers from ObjectAssets for event {EventId}", eventId);
+            }
+
+            var firstReg = registrations.First();
+            var targetUser = firstReg.User;
+
+            // Filter out already signed waivers (unless in redo mode)
+            if (firstReg.WaiverSignedAt != null && !redoWaiver)
+            {
+                pendingWaiverDtos = pendingWaiverDtos
+                    .Where(w => firstReg.WaiverDocumentId != w.Id)
+                    .ToList();
+            }
+
+            // Get signed waiver PDF URL
+            var signedPdfUrl = !string.IsNullOrEmpty(firstReg.SignedWaiverPdfUrl)
+                ? GetFullUrl(firstReg.SignedWaiverPdfUrl)
+                : null;
+
+            var statusData = new PlayerCheckInStatusDto
+            {
+                IsRegistered = true,
+                IsCheckedIn = firstReg.IsCheckedIn,
+                CheckInStatus = firstReg.CheckInStatus,
+                WaiverSigned = firstReg.WaiverSignedAt != null,
+                WaiverSignedAt = firstReg.WaiverSignedAt,
+                SignedWaiverPdfUrl = signedPdfUrl,
+                PendingWaivers = pendingWaiverDtos,
+                HasPaid = firstReg.HasPaid,
+                PaidAt = firstReg.PaidAt,
+                AmountPaid = firstReg.AmountPaid,
+                PlayerName = targetUser != null ? $"{targetUser.FirstName} {targetUser.LastName}".Trim() : null,
+                PlayerEmail = targetUser?.Email
+            };
+
+            return Ok(new ApiResponse<PlayerCheckInStatusDto>
+            {
+                Success = true,
+                Data = statusData
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting admin check-in status for event {EventId} user {UserId}", eventId, targetUserId);
+            return StatusCode(500, new ApiResponse<PlayerCheckInStatusDto>
+            {
+                Success = false,
+                Message = "An error occurred while getting check-in status"
+            });
+        }
+    }
+
+    /// <summary>
+    /// Sign waiver on behalf of a player (admin only) - for in-person signing on admin's device
+    /// </summary>
+    [HttpPost("admin/waiver/{eventId}/{targetUserId}")]
+    [Authorize]
+    public async Task<ActionResult<ApiResponse<object>>> AdminSignWaiver(int eventId, int targetUserId, [FromBody] SignWaiverRequest request)
+    {
+        var currentUserId = GetUserId();
+        if (currentUserId == 0) return Unauthorized();
+
+        // Verify current user is TD/organizer
+        var evt = await _context.Events.FindAsync(eventId);
+        if (evt == null)
+            return NotFound(new ApiResponse<object> { Success = false, Message = "Event not found" });
+
+        var currentUser = await _context.Users.FindAsync(currentUserId);
+        var isOrganizer = evt.OrganizedByUserId == currentUserId || currentUser?.Role == "Admin";
+
+        if (!isOrganizer)
+            return Forbid();
+
+        // Find waiver in ObjectAssets
+        var objectAsset = await _context.ObjectAssets
+            .Include(a => a.AssetType)
+            .FirstOrDefaultAsync(a => a.Id == request.WaiverId
+                && a.ObjectId == eventId
+                && a.AssetType != null
+                && a.AssetType.TypeName.ToLower() == "waiver");
+
+        if (objectAsset == null)
+            return NotFound(new ApiResponse<object> { Success = false, Message = "Waiver not found" });
+
+        // Fetch waiver content from file URL if available
+        string waiverContent = "";
+        if (!string.IsNullOrEmpty(objectAsset.FileUrl) && IsRenderableFile(objectAsset.FileName))
+        {
+            waiverContent = await FetchFileContentAsync(objectAsset.FileUrl);
+        }
+
+        // Get TARGET user info for legal record
+        var targetUser = await _context.Users.FindAsync(targetUserId);
+        if (targetUser == null)
+            return NotFound(new ApiResponse<object> { Success = false, Message = "Target user not found" });
+
+        // Get target user's registrations
+        var registrations = await _context.EventUnitMembers
+            .Where(m => m.Unit!.EventId == eventId && m.UserId == targetUserId && m.InviteStatus == "Accepted")
+            .ToListAsync();
+
+        if (!registrations.Any())
+            return BadRequest(new ApiResponse<object> { Success = false, Message = "User is not registered for this event" });
+
+        // Validate typed signature
+        if (string.IsNullOrWhiteSpace(request.Signature))
+            return BadRequest(new ApiResponse<object> { Success = false, Message = "Typed signature is required" });
+
+        // Validate drawn signature
+        if (string.IsNullOrWhiteSpace(request.SignatureImage))
+            return BadRequest(new ApiResponse<object> { Success = false, Message = "Drawn signature is required" });
+
+        // Get IP address for legal record
+        var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString();
+        var signedAt = DateTime.Now;
+
+        // Get first registration for reference ID
+        var firstReg = registrations.First();
+
+        // Generate reference ID in format E{eventId}-W{waiverId}-M{memberId}
+        var referenceId = $"E{eventId}-W{objectAsset.Id}-M{firstReg.Id}";
+
+        // Get player name from TARGET user
+        var playerName = $"{targetUser.FirstName} {targetUser.LastName}".Trim();
+        if (string.IsNullOrEmpty(playerName))
+            playerName = targetUser.Email ?? "Unknown";
+
+        // Process signature: upload assets, generate PDF, call notification SP
+        WaiverSigningResult? signingResult = null;
+        try
+        {
+            var waiverDto = new WaiverDocumentDto
+            {
+                Id = objectAsset.Id,
+                EventId = eventId,
+                EventName = evt.Name,
+                Title = objectAsset.Title,
+                Content = waiverContent,
+                PlayerName = playerName,
+                ReferenceId = referenceId
+            };
+
+            signingResult = await _waiverPdfService.ProcessWaiverSignatureAsync(
+                waiverDto,
+                targetUser,  // Use target user, not current user
+                request.Signature.Trim(),
+                request.SignatureImage,
+                signedAt,
+                ipAddress,
+                request.SignerRole,
+                request.ParentGuardianName);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to process waiver signature for user {UserId} event {EventId}", targetUserId, eventId);
+        }
+
+        // Sign waiver for all registrations
+        foreach (var reg in registrations)
+        {
+            reg.WaiverSignedAt = signedAt;
+            reg.WaiverDocumentId = objectAsset.Id;
+            reg.WaiverSignature = request.Signature.Trim();
+        }
+
+        await _context.SaveChangesAsync();
+
+        // Update extended fields
+        try
+        {
+            foreach (var reg in registrations)
+            {
+                reg.SignatureAssetUrl = signingResult?.SignatureAssetUrl;
+                reg.SignedWaiverPdfUrl = signingResult?.SignedWaiverPdfUrl;
+                reg.SignerEmail = targetUser.Email;
+                reg.SignerIpAddress = ipAddress;
+                reg.WaiverSignerRole = request.SignerRole;
+                reg.ParentGuardianName = request.ParentGuardianName?.Trim();
+            }
+            await _context.SaveChangesAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Could not save extended waiver fields - migration may not have been run");
+        }
+
+        _logger.LogInformation("Admin {AdminId} signed waiver {WaiverId} for user {UserId} at event {EventId}",
+            currentUserId, objectAsset.Id, targetUserId, eventId);
+
+        return Ok(new ApiResponse<object>
+        {
+            Success = true,
+            Message = "Waiver signed successfully",
+            Data = new
+            {
+                SignedWaiverPdfUrl = signingResult?.SignedWaiverPdfUrl
+            }
+        });
+    }
+
+    /// <summary>
     /// Override payment status for a player (admin only)
     /// </summary>
     [HttpPost("payment-override/{eventId}/{userId}")]

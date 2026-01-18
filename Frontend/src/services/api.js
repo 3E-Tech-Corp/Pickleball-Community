@@ -2006,6 +2006,22 @@ export const checkInApi = {
     chineseName: signatureData.chineseName
   }),
 
+  // Admin: Get check-in status for a specific user (for admin-initiated waiver signing)
+  getAdminStatus: (eventId, userId, redo = null) =>
+    api.get(`/checkin/admin/status/${eventId}/${userId}${redo ? `?redo=${redo}` : ''}`),
+
+  // Admin: Sign waiver on behalf of a user (for in-person signing on admin's device)
+  adminSignWaiver: (eventId, userId, waiverId, signatureData = {}) =>
+    api.post(`/checkin/admin/waiver/${eventId}/${userId}`, {
+      waiverId,
+      signature: signatureData.signature,
+      signatureImage: signatureData.signatureImage,
+      signerRole: signatureData.signerRole || 'Participant',
+      parentGuardianName: signatureData.parentGuardianName,
+      emergencyPhone: signatureData.emergencyPhone,
+      chineseName: signatureData.chineseName
+    }),
+
   // Get event check-in summary (TD view)
   getEventCheckIns: (eventId) => api.get(`/checkin/event/${eventId}`),
 

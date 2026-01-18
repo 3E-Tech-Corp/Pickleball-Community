@@ -18,6 +18,9 @@ export default function PlayerCheckIn() {
 
   // Check if redo mode is enabled (allows re-signing waiver even if checked in)
   const redoMode = searchParams.get('redo') === 'waiver';
+  // Check if admin is signing on behalf of another user
+  const targetUserId = searchParams.get('userId');
+  const isAdminMode = !!targetUserId;
 
   const [loading, setLoading] = useState(true);
   const [event, setEvent] = useState(null);
@@ -30,9 +33,14 @@ export default function PlayerCheckIn() {
   const loadData = useCallback(async () => {
     try {
       setLoading(true);
+      // Use admin endpoint if userId is specified
+      const statusPromise = isAdminMode
+        ? checkInApi.getAdminStatus(eventId, targetUserId, redoMode ? 'waiver' : null)
+        : checkInApi.getStatus(eventId, redoMode ? 'waiver' : null);
+
       const [eventRes, statusRes] = await Promise.all([
         eventsApi.getEvent(eventId),
-        checkInApi.getStatus(eventId, redoMode ? 'waiver' : null)
+        statusPromise
       ]);
 
       if (eventRes.success) {
@@ -59,7 +67,7 @@ export default function PlayerCheckIn() {
     } finally {
       setLoading(false);
     }
-  }, [eventId, toast, redoMode]);
+  }, [eventId, toast, redoMode, isAdminMode, targetUserId]);
 
   useEffect(() => {
     if (isAuthenticated && eventId) {
@@ -69,7 +77,12 @@ export default function PlayerCheckIn() {
 
   const handleSignWaiver = async (waiverId, signatureData) => {
     try {
-      await checkInApi.signWaiver(eventId, waiverId, signatureData);
+      // Use admin endpoint if signing on behalf of another user
+      if (isAdminMode) {
+        await checkInApi.adminSignWaiver(eventId, targetUserId, waiverId, signatureData);
+      } else {
+        await checkInApi.signWaiver(eventId, waiverId, signatureData);
+      }
       toast.success('Waiver signed successfully');
       setShowWaiverModal(false);
       await loadData();
@@ -144,8 +157,8 @@ export default function PlayerCheckIn() {
   const pendingWaivers = checkInStatus?.pendingWaivers || [];
   const isAlreadyCheckedIn = checkInStatus?.isCheckedIn;
 
-  // Show "already checked in" unless redo mode is enabled (admin sent link to re-sign waiver)
-  if (isAlreadyCheckedIn && !redoMode) {
+  // Show "already checked in" unless redo mode or admin mode is enabled
+  if (isAlreadyCheckedIn && !redoMode && !isAdminMode) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
         <div className="text-center max-w-md">
@@ -177,10 +190,18 @@ export default function PlayerCheckIn() {
           >
             <ArrowLeft className="w-5 h-5" />
           </button>
-          <div>
-            <h1 className="font-semibold text-gray-900">Check-In</h1>
+          <div className="flex-1">
+            <h1 className="font-semibold text-gray-900">
+              {isAdminMode ? 'Sign Waiver for Player' : 'Check-In'}
+            </h1>
             <p className="text-sm text-gray-500">{event?.name}</p>
           </div>
+          {isAdminMode && checkInStatus?.playerName && (
+            <div className="text-right">
+              <p className="text-sm font-medium text-orange-600">Signing for:</p>
+              <p className="text-sm text-gray-900">{checkInStatus.playerName}</p>
+            </div>
+          )}
         </div>
       </header>
 
