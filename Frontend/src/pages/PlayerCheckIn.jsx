@@ -460,7 +460,6 @@ function renderMarkdown(text) {
 
 // Waiver Modal Component
 function WaiverModal({ waiver, playerName, onSign, onClose }) {
-  const [signature, setSignature] = useState('');
   const [signatureImage, setSignatureImage] = useState('');
   const [emergencyPhone, setEmergencyPhone] = useState('');
   const [agreed, setAgreed] = useState(false);
@@ -472,8 +471,11 @@ function WaiverModal({ waiver, playerName, onSign, onClose }) {
 
   const isGuardianSigning = signerRole !== 'Participant';
 
+  // Auto-fill signature from guardian name or player name
+  const signature = isGuardianSigning ? guardianName.trim() : playerName;
+
   const handleSubmit = async () => {
-    if (!signature || !signatureImage || !agreed) {
+    if (!signatureImage || !agreed) {
       return;
     }
 
@@ -485,7 +487,7 @@ function WaiverModal({ waiver, playerName, onSign, onClose }) {
     setSigning(true);
     try {
       await onSign(waiver.id, {
-        signature,
+        signature: signature || playerName,
         signatureImage,
         emergencyPhone,
         signerRole,
@@ -634,20 +636,6 @@ function WaiverModal({ waiver, playerName, onSign, onClose }) {
             />
           </div>
 
-          {/* Typed Signature */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Type your full legal name to sign
-            </label>
-            <input
-              type="text"
-              value={signature}
-              onChange={(e) => setSignature(e.target.value)}
-              placeholder={isGuardianSigning ? guardianName || 'Your Full Name' : playerName || 'Your Full Name'}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-            />
-          </div>
-
           {/* Drawn Signature */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -689,7 +677,7 @@ function WaiverModal({ waiver, playerName, onSign, onClose }) {
             </button>
             <button
               onClick={handleSubmit}
-              disabled={!signature || !signatureImage || !agreed || signing}
+              disabled={!signatureImage || !agreed || signing || (isGuardianSigning && !guardianName.trim())}
               className="flex-1 px-4 py-2 bg-orange-600 text-white font-medium rounded-lg hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
             >
               {signing ? (
