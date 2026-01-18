@@ -1649,11 +1649,16 @@ public class PlayerCheckInStatusDto
 {
     public bool IsRegistered { get; set; }
     public bool IsCheckedIn { get; set; }
+    public string? CheckInStatus { get; set; }
     public DateTime? CheckedInAt { get; set; }
     public bool WaiverSigned { get; set; }
     public DateTime? WaiverSignedAt { get; set; }
     public string? SignedWaiverPdfUrl { get; set; }
     public string? PlayerName { get; set; }
+    public string? PlayerEmail { get; set; }
+    public bool HasPaid { get; set; }
+    public DateTime? PaidAt { get; set; }
+    public decimal AmountPaid { get; set; }
     public List<WaiverDto> PendingWaivers { get; set; } = new();
     public List<CheckInDivisionDto> Divisions { get; set; } = new();
 }
