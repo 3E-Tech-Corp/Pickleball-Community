@@ -3913,7 +3913,8 @@ public class TournamentController : ControllerBase
 
         // Send real-time notifications to players if status changed significantly
         var encounter = game.EncounterMatch?.Encounter;
-        if (encounter != null && (request.Status == "Started" || request.Status == "Playing"))
+        var notifyStatuses = new[] { "Queued", "Ready", "InProgress", "Started", "Playing" };
+        if (encounter != null && notifyStatuses.Contains(request.Status) && oldStatus != request.Status)
         {
             var playerIds = new List<int>();
             if (encounter.Unit1?.Members != null)
@@ -3928,12 +3929,21 @@ public class TournamentController : ControllerBase
                 var courtName = game.TournamentCourt?.CourtLabel ?? "assigned court";
                 var actionUrl = $"/event/{encounter.EventId}/gameday";
 
+                // Customize message based on status
+                var title = request.Status switch
+                {
+                    "Queued" => "Game Queued!",
+                    "Ready" => "Get Ready!",
+                    "InProgress" or "Playing" or "Started" => "Game Starting!",
+                    _ => "Game Update"
+                };
+
                 foreach (var playerId in playerIds.Distinct())
                 {
                     await _notificationService.CreateAndSendAsync(
                         playerId,
                         "GameUpdate",
-                        "Game Starting!",
+                        title,
                         $"{unit1Name} vs {unit2Name} - {courtName}",
                         actionUrl,
                         "Game",
