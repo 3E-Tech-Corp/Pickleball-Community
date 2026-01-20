@@ -8,7 +8,6 @@ DECLARE @EventId INT = 1; -- <-- CHANGE THIS TO YOUR EVENT ID
 SELECT
     e.Id AS EventId,
     e.Name AS EventName,
-    e.PoolCount AS EventPoolCount,
     e.TournamentStatus
 FROM Events e
 WHERE e.Id = @EventId;
@@ -17,6 +16,7 @@ WHERE e.Id = @EventId;
 SELECT
     d.Name AS DivisionName,
     d.Id AS DivisionId,
+    d.PoolCount AS DivisionPoolCount,
     COALESCE(u.PoolName, 'Pool ' + CAST(u.PoolNumber AS VARCHAR), 'Unassigned') AS Pool,
     u.PoolNumber,
     u.UnitNumber AS Seed,
@@ -24,14 +24,14 @@ SELECT
     -- Calculate what pool SHOULD be based on UnitNumber (for comparison)
     CASE
         WHEN u.UnitNumber IS NOT NULL AND u.UnitNumber > 0
-        THEN ((u.UnitNumber - 1) % COALESCE(e.PoolCount, 2)) + 1
+        THEN ((u.UnitNumber - 1) % COALESCE(d.PoolCount, 2)) + 1
         ELSE NULL
     END AS CalculatedPoolNumber,
     -- Flag if there's a mismatch
     CASE
         WHEN u.UnitNumber IS NOT NULL AND u.UnitNumber > 0
              AND u.PoolNumber IS NOT NULL
-             AND u.PoolNumber != ((u.UnitNumber - 1) % COALESCE(e.PoolCount, 2)) + 1
+             AND u.PoolNumber != ((u.UnitNumber - 1) % COALESCE(d.PoolCount, 2)) + 1
         THEN 'MISMATCH!'
         ELSE ''
     END AS PoolMismatch,
@@ -48,8 +48,7 @@ SELECT
     u.MatchesLost
 FROM EventUnits u
 INNER JOIN EventDivisions d ON u.DivisionId = d.Id
-INNER JOIN Events e ON d.EventId = e.Id
-WHERE e.Id = @EventId
+WHERE d.EventId = @EventId
   AND u.Status != 'Cancelled'
 ORDER BY
     d.Name,
@@ -77,18 +76,17 @@ SELECT
     u.UnitNumber AS Seed,
     u.Name AS TeamName,
     u.PoolNumber AS CurrentPool,
-    ((u.UnitNumber - 1) % COALESCE(e.PoolCount, 2)) + 1 AS ExpectedPool,
+    ((u.UnitNumber - 1) % COALESCE(d.PoolCount, 2)) + 1 AS ExpectedPool,
     u.PoolName AS CurrentPoolName,
-    'Pool ' + CHAR(64 + ((u.UnitNumber - 1) % COALESCE(e.PoolCount, 2)) + 1) AS ExpectedPoolName
+    'Pool ' + CHAR(64 + ((u.UnitNumber - 1) % COALESCE(d.PoolCount, 2)) + 1) AS ExpectedPoolName
 FROM EventUnits u
 INNER JOIN EventDivisions d ON u.DivisionId = d.Id
-INNER JOIN Events e ON d.EventId = e.Id
-WHERE e.Id = @EventId
+WHERE d.EventId = @EventId
   AND u.Status != 'Cancelled'
   AND u.UnitNumber IS NOT NULL
   AND u.UnitNumber > 0
   AND u.PoolNumber IS NOT NULL
-  AND u.PoolNumber != ((u.UnitNumber - 1) % COALESCE(e.PoolCount, 2)) + 1
+  AND u.PoolNumber != ((u.UnitNumber - 1) % COALESCE(d.PoolCount, 2)) + 1
 ORDER BY d.Name, u.UnitNumber;
 
 -- Check encounters to see what pool they're assigned to vs units
