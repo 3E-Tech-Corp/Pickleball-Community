@@ -62,7 +62,7 @@ SELECT
     COALESCE(u.PoolName, 'Pool ' + CAST(u.PoolNumber AS VARCHAR), 'Unassigned') AS Pool,
     u.PoolNumber,
     COUNT(*) AS UnitCount,
-    STRING_AGG(CAST(u.UnitNumber AS VARCHAR), ', ') WITHIN GROUP (ORDER BY u.UnitNumber) AS Seeds
+    STRING_AGG(CAST(u.UnitNumber AS VARCHAR), ', ') AS Seeds  -- Note: ORDER not guaranteed in SQL Server < 2022
 FROM EventUnits u
 INNER JOIN EventDivisions d ON u.DivisionId = d.Id
 WHERE d.EventId = @EventId
