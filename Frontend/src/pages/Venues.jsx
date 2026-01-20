@@ -2379,6 +2379,22 @@ function AddCourtModal({ onClose, onCourtAdded, userLocation, courtTypes }) {
           }
         }
 
+        // If user pasted a full address, extract the street portion to use as addr1
+        // This preserves the user's exact input rather than relying on Nominatim parsing
+        const userInput = addressInput.trim();
+        if (userInput.includes(',')) {
+          // User pasted a full address like "123 Main St, City, State 12345"
+          // Use the first comma-separated part as the street address
+          const userParts = userInput.split(',').map(p => p.trim());
+          if (userParts[0]) {
+            streetAddress = userParts[0];
+          }
+        } else if (userInput && !streetAddress) {
+          // User typed something without commas and we couldn't parse an address
+          // Use display_name's first part as fallback
+          streetAddress = display_name ? display_name.split(',')[0].trim() : userInput;
+        }
+
         // Update form data with geocoded coordinates AND address components
         setFormData(prev => ({
           ...prev,
