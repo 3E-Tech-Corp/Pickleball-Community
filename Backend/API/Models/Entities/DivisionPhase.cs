@@ -1,0 +1,160 @@
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+
+namespace Pickleball.Community.Models.Entities;
+
+/// <summary>
+/// Phase types for tournament progression.
+/// </summary>
+public static class PhaseTypes
+{
+    public const string RoundRobin = "RoundRobin";
+    public const string SingleElimination = "SingleElimination";
+    public const string DoubleElimination = "DoubleElimination";
+    public const string Swiss = "Swiss";
+    public const string Pools = "Pools";
+    public const string Bracket = "Bracket";
+}
+
+/// <summary>
+/// Phase status tracking.
+/// </summary>
+public static class PhaseStatus
+{
+    public const string Pending = "Pending";
+    public const string InProgress = "InProgress";
+    public const string Completed = "Completed";
+    public const string Locked = "Locked";
+}
+
+/// <summary>
+/// Reseed options between phases.
+/// </summary>
+public static class ReseedOptions
+{
+    public const string PreserveSeeds = "PreserveSeeds";
+    public const string ReseedByStandings = "ReseedByStandings";
+    public const string Random = "Random";
+}
+
+/// <summary>
+/// Represents a phase in a multi-phase tournament structure.
+/// Examples: Pool Play -> Quarterfinals -> Semifinals -> Finals
+/// </summary>
+public class DivisionPhase
+{
+    public int Id { get; set; }
+
+    public int DivisionId { get; set; }
+
+    /// <summary>
+    /// Sequence order within the division (1, 2, 3, etc.)
+    /// </summary>
+    public int PhaseOrder { get; set; } = 1;
+
+    /// <summary>
+    /// Type of phase: RoundRobin, SingleElimination, DoubleElimination, Swiss, Pools, Bracket
+    /// </summary>
+    [Required]
+    [MaxLength(30)]
+    public string PhaseType { get; set; } = PhaseTypes.RoundRobin;
+
+    /// <summary>
+    /// Human-readable name (e.g., "Pool Play", "Quarterfinals", "Championship Bracket")
+    /// </summary>
+    [Required]
+    [MaxLength(100)]
+    public string Name { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Optional description of this phase
+    /// </summary>
+    [MaxLength(500)]
+    public string? Description { get; set; }
+
+    /// <summary>
+    /// Number of slots coming into this phase (from registrations or previous phase)
+    /// </summary>
+    public int IncomingSlotCount { get; set; }
+
+    /// <summary>
+    /// Number of slots advancing from this phase (0 for final phase)
+    /// </summary>
+    public int AdvancingSlotCount { get; set; }
+
+    /// <summary>
+    /// Status: Pending, InProgress, Completed, Locked
+    /// </summary>
+    [MaxLength(20)]
+    public string Status { get; set; } = PhaseStatus.Pending;
+
+    /// <summary>
+    /// JSON configuration for ranking/tie-breaker criteria
+    /// Example: {"primary":"wins","secondary":"point_differential","tertiary":"head_to_head"}
+    /// </summary>
+    [MaxLength(1000)]
+    public string? RankingCriteria { get; set; }
+
+    /// <summary>
+    /// How to reseed units between phases: PreserveSeeds, ReseedByStandings, Random
+    /// </summary>
+    [MaxLength(30)]
+    public string? ReseedOption { get; set; } = ReseedOptions.PreserveSeeds;
+
+    /// <summary>
+    /// JSON configuration for phase-type specific settings
+    /// RoundRobin: {"games_per_match":2}
+    /// SingleElim: {"consolation":true,"third_place_match":true}
+    /// Pools: {"pool_count":4,"pool_size":4,"cross_pool_matches":false}
+    /// </summary>
+    [MaxLength(2000)]
+    public string? Settings { get; set; }
+
+    /// <summary>
+    /// Best of X games for matches in this phase (can override division default)
+    /// </summary>
+    public int? BestOf { get; set; }
+
+    /// <summary>
+    /// Score format override for this phase
+    /// </summary>
+    public int? ScoreFormatId { get; set; }
+
+    /// <summary>
+    /// Whether this phase has been manually locked (no automatic slot resolution)
+    /// </summary>
+    public bool IsManuallyLocked { get; set; } = false;
+
+    /// <summary>
+    /// When this phase was locked/finalized
+    /// </summary>
+    public DateTime? LockedAt { get; set; }
+
+    /// <summary>
+    /// User who locked/finalized this phase
+    /// </summary>
+    public int? LockedByUserId { get; set; }
+
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+
+    // Navigation
+    [ForeignKey("DivisionId")]
+    public EventDivision? Division { get; set; }
+
+    [ForeignKey("ScoreFormatId")]
+    public ScoreFormat? ScoreFormat { get; set; }
+
+    [ForeignKey("LockedByUserId")]
+    public User? LockedBy { get; set; }
+
+    /// <summary>
+    /// All slots in this phase (incoming and advancing)
+    /// </summary>
+    public ICollection<PhaseSlot> Slots { get; set; } = new List<PhaseSlot>();
+
+    /// <summary>
+    /// All encounters in this phase
+    /// </summary>
+    public ICollection<EventEncounter> Encounters { get; set; } = new List<EventEncounter>();
+}

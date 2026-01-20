@@ -320,6 +320,7 @@ public class EventDivision
     public ICollection<EventEncounter> Encounters { get; set; } = new List<EventEncounter>();
     public ICollection<EncounterMatchFormat> EncounterMatchFormats { get; set; } = new List<EncounterMatchFormat>();
     public ICollection<DivisionCourtBlock> CourtBlocks { get; set; } = new List<DivisionCourtBlock>();
+    public ICollection<DivisionPhase> Phases { get; set; } = new List<DivisionPhase>();
 }
 
 public class EventRegistration

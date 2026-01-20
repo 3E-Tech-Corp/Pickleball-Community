@@ -92,6 +92,8 @@ public class ApplicationDbContext : DbContext
     public DbSet<EventGameScoreHistory> EventGameScoreHistories { get; set; }
     public DbSet<TournamentCourt> TournamentCourts { get; set; }
     public DbSet<EventDocument> EventDocuments { get; set; }
+    public DbSet<DivisionPhase> DivisionPhases { get; set; }
+    public DbSet<PhaseSlot> PhaseSlots { get; set; }
 
     // Clubs
     public DbSet<Club> Clubs { get; set; }
@@ -1116,6 +1118,22 @@ public class ApplicationDbContext : DbContext
                   .WithMany()
                   .HasForeignKey(e => e.TournamentCourtId)
                   .OnDelete(DeleteBehavior.SetNull);
+
+            // Phase and Slot relationships (for multi-phase tournaments)
+            entity.HasOne(e => e.Phase)
+                  .WithMany(p => p.Encounters)
+                  .HasForeignKey(e => e.PhaseId)
+                  .OnDelete(DeleteBehavior.NoAction);
+
+            entity.HasOne(e => e.Unit1Slot)
+                  .WithMany(s => s.EncountersAsUnit1)
+                  .HasForeignKey(e => e.Unit1SlotId)
+                  .OnDelete(DeleteBehavior.NoAction);
+
+            entity.HasOne(e => e.Unit2Slot)
+                  .WithMany(s => s.EncountersAsUnit2)
+                  .HasForeignKey(e => e.Unit2SlotId)
+                  .OnDelete(DeleteBehavior.NoAction);
         });
 
         // Encounter Match configuration
@@ -1179,6 +1197,79 @@ public class ApplicationDbContext : DbContext
             entity.HasOne(p => p.Unit)
                   .WithMany()
                   .HasForeignKey(p => p.UnitId)
+                  .OnDelete(DeleteBehavior.NoAction);
+        });
+
+        // Division Phase configuration (multi-phase tournament support)
+        modelBuilder.Entity<DivisionPhase>(entity =>
+        {
+            entity.Property(p => p.PhaseType).IsRequired().HasMaxLength(30);
+            entity.Property(p => p.Name).IsRequired().HasMaxLength(100);
+            entity.Property(p => p.Description).HasMaxLength(500);
+            entity.Property(p => p.Status).HasMaxLength(20);
+            entity.Property(p => p.RankingCriteria).HasMaxLength(1000);
+            entity.Property(p => p.ReseedOption).HasMaxLength(30);
+            entity.Property(p => p.Settings).HasMaxLength(2000);
+
+            entity.HasIndex(p => p.DivisionId);
+            entity.HasIndex(p => p.Status);
+            entity.HasIndex(p => new { p.DivisionId, p.PhaseOrder }).IsUnique();
+
+            entity.HasOne(p => p.Division)
+                  .WithMany(d => d.Phases)
+                  .HasForeignKey(p => p.DivisionId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(p => p.ScoreFormat)
+                  .WithMany()
+                  .HasForeignKey(p => p.ScoreFormatId)
+                  .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasOne(p => p.LockedBy)
+                  .WithMany()
+                  .HasForeignKey(p => p.LockedByUserId)
+                  .OnDelete(DeleteBehavior.NoAction);
+        });
+
+        // Phase Slot configuration (placeholder-based unit assignment)
+        modelBuilder.Entity<PhaseSlot>(entity =>
+        {
+            entity.Property(s => s.SlotType).IsRequired().HasMaxLength(20);
+            entity.Property(s => s.SourceType).IsRequired().HasMaxLength(20);
+            entity.Property(s => s.SourcePoolName).HasMaxLength(20);
+            entity.Property(s => s.PlaceholderLabel).HasMaxLength(100);
+            entity.Property(s => s.ResolutionNotes).HasMaxLength(500);
+
+            entity.HasIndex(s => s.PhaseId);
+            entity.HasIndex(s => s.UnitId);
+            entity.HasIndex(s => s.SourceEncounterId);
+            entity.HasIndex(s => s.SourcePhaseId);
+            entity.HasIndex(s => s.IsResolved);
+            entity.HasIndex(s => new { s.PhaseId, s.SlotType, s.SlotNumber }).IsUnique();
+
+            entity.HasOne(s => s.Phase)
+                  .WithMany(p => p.Slots)
+                  .HasForeignKey(s => s.PhaseId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(s => s.Unit)
+                  .WithMany()
+                  .HasForeignKey(s => s.UnitId)
+                  .OnDelete(DeleteBehavior.NoAction);
+
+            entity.HasOne(s => s.SourceEncounter)
+                  .WithMany()
+                  .HasForeignKey(s => s.SourceEncounterId)
+                  .OnDelete(DeleteBehavior.NoAction);
+
+            entity.HasOne(s => s.SourcePhase)
+                  .WithMany()
+                  .HasForeignKey(s => s.SourcePhaseId)
+                  .OnDelete(DeleteBehavior.NoAction);
+
+            entity.HasOne(s => s.ResolvedBy)
+                  .WithMany()
+                  .HasForeignKey(s => s.ResolvedByUserId)
                   .OnDelete(DeleteBehavior.NoAction);
         });
 

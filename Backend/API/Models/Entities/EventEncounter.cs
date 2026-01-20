@@ -15,6 +15,23 @@ public class EventEncounter
     public int DivisionId { get; set; }
 
     /// <summary>
+    /// Phase this encounter belongs to (null for legacy encounters without phases)
+    /// </summary>
+    public int? PhaseId { get; set; }
+
+    /// <summary>
+    /// Slot reference for Unit1 (enables placeholder-based scheduling)
+    /// When set, Unit1Id is derived from the slot's resolved unit
+    /// </summary>
+    public int? Unit1SlotId { get; set; }
+
+    /// <summary>
+    /// Slot reference for Unit2 (enables placeholder-based scheduling)
+    /// When set, Unit2Id is derived from the slot's resolved unit
+    /// </summary>
+    public int? Unit2SlotId { get; set; }
+
+    /// <summary>
     /// Type of round: Pool, Bracket, Final
     /// </summary>
     [MaxLength(20)]
@@ -134,6 +151,15 @@ public class EventEncounter
 
     [ForeignKey("DivisionId")]
     public EventDivision? Division { get; set; }
+
+    [ForeignKey("PhaseId")]
+    public DivisionPhase? Phase { get; set; }
+
+    [ForeignKey("Unit1SlotId")]
+    public PhaseSlot? Unit1Slot { get; set; }
+
+    [ForeignKey("Unit2SlotId")]
+    public PhaseSlot? Unit2Slot { get; set; }
 
     [ForeignKey("Unit1Id")]
     public EventUnit? Unit1 { get; set; }
