@@ -1959,6 +1959,23 @@ public class TournamentGameDayController : ControllerBase
             }
 
             await _context.SaveChangesAsync();
+
+            // If this is a bracket match, advance the winner to the next round
+            if (match.WinnerUnitId.HasValue &&
+                (match.RoundType == "Bracket" || match.RoundType == "Final" || match.RoundType == "ThirdPlace"))
+            {
+                // Load all bracket matches for this division to find the next match
+                var allBracketMatches = await _context.EventMatches
+                    .Where(m => m.DivisionId == match.DivisionId &&
+                               (m.RoundType == "Bracket" || m.RoundType == "Final" || m.RoundType == "ThirdPlace"))
+                    .ToListAsync();
+
+                await AdvanceWinnerToNextRound(match, match.WinnerUnitId.Value, allBracketMatches);
+                await _context.SaveChangesAsync();
+
+                _logger.LogInformation("Playoff match {MatchId} completed, advancing winner unit {WinnerUnitId} to next round",
+                    match.Id, match.WinnerUnitId);
+            }
         }
     }
 
