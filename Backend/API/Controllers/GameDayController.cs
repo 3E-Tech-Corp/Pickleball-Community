@@ -235,7 +235,28 @@ public class GameDayController : ControllerBase
         if (dto.Label != null)
             court.CourtLabel = dto.Label;
         if (dto.Status != null)
+        {
             court.Status = dto.Status;
+
+            // If setting to Available, clear CurrentGameId and unassign any queued games
+            if (dto.Status == "Available")
+            {
+                court.CurrentGameId = null;
+
+                // Unassign any games that are queued/pending on this court
+                var gamesOnCourt = await _context.EventGames
+                    .Where(g => g.TournamentCourtId == courtId &&
+                           (g.Status == "Queued" || g.Status == "Pending" || g.Status == "Ready"))
+                    .ToListAsync();
+
+                foreach (var game in gamesOnCourt)
+                {
+                    game.TournamentCourtId = null;
+                    game.QueuedAt = null;
+                    game.Status = "Scheduled";
+                }
+            }
+        }
         if (dto.IsActive.HasValue)
             court.IsActive = dto.IsActive.Value;
 

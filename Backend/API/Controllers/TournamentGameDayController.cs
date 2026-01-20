@@ -185,12 +185,17 @@ public class TournamentGameDayController : ControllerBase
                 .Include(g => g.EncounterMatch)
                     .ThenInclude(m => m!.Encounter)
                         .ThenInclude(e => e!.Unit1)
+                            .ThenInclude(u => u!.Members)
+                                .ThenInclude(m => m.User)
                 .Include(g => g.EncounterMatch)
                     .ThenInclude(m => m!.Encounter)
                         .ThenInclude(e => e!.Unit2)
+                            .ThenInclude(u => u!.Members)
+                                .ThenInclude(m => m.User)
                 .Include(g => g.EncounterMatch)
                     .ThenInclude(m => m!.Encounter)
                         .ThenInclude(e => e!.Division)
+                            .ThenInclude(d => d!.TeamUnit)
                 .Include(g => g.TournamentCourt)
                 .Where(g => g.EncounterMatch!.Encounter!.EventId == eventId)
                 .ToListAsync();
@@ -216,11 +221,30 @@ public class TournamentGameDayController : ControllerBase
                         RoundType = encounter.RoundType,
                         RoundName = encounter.RoundName,
                         DivisionName = encounter.Division?.Name ?? "",
+                        GameFormat = encounter.Division?.TeamUnit?.Name,
                         MyUnitId = myUnitId ?? 0,
                         Unit1Id = encounter.Unit1Id,
                         Unit1Name = encounter.Unit1?.Name,
+                        Unit1Players = encounter.Unit1?.Members?
+                            .Where(m => m.InviteStatus == "Accepted")
+                            .Select(m => new PlayerBriefDto
+                            {
+                                UserId = m.UserId,
+                                Name = m.User != null ? $"{m.User.FirstName} {m.User.LastName}" : "",
+                                ProfileImageUrl = m.User?.ProfileImageUrl,
+                                IsCheckedIn = m.IsCheckedIn
+                            }).ToList() ?? new List<PlayerBriefDto>(),
                         Unit2Id = encounter.Unit2Id,
                         Unit2Name = encounter.Unit2?.Name,
+                        Unit2Players = encounter.Unit2?.Members?
+                            .Where(m => m.InviteStatus == "Accepted")
+                            .Select(m => new PlayerBriefDto
+                            {
+                                UserId = m.UserId,
+                                Name = m.User != null ? $"{m.User.FirstName} {m.User.LastName}" : "",
+                                ProfileImageUrl = m.User?.ProfileImageUrl,
+                                IsCheckedIn = m.IsCheckedIn
+                            }).ToList() ?? new List<PlayerBriefDto>(),
                         CourtName = g.TournamentCourt?.CourtLabel,
                         CourtNumber = g.TournamentCourt?.SortOrder,
                         ScheduledTime = encounter.ScheduledTime,
@@ -376,6 +400,7 @@ public class TournamentGameDayController : ControllerBase
                     {
                         UserId = m.UserId,
                         Name = m.User!.FirstName + " " + m.User.LastName,
+                        ProfileImageUrl = m.User.ProfileImageUrl,
                         IsCheckedIn = m.IsCheckedIn
                     }).ToList(),
                 Unit2Id = g.EncounterMatch.Encounter.Unit2Id!.Value,
@@ -386,6 +411,7 @@ public class TournamentGameDayController : ControllerBase
                     {
                         UserId = m.UserId,
                         Name = m.User!.FirstName + " " + m.User.LastName,
+                        ProfileImageUrl = m.User.ProfileImageUrl,
                         IsCheckedIn = m.IsCheckedIn
                     }).ToList(),
                 AllPlayersCheckedIn = g.EncounterMatch.Encounter.Unit1.Members.All(m => m.InviteStatus != "Accepted" || m.IsCheckedIn)
@@ -476,6 +502,106 @@ public class TournamentGameDayController : ControllerBase
     }
 
     /// <summary>
+    /// Player self-assigns their game to a court
+    /// </summary>
+    [HttpPost("player-queue-game")]
+    [Authorize]
+    public async Task<ActionResult<ApiResponse<GameQueueItemDto>>> PlayerQueueGame([FromBody] QueueGameRequest request)
+    {
+        var userId = GetUserId();
+
+        var game = await _context.EventGames
+            .Include(g => g.EncounterMatch)
+                .ThenInclude(m => m!.Encounter)
+                    .ThenInclude(e => e!.Unit1)
+                        .ThenInclude(u => u!.Members)
+            .Include(g => g.EncounterMatch)
+                .ThenInclude(m => m!.Encounter)
+                    .ThenInclude(e => e!.Unit2)
+                        .ThenInclude(u => u!.Members)
+            .FirstOrDefaultAsync(g => g.Id == request.GameId);
+
+        if (game == null)
+            return NotFound(new ApiResponse<GameQueueItemDto> { Success = false, Message = "Game not found" });
+
+        var encounter = game.EncounterMatch?.Encounter;
+        if (encounter == null)
+            return NotFound(new ApiResponse<GameQueueItemDto> { Success = false, Message = "Game encounter not found" });
+
+        // Verify player is part of one of the units in this game
+        var unit1PlayerIds = encounter.Unit1?.Members?.Where(m => m.InviteStatus == "Accepted").Select(m => m.UserId).ToList() ?? new List<int>();
+        var unit2PlayerIds = encounter.Unit2?.Members?.Where(m => m.InviteStatus == "Accepted").Select(m => m.UserId).ToList() ?? new List<int>();
+
+        if (!unit1PlayerIds.Contains(userId) && !unit2PlayerIds.Contains(userId))
+            return Forbid();
+
+        // Check game status - allow Scheduled, Pending, or Ready
+        if (game.Status != "Scheduled" && game.Status != "Pending" && game.Status != "Ready")
+            return BadRequest(new ApiResponse<GameQueueItemDto> { Success = false, Message = $"Game cannot be queued (current status: {game.Status})" });
+
+        var court = await _context.TournamentCourts.FindAsync(request.CourtId);
+        if (court == null || court.EventId != encounter.EventId)
+            return BadRequest(new ApiResponse<GameQueueItemDto> { Success = false, Message = "Invalid court" });
+
+        // Check court is available
+        if (court.Status != "Available")
+            return BadRequest(new ApiResponse<GameQueueItemDto> { Success = false, Message = $"Court {court.CourtLabel} is not available" });
+
+        // Update game
+        game.Status = "Queued";
+        game.TournamentCourtId = request.CourtId;
+        game.QueuedAt = DateTime.Now;
+        game.UpdatedAt = DateTime.Now;
+
+        // Update court
+        court.CurrentGameId = game.Id;
+        court.Status = "InUse";
+
+        // Create queue entry
+        var queueEntry = new GameQueue
+        {
+            EventId = encounter.EventId,
+            TournamentCourtId = request.CourtId,
+            GameId = game.Id,
+            QueuePosition = 0,
+            QueuedByUserId = userId
+        };
+        _context.GameQueues.Add(queueEntry);
+
+        await _context.SaveChangesAsync();
+
+        // Send notifications to players
+        await NotifyPlayersGameQueued(game, court);
+
+        // Notify admin dashboard via SignalR
+        await _notificationService.SendToEventAsync(encounter.EventId, new NotificationPayload
+        {
+            Type = "GameUpdate",
+            Title = "Game Queued",
+            Message = $"Game queued to {court.CourtLabel}",
+            ReferenceType = "Game",
+            ReferenceId = game.Id
+        });
+
+        _logger.LogInformation("Player {UserId} self-queued game {GameId} to court {CourtId}", userId, game.Id, request.CourtId);
+
+        return Ok(new ApiResponse<GameQueueItemDto>
+        {
+            Success = true,
+            Data = new GameQueueItemDto
+            {
+                GameId = game.Id,
+                Status = game.Status,
+                CourtId = request.CourtId,
+                CourtName = court.CourtLabel,
+                CourtNumber = court.SortOrder,
+                QueuedAt = game.QueuedAt
+            },
+            Message = $"Game queued to {court.CourtLabel}"
+        });
+    }
+
+    /// <summary>
     /// Start a game
     /// </summary>
     [HttpPost("start-game/{gameId}")]
@@ -531,6 +657,8 @@ public class TournamentGameDayController : ControllerBase
     [Authorize]
     public async Task<ActionResult<ApiResponse<object>>> SubmitScore(int gameId, [FromBody] GameDaySubmitScoreRequest request)
     {
+        try
+        {
         var userId = GetUserId();
 
         var game = await _context.EventGames
@@ -563,6 +691,43 @@ public class TournamentGameDayController : ControllerBase
         var previousUnit1Score = game.Unit1Score;
         var previousUnit2Score = game.Unit2Score;
 
+        // Player-specific validation (organizers can always override)
+        if (!isOrganizer && playerUnitId.HasValue)
+        {
+            // Check if score is already locked (both sides confirmed with matching scores)
+            if (game.Status == "Finished" && game.ScoreSubmittedByUnitId != null && game.ScoreConfirmedByUnitId != null)
+            {
+                return BadRequest(new ApiResponse<object>
+                {
+                    Success = false,
+                    Message = "Score is locked. Both teams have confirmed the final score. Contact a tournament director if you need to dispute."
+                });
+            }
+
+            // Check if other team already submitted a DIFFERENT score
+            if (game.ScoreSubmittedByUnitId != null && game.ScoreSubmittedByUnitId != playerUnitId)
+            {
+                // Other team already submitted - check if scores match
+                bool scoresMatch = game.Unit1Score == request.Unit1Score && game.Unit2Score == request.Unit2Score;
+
+                if (!scoresMatch)
+                {
+                    return BadRequest(new ApiResponse<object>
+                    {
+                        Success = false,
+                        Message = $"Score conflict! Opponent submitted {game.Unit1Score}-{game.Unit2Score}, but you entered {request.Unit1Score}-{request.Unit2Score}. Please verify with your opponent. If you cannot agree, contact a tournament director."
+                    });
+                }
+            }
+
+            // Check if this player's team already submitted and is trying to change
+            if (game.ScoreSubmittedByUnitId == playerUnitId && game.ScoreConfirmedByUnitId == null)
+            {
+                // Same team trying to update - allow it but warn if different
+                // (They might be correcting a mistake before opponent confirms)
+            }
+        }
+
         game.Unit1Score = request.Unit1Score;
         game.Unit2Score = request.Unit2Score;
         game.UpdatedAt = DateTime.Now;
@@ -578,17 +743,19 @@ public class TournamentGameDayController : ControllerBase
         {
             if (game.ScoreSubmittedByUnitId == null)
             {
+                // First submission
                 game.ScoreSubmittedByUnitId = playerUnitId;
                 game.ScoreSubmittedAt = DateTime.Now;
             }
             else if (game.ScoreSubmittedByUnitId != playerUnitId)
             {
-                // Other unit is confirming
+                // Other unit is confirming with matching score - lock it
                 game.ScoreConfirmedByUnitId = playerUnitId;
                 game.ScoreConfirmedAt = DateTime.Now;
                 game.Status = "Finished";
                 game.FinishedAt = DateTime.Now;
             }
+            // If same team is updating their own submission (before opponent confirms), just update the score
         }
         else if (isOrganizer)
         {
@@ -623,7 +790,10 @@ public class TournamentGameDayController : ControllerBase
         if (game.Status == "Finished")
         {
             await UpdateStatsAfterGameFinish(game);
-            await CheckMatchCompletion(game.EncounterMatch!.EncounterId);
+            if (game.EncounterMatch != null)
+            {
+                await CheckMatchCompletion(game.EncounterMatch.EncounterId);
+            }
             await AdvanceCourtQueue(game);
         }
 
@@ -635,6 +805,17 @@ public class TournamentGameDayController : ControllerBase
             Success = true,
             Message = game.Status == "Finished" ? "Game completed" : "Score updated"
         });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error submitting score for game {GameId}", gameId);
+            return StatusCode(500, new ApiResponse<object>
+            {
+                Success = false,
+                Message = $"Error: {ex.Message}",
+                Data = new { InnerException = ex.InnerException?.Message, StackTrace = ex.StackTrace?.Substring(0, Math.Min(500, ex.StackTrace?.Length ?? 0)) }
+            });
+        }
     }
 
     /// <summary>
@@ -724,6 +905,7 @@ public class TournamentGameDayController : ControllerBase
 
     /// <summary>
     /// Calculate and assign pool rankings based on current statistics
+    /// Recalculates all stats from game scores - safe to run multiple times
     /// </summary>
     [HttpPost("calculate-pool-rankings/{eventId}/{divisionId}")]
     [Authorize]
@@ -746,10 +928,152 @@ public class TournamentGameDayController : ControllerBase
                 .ThenInclude(m => m.User)
             .ToListAsync();
 
-        // Get head-to-head results for tiebreakers
-        var poolMatches = await _context.EventMatches
-            .Where(m => m.DivisionId == divisionId && m.RoundType == "Pool" && m.Status == "Completed")
+        // Reset all unit statistics to zero before recalculating
+        foreach (var unit in units)
+        {
+            unit.MatchesPlayed = 0;
+            unit.MatchesWon = 0;
+            unit.MatchesLost = 0;
+            unit.GamesWon = 0;
+            unit.GamesLost = 0;
+            unit.PointsScored = 0;
+            unit.PointsAgainst = 0;
+            // Reset playoff advancement (can be re-finalized after recalculation)
+            unit.AdvancedToPlayoff = false;
+            unit.ManuallyAdvanced = false;
+            unit.OverallRank = null;
+        }
+
+        // Reset playoff bracket match assignments (only first round, and only if no games played)
+        var playoffMatches = await _context.EventMatches
+            .Where(m => m.DivisionId == divisionId && m.RoundType == "Bracket" && m.RoundNumber == 1)
             .ToListAsync();
+
+        var hasPlayedPlayoffGames = await _context.EventGames
+            .AnyAsync(g => g.EncounterMatch != null &&
+                          g.EncounterMatch.Encounter != null &&
+                          g.EncounterMatch.Encounter.DivisionId == divisionId &&
+                          g.EncounterMatch.Encounter.RoundType == "Bracket" &&
+                          (g.Status == "Playing" || g.Status == "Finished" || g.Status == "Completed"));
+
+        if (!hasPlayedPlayoffGames)
+        {
+            foreach (var match in playoffMatches)
+            {
+                match.Unit1Id = null;
+                match.Unit2Id = null;
+                match.UpdatedAt = DateTime.Now;
+            }
+
+            // Reset division status back to UnitsAssigned
+            if (division.ScheduleStatus == "PoolsFinalized")
+            {
+                division.ScheduleStatus = "UnitsAssigned";
+            }
+        }
+
+        // Get all completed pool encounters with their games
+        var poolEncounters = await _context.EventMatches
+            .Where(m => m.DivisionId == divisionId && m.RoundType == "Pool" && m.Status == "Completed")
+            .Include(m => m.Matches)
+                .ThenInclude(em => em.Games)
+            .ToListAsync();
+
+        // Create lookup for units
+        var unitLookup = units.ToDictionary(u => u.Id);
+
+        // Recalculate statistics from all completed pool encounters
+        foreach (var encounter in poolEncounters)
+        {
+            if (encounter.Unit1Id == null || encounter.Unit2Id == null)
+                continue;
+
+            var unit1 = unitLookup.GetValueOrDefault(encounter.Unit1Id.Value);
+            var unit2 = unitLookup.GetValueOrDefault(encounter.Unit2Id.Value);
+
+            if (unit1 == null || unit2 == null)
+                continue;
+
+            // Only process encounters where both units are in the same pool
+            if (unit1.PoolNumber != unit2.PoolNumber)
+            {
+                _logger.LogWarning("Skipping encounter {EncounterId} - units {Unit1Id} (Pool {Pool1}) and {Unit2Id} (Pool {Pool2}) are in different pools",
+                    encounter.Id, unit1.Id, unit1.PoolNumber, unit2.Id, unit2.PoolNumber);
+                continue;
+            }
+
+            // Count games won/lost and points from all games in this encounter
+            int unit1GamesWon = 0;
+            int unit2GamesWon = 0;
+            int unit1Points = 0;
+            int unit2Points = 0;
+
+            // Get games either from EncounterMatches or directly from encounter
+            var games = encounter.Matches?.SelectMany(m => m.Games).ToList() ?? new List<EventGame>();
+
+            // If no games through matches, check for legacy direct games
+            if (!games.Any())
+            {
+                games = await _context.EventGames
+                    .Where(g => g.EncounterMatch != null && g.EncounterMatch.EncounterId == encounter.Id &&
+                           (g.Status == "Completed" || g.Status == "Finished"))
+                    .ToListAsync();
+            }
+
+            foreach (var game in games.Where(g => g.Status == "Completed" || g.Status == "Finished"))
+            {
+                unit1Points += game.Unit1Score;
+                unit2Points += game.Unit2Score;
+
+                if (game.Unit1Score > game.Unit2Score)
+                    unit1GamesWon++;
+                else if (game.Unit2Score > game.Unit1Score)
+                    unit2GamesWon++;
+            }
+
+            // Update game stats
+            unit1.GamesWon += unit1GamesWon;
+            unit1.GamesLost += unit2GamesWon;
+            unit2.GamesWon += unit2GamesWon;
+            unit2.GamesLost += unit1GamesWon;
+
+            // Update point stats
+            unit1.PointsScored += unit1Points;
+            unit1.PointsAgainst += unit2Points;
+            unit2.PointsScored += unit2Points;
+            unit2.PointsAgainst += unit1Points;
+
+            // Update match stats (encounter is the match)
+            unit1.MatchesPlayed++;
+            unit2.MatchesPlayed++;
+
+            // Determine match winner based on games won
+            if (unit1GamesWon > unit2GamesWon)
+            {
+                unit1.MatchesWon++;
+                unit2.MatchesLost++;
+            }
+            else if (unit2GamesWon > unit1GamesWon)
+            {
+                unit2.MatchesWon++;
+                unit1.MatchesLost++;
+            }
+            else
+            {
+                // Tie in games - use point differential or mark as tie
+                // For now, if games are tied, check encounter's explicit winner
+                if (encounter.WinnerUnitId == unit1.Id)
+                {
+                    unit1.MatchesWon++;
+                    unit2.MatchesLost++;
+                }
+                else if (encounter.WinnerUnitId == unit2.Id)
+                {
+                    unit2.MatchesWon++;
+                    unit1.MatchesLost++;
+                }
+            }
+        }
 
         var poolStandings = new List<PoolStandingsResultDto>();
 
@@ -768,7 +1092,7 @@ public class TournamentGameDayController : ControllerBase
                 .ToList();
 
             // Handle tiebreakers with head-to-head
-            rankedUnits = ApplyHeadToHeadTiebreaker(rankedUnits, poolMatches);
+            rankedUnits = ApplyHeadToHeadTiebreaker(rankedUnits, poolEncounters);
 
             // Assign pool ranks
             for (int i = 0; i < rankedUnits.Count; i++)
@@ -808,7 +1132,7 @@ public class TournamentGameDayController : ControllerBase
         {
             Success = true,
             Data = poolStandings,
-            Message = "Pool rankings calculated"
+            Message = "Pool rankings recalculated from all game scores"
         });
     }
 
@@ -918,6 +1242,9 @@ public class TournamentGameDayController : ControllerBase
                     Unit2Name = unit2?.Name
                 });
             }
+
+            // Handle bye matches - auto-complete them and advance winners
+            await HandlePlayoffByes(divisionId);
         }
 
         await _context.SaveChangesAsync();
@@ -1000,6 +1327,152 @@ public class TournamentGameDayController : ControllerBase
         await _context.SaveChangesAsync();
 
         return Ok(new ApiResponse<object> { Success = true, Message = "Pool finalization reset" });
+    }
+
+    /// <summary>
+    /// Manually override playoff team assignments (TD only)
+    /// Allows setting which teams advance and their bracket positions
+    /// </summary>
+    [HttpPost("override-playoff-teams/{eventId}/{divisionId}")]
+    [Authorize]
+    public async Task<ActionResult<ApiResponse<AdvancementResultDto>>> OverridePlayoffTeams(
+        int eventId,
+        int divisionId,
+        [FromBody] OverridePlayoffTeamsRequest request)
+    {
+        var userId = GetUserId();
+        if (!await IsEventOrganizer(eventId, userId))
+            return Forbid();
+
+        var division = await _context.EventDivisions
+            .FirstOrDefaultAsync(d => d.Id == divisionId && d.EventId == eventId);
+
+        if (division == null)
+            return NotFound(new ApiResponse<AdvancementResultDto> { Success = false, Message = "Division not found" });
+
+        // Check if any playoff matches have been played
+        var hasPlayedPlayoffGames = await _context.EventGames
+            .AnyAsync(g => g.EncounterMatch != null &&
+                          g.EncounterMatch.Encounter != null &&
+                          g.EncounterMatch.Encounter.DivisionId == divisionId &&
+                          g.EncounterMatch.Encounter.RoundType == "Bracket" &&
+                          (g.Status == "Playing" || g.Status == "Finished" || g.Status == "Completed"));
+
+        if (hasPlayedPlayoffGames)
+            return BadRequest(new ApiResponse<AdvancementResultDto> { Success = false, Message = "Cannot override playoff teams after playoff games have been played" });
+
+        // Get all units in this division
+        var allUnits = await _context.EventUnits
+            .Where(u => u.DivisionId == divisionId && u.Status != "Cancelled")
+            .ToListAsync();
+
+        var unitLookup = allUnits.ToDictionary(u => u.Id);
+
+        // Reset all units first
+        foreach (var unit in allUnits)
+        {
+            unit.AdvancedToPlayoff = false;
+            unit.ManuallyAdvanced = false;
+            unit.OverallRank = null;
+            unit.UpdatedAt = DateTime.Now;
+        }
+
+        // Apply manual overrides
+        var advancingUnits = new List<EventUnit>();
+        foreach (var assignment in request.Assignments.OrderBy(a => a.OverallSeed))
+        {
+            if (unitLookup.TryGetValue(assignment.UnitId, out var unit))
+            {
+                unit.AdvancedToPlayoff = true;
+                unit.ManuallyAdvanced = true;
+                unit.OverallRank = assignment.OverallSeed;
+                advancingUnits.Add(unit);
+            }
+        }
+
+        // Get playoff first round matches
+        var playoffMatches = await _context.EventMatches
+            .Where(m => m.DivisionId == divisionId && m.RoundType == "Bracket" && m.RoundNumber == 1)
+            .OrderBy(m => m.BracketPosition)
+            .ToListAsync();
+
+        // Clear existing assignments
+        foreach (var match in playoffMatches)
+        {
+            match.Unit1Id = null;
+            match.Unit2Id = null;
+        }
+
+        var assignedMatches = new List<PlayoffMatchAssignmentDto>();
+
+        if (playoffMatches.Any() && advancingUnits.Any())
+        {
+            // Assign units to bracket positions based on seeding
+            var bracketSize = playoffMatches.Count * 2;
+            var seedPositions = GetSeededBracketPositions(bracketSize);
+
+            for (int i = 0; i < playoffMatches.Count && i < seedPositions.Count; i++)
+            {
+                var match = playoffMatches[i];
+                var (seed1, seed2) = seedPositions[i];
+
+                var unit1 = advancingUnits.FirstOrDefault(u => u.OverallRank == seed1);
+                var unit2 = advancingUnits.FirstOrDefault(u => u.OverallRank == seed2);
+
+                if (unit1 != null)
+                {
+                    match.Unit1Id = unit1.Id;
+                    match.Unit1Number = seed1;
+                }
+                if (unit2 != null)
+                {
+                    match.Unit2Id = unit2.Id;
+                    match.Unit2Number = seed2;
+                }
+
+                match.UpdatedAt = DateTime.Now;
+
+                assignedMatches.Add(new PlayoffMatchAssignmentDto
+                {
+                    MatchId = match.Id,
+                    BracketPosition = match.BracketPosition ?? 0,
+                    Unit1Seed = seed1,
+                    Unit1Name = unit1?.Name,
+                    Unit2Seed = seed2,
+                    Unit2Name = unit2?.Name
+                });
+            }
+
+            // Handle bye matches - auto-complete them and advance winners
+            await HandlePlayoffByes(divisionId);
+        }
+
+        // Update division status
+        division.ScheduleStatus = "PoolsFinalized";
+
+        await _context.SaveChangesAsync();
+
+        _logger.LogInformation("TD {UserId} manually overrode playoff teams for division {DivisionId}, {Count} teams assigned",
+            userId, divisionId, advancingUnits.Count);
+
+        return Ok(new ApiResponse<AdvancementResultDto>
+        {
+            Success = true,
+            Data = new AdvancementResultDto
+            {
+                AdvancedCount = advancingUnits.Count,
+                AdvancedUnits = advancingUnits.Select(u => new AdvancedUnitDto
+                {
+                    UnitId = u.Id,
+                    UnitName = u.Name,
+                    PoolNumber = u.PoolNumber ?? 0,
+                    PoolRank = u.PoolRank ?? 0,
+                    OverallSeed = u.OverallRank ?? 0
+                }).OrderBy(u => u.OverallSeed).ToList(),
+                PlayoffMatches = assignedMatches
+            },
+            Message = $"Manually assigned {advancingUnits.Count} teams to playoffs"
+        });
     }
 
     private List<EventUnit> ApplyHeadToHeadTiebreaker(List<EventUnit> units, List<EventEncounter> matches)
@@ -1097,6 +1570,116 @@ public class TournamentGameDayController : ControllerBase
         }
 
         return positions;
+    }
+
+    /// <summary>
+    /// Handle bye matches in playoff brackets - auto-complete them and advance winners
+    /// </summary>
+    private async Task HandlePlayoffByes(int divisionId)
+    {
+        // Get all bracket matches for this division, ordered by round
+        var allBracketMatches = await _context.EventMatches
+            .Where(m => m.DivisionId == divisionId && (m.RoundType == "Bracket" || m.RoundType == "Final" || m.RoundType == "ThirdPlace"))
+            .Include(m => m.Matches)
+                .ThenInclude(em => em.Games)
+            .OrderBy(m => m.RoundNumber)
+            .ThenBy(m => m.BracketPosition)
+            .ToListAsync();
+
+        // Process each round
+        var maxRound = allBracketMatches.Max(m => m.RoundNumber);
+
+        for (int round = 1; round <= maxRound; round++)
+        {
+            var roundMatches = allBracketMatches.Where(m => m.RoundNumber == round).ToList();
+
+            foreach (var match in roundMatches)
+            {
+                // Skip if already completed
+                if (match.Status == "Completed" || match.Status == "Finished")
+                    continue;
+
+                // Check for bye (one unit assigned, one null)
+                var isBye = (match.Unit1Id != null && match.Unit2Id == null) ||
+                            (match.Unit1Id == null && match.Unit2Id != null);
+
+                if (!isBye)
+                    continue;
+
+                // Determine winner (the non-null unit)
+                var winnerUnitId = match.Unit1Id ?? match.Unit2Id;
+
+                if (winnerUnitId == null)
+                    continue; // Both null, skip
+
+                // Mark match as completed with bye winner
+                match.WinnerUnitId = winnerUnitId;
+                match.Status = "Completed";
+                match.CompletedAt = DateTime.Now;
+                match.UpdatedAt = DateTime.Now;
+
+                // Delete any games for this bye match
+                var byeGames = match.Matches?.SelectMany(em => em.Games).ToList() ?? new List<EventGame>();
+                foreach (var game in byeGames)
+                {
+                    _context.EventGames.Remove(game);
+                }
+
+                _logger.LogInformation("Auto-completed bye match {MatchId} with winner unit {WinnerUnitId}",
+                    match.Id, winnerUnitId);
+
+                // Find and update the next round match
+                await AdvanceWinnerToNextRound(match, winnerUnitId.Value, allBracketMatches);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Advance a winner to their next bracket match
+    /// </summary>
+    private async Task AdvanceWinnerToNextRound(EventEncounter completedMatch, int winnerUnitId, List<EventEncounter> allMatches)
+    {
+        // Find the next round match this winner should go to
+        var nextRoundNumber = completedMatch.RoundNumber + 1;
+
+        // Calculate which match in the next round (bracket position / 2, rounded up)
+        var currentBracketPos = completedMatch.BracketPosition ?? 0;
+        var nextBracketPos = (currentBracketPos + 1) / 2; // 1,2->1, 3,4->2, etc.
+
+        // Handle finals and third place specially
+        if (completedMatch.RoundType == "Final" || completedMatch.RoundType == "ThirdPlace")
+            return; // No next round
+
+        var nextMatch = allMatches.FirstOrDefault(m =>
+            m.RoundNumber == nextRoundNumber &&
+            m.BracketPosition == nextBracketPos &&
+            m.RoundType != "ThirdPlace");
+
+        if (nextMatch == null)
+        {
+            // Check if this is a semifinal going to final
+            nextMatch = allMatches.FirstOrDefault(m =>
+                m.RoundNumber == nextRoundNumber &&
+                m.RoundType == "Final");
+        }
+
+        if (nextMatch == null)
+            return;
+
+        // Determine which slot (unit1 or unit2) based on bracket position
+        // Odd bracket positions go to Unit1, even go to Unit2
+        if (currentBracketPos % 2 == 1)
+        {
+            nextMatch.Unit1Id = winnerUnitId;
+        }
+        else
+        {
+            nextMatch.Unit2Id = winnerUnitId;
+        }
+        nextMatch.UpdatedAt = DateTime.Now;
+
+        _logger.LogInformation("Advanced unit {UnitId} from match {FromMatchId} to match {ToMatchId}",
+            winnerUnitId, completedMatch.Id, nextMatch.Id);
     }
 
     /// <summary>
@@ -1314,7 +1897,8 @@ public class TournamentGameDayController : ControllerBase
 
         if (match == null) return;
 
-        var allGames = match.Matches.SelectMany(m => m.Games).ToList();
+        var allGames = match.Matches?.SelectMany(m => m.Games ?? Enumerable.Empty<EventGame>()).ToList()
+            ?? new List<EventGame>();
         var finishedGames = allGames.Where(g => g.Status == "Finished").ToList();
         var unit1Wins = finishedGames.Count(g => g.WinnerUnitId == match.Unit1Id);
         var unit2Wins = finishedGames.Count(g => g.WinnerUnitId == match.Unit2Id);
@@ -1383,6 +1967,147 @@ public class TournamentGameDayController : ControllerBase
 
         await _context.SaveChangesAsync();
     }
+
+    /// <summary>
+    /// Suggest the next game to play based on pool progress and player availability
+    /// </summary>
+    [HttpGet("suggest-next-game/{eventId}")]
+    [Authorize]
+    public async Task<ActionResult<ApiResponse<SuggestedGameDto>>> SuggestNextGame(int eventId)
+    {
+        var userId = GetUserId();
+        if (!await IsEventOrganizer(eventId, userId))
+            return Forbid();
+
+        // Get all player IDs currently playing (in active games)
+        var playersCurrentlyPlaying = await _context.EventGames
+            .Where(g => g.EncounterMatch != null &&
+                   g.EncounterMatch.Encounter != null &&
+                   g.EncounterMatch.Encounter.EventId == eventId &&
+                   (g.Status == "Playing" || g.Status == "InProgress"))
+            .SelectMany(g => g.EncounterMatch!.Encounter!.Unit1!.Members
+                .Concat(g.EncounterMatch.Encounter.Unit2!.Members)
+                .Where(m => m.InviteStatus == "Accepted")
+                .Select(m => m.UserId))
+            .Distinct()
+            .ToListAsync();
+
+        // Also include players in queued games on courts
+        var playersInQueue = await _context.EventGames
+            .Where(g => g.EncounterMatch != null &&
+                   g.EncounterMatch.Encounter != null &&
+                   g.EncounterMatch.Encounter.EventId == eventId &&
+                   (g.Status == "Queued" || g.Status == "Ready"))
+            .SelectMany(g => g.EncounterMatch!.Encounter!.Unit1!.Members
+                .Concat(g.EncounterMatch.Encounter.Unit2!.Members)
+                .Where(m => m.InviteStatus == "Accepted")
+                .Select(m => m.UserId))
+            .Distinct()
+            .ToListAsync();
+
+        var busyPlayerIds = playersCurrentlyPlaying.Concat(playersInQueue).Distinct().ToHashSet();
+
+        // Get all pool encounters for this event grouped by division and pool
+        var poolEncounters = await _context.EventMatches
+            .Where(m => m.EventId == eventId && m.RoundType == "Pool")
+            .Include(m => m.Division)
+            .Include(m => m.Unit1)
+                .ThenInclude(u => u!.Members)
+            .Include(m => m.Unit2)
+                .ThenInclude(u => u!.Members)
+            .Include(m => m.Matches)
+                .ThenInclude(em => em.Games)
+            .ToListAsync();
+
+        // Group by division and pool to find which is furthest behind
+        var poolProgress = poolEncounters
+            .Where(e => e.Unit1 != null && e.Unit2 != null)
+            .GroupBy(e => new { e.DivisionId, e.Unit1!.PoolNumber })
+            .Select(g => new
+            {
+                g.Key.DivisionId,
+                DivisionName = g.First().Division?.Name ?? "Unknown",
+                PoolNumber = g.Key.PoolNumber ?? 0,
+                PoolName = g.First().Unit1?.PoolName ?? $"Pool {g.Key.PoolNumber}",
+                TotalEncounters = g.Count(),
+                CompletedEncounters = g.Count(e => e.Status == "Completed"),
+                PendingEncounters = g.Where(e => e.Status != "Completed").ToList()
+            })
+            .OrderBy(p => (double)p.CompletedEncounters / Math.Max(1, p.TotalEncounters)) // Furthest behind first
+            .ToList();
+
+        // Find the best game from the furthest behind pools
+        foreach (var pool in poolProgress)
+        {
+            foreach (var encounter in pool.PendingEncounters.OrderBy(e => e.MatchNumber))
+            {
+                // Check if any games exist for this encounter
+                var games = encounter.Matches?.SelectMany(m => m.Games).ToList() ?? new List<EventGame>();
+
+                // Find games that are scheduled but not yet started
+                var availableGames = games
+                    .Where(g => g.Status == "Scheduled" || g.Status == "Pending")
+                    .ToList();
+
+                // If no games, check if the encounter itself is ready
+                if (!games.Any() || availableGames.Any())
+                {
+                    // Get player IDs for this encounter
+                    var unit1PlayerIds = encounter.Unit1?.Members
+                        .Where(m => m.InviteStatus == "Accepted")
+                        .Select(m => m.UserId)
+                        .ToList() ?? new List<int>();
+
+                    var unit2PlayerIds = encounter.Unit2?.Members
+                        .Where(m => m.InviteStatus == "Accepted")
+                        .Select(m => m.UserId)
+                        .ToList() ?? new List<int>();
+
+                    // Check if any of these players are busy
+                    var allPlayerIds = unit1PlayerIds.Concat(unit2PlayerIds).ToList();
+                    if (!allPlayerIds.Any(id => busyPlayerIds.Contains(id)))
+                    {
+                        // Found a good game! Return it
+                        var game = availableGames.FirstOrDefault();
+
+                        return Ok(new ApiResponse<SuggestedGameDto>
+                        {
+                            Success = true,
+                            Data = new SuggestedGameDto
+                            {
+                                GameId = game?.Id,
+                                EncounterId = encounter.Id,
+                                DivisionId = pool.DivisionId,
+                                DivisionName = pool.DivisionName,
+                                PoolNumber = pool.PoolNumber,
+                                PoolName = pool.PoolName,
+                                MatchNumber = encounter.MatchNumber,
+                                Unit1Id = encounter.Unit1Id ?? 0,
+                                Unit1Name = encounter.Unit1?.Name ?? "TBD",
+                                Unit1Players = string.Join(", ", encounter.Unit1?.Members
+                                    .Where(m => m.InviteStatus == "Accepted")
+                                    .Select(m => Utility.FormatName(m.User?.LastName, m.User?.FirstName)) ?? Array.Empty<string>()),
+                                Unit2Id = encounter.Unit2Id ?? 0,
+                                Unit2Name = encounter.Unit2?.Name ?? "TBD",
+                                Unit2Players = string.Join(", ", encounter.Unit2?.Members
+                                    .Where(m => m.InviteStatus == "Accepted")
+                                    .Select(m => Utility.FormatName(m.User?.LastName, m.User?.FirstName)) ?? Array.Empty<string>()),
+                                PoolProgress = $"{pool.CompletedEncounters}/{pool.TotalEncounters} completed",
+                                Reason = $"{pool.DivisionName} - {pool.PoolName} is furthest behind ({pool.CompletedEncounters}/{pool.TotalEncounters} matches completed)"
+                            },
+                            Message = "Suggested next game found"
+                        });
+                    }
+                }
+            }
+        }
+
+        return Ok(new ApiResponse<SuggestedGameDto>
+        {
+            Success = false,
+            Message = "No available games found. All players may be busy or all pool games completed."
+        });
+    }
 }
 
 // DTOs for Tournament Game Day
@@ -1437,6 +2162,7 @@ public class PlayerBriefDto
 {
     public int UserId { get; set; }
     public string Name { get; set; } = string.Empty;
+    public string? ProfileImageUrl { get; set; }
     public bool IsCheckedIn { get; set; }
 }
 
@@ -1521,11 +2247,14 @@ public class PlayerGameInfoDto
     public string RoundType { get; set; } = string.Empty;
     public string? RoundName { get; set; }
     public string DivisionName { get; set; } = string.Empty;
+    public string? GameFormat { get; set; } // e.g., "Men's Doubles", "Mixed Doubles"
     public int MyUnitId { get; set; }
     public int? Unit1Id { get; set; }
     public string? Unit1Name { get; set; }
+    public List<PlayerBriefDto> Unit1Players { get; set; } = new();
     public int? Unit2Id { get; set; }
     public string? Unit2Name { get; set; }
+    public List<PlayerBriefDto> Unit2Players { get; set; } = new();
     public string? CourtName { get; set; }
     public int? CourtNumber { get; set; }
     public DateTime? ScheduledTime { get; set; }
@@ -1617,6 +2346,17 @@ public class FinalizePoolsRequest
     public int? AdvancePerPool { get; set; }
 }
 
+public class OverridePlayoffTeamsRequest
+{
+    public List<PlayoffTeamAssignment> Assignments { get; set; } = new();
+}
+
+public class PlayoffTeamAssignment
+{
+    public int UnitId { get; set; }
+    public int OverallSeed { get; set; }
+}
+
 public class AdvancementResultDto
 {
     public int AdvancedCount { get; set; }
@@ -1641,4 +2381,23 @@ public class PlayoffMatchAssignmentDto
     public string? Unit1Name { get; set; }
     public int Unit2Seed { get; set; }
     public string? Unit2Name { get; set; }
+}
+
+public class SuggestedGameDto
+{
+    public int? GameId { get; set; }
+    public int EncounterId { get; set; }
+    public int DivisionId { get; set; }
+    public string DivisionName { get; set; } = string.Empty;
+    public int PoolNumber { get; set; }
+    public string PoolName { get; set; } = string.Empty;
+    public int MatchNumber { get; set; }
+    public int Unit1Id { get; set; }
+    public string Unit1Name { get; set; } = string.Empty;
+    public string Unit1Players { get; set; } = string.Empty;
+    public int Unit2Id { get; set; }
+    public string Unit2Name { get; set; } = string.Empty;
+    public string Unit2Players { get; set; } = string.Empty;
+    public string PoolProgress { get; set; } = string.Empty;
+    public string Reason { get; set; } = string.Empty;
 }

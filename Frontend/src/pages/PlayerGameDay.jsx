@@ -1,12 +1,12 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams } from 'react-router-dom'
 import {
   CheckCircle, XCircle, Play, Clock, MapPin,
   RefreshCw, AlertCircle, FileText, Trophy, Calendar,
   ChevronRight, User, DollarSign, Users, Bell, History,
-  ChevronDown, ChevronUp, Info
+  ChevronDown, ChevronUp, Info, Map, X
 } from 'lucide-react'
-import { gameDayApi, checkInApi, tournamentApi, getSharedAssetUrl } from '../services/api'
+import { gameDayApi, checkInApi, tournamentApi, objectAssetsApi, getSharedAssetUrl } from '../services/api'
 import { useNotifications } from '../hooks/useNotifications'
 import SignatureCanvas from '../components/SignatureCanvas'
 import PublicProfileModal from '../components/ui/PublicProfileModal'
@@ -25,15 +25,21 @@ export default function PlayerGameDay() {
   const [schedule, setSchedule] = useState(null)
   const [loadingSchedule, setLoadingSchedule] = useState(false)
   const [selectedDivisionId, setSelectedDivisionId] = useState(null)
+  const selectedDivisionIdRef = useRef(null) // Ref to track selectedDivisionId for SignalR listener
   const [profileModalUserId, setProfileModalUserId] = useState(null)
   const [expandedRounds, setExpandedRounds] = useState({})
+  const [mapAsset, setMapAsset] = useState(null)
+  const [showMapModal, setShowMapModal] = useState(false)
+  const [courts, setCourts] = useState([])
+  const [loadingCourts, setLoadingCourts] = useState(false)
 
   const loadData = useCallback(async () => {
     try {
       setRefreshing(true)
-      const [gameDayRes, checkInRes] = await Promise.all([
+      const [gameDayRes, checkInRes, assetsRes] = await Promise.all([
         gameDayApi.getPlayerGameDay(eventId),
-        checkInApi.getStatus(eventId)
+        checkInApi.getStatus(eventId),
+        objectAssetsApi.getAssets('Event', eventId)
       ])
       if (gameDayRes.success) {
         setGameDay(gameDayRes.data)
@@ -43,6 +49,11 @@ export default function PlayerGameDay() {
         }
       }
       if (checkInRes.success) setCheckInStatus(checkInRes.data)
+      // Load map asset
+      if (assetsRes.success && assetsRes.data) {
+        const map = assetsRes.data.find(a => a.assetTypeName?.toLowerCase() === 'map')
+        setMapAsset(map || null)
+      }
     } catch (err) {
       setError(err.message || 'Failed to load data')
     } finally {
@@ -51,9 +62,9 @@ export default function PlayerGameDay() {
     }
   }, [eventId, selectedDivisionId])
 
-  const loadSchedule = useCallback(async (divisionId) => {
+  const loadSchedule = useCallback(async (divisionId, silent = false) => {
     if (!divisionId) return
-    setLoadingSchedule(true)
+    if (!silent) setLoadingSchedule(true)
     try {
       const response = await tournamentApi.getSchedule(divisionId)
       if (response.success) {
@@ -62,15 +73,35 @@ export default function PlayerGameDay() {
     } catch (err) {
       console.error('Error loading schedule:', err)
     } finally {
-      setLoadingSchedule(false)
+      if (!silent) setLoadingSchedule(false)
     }
   }, [])
 
+  const loadCourts = useCallback(async (silent = false) => {
+    if (!silent) setLoadingCourts(true)
+    try {
+      const response = await tournamentApi.getDashboard(eventId)
+      if (response.success) {
+        setCourts(response.data.courts || [])
+      }
+    } catch (err) {
+      console.error('Error loading courts:', err)
+    } finally {
+      if (!silent) setLoadingCourts(false)
+    }
+  }, [eventId])
+
+  // Keep ref in sync with selectedDivisionId for SignalR listener
+  useEffect(() => {
+    selectedDivisionIdRef.current = selectedDivisionId
+  }, [selectedDivisionId])
+
   useEffect(() => {
     loadData()
+    loadCourts() // Load courts for self-assignment feature
     const interval = setInterval(loadData, 15000)
     return () => clearInterval(interval)
-  }, [loadData])
+  }, [loadData, loadCourts])
 
   // SignalR connection for real-time updates from admin (court assignments, status changes)
   useEffect(() => {
@@ -83,13 +114,16 @@ export default function PlayerGameDay() {
 
     setupSignalR()
 
-    // Listen for game updates and refresh data
+    // Listen for game updates and refresh data (including standings and courts)
     const removeListener = addListener((notification) => {
       if (notification.Type === 'GameUpdate' || notification.Type === 'ScoreUpdate') {
         console.log('Player dashboard: Received game update, refreshing...', notification)
         loadData()
-        if (activeTab === 'others' && selectedDivisionId) {
-          loadSchedule(selectedDivisionId)
+        loadCourts(true) // silent refresh courts
+        // Always refresh schedule for standings update (use ref to avoid stale closure)
+        const currentDivisionId = selectedDivisionIdRef.current
+        if (currentDivisionId) {
+          loadSchedule(currentDivisionId, true) // silent refresh
         }
       }
     })
@@ -98,13 +132,16 @@ export default function PlayerGameDay() {
       removeListener()
       leaveEvent(parseInt(eventId))
     }
-  }, [eventId, connect, joinEvent, leaveEvent, addListener, activeTab, selectedDivisionId, loadData, loadSchedule])
+  }, [eventId, connect, joinEvent, leaveEvent, addListener, loadData, loadSchedule, loadCourts])
 
   useEffect(() => {
     if (activeTab === 'others' && selectedDivisionId) {
       loadSchedule(selectedDivisionId)
     }
-  }, [activeTab, selectedDivisionId, loadSchedule])
+    if (activeTab === 'courts') {
+      loadCourts()
+    }
+  }, [activeTab, selectedDivisionId, loadSchedule, loadCourts])
 
   const handleCheckIn = async () => {
     try {
@@ -135,11 +172,17 @@ export default function PlayerGameDay() {
 
   const handleSubmitScore = async (gameId, unit1Score, unit2Score) => {
     try {
-      await gameDayApi.submitScore(gameId, unit1Score, unit2Score)
-      setShowScoreModal(null)
-      loadData()
+      const response = await gameDayApi.submitScore(gameId, unit1Score, unit2Score)
+      if (response.success) {
+        setShowScoreModal(null)
+        loadData()
+        return { success: true }
+      } else {
+        // Return error message to the modal
+        return { error: response.message || 'Failed to submit score' }
+      }
     } catch (err) {
-      alert('Failed to submit score: ' + (err.message || 'Unknown error'))
+      return { error: err.message || 'Failed to submit score' }
     }
   }
 
@@ -234,12 +277,22 @@ export default function PlayerGameDay() {
             >
               Others
             </button>
+            <button
+              onClick={() => setActiveTab('courts')}
+              className={`px-4 py-3 font-medium text-sm border-b-2 transition-colors ${
+                activeTab === 'courts'
+                  ? 'border-green-600 text-green-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              Courts
+            </button>
           </div>
         </div>
       </div>
 
       {/* Tab Content */}
-      {activeTab === 'myGames' ? (
+      {activeTab === 'myGames' && (
         <MyGamesTab
           gameDay={gameDay}
           checkInStatus={checkInStatus}
@@ -251,8 +304,21 @@ export default function PlayerGameDay() {
           onShowWaiver={() => setShowWaiverModal(true)}
           onSubmitScore={setShowScoreModal}
           onPlayerClick={setProfileModalUserId}
+          mapAsset={mapAsset}
+          onShowMap={() => setShowMapModal(true)}
+          courts={courts}
+          onAssignCourt={async (gameId, courtId) => {
+            const response = await gameDayApi.playerQueueGame(gameId, courtId)
+            if (response.success) {
+              loadData()
+              loadCourts(true)
+            } else {
+              alert(response.message || 'Failed to assign court')
+            }
+          }}
         />
-      ) : (
+      )}
+      {activeTab === 'others' && (
         <OthersTab
           gameDay={gameDay}
           allDivisions={gameDay.allDivisions || []}
@@ -263,6 +329,15 @@ export default function PlayerGameDay() {
           expandedRounds={expandedRounds}
           setExpandedRounds={setExpandedRounds}
           onPlayerClick={setProfileModalUserId}
+        />
+      )}
+      {activeTab === 'courts' && (
+        <CourtsTab
+          courts={courts}
+          loading={loadingCourts}
+          mapAsset={mapAsset}
+          onShowMap={() => setShowMapModal(true)}
+          onRefresh={() => loadCourts()}
         />
       )}
 
@@ -290,6 +365,33 @@ export default function PlayerGameDay() {
           onClose={() => setProfileModalUserId(null)}
         />
       )}
+
+      {/* Court Map Modal */}
+      {showMapModal && mapAsset && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-50 p-4"
+          onClick={() => setShowMapModal(false)}
+        >
+          <div
+            className="relative w-full h-full flex flex-col items-center justify-center"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setShowMapModal(false)}
+              className="absolute top-4 right-4 text-white hover:text-gray-300 flex items-center gap-2 bg-black bg-opacity-50 px-4 py-2 rounded-lg z-10"
+            >
+              <X className="w-6 h-6" />
+              Close
+            </button>
+            <img
+              src={getSharedAssetUrl(mapAsset.fileUrl)}
+              alt="Court Map"
+              className="max-w-full max-h-[90vh] object-contain"
+              onClick={() => setShowMapModal(false)}
+            />
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -307,10 +409,15 @@ function MyGamesTab({
   onCheckIn,
   onShowWaiver,
   onSubmitScore,
-  onPlayerClick
+  onPlayerClick,
+  mapAsset,
+  onShowMap,
+  courts,
+  onAssignCourt
 }) {
   const myDiv = gameDay.myDivisions?.[0]
   const [selectedMatch, setSelectedMatch] = useState(null)
+  const [assigningCourt, setAssigningCourt] = useState(false)
 
   // Combine futureGames with scheduledMatches (avoid duplicates)
   const futureGameIds = new Set(futureGames.map(g => g.matchId))
@@ -332,6 +439,17 @@ function MyGamesTab({
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-4 space-y-4">
+      {/* Court Map Button - Prominent */}
+      {mapAsset && (
+        <button
+          onClick={onShowMap}
+          className="w-full bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl p-4 flex items-center justify-center gap-3 shadow-lg hover:from-blue-700 hover:to-blue-800 transition-all active:scale-[0.98]"
+        >
+          <Map className="w-6 h-6" />
+          <span className="text-lg font-semibold">View Court Map</span>
+        </button>
+      )}
+
       {/* Top Section: Division Info + Notifications */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Left: Division & Partner Info */}
@@ -490,19 +608,29 @@ function MyGamesTab({
       <div className="bg-gradient-to-br from-blue-600 to-blue-700 text-white rounded-xl p-5">
         {currentGame ? (
           <>
-            <div className="flex items-center gap-2 mb-3">
-              {currentGame.status === 'Playing' || currentGame.status === 'InProgress' ? (
-                <>
-                  <Play className="w-5 h-5" />
-                  <span className="font-semibold">Game In Progress</span>
-                </>
-              ) : (
-                <>
-                  <Clock className="w-5 h-5" />
-                  <span className="font-semibold">Next Up</span>
-                </>
-              )}
-              <span className={`ml-auto px-2 py-0.5 rounded text-xs font-medium ${
+            {/* Game Format - Top Center */}
+            <div className="text-center mb-3">
+              <span className="px-3 py-1 bg-white/20 rounded-full text-sm font-medium">
+                {currentGame.gameFormat || currentGame.divisionName}
+              </span>
+            </div>
+
+            {/* Status Row */}
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                {currentGame.status === 'Playing' || currentGame.status === 'InProgress' ? (
+                  <>
+                    <Play className="w-5 h-5" />
+                    <span className="font-semibold">Game In Progress</span>
+                  </>
+                ) : (
+                  <>
+                    <Clock className="w-5 h-5" />
+                    <span className="font-semibold">Next Up</span>
+                  </>
+                )}
+              </div>
+              <span className={`px-2 py-0.5 rounded text-xs font-medium ${
                 currentGame.status === 'Playing' || currentGame.status === 'InProgress'
                   ? 'bg-green-500'
                   : 'bg-yellow-500'
@@ -511,36 +639,109 @@ function MyGamesTab({
               </span>
             </div>
 
-            <div className="text-center py-4">
-              <div className="text-lg font-bold mb-2">
-                {currentGame.unit1Name} vs {currentGame.unit2Name}
-              </div>
-              {currentGame.courtName && (
-                <div className="flex items-center justify-center gap-1 text-blue-100 mb-2">
-                  <MapPin className="w-4 h-4" />
-                  <span className="font-medium">{currentGame.courtName}</span>
-                </div>
-              )}
-              <div className="text-sm text-blue-200">{currentGame.divisionName}</div>
-
-              {(currentGame.status === 'Playing' || currentGame.status === 'InProgress') && (
-                <div className="mt-4">
-                  <div className="text-4xl font-bold">
-                    {currentGame.unit1Score} - {currentGame.unit2Score}
-                  </div>
-                  <button
-                    onClick={() => onSubmitScore(currentGame)}
-                    className="mt-3 px-6 py-2 bg-white text-blue-600 rounded-lg font-semibold hover:bg-blue-50"
-                  >
-                    <CheckCircle className="w-4 h-4 inline mr-2" />
-                    {currentGame.needsConfirmation ? 'Confirm Score' : 'Submit Score'}
-                  </button>
-                  {currentGame.needsConfirmation && (
-                    <p className="text-xs text-blue-200 mt-2">Opponent submitted a score - confirm to finish</p>
+            {/* Players Display */}
+            <div className="flex items-center justify-between gap-4 py-4">
+              {/* Team 1 Players */}
+              <div className="flex-1 text-center">
+                <div className="flex justify-center gap-2 mb-2">
+                  {currentGame.unit1Players?.length > 0 ? (
+                    currentGame.unit1Players.map((player, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => onPlayerClick(player.userId)}
+                        className="flex flex-col items-center hover:opacity-80 transition-opacity"
+                      >
+                        {player.profileImageUrl ? (
+                          <img
+                            src={getSharedAssetUrl(player.profileImageUrl)}
+                            alt=""
+                            className="w-12 h-12 rounded-full object-cover border-2 border-white/50"
+                          />
+                        ) : (
+                          <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center border-2 border-white/50">
+                            <User className="w-6 h-6 text-white/70" />
+                          </div>
+                        )}
+                        <span className="text-xs mt-1 max-w-[80px] truncate">{player.name?.split(' ')[0]}</span>
+                      </button>
+                    ))
+                  ) : (
+                    <div className="text-sm font-medium">{currentGame.unit1Name}</div>
                   )}
                 </div>
-              )}
+                {currentGame.unit1Players?.length > 0 && (
+                  <div className="text-xs text-blue-200">{currentGame.unit1Name}</div>
+                )}
+              </div>
+
+              {/* VS / Score */}
+              <div className="flex flex-col items-center">
+                {(currentGame.status === 'Playing' || currentGame.status === 'InProgress') ? (
+                  <div className="text-3xl font-bold">
+                    {currentGame.unit1Score} - {currentGame.unit2Score}
+                  </div>
+                ) : (
+                  <div className="text-xl font-bold text-white/80">VS</div>
+                )}
+              </div>
+
+              {/* Team 2 Players */}
+              <div className="flex-1 text-center">
+                <div className="flex justify-center gap-2 mb-2">
+                  {currentGame.unit2Players?.length > 0 ? (
+                    currentGame.unit2Players.map((player, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => onPlayerClick(player.userId)}
+                        className="flex flex-col items-center hover:opacity-80 transition-opacity"
+                      >
+                        {player.profileImageUrl ? (
+                          <img
+                            src={getSharedAssetUrl(player.profileImageUrl)}
+                            alt=""
+                            className="w-12 h-12 rounded-full object-cover border-2 border-white/50"
+                          />
+                        ) : (
+                          <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center border-2 border-white/50">
+                            <User className="w-6 h-6 text-white/70" />
+                          </div>
+                        )}
+                        <span className="text-xs mt-1 max-w-[80px] truncate">{player.name?.split(' ')[0]}</span>
+                      </button>
+                    ))
+                  ) : (
+                    <div className="text-sm font-medium">{currentGame.unit2Name}</div>
+                  )}
+                </div>
+                {currentGame.unit2Players?.length > 0 && (
+                  <div className="text-xs text-blue-200">{currentGame.unit2Name}</div>
+                )}
+              </div>
             </div>
+
+            {/* Court Info */}
+            {currentGame.courtName && (
+              <div className="flex items-center justify-center gap-1 text-blue-100 mb-3">
+                <MapPin className="w-4 h-4" />
+                <span className="font-medium">{currentGame.courtName}</span>
+              </div>
+            )}
+
+            {/* Submit Score Button */}
+            {(currentGame.status === 'Playing' || currentGame.status === 'InProgress') && (
+              <div className="text-center">
+                <button
+                  onClick={() => onSubmitScore(currentGame)}
+                  className="px-6 py-2 bg-white text-blue-600 rounded-lg font-semibold hover:bg-blue-50"
+                >
+                  <CheckCircle className="w-4 h-4 inline mr-2" />
+                  {currentGame.needsConfirmation ? 'Confirm Score' : 'Submit Score'}
+                </button>
+                {currentGame.needsConfirmation && (
+                  <p className="text-xs text-blue-200 mt-2">Opponent submitted a score - confirm to finish</p>
+                )}
+              </div>
+            )}
           </>
         ) : (
           <div className="text-center py-8">
@@ -608,6 +809,17 @@ function MyGamesTab({
           match={selectedMatch}
           onClose={() => setSelectedMatch(null)}
           onPlayerClick={onPlayerClick}
+          courts={courts}
+          onAssignCourt={async (gameId, courtId) => {
+            setAssigningCourt(true)
+            try {
+              await onAssignCourt(gameId, courtId)
+              setSelectedMatch(null)
+            } finally {
+              setAssigningCourt(false)
+            }
+          }}
+          assigningCourt={assigningCourt}
         />
       )}
     </div>
@@ -676,7 +888,8 @@ function FutureGameCard({ game, onClick }) {
 // ============================================
 // Match Detail Modal
 // ============================================
-function MatchDetailModal({ match, onClose, onPlayerClick }) {
+function MatchDetailModal({ match, onClose, onPlayerClick, courts = [], onAssignCourt, assigningCourt }) {
+  const [selectedCourtId, setSelectedCourtId] = useState('')
   const isMyUnit1 = match.myUnitId === match.unit1Id
   const myTeam = isMyUnit1 ? match.unit1Name : match.unit2Name
   const opponent = isMyUnit1 ? match.unit2Name : match.unit1Name
@@ -684,6 +897,13 @@ function MatchDetailModal({ match, onClose, onPlayerClick }) {
   const opponentScore = isMyUnit1 ? match.unit2Score : match.unit1Score
   const isFinished = match.status === 'Finished' || match.status === 'Completed'
   const won = isFinished && myScore > opponentScore
+
+  // Can assign court if game has a gameId and status allows it
+  const canAssignCourt = match.gameId &&
+    !match.courtName &&
+    (match.status === 'Scheduled' || match.status === 'Pending' || match.status === 'Ready' || !match.status)
+
+  const availableCourts = courts.filter(c => c.status === 'Available')
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-end md:items-center justify-center z-50">
@@ -751,6 +971,47 @@ function MatchDetailModal({ match, onClose, onPlayerClick }) {
                 Court
               </span>
               <span className="font-medium text-gray-900">{match.courtName}</span>
+            </div>
+          )}
+
+          {/* Court Assignment (if no court assigned and game can be assigned) */}
+          {canAssignCourt && availableCourts.length > 0 && onAssignCourt && (
+            <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <div className="flex items-center gap-2 mb-2">
+                <MapPin className="w-4 h-4 text-blue-600" />
+                <span className="text-sm font-medium text-blue-900">Assign Court</span>
+              </div>
+              <div className="flex gap-2">
+                <select
+                  value={selectedCourtId}
+                  onChange={(e) => setSelectedCourtId(e.target.value)}
+                  className="flex-1 px-3 py-2 border border-blue-300 rounded-lg text-sm bg-white"
+                >
+                  <option value="">Select a court...</option>
+                  {availableCourts.map(c => (
+                    <option key={c.id} value={c.id}>{c.courtLabel}</option>
+                  ))}
+                </select>
+                <button
+                  onClick={() => {
+                    if (selectedCourtId && match.gameId) {
+                      onAssignCourt(match.gameId, parseInt(selectedCourtId))
+                    }
+                  }}
+                  disabled={!selectedCourtId || assigningCourt}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {assigningCourt ? 'Assigning...' : 'Go'}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* No courts available message */}
+          {canAssignCourt && availableCourts.length === 0 && (
+            <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-600 flex items-center gap-2">
+              <MapPin className="w-4 h-4" />
+              No courts available right now
             </div>
           )}
 
@@ -1207,17 +1468,24 @@ function WaiverModal({ waivers, playerName, onSign, onClose }) {
 }
 
 // ============================================
-// Score Modal (unchanged)
+// Score Modal
 // ============================================
 function ScoreModal({ game, onSubmit, onClose }) {
   const [unit1Score, setUnit1Score] = useState(game.unit1Score || 0)
   const [unit2Score, setUnit2Score] = useState(game.unit2Score || 0)
   const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState(null)
 
   const handleSubmit = async () => {
     setSubmitting(true)
-    await onSubmit(game.gameId, unit1Score, unit2Score)
-    setSubmitting(false)
+    setError(null)
+    const result = await onSubmit(game.gameId, unit1Score, unit2Score)
+    if (result?.error) {
+      setError(result.error)
+      setSubmitting(false)
+    } else {
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -1233,28 +1501,95 @@ function ScoreModal({ game, onSubmit, onClose }) {
         </div>
 
         <div className="p-6">
-          <div className="grid grid-cols-3 gap-4 items-center">
+          {/* Game Format */}
+          {(game.gameFormat || game.divisionName) && (
+            <div className="text-center mb-4">
+              <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm font-medium">
+                {game.gameFormat || game.divisionName}
+              </span>
+            </div>
+          )}
+
+          {/* Players and Score Input */}
+          <div className="grid grid-cols-3 gap-2 items-start">
+            {/* Team 1 */}
             <div className="text-center">
-              <div className="font-medium mb-2">{game.unit1Name}</div>
+              {/* Player Avatars */}
+              <div className="flex justify-center gap-1 mb-2">
+                {game.unit1Players?.length > 0 ? (
+                  game.unit1Players.map((player, idx) => (
+                    <div key={idx} className="flex flex-col items-center">
+                      {player.profileImageUrl ? (
+                        <img
+                          src={getSharedAssetUrl(player.profileImageUrl)}
+                          alt=""
+                          className="w-10 h-10 rounded-full object-cover border-2 border-gray-200"
+                        />
+                      ) : (
+                        <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center">
+                          <User className="w-5 h-5 text-gray-400" />
+                        </div>
+                      )}
+                      <span className="text-xs mt-1 max-w-[60px] truncate text-gray-600">
+                        {player.name?.split(' ')[0]}
+                      </span>
+                    </div>
+                  ))
+                ) : (
+                  <div className="font-medium text-sm text-gray-700">{game.unit1Name}</div>
+                )}
+              </div>
+              {game.unit1Players?.length > 0 && (
+                <div className="text-xs text-gray-500 mb-2">{game.unit1Name}</div>
+              )}
               <input
                 type="number"
                 min="0"
                 value={unit1Score}
                 onChange={(e) => setUnit1Score(parseInt(e.target.value) || 0)}
-                className="w-20 h-16 text-2xl font-bold text-center border rounded-lg mx-auto"
+                className="w-16 h-14 text-2xl font-bold text-center border rounded-lg mx-auto"
               />
             </div>
 
-            <div className="text-center text-2xl font-bold text-gray-400">vs</div>
+            {/* VS */}
+            <div className="text-center text-xl font-bold text-gray-400 pt-12">vs</div>
 
+            {/* Team 2 */}
             <div className="text-center">
-              <div className="font-medium mb-2">{game.unit2Name}</div>
+              {/* Player Avatars */}
+              <div className="flex justify-center gap-1 mb-2">
+                {game.unit2Players?.length > 0 ? (
+                  game.unit2Players.map((player, idx) => (
+                    <div key={idx} className="flex flex-col items-center">
+                      {player.profileImageUrl ? (
+                        <img
+                          src={getSharedAssetUrl(player.profileImageUrl)}
+                          alt=""
+                          className="w-10 h-10 rounded-full object-cover border-2 border-gray-200"
+                        />
+                      ) : (
+                        <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center">
+                          <User className="w-5 h-5 text-gray-400" />
+                        </div>
+                      )}
+                      <span className="text-xs mt-1 max-w-[60px] truncate text-gray-600">
+                        {player.name?.split(' ')[0]}
+                      </span>
+                    </div>
+                  ))
+                ) : (
+                  <div className="font-medium text-sm text-gray-700">{game.unit2Name}</div>
+                )}
+              </div>
+              {game.unit2Players?.length > 0 && (
+                <div className="text-xs text-gray-500 mb-2">{game.unit2Name}</div>
+              )}
               <input
                 type="number"
                 min="0"
                 value={unit2Score}
                 onChange={(e) => setUnit2Score(parseInt(e.target.value) || 0)}
-                className="w-20 h-16 text-2xl font-bold text-center border rounded-lg mx-auto"
+                className="w-16 h-14 text-2xl font-bold text-center border rounded-lg mx-auto"
               />
             </div>
           </div>
@@ -1263,6 +1598,12 @@ function ScoreModal({ game, onSubmit, onClose }) {
             <p className="text-sm text-gray-500 text-center mt-4">
               Opponent submitted: {game.unit1Score} - {game.unit2Score}
             </p>
+          )}
+
+          {error && (
+            <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+              {error}
+            </div>
           )}
         </div>
 
@@ -1282,6 +1623,141 @@ function ScoreModal({ game, onSubmit, onClose }) {
           </button>
         </div>
       </div>
+    </div>
+  )
+}
+
+function CourtsTab({ courts, loading, mapAsset, onShowMap, onRefresh }) {
+  // Helper to format time elapsed
+  const formatTimeElapsed = (startTime) => {
+    if (!startTime) return ''
+    const start = new Date(startTime)
+    const now = new Date()
+    const diffMs = now - start
+    const diffMins = Math.floor(diffMs / 60000)
+    if (diffMins < 1) return 'Just started'
+    if (diffMins < 60) return `${diffMins}m`
+    const hours = Math.floor(diffMins / 60)
+    const mins = diffMins % 60
+    return `${hours}h ${mins}m`
+  }
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center py-12">
+        <RefreshCw className="w-6 h-6 animate-spin text-gray-400" />
+      </div>
+    )
+  }
+
+  return (
+    <div className="max-w-4xl mx-auto px-4 py-4">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-4">
+          <h2 className="text-lg font-semibold text-gray-900">All Courts</h2>
+          {mapAsset && (
+            <button
+              onClick={onShowMap}
+              className="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700"
+            >
+              <Map className="w-4 h-4" />
+              View Map
+            </button>
+          )}
+        </div>
+        <button
+          onClick={onRefresh}
+          className="px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-2"
+        >
+          <RefreshCw className="w-4 h-4" />
+          Refresh
+        </button>
+      </div>
+
+      {courts.length === 0 ? (
+        <div className="bg-white rounded-xl shadow-sm p-12 text-center">
+          <MapPin className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-gray-900 mb-2">No Courts Available</h3>
+          <p className="text-gray-500">Court information is not yet available for this event.</p>
+        </div>
+      ) : (
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {courts.map(court => (
+            <div key={court.id} className="bg-white rounded-xl shadow-sm p-4">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="font-medium text-gray-900">{court.courtLabel}</h3>
+                <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                  court.status === 'InUse' ? 'bg-orange-100 text-orange-700' :
+                  court.status === 'Available' ? 'bg-green-100 text-green-700' :
+                  'bg-gray-100 text-gray-700'
+                }`}>
+                  {court.status}
+                </span>
+              </div>
+
+              {/* Current Game */}
+              {court.currentGame ? (
+                <div className="mb-3 p-3 bg-orange-50 border border-orange-200 rounded-lg">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs font-semibold text-orange-700 uppercase">Current Game</span>
+                    {court.currentGame.startedAt && (
+                      <span className="text-xs text-orange-600 flex items-center gap-1">
+                        <Clock className="w-3 h-3" />
+                        {formatTimeElapsed(court.currentGame.startedAt)}
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-sm font-medium text-gray-900">
+                    {court.currentGame.unit1Players || 'TBD'} vs {court.currentGame.unit2Players || 'TBD'}
+                  </div>
+                  {court.currentGame.unit1Score !== null && court.currentGame.unit2Score !== null && (
+                    <div className="text-sm text-gray-600 mt-1">
+                      Score: {court.currentGame.unit1Score} - {court.currentGame.unit2Score}
+                    </div>
+                  )}
+                  {court.currentGame.divisionName && (
+                    <div className="text-xs text-gray-500 mt-1">
+                      {court.currentGame.divisionName} • {court.currentGame.roundName || `Game ${court.currentGame.gameNumber}`}
+                    </div>
+                  )}
+                </div>
+              ) : court.status === 'Available' ? (
+                <div className="mb-3 p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                  <span className="text-sm text-gray-500">No game in progress</span>
+                </div>
+              ) : null}
+
+              {/* Next Game */}
+              {court.nextGame && (
+                <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs font-semibold text-blue-700 uppercase">Next Game</span>
+                    {court.nextGame.queuedAt && (
+                      <span className="text-xs text-blue-600 flex items-center gap-1">
+                        <Clock className="w-3 h-3" />
+                        Queued {formatTimeElapsed(court.nextGame.queuedAt)}
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-sm font-medium text-gray-900">
+                    {court.nextGame.unit1Players || 'TBD'} vs {court.nextGame.unit2Players || 'TBD'}
+                  </div>
+                  {court.nextGame.divisionName && (
+                    <div className="text-xs text-gray-500 mt-1">
+                      {court.nextGame.divisionName} • {court.nextGame.roundName || `Game ${court.nextGame.gameNumber}`}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {court.locationDescription && (
+                <p className="text-xs text-gray-500 mt-2">{court.locationDescription}</p>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

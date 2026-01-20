@@ -43,6 +43,7 @@ export default function GameScoreModal({
   onChangeUnits,
   showCourtAssignment = true,
   showStatusControl = true,
+  showAllCourts = false,
   readOnly = false,
   isAdmin = false
 }) {
@@ -54,7 +55,9 @@ export default function GameScoreModal({
   const [selectedUnit1Id, setSelectedUnit1Id] = useState(game.unit1?.id || '');
   const [selectedUnit2Id, setSelectedUnit2Id] = useState(game.unit2?.id || '');
 
-  const availableCourts = courts.filter(c => c.status === 'Available' || c.id === game.tournamentCourtId);
+  const availableCourts = showAllCourts
+    ? courts
+    : courts.filter(c => c.status === 'Available' || c.id === game.tournamentCourtId);
   const isCompleted = game.status === 'Completed' || game.status === 'Finished';
   const isInProgress = game.status === 'InProgress' || game.status === 'Playing';
   const hasBestOf = game.bestOf > 1;
@@ -427,7 +430,7 @@ export default function GameScoreModal({
                   <option key={c.id} value={c.id}>{c.label || c.courtLabel}</option>
                 ))}
               </select>
-              {!readOnly && courtId !== (game.courtId || '').toString() && (
+              {!readOnly && courtId !== (game.tournamentCourtId || '').toString() && (
                 <button
                   onClick={handleAssignCourt}
                   className="px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"

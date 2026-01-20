@@ -659,6 +659,8 @@ public class PoolStandingsDto
 public class PoolStandingEntryDto
 {
     public int Rank { get; set; }
+    public int? PoolNumber { get; set; }
+    public string? PoolName { get; set; }
     public int? UnitNumber { get; set; }
     public int? UnitId { get; set; }
     public string? UnitName { get; set; }

@@ -3148,6 +3148,8 @@ public class TournamentController : ControllerBase
     [HttpPost("divisions/{divisionId}/generate-schedule")]
     public async Task<ActionResult<ApiResponse<List<EventMatchDto>>>> GenerateSchedule(int divisionId, [FromBody] CreateMatchScheduleRequest request)
     {
+        try
+        {
         var division = await _context.EventDivisions
             .Include(d => d.Event)
             .Include(d => d.TeamUnit)
@@ -3233,6 +3235,32 @@ public class TournamentController : ControllerBase
             {
                 court.CurrentGameId = null;
                 court.Status = "Available";
+            }
+
+            // Get all game IDs for this division to delete score history first
+            var gameIds = existingMatches
+                .SelectMany(e => e.Matches)
+                .SelectMany(m => m.Games)
+                .Select(g => g.Id)
+                .ToList();
+
+            // Delete score history for these games (must be done before deleting games due to FK constraint)
+            if (gameIds.Any())
+            {
+                try
+                {
+                    var scoreHistories = await _context.EventGameScoreHistories
+                        .Where(h => gameIds.Contains(h.GameId))
+                        .ToListAsync();
+                    if (scoreHistories.Any())
+                    {
+                        _context.EventGameScoreHistories.RemoveRange(scoreHistories);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Could not delete score histories for division {DivisionId} - table may not exist", divisionId);
+                }
             }
 
             // Delete games first, then matches
@@ -3365,6 +3393,21 @@ public class TournamentController : ControllerBase
             Success = true,
             Data = result.Select(m => MapToMatchDto(m)).ToList()
         });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error generating schedule for division {DivisionId}", divisionId);
+            var innerMessage = ex.InnerException?.Message ?? "";
+            var fullMessage = string.IsNullOrEmpty(innerMessage)
+                ? ex.Message
+                : $"{ex.Message} Inner: {innerMessage}";
+            return StatusCode(500, new ApiResponse<List<EventMatchDto>>
+            {
+                Success = false,
+                Message = $"Error generating schedule: {fullMessage}",
+                Data = null
+            });
+        }
     }
 
     [Authorize]
@@ -3527,6 +3570,20 @@ public class TournamentController : ControllerBase
             .ThenBy(m => m.EncounterNumber)
             .ToListAsync();
 
+        // Extract pool assignments from pool encounters (since units may not have PoolNumber/PoolName set)
+        var unitPoolAssignments = new Dictionary<int, (int PoolNumber, string PoolName)>();
+        var poolEncounters = matches.Where(m => m.RoundType == "Pool").ToList();
+        foreach (var enc in poolEncounters)
+        {
+            var poolNum = enc.RoundNumber;
+            var poolName = enc.RoundName ?? $"Pool {(char)('A' + poolNum - 1)}";
+
+            if (enc.Unit1Id.HasValue && !unitPoolAssignments.ContainsKey(enc.Unit1Id.Value))
+                unitPoolAssignments[enc.Unit1Id.Value] = (poolNum, poolName);
+            if (enc.Unit2Id.HasValue && !unitPoolAssignments.ContainsKey(enc.Unit2Id.Value))
+                unitPoolAssignments[enc.Unit2Id.Value] = (poolNum, poolName);
+        }
+
         // Include members to show team composition
         // Order: pool number, then by matches won (for standings after games), then by point differential, then by unit number (for drawing results)
         var units = await _context.EventUnits
@@ -3537,6 +3594,27 @@ public class TournamentController : ControllerBase
             .ThenByDescending(u => u.PointsScored - u.PointsAgainst)
             .ThenBy(u => u.UnitNumber)
             .ToListAsync();
+
+        // Apply pool assignments from encounters to units (for display purposes)
+        foreach (var unit in units)
+        {
+            if (unitPoolAssignments.TryGetValue(unit.Id, out var poolInfo))
+            {
+                // Use encounter-derived pool info if unit doesn't have it set
+                if (!unit.PoolNumber.HasValue || unit.PoolNumber == 0)
+                    unit.PoolNumber = poolInfo.PoolNumber;
+                if (string.IsNullOrEmpty(unit.PoolName))
+                    unit.PoolName = poolInfo.PoolName;
+            }
+        }
+
+        // Re-sort units after applying pool assignments
+        units = units
+            .OrderBy(u => u.PoolNumber ?? 99)
+            .ThenByDescending(u => u.MatchesWon)
+            .ThenByDescending(u => u.PointsScored - u.PointsAgainst)
+            .ThenBy(u => u.UnitNumber)
+            .ToList();
 
         // Build lookup for unit pool/rank info (for playoff seed descriptions)
         var unitPoolInfo = new Dictionary<int, (string PoolName, int Rank)>();
@@ -3574,6 +3652,22 @@ public class TournamentController : ControllerBase
                 return null;
             var info = unitPoolInfo[unitId.Value];
             return $"{info.PoolName} #{info.Rank}";
+        }
+
+        // Build court lookup for games - load all courts for this event to avoid EF Core CTE issue with Contains()
+        var courts = await _context.TournamentCourts
+            .Where(c => c.EventId == division.EventId)
+            .ToDictionaryAsync(c => c.Id, c => c.CourtLabel);
+
+        // Helper to get court label for an encounter
+        string? GetCourtLabel(EventEncounter encounter)
+        {
+            var game = encounter.Matches
+                .SelectMany(em => em.Games)
+                .FirstOrDefault(g => g.TournamentCourtId.HasValue);
+            if (game?.TournamentCourtId != null && courts.TryGetValue(game.TournamentCourtId.Value, out var label))
+                return label;
+            return null;
         }
 
         var schedule = new ScheduleExportDto
@@ -3614,7 +3708,7 @@ public class TournamentController : ControllerBase
                             ? (m.Unit2Id == null ? m.Unit2SeedLabel : GetSeedInfo(m.Unit2Id))
                             : null,
                         IsBye = (m.Unit1Id == null) != (m.Unit2Id == null), // One but not both is null
-                        CourtLabel = m.Matches.FirstOrDefault()?.Games.FirstOrDefault(g => g.TournamentCourt != null)?.TournamentCourt?.CourtLabel,
+                        CourtLabel = GetCourtLabel(m),
                         ScheduledTime = m.ScheduledTime,
                         StartedAt = m.StartedAt,
                         CompletedAt = m.CompletedAt,
@@ -3628,22 +3722,27 @@ public class TournamentController : ControllerBase
                             Unit1Score = game.Unit1Score,
                             Unit2Score = game.Unit2Score,
                             TournamentCourtId = game.TournamentCourtId,
-                            CourtLabel = game.TournamentCourt?.CourtLabel,
+                            CourtLabel = game.TournamentCourtId.HasValue && courts.TryGetValue(game.TournamentCourtId.Value, out var courtLabel) ? courtLabel : null,
                             Status = game.Status,
                             StartedAt = game.StartedAt,
                             CompletedAt = game.FinishedAt
                         }).ToList()
                     }).ToList()
                 }).ToList(),
-            PoolStandings = units.GroupBy(u => u.PoolNumber ?? 0)
-                .OrderBy(g => g.Key)
+            // Group by PoolName first (if set), then by PoolNumber as fallback
+            // This handles cases where PoolName is set but PoolNumber is null
+            PoolStandings = units.GroupBy(u => u.PoolName ?? $"Pool {u.PoolNumber ?? 0}")
+                .OrderBy(g => g.First().PoolNumber ?? 0)
+                .ThenBy(g => g.Key)
                 .Select(g => new PoolStandingsDto
                 {
-                    PoolNumber = g.Key,
-                    PoolName = g.First().PoolName,
+                    PoolNumber = g.First().PoolNumber ?? 0,
+                    PoolName = g.Key,
                     Standings = g.Select((u, idx) => new PoolStandingEntryDto
                     {
                         Rank = idx + 1,
+                        PoolNumber = u.PoolNumber ?? 0,
+                        PoolName = u.PoolName ?? $"Pool {u.PoolNumber ?? 0}",
                         UnitId = u.Id,
                         UnitNumber = u.UnitNumber,
                         UnitName = Utility.FormatUnitDisplayName(u.Members, u.Name),
@@ -6523,11 +6622,21 @@ public class TournamentController : ControllerBase
                 court.Status = "Available";
             }
 
-            // Delete all score history
-            var scoreHistories = await _context.EventGameScoreHistories
-                .Where(h => h.Game!.EncounterMatch!.Encounter!.EventId == eventId)
-                .ToListAsync();
-            _context.EventGameScoreHistories.RemoveRange(scoreHistories);
+            // Delete all score history (wrapped in try-catch in case table doesn't exist)
+            try
+            {
+                var scoreHistories = await _context.EventGameScoreHistories
+                    .Where(h => h.Game!.EncounterMatch!.Encounter!.EventId == eventId)
+                    .ToListAsync();
+                if (scoreHistories.Any())
+                {
+                    _context.EventGameScoreHistories.RemoveRange(scoreHistories);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Could not delete score histories for event {EventId} - table may not exist", eventId);
+            }
 
             // Delete game-related notifications for this event
             var gameIds = games.Select(g => g.Id).ToList();

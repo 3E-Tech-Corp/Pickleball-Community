@@ -6,7 +6,7 @@ import {
   AlertCircle, Loader2, Plus, Edit2, DollarSign, Eye, Share2, LayoutGrid,
   Award, ArrowRight, Lock, Unlock, Save, Map, ExternalLink, FileText, User,
   CheckCircle, XCircle, MoreVertical, Upload, Send, Info, Radio, ClipboardList,
-  Download
+  Download, Lightbulb
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
@@ -33,6 +33,8 @@ export default function TournamentManage() {
   const [downloadingStandings, setDownloadingStandings] = useState(false);
   const [editingRank, setEditingRank] = useState(null);
   const [showAdvancementPreview, setShowAdvancementPreview] = useState(false);
+  const [standingsViewMode, setStandingsViewMode] = useState('grouped'); // 'grouped' or 'flat'
+  const [standingsSortBy, setStandingsSortBy] = useState('pool'); // 'pool', 'rank', 'matchesWon', 'gameDiff', 'pointDiff'
   const [event, setEvent] = useState(null);
   const [activeTab, setActiveTab] = useState('overview');
   const [selectedDivision, setSelectedDivision] = useState(null);
@@ -58,6 +60,8 @@ export default function TournamentManage() {
   const [addingCourts, setAddingCourts] = useState(false);
   const [mapAsset, setMapAsset] = useState(null);
   const [showMapModal, setShowMapModal] = useState(false);
+  const [suggestedGame, setSuggestedGame] = useState(null);
+  const [loadingSuggestion, setLoadingSuggestion] = useState(false);
 
   // Edit court modal state
   const [editingCourt, setEditingCourt] = useState(null);
@@ -120,11 +124,13 @@ export default function TournamentManage() {
     const removeListener = addListener((notification) => {
       if (notification.Type === 'ScoreUpdate' || notification.Type === 'GameUpdate') {
         console.log('Admin dashboard: Received game update, refreshing...', notification);
+        // Show toast to admin
+        toast.info(notification.Message || 'Score updated - refreshing...');
         loadDashboard();
         // Use ref to get current selectedDivision value (avoids stale closure)
         const currentDivision = selectedDivisionRef.current;
         if (currentDivision?.scheduleReady) {
-          loadSchedule(currentDivision.id);
+          loadSchedule(currentDivision.id, true); // silent refresh
         }
       }
     });
@@ -135,6 +141,22 @@ export default function TournamentManage() {
     };
   }, [eventId, isAuthenticated, connect, joinEvent, leaveEvent, addListener]);
 
+  // Auto-refresh every 30 seconds as fallback for SignalR (silent - no loading spinners)
+  useEffect(() => {
+    if (!eventId) return;
+
+    const refreshInterval = setInterval(() => {
+      console.log('Auto-refresh: updating dashboard and schedule...');
+      loadDashboard(true); // silent refresh
+      const currentDivision = selectedDivisionRef.current;
+      if (currentDivision?.scheduleReady) {
+        loadSchedule(currentDivision.id, true); // silent refresh
+      }
+    }, 30000); // 30 seconds
+
+    return () => clearInterval(refreshInterval);
+  }, [eventId]);
+
   useEffect(() => {
     if (selectedDivision?.scheduleReady) {
       loadSchedule(selectedDivision.id);
@@ -143,24 +165,29 @@ export default function TournamentManage() {
     }
   }, [selectedDivision]);
 
-  const loadDashboard = async () => {
+  const loadDashboard = async (silent = false) => {
     try {
       const response = await tournamentApi.getDashboard(eventId);
       if (response.success) {
         setDashboard(response.data);
-        if (!selectedDivision && response.data.divisions?.length > 0) {
+        // Only auto-select division on initial load, not on silent refresh
+        if (!silent && !selectedDivision && response.data.divisions?.length > 0) {
           // Select first division with registrations, or first division if none have registrations
           const divisionsWithRegs = response.data.divisions.filter(d => d.registeredUnits > 0);
           setSelectedDivision(divisionsWithRegs.length > 0 ? divisionsWithRegs[0] : response.data.divisions[0]);
         }
-      } else {
+      } else if (!silent) {
         setError(response.message || 'Failed to load tournament dashboard');
       }
     } catch (err) {
       console.error('Error loading dashboard:', err);
-      setError('Failed to load tournament dashboard');
+      if (!silent) {
+        setError('Failed to load tournament dashboard');
+      }
     } finally {
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      }
     }
   };
 
@@ -255,8 +282,8 @@ export default function TournamentManage() {
     }
   };
 
-  const loadSchedule = async (divisionId) => {
-    setLoadingSchedule(true);
+  const loadSchedule = async (divisionId, silent = false) => {
+    if (!silent) setLoadingSchedule(true);
     try {
       const response = await tournamentApi.getSchedule(divisionId);
       if (response.success) {
@@ -270,7 +297,7 @@ export default function TournamentManage() {
     } catch (err) {
       console.error('Error loading schedule:', err);
     } finally {
-      setLoadingSchedule(false);
+      if (!silent) setLoadingSchedule(false);
     }
   };
 
@@ -1303,13 +1330,46 @@ export default function TournamentManage() {
               </div>
               <div className="flex items-center gap-2">
                 <button
-                  onClick={() => loadDashboard()}
+                  onClick={() => {
+                    loadDashboard();
+                    if (selectedDivision?.scheduleReady) {
+                      loadSchedule(selectedDivision.id);
+                    }
+                  }}
                   className="px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-2"
                   title="Refresh courts"
                 >
-                  <RefreshCw className="w-4 h-4" />
+                  <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
                   Refresh
                 </button>
+                {isOrganizer && (
+                  <button
+                    onClick={async () => {
+                      setLoadingSuggestion(true);
+                      try {
+                        const response = await gameDayApi.suggestNextGame(eventId);
+                        if (response.success && response.data) {
+                          setSuggestedGame(response.data);
+                        } else {
+                          toast.info(response.message || 'No games available to suggest');
+                        }
+                      } catch (err) {
+                        toast.error('Failed to get suggestion');
+                      } finally {
+                        setLoadingSuggestion(false);
+                      }
+                    }}
+                    disabled={loadingSuggestion}
+                    className="px-3 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 flex items-center gap-2 disabled:opacity-50"
+                  >
+                    {loadingSuggestion ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Lightbulb className="w-4 h-4" />
+                    )}
+                    Suggest Next
+                  </button>
+                )}
                 {isOrganizer && (
                   <button
                     onClick={() => setShowAddCourtsModal(true)}
@@ -1321,6 +1381,63 @@ export default function TournamentManage() {
                 )}
               </div>
             </div>
+
+            {/* Suggested Game Card */}
+            {suggestedGame && (
+              <div className="mb-4 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 bg-blue-100 rounded-lg">
+                      <Lightbulb className="w-5 h-5 text-blue-600" />
+                    </div>
+                    <div>
+                      <h4 className="font-medium text-gray-900">Suggested Next Game</h4>
+                      <p className="text-sm text-blue-700 mt-0.5">{suggestedGame.reason}</p>
+                      <div className="mt-2 p-3 bg-white rounded-lg border border-blue-100">
+                        <div className="text-sm font-medium text-gray-900 mb-1">
+                          {suggestedGame.unit1Players} vs {suggestedGame.unit2Players}
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          {suggestedGame.divisionName} • {suggestedGame.poolName} • Match #{suggestedGame.matchNumber}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {dashboard?.courts?.filter(c => c.status === 'Available').length > 0 && suggestedGame.gameId && (
+                      <select
+                        onChange={async (e) => {
+                          const courtId = parseInt(e.target.value);
+                          if (courtId) {
+                            try {
+                              await gameDayApi.queueGame(suggestedGame.gameId, courtId);
+                              toast.success('Game queued to court');
+                              setSuggestedGame(null);
+                              loadDashboard();
+                            } catch (err) {
+                              toast.error('Failed to queue game');
+                            }
+                          }
+                        }}
+                        className="text-sm border border-gray-300 rounded-lg px-2 py-1"
+                        defaultValue=""
+                      >
+                        <option value="" disabled>Queue to court...</option>
+                        {dashboard?.courts?.filter(c => c.status === 'Available').map(c => (
+                          <option key={c.id} value={c.id}>{c.courtLabel}</option>
+                        ))}
+                      </select>
+                    )}
+                    <button
+                      onClick={() => setSuggestedGame(null)}
+                      className="p-1 text-gray-400 hover:text-gray-600"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {dashboard?.courts?.length === 0 ? (
               <div className="bg-white rounded-xl shadow-sm p-12 text-center">
@@ -1394,6 +1511,7 @@ export default function TournamentManage() {
                                 <button
                                   onClick={() => setSelectedGameForEdit({
                                     id: court.currentGame.gameId,
+                                    encounterId: court.currentGame.encounterId || court.currentGame.matchId,
                                     unit1Score: court.currentGame.unit1Score || 0,
                                     unit2Score: court.currentGame.unit2Score || 0,
                                     tournamentCourtId: court.id,
@@ -1437,12 +1555,32 @@ export default function TournamentManage() {
                         <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
                           <div className="flex items-center justify-between mb-1">
                             <span className="text-xs font-semibold text-blue-700 uppercase">Next Game</span>
-                            {court.nextGame.queuedAt && (
-                              <span className="text-xs text-blue-600 flex items-center gap-1">
-                                <Clock className="w-3 h-3" />
-                                Queued {formatTimeElapsed(court.nextGame.queuedAt)}
-                              </span>
-                            )}
+                            <div className="flex items-center gap-2">
+                              {court.nextGame.queuedAt && (
+                                <span className="text-xs text-blue-600 flex items-center gap-1">
+                                  <Clock className="w-3 h-3" />
+                                  Queued {formatTimeElapsed(court.nextGame.queuedAt)}
+                                </span>
+                              )}
+                              {isOrganizer && (
+                                <button
+                                  onClick={async () => {
+                                    try {
+                                      await gameDayApi.startGame(court.nextGame.gameId);
+                                      loadDashboard();
+                                      toast.success('Game started');
+                                    } catch (err) {
+                                      toast.error('Failed to start game');
+                                    }
+                                  }}
+                                  className="text-xs bg-green-600 text-white px-2 py-1 rounded hover:bg-green-700 flex items-center gap-1"
+                                  title="Start game"
+                                >
+                                  <Play className="w-3 h-3" />
+                                  Start
+                                </button>
+                              )}
+                            </div>
                           </div>
                           <div className="text-sm font-medium text-gray-900">
                             {court.nextGame.unit1Players || 'TBD'} vs {court.nextGame.unit2Players || 'TBD'}
@@ -1591,10 +1729,15 @@ export default function TournamentManage() {
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold text-gray-900">Match Schedule</h2>
               <button
-                onClick={loadDashboard}
+                onClick={() => {
+                  loadDashboard();
+                  if (selectedDivision?.scheduleReady) {
+                    loadSchedule(selectedDivision.id);
+                  }
+                }}
                 className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100"
               >
-                <RefreshCw className="w-5 h-5" />
+                <RefreshCw className={`w-5 h-5 ${loadingSchedule ? 'animate-spin' : ''}`} />
               </button>
             </div>
 
@@ -1728,6 +1871,7 @@ export default function TournamentManage() {
                                   <button
                                     onClick={() => setSelectedGameForEdit({
                                       id: match.games?.[0]?.gameId || match.games?.[0]?.id || match.encounterId,
+                                      encounterId: match.encounterId,
                                       ...(match.games?.[0] || {}),
                                       unit1: { id: match.unit1Id, name: match.unit1Name || match.unit1SeedInfo, members: match.unit1Members || [] },
                                       unit2: { id: match.unit2Id, name: match.unit2Name || match.unit2SeedInfo, members: match.unit2Members || [] },
@@ -1823,6 +1967,7 @@ export default function TournamentManage() {
                                     <button
                                       onClick={() => setSelectedGameForEdit({
                                         id: match.games?.[0]?.gameId || match.games?.[0]?.id || match.encounterId,
+                                        encounterId: match.encounterId,
                                         ...(match.games?.[0] || {}),
                                         unit1: { id: match.unit1Id, name: match.unit1Name || match.unit1SeedInfo, members: match.unit1Members || [] },
                                         unit2: { id: match.unit2Id, name: match.unit2Name || match.unit2SeedInfo, members: match.unit2Members || [] },
@@ -1920,6 +2065,7 @@ export default function TournamentManage() {
                                 <button
                                   onClick={() => setSelectedGameForEdit({
                                     id: match.games?.[0]?.gameId || match.games?.[0]?.id || match.encounterId,
+                                    encounterId: match.encounterId,
                                     ...(match.games?.[0] || {}),
                                     unit1: { id: match.unit1Id, name: match.unit1Name || match.unit1SeedInfo, members: match.unit1Members || [] },
                                     unit2: { id: match.unit2Id, name: match.unit2Name || match.unit2SeedInfo, members: match.unit2Members || [] },
@@ -2070,6 +2216,136 @@ export default function TournamentManage() {
                         </div>
                       )}
 
+                      {/* View Toggle */}
+                      <div className="px-4 py-2 border-b flex items-center gap-2">
+                        <span className="text-sm text-gray-500">View:</span>
+                        <button
+                          onClick={() => setStandingsViewMode('grouped')}
+                          className={`px-3 py-1 text-sm rounded-lg ${standingsViewMode === 'grouped' ? 'bg-orange-100 text-orange-700 font-medium' : 'text-gray-600 hover:bg-gray-100'}`}
+                        >
+                          By Pool
+                        </button>
+                        <button
+                          onClick={() => setStandingsViewMode('flat')}
+                          className={`px-3 py-1 text-sm rounded-lg ${standingsViewMode === 'flat' ? 'bg-orange-100 text-orange-700 font-medium' : 'text-gray-600 hover:bg-gray-100'}`}
+                        >
+                          All Teams
+                        </button>
+                      </div>
+
+                      {standingsViewMode === 'flat' ? (
+                        /* Flat view - all teams in one table with pool column */
+                        <div className="p-4">
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-sm">
+                              <thead className="text-gray-500 border-b bg-gray-50">
+                                <tr>
+                                  <th
+                                    className="text-left py-2 px-2 cursor-pointer hover:bg-gray-100"
+                                    onClick={() => setStandingsSortBy(standingsSortBy === 'pool' ? 'pool-desc' : 'pool')}
+                                    title="Sort by Pool"
+                                  >
+                                    Pool {standingsSortBy.startsWith('pool') && (standingsSortBy === 'pool' ? '↑' : '↓')}
+                                  </th>
+                                  <th
+                                    className="text-left py-2 px-2 cursor-pointer hover:bg-gray-100"
+                                    onClick={() => setStandingsSortBy(standingsSortBy === 'rank' ? 'rank-desc' : 'rank')}
+                                    title="Sort by Rank"
+                                  >
+                                    # {standingsSortBy.startsWith('rank') && (standingsSortBy === 'rank' ? '↑' : '↓')}
+                                  </th>
+                                  <th className="text-left py-2 px-2">Team</th>
+                                  <th
+                                    className="text-center py-2 px-2 cursor-pointer hover:bg-gray-100"
+                                    onClick={() => setStandingsSortBy(standingsSortBy === 'matchesWon' ? 'matchesWon-desc' : 'matchesWon')}
+                                    title="Sort by Matches Won"
+                                  >
+                                    MW {standingsSortBy.startsWith('matchesWon') && (standingsSortBy === 'matchesWon-desc' ? '↓' : '↑')}
+                                  </th>
+                                  <th className="text-center py-2 px-2" title="Matches Lost">ML</th>
+                                  <th className="text-center py-2 px-2" title="Games Won">GW</th>
+                                  <th className="text-center py-2 px-2" title="Games Lost">GL</th>
+                                  <th
+                                    className="text-center py-2 px-2 cursor-pointer hover:bg-gray-100"
+                                    onClick={() => setStandingsSortBy(standingsSortBy === 'gameDiff' ? 'gameDiff-desc' : 'gameDiff')}
+                                    title="Sort by Game Differential"
+                                  >
+                                    G+/- {standingsSortBy.startsWith('gameDiff') && (standingsSortBy === 'gameDiff-desc' ? '↓' : '↑')}
+                                  </th>
+                                  <th className="text-center py-2 px-2" title="Points For">PF</th>
+                                  <th className="text-center py-2 px-2" title="Points Against">PA</th>
+                                  <th
+                                    className="text-center py-2 px-2 cursor-pointer hover:bg-gray-100"
+                                    onClick={() => setStandingsSortBy(standingsSortBy === 'pointDiff' ? 'pointDiff-desc' : 'pointDiff')}
+                                    title="Sort by Point Differential"
+                                  >
+                                    P+/- {standingsSortBy.startsWith('pointDiff') && (standingsSortBy === 'pointDiff-desc' ? '↓' : '↑')}
+                                  </th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {(() => {
+                                  // Flatten all standings with pool info
+                                  const allStandings = schedule.poolStandings.flatMap(pool =>
+                                    (pool.standings || []).map(s => ({ ...s, poolNumber: pool.poolNumber, poolName: pool.poolName }))
+                                  );
+
+                                  // Sort based on current sort setting
+                                  const sorted = [...allStandings].sort((a, b) => {
+                                    switch (standingsSortBy) {
+                                      case 'pool': return (a.poolNumber || 0) - (b.poolNumber || 0);
+                                      case 'pool-desc': return (b.poolNumber || 0) - (a.poolNumber || 0);
+                                      case 'rank': return (a.rank || 0) - (b.rank || 0);
+                                      case 'rank-desc': return (b.rank || 0) - (a.rank || 0);
+                                      case 'matchesWon': return (a.matchesWon || 0) - (b.matchesWon || 0);
+                                      case 'matchesWon-desc': return (b.matchesWon || 0) - (a.matchesWon || 0);
+                                      case 'gameDiff': return ((a.gamesWon || 0) - (a.gamesLost || 0)) - ((b.gamesWon || 0) - (b.gamesLost || 0));
+                                      case 'gameDiff-desc': return ((b.gamesWon || 0) - (b.gamesLost || 0)) - ((a.gamesWon || 0) - (a.gamesLost || 0));
+                                      case 'pointDiff': return (a.pointDifferential || 0) - (b.pointDifferential || 0);
+                                      case 'pointDiff-desc': return (b.pointDifferential || 0) - (a.pointDifferential || 0);
+                                      default: return (a.poolNumber || 0) - (b.poolNumber || 0) || (a.rank || 0) - (b.rank || 0);
+                                    }
+                                  });
+
+                                  return sorted.map((standing, idx) => {
+                                    const willAdvance = selectedDivision?.playoffFromPools && standing.rank <= selectedDivision.playoffFromPools;
+                                    const gameDiff = (standing.gamesWon || 0) - (standing.gamesLost || 0);
+
+                                    return (
+                                      <tr key={idx} className={`border-b last:border-0 ${willAdvance ? 'bg-green-50' : ''}`}>
+                                        <td className="py-2 px-2 font-medium text-orange-600">
+                                          {standing.poolName || `Pool ${standing.poolNumber}`}
+                                        </td>
+                                        <td className="py-2 px-2">
+                                          <span className={`font-medium ${willAdvance ? 'text-green-600' : 'text-gray-400'}`}>
+                                            {standing.rank}
+                                          </span>
+                                        </td>
+                                        <td className="py-2 px-2">
+                                          <div className="text-gray-900 font-medium">{standing.unitName || `Unit #${standing.unitNumber}`}</div>
+                                        </td>
+                                        <td className="py-2 px-2 text-center font-medium text-green-600">{standing.matchesWon}</td>
+                                        <td className="py-2 px-2 text-center text-red-600">{standing.matchesLost}</td>
+                                        <td className="py-2 px-2 text-center text-gray-600">{standing.gamesWon}</td>
+                                        <td className="py-2 px-2 text-center text-gray-600">{standing.gamesLost}</td>
+                                        <td className={`py-2 px-2 text-center font-medium ${gameDiff > 0 ? 'text-green-600' : gameDiff < 0 ? 'text-red-600' : 'text-gray-400'}`}>
+                                          {gameDiff > 0 ? '+' : ''}{gameDiff}
+                                        </td>
+                                        <td className="py-2 px-2 text-center text-gray-600">{standing.pointsFor || 0}</td>
+                                        <td className="py-2 px-2 text-center text-gray-600">{standing.pointsAgainst || 0}</td>
+                                        <td className={`py-2 px-2 text-center font-medium ${(standing.pointDifferential || 0) > 0 ? 'text-green-600' : (standing.pointDifferential || 0) < 0 ? 'text-red-600' : 'text-gray-400'}`}>
+                                          {(standing.pointDifferential || 0) > 0 ? '+' : ''}{standing.pointDifferential || 0}
+                                        </td>
+                                      </tr>
+                                    );
+                                  });
+                                })()}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      ) : (
+                      /* Grouped view - separate tables per pool */
                       <div className="p-4 space-y-6">
                         {schedule.poolStandings.map((pool, poolIdx) => (
                           <div key={poolIdx}>
@@ -2191,6 +2467,7 @@ export default function TournamentManage() {
                           </div>
                         ))}
                       </div>
+                      )}
 
                       {/* Legend */}
                       <div className="px-4 py-2 bg-gray-50 border-t text-xs text-gray-500 flex items-center gap-4">
@@ -2943,8 +3220,9 @@ export default function TournamentManage() {
             await tournamentApi.updateGameStatus(gameId, status);
           } : undefined}
           onChangeUnits={handleChangeEncounterUnits}
-          readOnly={!selectedGameForEdit.hasGames}
+          readOnly={false}
           isAdmin={user?.role === 'Admin'}
+          showAllCourts={true}
         />
       )}
 
