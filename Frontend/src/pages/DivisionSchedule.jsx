@@ -1,12 +1,13 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import {
   Calendar, Users, Trophy, ChevronLeft, Loader2,
-  AlertCircle, Printer, Download, Clock, MapPin, User, RotateCcw, Info, X, Edit2, Save
+  AlertCircle, Printer, Download, Clock, MapPin, User, RotateCcw, Info, X, Edit2, Save, Wifi, WifiOff
 } from 'lucide-react';
 import { tournamentApi, getSharedAssetUrl } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
+import { useScoreHub } from '../hooks/useScoreHub';
 import PublicProfileModal from '../components/ui/PublicProfileModal';
 
 export default function DivisionSchedule() {
@@ -25,11 +26,59 @@ export default function DivisionSchedule() {
 
   const isAdmin = user?.role === 'Admin';
 
+  // SignalR connection for real-time updates
+  const {
+    connect: connectScoreHub,
+    disconnect: disconnectScoreHub,
+    joinDivision,
+    leaveDivision,
+    isConnected,
+    connectionState,
+    refreshSignal,
+    lastBracketProgression
+  } = useScoreHub();
+
+  // Connect to SignalR and join division
+  useEffect(() => {
+    let mounted = true;
+
+    const initializeHub = async () => {
+      const connection = await connectScoreHub();
+      if (connection && mounted && divisionId) {
+        await joinDivision(parseInt(divisionId));
+      }
+    };
+
+    initializeHub();
+
+    return () => {
+      mounted = false;
+      if (divisionId) {
+        leaveDivision(parseInt(divisionId));
+      }
+    };
+  }, [divisionId, connectScoreHub, joinDivision, leaveDivision]);
+
+  // Reload schedule when we receive a refresh signal from SignalR
+  useEffect(() => {
+    if (refreshSignal > 0) {
+      console.log('DivisionSchedule: Received SignalR update, reloading schedule...');
+      loadSchedule();
+    }
+  }, [refreshSignal]);
+
+  // Show toast notification for bracket progression
+  useEffect(() => {
+    if (lastBracketProgression && lastBracketProgression.receivedAt) {
+      toast.success(`${lastBracketProgression.winnerName} advanced to ${lastBracketProgression.nextRoundName}!`);
+    }
+  }, [lastBracketProgression]);
+
   useEffect(() => {
     loadSchedule();
   }, [divisionId]);
 
-  const loadSchedule = async () => {
+  const loadSchedule = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -45,7 +94,7 @@ export default function DivisionSchedule() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [divisionId]);
 
   const handlePrint = () => {
     window.print();
@@ -217,7 +266,31 @@ export default function DivisionSchedule() {
                 <ChevronLeft className="w-5 h-5 text-gray-400" />
               </Link>
               <div>
-                <h1 className="text-xl font-bold text-white">{schedule?.divisionName}</h1>
+                <div className="flex items-center gap-2">
+                  <h1 className="text-xl font-bold text-white">{schedule?.divisionName}</h1>
+                  {/* Real-time connection indicator */}
+                  <div
+                    className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-xs ${
+                      isConnected
+                        ? 'bg-green-500/20 text-green-400'
+                        : connectionState === 'connecting' || connectionState === 'reconnecting'
+                        ? 'bg-yellow-500/20 text-yellow-400'
+                        : 'bg-gray-500/20 text-gray-400'
+                    }`}
+                    title={isConnected ? 'Real-time updates active' : `Connection: ${connectionState}`}
+                  >
+                    {isConnected ? (
+                      <Wifi className="w-3 h-3" />
+                    ) : connectionState === 'connecting' || connectionState === 'reconnecting' ? (
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                    ) : (
+                      <WifiOff className="w-3 h-3" />
+                    )}
+                    <span className="hidden sm:inline">
+                      {isConnected ? 'Live' : connectionState === 'connecting' ? 'Connecting...' : 'Offline'}
+                    </span>
+                  </div>
+                </div>
                 <p className="text-sm text-gray-400">{schedule?.eventName}</p>
               </div>
             </div>

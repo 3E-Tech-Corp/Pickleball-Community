@@ -19,17 +19,23 @@ public class TournamentController : ControllerBase
     private readonly ILogger<TournamentController> _logger;
     private readonly IDrawingBroadcaster _drawingBroadcaster;
     private readonly INotificationService _notificationService;
+    private readonly IBracketProgressionService _bracketProgressionService;
+    private readonly IScoreBroadcaster _scoreBroadcaster;
 
     public TournamentController(
         ApplicationDbContext context,
         ILogger<TournamentController> logger,
         IDrawingBroadcaster drawingBroadcaster,
-        INotificationService notificationService)
+        INotificationService notificationService,
+        IBracketProgressionService bracketProgressionService,
+        IScoreBroadcaster scoreBroadcaster)
     {
         _context = context;
         _logger = logger;
         _drawingBroadcaster = drawingBroadcaster;
         _notificationService = notificationService;
+        _bracketProgressionService = bracketProgressionService;
+        _scoreBroadcaster = scoreBroadcaster;
     }
 
     private int? GetUserId()
@@ -4201,7 +4207,23 @@ public class TournamentController : ControllerBase
                     }
                 }
 
-                // Check if match is complete (for best-of series)
+                // Broadcast game score update via SignalR
+                var winnerUnit = game.WinnerUnitId == encounter.Unit1Id ? encounter.Unit1 : encounter.Unit2;
+                await _scoreBroadcaster.BroadcastGameScoreUpdated(encounter.EventId, encounter.DivisionId, new GameScoreUpdateDto
+                {
+                    GameId = game.Id,
+                    EncounterId = encounter.Id,
+                    DivisionId = encounter.DivisionId,
+                    GameNumber = game.GameNumber,
+                    Unit1Score = game.Unit1Score,
+                    Unit2Score = game.Unit2Score,
+                    WinnerUnitId = game.WinnerUnitId,
+                    WinnerName = winnerUnit?.Name,
+                    Status = game.Status ?? "Finished",
+                    UpdatedAt = DateTime.Now
+                });
+
+                // Check if match is complete (for best-of series) - this also handles bracket progression
                 await CheckMatchComplete(encounter.Id);
 
                 // Save changes before starting next game
@@ -4230,6 +4252,25 @@ public class TournamentController : ControllerBase
             // Adjust unit stats (subtract old, add new)
             await AdjustUnitStats(encounter, oldUnit1Score, oldUnit2Score, oldWinnerId,
                                   game.Unit1Score, game.Unit2Score, game.WinnerUnitId);
+
+            // Broadcast score change
+            var winnerUnit = game.WinnerUnitId == encounter.Unit1Id ? encounter.Unit1 : encounter.Unit2;
+            await _scoreBroadcaster.BroadcastGameScoreUpdated(encounter.EventId, encounter.DivisionId, new GameScoreUpdateDto
+            {
+                GameId = game.Id,
+                EncounterId = encounter.Id,
+                DivisionId = encounter.DivisionId,
+                GameNumber = game.GameNumber,
+                Unit1Score = game.Unit1Score,
+                Unit2Score = game.Unit2Score,
+                WinnerUnitId = game.WinnerUnitId,
+                WinnerName = winnerUnit?.Name,
+                Status = game.Status ?? "Finished",
+                UpdatedAt = DateTime.Now
+            });
+
+            // Re-check match completion in case winner changed
+            await CheckMatchComplete(encounter.Id);
         }
 
         await _context.SaveChangesAsync();
@@ -5614,6 +5655,8 @@ public class TournamentController : ControllerBase
     {
         var match = await _context.EventMatches
             .Include(m => m.Matches).ThenInclude(match => match.Games)
+            .Include(m => m.Unit1)
+            .Include(m => m.Unit2)
             .FirstOrDefaultAsync(m => m.Id == matchId);
 
         if (match == null) return;
@@ -5647,6 +5690,53 @@ public class TournamentController : ControllerBase
                 loser.MatchesPlayed++;
                 loser.MatchesLost++;
                 loser.UpdatedAt = DateTime.Now;
+            }
+
+            await _context.SaveChangesAsync();
+
+            // Broadcast match completion
+            await _scoreBroadcaster.BroadcastMatchCompleted(match.EventId, match.DivisionId, new MatchCompletedDto
+            {
+                EncounterId = match.Id,
+                DivisionId = match.DivisionId,
+                RoundType = match.RoundType ?? "",
+                RoundName = match.RoundName ?? "",
+                Unit1Id = match.Unit1Id,
+                Unit1Name = match.Unit1?.Name,
+                Unit2Id = match.Unit2Id,
+                Unit2Name = match.Unit2?.Name,
+                WinnerUnitId = match.WinnerUnitId,
+                WinnerName = winner?.Name,
+                Score = $"{unit1Wins} - {unit2Wins}",
+                CompletedAt = match.CompletedAt ?? DateTime.Now
+            });
+
+            // Check for bracket progression (playoff matches only)
+            if (match.RoundType == "Bracket" || match.RoundType == "Final" || match.RoundType == "ThirdPlace")
+            {
+                var progressionResult = await _bracketProgressionService.CheckAndAdvanceAsync(matchId);
+
+                if (progressionResult.WinnerAdvanced && progressionResult.NextMatchId.HasValue)
+                {
+                    // Broadcast bracket progression
+                    await _scoreBroadcaster.BroadcastBracketProgression(match.EventId, match.DivisionId, new BracketProgressionDto
+                    {
+                        FromEncounterId = match.Id,
+                        ToEncounterId = progressionResult.NextMatchId.Value,
+                        DivisionId = match.DivisionId,
+                        WinnerUnitId = match.WinnerUnitId ?? 0,
+                        WinnerName = winner?.Name ?? "",
+                        FromRoundName = match.RoundName ?? "",
+                        NextRoundName = progressionResult.NextMatchRoundName ?? "",
+                        SlotPosition = (match.BracketPosition ?? 0) % 2 == 1 ? 1 : 2,
+                        AdvancedAt = DateTime.Now
+                    });
+
+                    _logger.LogInformation(
+                        "Bracket progression: {WinnerName} advanced from {FromRound} to {NextRound} (Match {FromMatch} -> {ToMatch})",
+                        winner?.Name, match.RoundName, progressionResult.NextMatchRoundName,
+                        match.Id, progressionResult.NextMatchId);
+                }
             }
         }
     }
