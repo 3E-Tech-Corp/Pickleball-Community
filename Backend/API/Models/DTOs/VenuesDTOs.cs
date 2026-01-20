@@ -110,7 +110,7 @@ public class VenueSearchRequest
     public string? Query { get; set; }
     public double? Latitude { get; set; }
     public double? Longitude { get; set; }
-    public double? RadiusMiles { get; set; } = 100;
+    public double? RadiusMiles { get; set; }  // No default - only filter by radius when explicitly requested
     public string? Country { get; set; }
     public string? State { get; set; }
     public string? City { get; set; }
