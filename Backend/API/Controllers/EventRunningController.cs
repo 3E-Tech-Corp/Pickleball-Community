@@ -165,7 +165,7 @@ public class EventRunningController : EventControllerBase
                     }).ToList()
             }).ToList(),
             Schedule = matches.Select(m => MapToMatchDto(m, unitIds)).ToList(),
-            Courts = courts.Select(c => new CourtStatusDto
+            Courts = courts.Select(c => new DashboardCourtStatusDto
             {
                 Id = c.Id,
                 Label = c.CourtLabel,
@@ -1457,7 +1457,7 @@ public class PlayerEventDashboardDto
     public string? VenueName { get; set; }
     public List<PlayerUnitDto> MyUnits { get; set; } = new();
     public List<PlayerMatchDto> Schedule { get; set; } = new();
-    public List<CourtStatusDto> Courts { get; set; } = new();
+    public List<DashboardCourtStatusDto> Courts { get; set; } = new();
     public List<EventNotificationDto> Notifications { get; set; } = new();
 }
 
@@ -1520,7 +1520,7 @@ public class PlayerGameDto
     public int? WinnerUnitId { get; set; }
 }
 
-public class CourtStatusDto
+public class DashboardCourtStatusDto
 {
     public int Id { get; set; }
     public string Label { get; set; } = string.Empty;

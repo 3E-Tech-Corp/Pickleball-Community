@@ -616,8 +616,8 @@ public class EventStaffController : EventControllerBase
                 .Select(e => new EncounterSummaryDto
                 {
                     Id = e.Id,
-                    Unit1Name = e.Unit1 != null ? e.Unit1.UnitName : "TBD",
-                    Unit2Name = e.Unit2 != null ? e.Unit2.UnitName : "TBD",
+                    Unit1Name = e.Unit1 != null ? e.Unit1.Name : "TBD",
+                    Unit2Name = e.Unit2 != null ? e.Unit2.Name : "TBD",
                     CourtLabel = e.TournamentCourt != null ? e.TournamentCourt.CourtLabel : null,
                     DivisionName = e.Division != null ? e.Division.Name : null,
                     Status = e.Status,
@@ -635,7 +635,7 @@ public class EventStaffController : EventControllerBase
             var pendingCheckIns = await _context.EventRegistrations
                 .Where(r => r.EventId == eventId &&
                            r.Status == "Approved" &&
-                           r.CheckedIn != true)
+                           r.CheckedInAt == null)
                 .Include(r => r.User)
                 .Include(r => r.Division)
                 .OrderBy(r => r.Division!.Name)
@@ -657,7 +657,7 @@ public class EventStaffController : EventControllerBase
             var totalApproved = await _context.EventRegistrations
                 .CountAsync(r => r.EventId == eventId && r.Status == "Approved");
             var checkedIn = await _context.EventRegistrations
-                .CountAsync(r => r.EventId == eventId && r.Status == "Approved" && r.CheckedIn == true);
+                .CountAsync(r => r.EventId == eventId && r.Status == "Approved" && r.CheckedInAt != null);
 
             dashboard.CheckInStats = new CheckInStatsDto
             {
@@ -685,7 +685,7 @@ public class EventStaffController : EventControllerBase
                         .FirstOrDefault(),
                     CurrentMatchDescription = _context.EventEncounters
                         .Where(e => e.TournamentCourtId == c.Id && e.Status == "InProgress")
-                        .Select(e => (e.Unit1 != null ? e.Unit1.UnitName : "TBD") + " vs " + (e.Unit2 != null ? e.Unit2.UnitName : "TBD"))
+                        .Select(e => (e.Unit1 != null ? e.Unit1.Name : "TBD") + " vs " + (e.Unit2 != null ? e.Unit2.Name : "TBD"))
                         .FirstOrDefault()
                 })
                 .ToListAsync();
@@ -708,8 +708,8 @@ public class EventStaffController : EventControllerBase
                 .Select(e => new EncounterSummaryDto
                 {
                     Id = e.Id,
-                    Unit1Name = e.Unit1 != null ? e.Unit1.UnitName : "TBD",
-                    Unit2Name = e.Unit2 != null ? e.Unit2.UnitName : "TBD",
+                    Unit1Name = e.Unit1 != null ? e.Unit1.Name : "TBD",
+                    Unit2Name = e.Unit2 != null ? e.Unit2.Name : "TBD",
                     CourtLabel = e.TournamentCourt != null ? e.TournamentCourt.CourtLabel : null,
                     DivisionName = e.Division != null ? e.Division.Name : null,
                     Status = e.Status,

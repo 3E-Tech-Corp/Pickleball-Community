@@ -669,7 +669,7 @@ public class CheckInController : EventControllerBase
 
         // Get user's registrations
         var registrations = await _context.EventUnitMembers
-            .Where(m => m.Unit!.EventId == eventId && m.UserId == userId.Value && m.InviteStatus == "Accepted")
+            .Where(m => m.Unit!.EventId == eventId && m.UserId == userId && m.InviteStatus == "Accepted")
             .Include(m => m.Unit)
             .ToListAsync();
 
@@ -678,14 +678,14 @@ public class CheckInController : EventControllerBase
 
         // Create event check-in record
         var existingCheckIn = await _context.EventCheckIns
-            .FirstOrDefaultAsync(c => c.EventId == eventId && c.UserId == userId.Value);
+            .FirstOrDefaultAsync(c => c.EventId == eventId && c.UserId == userId);
 
         if (existingCheckIn == null)
         {
             existingCheckIn = new EventCheckIn
             {
                 EventId = eventId,
-                UserId = userId.Value,
+                UserId = userId,
                 CheckInMethod = CheckInMethod.Manual,
                 CheckedInByUserId = currentUserId,
                 CheckedInAt = DateTime.Now,
@@ -1077,7 +1077,7 @@ public class CheckInController : EventControllerBase
 
         // Get user's registrations
         var registrations = await _context.EventUnitMembers
-            .Where(m => m.Unit!.EventId == eventId && m.UserId == userId.Value && m.InviteStatus == "Accepted")
+            .Where(m => m.Unit!.EventId == eventId && m.UserId == userId && m.InviteStatus == "Accepted")
             .ToListAsync();
 
         if (!registrations.Any())
@@ -1113,7 +1113,7 @@ public class CheckInController : EventControllerBase
 
         // Remove event-level check-in record
         var eventCheckIn = await _context.EventCheckIns
-            .FirstOrDefaultAsync(c => c.EventId == eventId && c.UserId == userId.Value);
+            .FirstOrDefaultAsync(c => c.EventId == eventId && c.UserId == userId);
         if (eventCheckIn != null)
         {
             _context.EventCheckIns.Remove(eventCheckIn);
@@ -1154,7 +1154,7 @@ public class CheckInController : EventControllerBase
 
         // Get user's registrations
         var registrations = await _context.EventUnitMembers
-            .Where(m => m.Unit!.EventId == eventId && m.UserId == userId.Value && m.InviteStatus == "Accepted")
+            .Where(m => m.Unit!.EventId == eventId && m.UserId == userId && m.InviteStatus == "Accepted")
             .ToListAsync();
 
         if (!registrations.Any())
@@ -1202,7 +1202,7 @@ public class CheckInController : EventControllerBase
 
         // Get user's registrations
         var registrations = await _context.EventUnitMembers
-            .Where(m => m.Unit!.EventId == eventId && m.UserId == userId.Value && m.InviteStatus == "Accepted")
+            .Where(m => m.Unit!.EventId == eventId && m.UserId == userId && m.InviteStatus == "Accepted")
             .ToListAsync();
 
         if (!registrations.Any())
@@ -1579,7 +1579,7 @@ public class CheckInController : EventControllerBase
 
         // Get user's registrations
         var registrations = await _context.EventUnitMembers
-            .Where(m => m.Unit!.EventId == eventId && m.UserId == userId.Value && m.InviteStatus == "Accepted")
+            .Where(m => m.Unit!.EventId == eventId && m.UserId == userId && m.InviteStatus == "Accepted")
             .ToListAsync();
 
         if (!registrations.Any())
@@ -1642,7 +1642,7 @@ public class CheckInController : EventControllerBase
 
         // Check if user is registered
         var registration = await _context.EventUnitMembers
-            .FirstOrDefaultAsync(m => m.Unit!.EventId == eventId && m.UserId == userId.Value && m.InviteStatus == "Accepted");
+            .FirstOrDefaultAsync(m => m.Unit!.EventId == eventId && m.UserId == userId && m.InviteStatus == "Accepted");
 
         if (registration == null)
             return BadRequest(new ApiResponse<object> { Success = false, Message = "User is not registered for this event" });
