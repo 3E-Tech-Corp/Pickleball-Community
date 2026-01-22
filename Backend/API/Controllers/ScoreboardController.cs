@@ -386,7 +386,7 @@ public class ScoreboardController : ControllerBase
                     {
                         UserId = m.UserId,
                         Name = m.User!.FirstName + " " + m.User.LastName,
-                        IsCaptain = m.IsCaptain
+                        IsCaptain = m.Role == "Captain"
                     })
                     .ToList()
             })
@@ -482,7 +482,7 @@ public class ScoreboardController : ControllerBase
                 CourtName = m.TournamentCourt != null ? m.TournamentCourt.CourtLabel : null,
                 CourtNumber = m.TournamentCourt != null ? m.TournamentCourt.SortOrder : null,
                 CourtGroupName = m.TournamentCourt != null && m.TournamentCourt.CourtGroup != null
-                    ? m.TournamentCourt.CourtGroup.Name : null,
+                    ? m.TournamentCourt.CourtGroup.GroupName : null,
                 WinnerUnitId = m.WinnerUnitId
             })
             .ToListAsync();
@@ -503,10 +503,10 @@ public class ScoreboardController : ControllerBase
             .Select(c => new ScheduleCourtDto
             {
                 CourtId = c.Id,
-                CourtName = c.CourtLabel ?? c.Name,
+                CourtName = c.CourtLabel,
                 CourtNumber = c.SortOrder,
-                GroupName = c.CourtGroup != null ? c.CourtGroup.Name : null,
-                Location = c.Location
+                GroupName = c.CourtGroup != null ? c.CourtGroup.GroupName : null,
+                Location = c.LocationDescription
             })
             .ToListAsync();
 
