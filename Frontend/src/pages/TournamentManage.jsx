@@ -925,6 +925,18 @@ export default function TournamentManage() {
                 </Link>
               )}
 
+              {/* Court Planning link - organizers only */}
+              {isOrganizer && (
+                <Link
+                  to={`/event/${eventId}/court-planning`}
+                  className="px-3 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors font-medium text-sm flex items-center gap-2"
+                  title="Court Planning"
+                >
+                  <MapPin className="w-4 h-4" />
+                  <span className="hidden sm:inline">Court Planning</span>
+                </Link>
+              )}
+
               {/* Status dropdown - organizers only */}
               {isOrganizer && (
                 <select

@@ -977,3 +977,120 @@ public class UserSearchResultDto
     public string? State { get; set; }
     public bool IsAlreadyRegistered { get; set; }
 }
+
+// ============================================
+// Court Planning DTOs
+// ============================================
+
+/// <summary>
+/// Complete court planning data for an event
+/// </summary>
+public class CourtPlanningDto
+{
+    public int EventId { get; set; }
+    public string EventName { get; set; } = string.Empty;
+    public DateTime EventStartDate { get; set; }
+    public DateTime? EventEndDate { get; set; }
+    public List<CourtGroupPlanningDto> CourtGroups { get; set; } = new();
+    public List<CourtPlanningItemDto> UnassignedCourts { get; set; } = new();
+    public List<DivisionPlanningDto> Divisions { get; set; } = new();
+    public List<EncounterPlanningDto> Encounters { get; set; } = new();
+}
+
+public class CourtGroupPlanningDto
+{
+    public int Id { get; set; }
+    public string GroupName { get; set; } = string.Empty;
+    public string? GroupCode { get; set; }
+    public string? LocationArea { get; set; }
+    public int CourtCount { get; set; }
+    public int Priority { get; set; }
+    public int SortOrder { get; set; }
+    public List<CourtPlanningItemDto> Courts { get; set; } = new();
+}
+
+public class CourtPlanningItemDto
+{
+    public int Id { get; set; }
+    public string CourtLabel { get; set; } = string.Empty;
+    public string? Status { get; set; }
+    public string? LocationDescription { get; set; }
+    public int SortOrder { get; set; }
+}
+
+public class DivisionPlanningDto
+{
+    public int Id { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public string? BracketType { get; set; }
+    public int UnitCount { get; set; }
+    public int EncounterCount { get; set; }
+    public int? EstimatedMatchDurationMinutes { get; set; }
+    public List<DivisionCourtGroupAssignmentDto> AssignedCourtGroups { get; set; } = new();
+}
+
+public class DivisionCourtGroupAssignmentDto
+{
+    public int Id { get; set; }
+    public int CourtGroupId { get; set; }
+    public string CourtGroupName { get; set; } = string.Empty;
+    public int Priority { get; set; }
+    public TimeSpan? ValidFromTime { get; set; }
+    public TimeSpan? ValidToTime { get; set; }
+}
+
+public class EncounterPlanningDto
+{
+    public int Id { get; set; }
+    public int DivisionId { get; set; }
+    public string DivisionName { get; set; } = string.Empty;
+    public string RoundType { get; set; } = string.Empty;
+    public int RoundNumber { get; set; }
+    public string? RoundName { get; set; }
+    public int EncounterNumber { get; set; }
+    public string? EncounterLabel { get; set; }
+    public int? Unit1Id { get; set; }
+    public string? Unit1Name { get; set; }
+    public int? Unit2Id { get; set; }
+    public string? Unit2Name { get; set; }
+    public string Status { get; set; } = string.Empty;
+    public int? CourtId { get; set; }
+    public string? CourtLabel { get; set; }
+    public int? CourtGroupId { get; set; }
+    public DateTime? ScheduledTime { get; set; }
+    public DateTime? EstimatedStartTime { get; set; }
+    public bool IsBye { get; set; }
+}
+
+// ============================================
+// Court Planning Request DTOs
+// ============================================
+
+public class BulkCourtTimeAssignmentRequest
+{
+    public int EventId { get; set; }
+    public List<CourtTimeAssignment> Assignments { get; set; } = new();
+}
+
+public class CourtTimeAssignment
+{
+    public int EncounterId { get; set; }
+    public int? CourtId { get; set; }
+    public DateTime? ScheduledTime { get; set; }
+    public DateTime? EstimatedStartTime { get; set; }
+}
+
+public class DivisionCourtGroupsRequest
+{
+    public int DivisionId { get; set; }
+    public List<int>? CourtGroupIds { get; set; }
+    public TimeSpan? ValidFromTime { get; set; }
+    public TimeSpan? ValidToTime { get; set; }
+}
+
+public class AutoAssignRequest
+{
+    public DateTime? StartTime { get; set; }
+    public int? MatchDurationMinutes { get; set; }
+    public bool ClearExisting { get; set; } = true;
+}

@@ -1591,7 +1591,21 @@ export const tournamentApi = {
   updateCourtGroup: (groupId, data) => api.put(`/courtgroups/${groupId}`, data),
   deleteCourtGroup: (groupId) => api.delete(`/courtgroups/${groupId}`),
   assignCourtsToGroup: (groupId, courtIds) => api.post(`/courtgroups/${groupId}/courts`, { courtIds }),
-  autoCreateCourtGroups: (eventId, groupSize = 4) => api.post(`/courtgroups/event/${eventId}/auto-create?groupSize=${groupSize}`)
+  autoCreateCourtGroups: (eventId, groupSize = 4) => api.post(`/courtgroups/event/${eventId}/auto-create?groupSize=${groupSize}`),
+
+  // =====================================================
+  // Court Planning (Dedicated Court Pre-Assignment)
+  // =====================================================
+
+  getCourtPlanningData: (eventId) => api.get(`/tournament/court-planning/${eventId}`),
+  bulkAssignCourtsAndTimes: (eventId, assignments) =>
+    api.post('/tournament/court-planning/bulk-assign', { eventId, assignments }),
+  assignCourtGroupsToDivision: (divisionId, courtGroupIds, validFromTime = null, validToTime = null) =>
+    api.post('/tournament/court-planning/division-courts', { divisionId, courtGroupIds, validFromTime, validToTime }),
+  autoAssignDivisionCourts: (divisionId, options = null) =>
+    api.post(`/tournament/court-planning/auto-assign/${divisionId}`, options),
+  clearDivisionCourtAssignments: (divisionId) =>
+    api.post(`/tournament/court-planning/clear/${divisionId}`)
 }
 
 // Messaging API
