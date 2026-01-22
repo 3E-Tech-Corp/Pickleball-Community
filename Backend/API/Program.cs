@@ -132,6 +132,8 @@ builder.Services.AddScoped<IPushNotificationService, PushNotificationService>();
 builder.Services.AddScoped<IActivityAwardService, ActivityAwardService>();
 builder.Services.AddScoped<IInstaGameService, InstaGameService>();
 builder.Services.AddScoped<IDrawingBroadcaster, DrawingBroadcaster>();
+builder.Services.AddScoped<IScoreBroadcaster, ScoreBroadcaster>();
+builder.Services.AddScoped<IBracketProgressionService, BracketProgressionService>();
 builder.Services.AddScoped<ISharedAssetService, SharedAssetService>();
 builder.Services.AddScoped<IWaiverPdfService, WaiverPdfService>();
 
@@ -182,6 +184,7 @@ app.MapControllers();
 app.MapHub<ChatHub>("/hubs/chat");
 app.MapHub<NotificationHub>("/hubs/notifications");
 app.MapHub<DrawingHub>("/hubs/drawing");
+app.MapHub<ScoreHub>("/hubs/scores");
 
 // Initialize database
 using (var scope = app.Services.CreateScope())

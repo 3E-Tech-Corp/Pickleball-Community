@@ -92,6 +92,8 @@ public class ApplicationDbContext : DbContext
     public DbSet<EventGameScoreHistory> EventGameScoreHistories { get; set; }
     public DbSet<TournamentCourt> TournamentCourts { get; set; }
     public DbSet<EventDocument> EventDocuments { get; set; }
+    public DbSet<DivisionPhase> DivisionPhases { get; set; }
+    public DbSet<PhaseSlot> PhaseSlots { get; set; }
 
     // Clubs
     public DbSet<Club> Clubs { get; set; }
@@ -173,6 +175,11 @@ public class ApplicationDbContext : DbContext
     public DbSet<EventCheckIn> EventCheckIns { get; set; }
     public DbSet<SpectatorSubscription> SpectatorSubscriptions { get; set; }
     public DbSet<GameQueue> GameQueues { get; set; }
+
+    // Event Staff System
+    public DbSet<EventStaffRole> EventStaffRoles { get; set; }
+    public DbSet<EventStaff> EventStaff { get; set; }
+    public DbSet<DivisionCourtBlock> DivisionCourtBlocks { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -1111,6 +1118,22 @@ public class ApplicationDbContext : DbContext
                   .WithMany()
                   .HasForeignKey(e => e.TournamentCourtId)
                   .OnDelete(DeleteBehavior.SetNull);
+
+            // Phase and Slot relationships (for multi-phase tournaments)
+            entity.HasOne(e => e.Phase)
+                  .WithMany(p => p.Encounters)
+                  .HasForeignKey(e => e.PhaseId)
+                  .OnDelete(DeleteBehavior.NoAction);
+
+            entity.HasOne(e => e.Unit1Slot)
+                  .WithMany(s => s.EncountersAsUnit1)
+                  .HasForeignKey(e => e.Unit1SlotId)
+                  .OnDelete(DeleteBehavior.NoAction);
+
+            entity.HasOne(e => e.Unit2Slot)
+                  .WithMany(s => s.EncountersAsUnit2)
+                  .HasForeignKey(e => e.Unit2SlotId)
+                  .OnDelete(DeleteBehavior.NoAction);
         });
 
         // Encounter Match configuration
@@ -1174,6 +1197,79 @@ public class ApplicationDbContext : DbContext
             entity.HasOne(p => p.Unit)
                   .WithMany()
                   .HasForeignKey(p => p.UnitId)
+                  .OnDelete(DeleteBehavior.NoAction);
+        });
+
+        // Division Phase configuration (multi-phase tournament support)
+        modelBuilder.Entity<DivisionPhase>(entity =>
+        {
+            entity.Property(p => p.PhaseType).IsRequired().HasMaxLength(30);
+            entity.Property(p => p.Name).IsRequired().HasMaxLength(100);
+            entity.Property(p => p.Description).HasMaxLength(500);
+            entity.Property(p => p.Status).HasMaxLength(20);
+            entity.Property(p => p.RankingCriteria).HasMaxLength(1000);
+            entity.Property(p => p.ReseedOption).HasMaxLength(30);
+            entity.Property(p => p.Settings).HasMaxLength(2000);
+
+            entity.HasIndex(p => p.DivisionId);
+            entity.HasIndex(p => p.Status);
+            entity.HasIndex(p => new { p.DivisionId, p.PhaseOrder }).IsUnique();
+
+            entity.HasOne(p => p.Division)
+                  .WithMany(d => d.Phases)
+                  .HasForeignKey(p => p.DivisionId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(p => p.ScoreFormat)
+                  .WithMany()
+                  .HasForeignKey(p => p.ScoreFormatId)
+                  .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasOne(p => p.LockedBy)
+                  .WithMany()
+                  .HasForeignKey(p => p.LockedByUserId)
+                  .OnDelete(DeleteBehavior.NoAction);
+        });
+
+        // Phase Slot configuration (placeholder-based unit assignment)
+        modelBuilder.Entity<PhaseSlot>(entity =>
+        {
+            entity.Property(s => s.SlotType).IsRequired().HasMaxLength(20);
+            entity.Property(s => s.SourceType).IsRequired().HasMaxLength(20);
+            entity.Property(s => s.SourcePoolName).HasMaxLength(20);
+            entity.Property(s => s.PlaceholderLabel).HasMaxLength(100);
+            entity.Property(s => s.ResolutionNotes).HasMaxLength(500);
+
+            entity.HasIndex(s => s.PhaseId);
+            entity.HasIndex(s => s.UnitId);
+            entity.HasIndex(s => s.SourceEncounterId);
+            entity.HasIndex(s => s.SourcePhaseId);
+            entity.HasIndex(s => s.IsResolved);
+            entity.HasIndex(s => new { s.PhaseId, s.SlotType, s.SlotNumber }).IsUnique();
+
+            entity.HasOne(s => s.Phase)
+                  .WithMany(p => p.Slots)
+                  .HasForeignKey(s => s.PhaseId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(s => s.Unit)
+                  .WithMany()
+                  .HasForeignKey(s => s.UnitId)
+                  .OnDelete(DeleteBehavior.NoAction);
+
+            entity.HasOne(s => s.SourceEncounter)
+                  .WithMany()
+                  .HasForeignKey(s => s.SourceEncounterId)
+                  .OnDelete(DeleteBehavior.NoAction);
+
+            entity.HasOne(s => s.SourcePhase)
+                  .WithMany()
+                  .HasForeignKey(s => s.SourcePhaseId)
+                  .OnDelete(DeleteBehavior.NoAction);
+
+            entity.HasOne(s => s.ResolvedBy)
+                  .WithMany()
+                  .HasForeignKey(s => s.ResolvedByUserId)
                   .OnDelete(DeleteBehavior.NoAction);
         });
 
@@ -1793,6 +1889,77 @@ public class ApplicationDbContext : DbContext
             entity.HasOne(q => q.QueuedBy)
                   .WithMany()
                   .HasForeignKey(q => q.QueuedByUserId)
+                  .OnDelete(DeleteBehavior.NoAction);
+        });
+
+        // =========================================
+        // Event Staff System Configuration
+        // =========================================
+
+        // Event Staff Role configuration
+        modelBuilder.Entity<EventStaffRole>(entity =>
+        {
+            entity.Property(r => r.Name).IsRequired().HasMaxLength(100);
+            entity.Property(r => r.Description).HasMaxLength(500);
+            entity.HasIndex(r => r.EventId);
+            entity.HasIndex(r => r.SortOrder);
+            entity.HasIndex(r => new { r.EventId, r.Name });
+
+            entity.HasOne(r => r.Event)
+                  .WithMany(e => e.StaffRoles)
+                  .HasForeignKey(r => r.EventId)
+                  .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // Event Staff configuration
+        modelBuilder.Entity<EventStaff>(entity =>
+        {
+            entity.Property(s => s.Status).IsRequired().HasMaxLength(20);
+            entity.Property(s => s.SelfRegistrationNotes).HasMaxLength(500);
+            entity.Property(s => s.AdminNotes).HasMaxLength(500);
+            entity.HasIndex(s => s.EventId);
+            entity.HasIndex(s => s.UserId);
+            entity.HasIndex(s => s.Status);
+            entity.HasIndex(s => new { s.EventId, s.UserId }).IsUnique();
+
+            entity.HasOne(s => s.Event)
+                  .WithMany(e => e.Staff)
+                  .HasForeignKey(s => s.EventId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(s => s.User)
+                  .WithMany()
+                  .HasForeignKey(s => s.UserId)
+                  .OnDelete(DeleteBehavior.NoAction);
+
+            entity.HasOne(s => s.Role)
+                  .WithMany()
+                  .HasForeignKey(s => s.RoleId)
+                  .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasOne(s => s.AssignedBy)
+                  .WithMany()
+                  .HasForeignKey(s => s.AssignedByUserId)
+                  .OnDelete(DeleteBehavior.NoAction);
+        });
+
+        // Division Court Block configuration
+        modelBuilder.Entity<DivisionCourtBlock>(entity =>
+        {
+            entity.Property(b => b.Notes).HasMaxLength(500);
+            entity.HasIndex(b => b.DivisionId);
+            entity.HasIndex(b => b.TournamentCourtId);
+            entity.HasIndex(b => new { b.DivisionId, b.Priority });
+            entity.HasIndex(b => new { b.DivisionId, b.TournamentCourtId }).IsUnique();
+
+            entity.HasOne(b => b.Division)
+                  .WithMany(d => d.CourtBlocks)
+                  .HasForeignKey(b => b.DivisionId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(b => b.TournamentCourt)
+                  .WithMany()
+                  .HasForeignKey(b => b.TournamentCourtId)
                   .OnDelete(DeleteBehavior.NoAction);
         });
     }

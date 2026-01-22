@@ -1265,6 +1265,13 @@ public class UsersController : ControllerBase
                     System.Net.Http.Headers.AuthenticationHeaderValue.Parse(authHeader);
             }
 
+            // Pass API key for service-to-service authentication
+            var apiKey = _configuration["SharedAuth:ApiKey"];
+            if (!string.IsNullOrEmpty(apiKey))
+            {
+                httpClient.DefaultRequestHeaders.Add("X-Api-Key", apiKey);
+            }
+
             // Call Funtime-Shared admin endpoint: PUT /admin/users/{id}
             try
             {
@@ -1363,6 +1370,13 @@ public class UsersController : ControllerBase
             {
                 httpClient.DefaultRequestHeaders.Authorization =
                     System.Net.Http.Headers.AuthenticationHeaderValue.Parse(authHeader);
+            }
+
+            // Pass API key for service-to-service authentication
+            var apiKey = _configuration["SharedAuth:ApiKey"];
+            if (!string.IsNullOrEmpty(apiKey))
+            {
+                httpClient.DefaultRequestHeaders.Add("X-Api-Key", apiKey);
             }
 
             // Call Funtime-Shared admin endpoint: PUT /admin/users/{id}

@@ -19,17 +19,23 @@ public class TournamentController : ControllerBase
     private readonly ILogger<TournamentController> _logger;
     private readonly IDrawingBroadcaster _drawingBroadcaster;
     private readonly INotificationService _notificationService;
+    private readonly IBracketProgressionService _bracketProgressionService;
+    private readonly IScoreBroadcaster _scoreBroadcaster;
 
     public TournamentController(
         ApplicationDbContext context,
         ILogger<TournamentController> logger,
         IDrawingBroadcaster drawingBroadcaster,
-        INotificationService notificationService)
+        INotificationService notificationService,
+        IBracketProgressionService bracketProgressionService,
+        IScoreBroadcaster scoreBroadcaster)
     {
         _context = context;
         _logger = logger;
         _drawingBroadcaster = drawingBroadcaster;
         _notificationService = notificationService;
+        _bracketProgressionService = bracketProgressionService;
+        _scoreBroadcaster = scoreBroadcaster;
     }
 
     private int? GetUserId()
@@ -3570,18 +3576,23 @@ public class TournamentController : ControllerBase
             .ThenBy(m => m.EncounterNumber)
             .ToListAsync();
 
-        // Extract pool assignments from pool encounters (since units may not have PoolNumber/PoolName set)
-        var unitPoolAssignments = new Dictionary<int, (int PoolNumber, string PoolName)>();
+        // Get pool count from division settings or infer from encounters
         var poolEncounters = matches.Where(m => m.RoundType == "Pool").ToList();
+        var poolCount = poolEncounters.Any()
+            ? poolEncounters.Max(m => m.RoundNumber)
+            : division.PoolCount ?? 2; // Default to 2 pools if not specified
+
+        // Extract pool assignments from pool encounters as fallback (for units without UnitNumber)
+        var unitPoolAssignmentsFromEncounters = new Dictionary<int, (int PoolNumber, string PoolName)>();
         foreach (var enc in poolEncounters)
         {
             var poolNum = enc.RoundNumber;
             var poolName = enc.RoundName ?? $"Pool {(char)('A' + poolNum - 1)}";
 
-            if (enc.Unit1Id.HasValue && !unitPoolAssignments.ContainsKey(enc.Unit1Id.Value))
-                unitPoolAssignments[enc.Unit1Id.Value] = (poolNum, poolName);
-            if (enc.Unit2Id.HasValue && !unitPoolAssignments.ContainsKey(enc.Unit2Id.Value))
-                unitPoolAssignments[enc.Unit2Id.Value] = (poolNum, poolName);
+            if (enc.Unit1Id.HasValue && !unitPoolAssignmentsFromEncounters.ContainsKey(enc.Unit1Id.Value))
+                unitPoolAssignmentsFromEncounters[enc.Unit1Id.Value] = (poolNum, poolName);
+            if (enc.Unit2Id.HasValue && !unitPoolAssignmentsFromEncounters.ContainsKey(enc.Unit2Id.Value))
+                unitPoolAssignmentsFromEncounters[enc.Unit2Id.Value] = (poolNum, poolName);
         }
 
         // Include members to show team composition
@@ -3595,16 +3606,27 @@ public class TournamentController : ControllerBase
             .ThenBy(u => u.UnitNumber)
             .ToListAsync();
 
-        // Apply pool assignments from encounters to units (for display purposes)
+        // Apply pool assignments to units (for display purposes)
+        // Priority: 1) Calculate from UnitNumber (deterministic), 2) From encounters (fallback)
         foreach (var unit in units)
         {
-            if (unitPoolAssignments.TryGetValue(unit.Id, out var poolInfo))
+            if (!unit.PoolNumber.HasValue || unit.PoolNumber == 0)
             {
-                // Use encounter-derived pool info if unit doesn't have it set
-                if (!unit.PoolNumber.HasValue || unit.PoolNumber == 0)
+                // Calculate pool from UnitNumber if available (most reliable)
+                // Pool assignment: odd UnitNumbers to Pool 1, even to Pool 2 (for 2 pools)
+                // General formula: ((UnitNumber - 1) % poolCount) + 1
+                if (unit.UnitNumber.HasValue && unit.UnitNumber > 0 && poolCount > 0)
+                {
+                    var calculatedPool = ((unit.UnitNumber.Value - 1) % poolCount) + 1;
+                    unit.PoolNumber = calculatedPool;
+                    unit.PoolName = $"Pool {(char)('A' + calculatedPool - 1)}";
+                }
+                // Fallback to encounter-derived pool info
+                else if (unitPoolAssignmentsFromEncounters.TryGetValue(unit.Id, out var poolInfo))
+                {
                     unit.PoolNumber = poolInfo.PoolNumber;
-                if (string.IsNullOrEmpty(unit.PoolName))
                     unit.PoolName = poolInfo.PoolName;
+                }
             }
         }
 
@@ -4185,7 +4207,23 @@ public class TournamentController : ControllerBase
                     }
                 }
 
-                // Check if match is complete (for best-of series)
+                // Broadcast game score update via SignalR
+                var winnerUnit = game.WinnerUnitId == encounter.Unit1Id ? encounter.Unit1 : encounter.Unit2;
+                await _scoreBroadcaster.BroadcastGameScoreUpdated(encounter.EventId, encounter.DivisionId, new GameScoreUpdateDto
+                {
+                    GameId = game.Id,
+                    EncounterId = encounter.Id,
+                    DivisionId = encounter.DivisionId,
+                    GameNumber = game.GameNumber,
+                    Unit1Score = game.Unit1Score,
+                    Unit2Score = game.Unit2Score,
+                    WinnerUnitId = game.WinnerUnitId,
+                    WinnerName = winnerUnit?.Name,
+                    Status = game.Status ?? "Finished",
+                    UpdatedAt = DateTime.Now
+                });
+
+                // Check if match is complete (for best-of series) - this also handles bracket progression
                 await CheckMatchComplete(encounter.Id);
 
                 // Save changes before starting next game
@@ -4214,6 +4252,25 @@ public class TournamentController : ControllerBase
             // Adjust unit stats (subtract old, add new)
             await AdjustUnitStats(encounter, oldUnit1Score, oldUnit2Score, oldWinnerId,
                                   game.Unit1Score, game.Unit2Score, game.WinnerUnitId);
+
+            // Broadcast score change
+            var winnerUnit = game.WinnerUnitId == encounter.Unit1Id ? encounter.Unit1 : encounter.Unit2;
+            await _scoreBroadcaster.BroadcastGameScoreUpdated(encounter.EventId, encounter.DivisionId, new GameScoreUpdateDto
+            {
+                GameId = game.Id,
+                EncounterId = encounter.Id,
+                DivisionId = encounter.DivisionId,
+                GameNumber = game.GameNumber,
+                Unit1Score = game.Unit1Score,
+                Unit2Score = game.Unit2Score,
+                WinnerUnitId = game.WinnerUnitId,
+                WinnerName = winnerUnit?.Name,
+                Status = game.Status ?? "Finished",
+                UpdatedAt = DateTime.Now
+            });
+
+            // Re-check match completion in case winner changed
+            await CheckMatchComplete(encounter.Id);
         }
 
         await _context.SaveChangesAsync();
@@ -5598,6 +5655,8 @@ public class TournamentController : ControllerBase
     {
         var match = await _context.EventMatches
             .Include(m => m.Matches).ThenInclude(match => match.Games)
+            .Include(m => m.Unit1)
+            .Include(m => m.Unit2)
             .FirstOrDefaultAsync(m => m.Id == matchId);
 
         if (match == null) return;
@@ -5631,6 +5690,53 @@ public class TournamentController : ControllerBase
                 loser.MatchesPlayed++;
                 loser.MatchesLost++;
                 loser.UpdatedAt = DateTime.Now;
+            }
+
+            await _context.SaveChangesAsync();
+
+            // Broadcast match completion
+            await _scoreBroadcaster.BroadcastMatchCompleted(match.EventId, match.DivisionId, new MatchCompletedDto
+            {
+                EncounterId = match.Id,
+                DivisionId = match.DivisionId,
+                RoundType = match.RoundType ?? "",
+                RoundName = match.RoundName ?? "",
+                Unit1Id = match.Unit1Id,
+                Unit1Name = match.Unit1?.Name,
+                Unit2Id = match.Unit2Id,
+                Unit2Name = match.Unit2?.Name,
+                WinnerUnitId = match.WinnerUnitId,
+                WinnerName = winner?.Name,
+                Score = $"{unit1Wins} - {unit2Wins}",
+                CompletedAt = match.CompletedAt ?? DateTime.Now
+            });
+
+            // Check for bracket progression (playoff matches only)
+            if (match.RoundType == "Bracket" || match.RoundType == "Final" || match.RoundType == "ThirdPlace")
+            {
+                var progressionResult = await _bracketProgressionService.CheckAndAdvanceAsync(matchId);
+
+                if (progressionResult.WinnerAdvanced && progressionResult.NextMatchId.HasValue)
+                {
+                    // Broadcast bracket progression
+                    await _scoreBroadcaster.BroadcastBracketProgression(match.EventId, match.DivisionId, new BracketProgressionDto
+                    {
+                        FromEncounterId = match.Id,
+                        ToEncounterId = progressionResult.NextMatchId.Value,
+                        DivisionId = match.DivisionId,
+                        WinnerUnitId = match.WinnerUnitId ?? 0,
+                        WinnerName = winner?.Name ?? "",
+                        FromRoundName = match.RoundName ?? "",
+                        NextRoundName = progressionResult.NextMatchRoundName ?? "",
+                        SlotPosition = (match.BracketPosition ?? 0) % 2 == 1 ? 1 : 2,
+                        AdvancedAt = DateTime.Now
+                    });
+
+                    _logger.LogInformation(
+                        "Bracket progression: {WinnerName} advanced from {FromRound} to {NextRound} (Match {FromMatch} -> {ToMatch})",
+                        winner?.Name, match.RoundName, progressionResult.NextMatchRoundName,
+                        match.Id, progressionResult.NextMatchId);
+                }
             }
         }
     }
@@ -6083,6 +6189,21 @@ public class TournamentController : ControllerBase
             unit.UnitNumber = null;
             unit.PoolNumber = null;
             unit.PoolName = null;
+        }
+
+        // Clear Unit1Id/Unit2Id from pool encounters to prevent stale pool assignments
+        // This ensures GetSchedule derives pools correctly after a new drawing
+        var poolEncounters = await _context.EventMatches
+            .Where(m => m.DivisionId == divisionId && m.RoundType == "Pool")
+            .ToListAsync();
+
+        foreach (var encounter in poolEncounters)
+        {
+            encounter.Unit1Id = null;
+            encounter.Unit2Id = null;
+            encounter.WinnerUnitId = null;
+            encounter.Status = "Scheduled";
+            encounter.UpdatedAt = DateTime.Now;
         }
 
         // End the drawing session and reset status
@@ -6677,5 +6798,273 @@ public class TournamentController : ControllerBase
                 Message = "Failed to reset tournament: " + ex.Message
             });
         }
+    }
+
+    // ============================================
+    // Division Court Blocks (Court Pre-allocation)
+    // ============================================
+
+    /// <summary>
+    /// Get court blocks for a division (pre-allocated courts with priority)
+    /// </summary>
+    [HttpGet("division/{divisionId}/court-blocks")]
+    public async Task<ActionResult<ApiResponse<List<DivisionCourtBlockDto>>>> GetDivisionCourtBlocks(int divisionId)
+    {
+        var blocks = await _context.DivisionCourtBlocks
+            .Include(b => b.TournamentCourt)
+            .Include(b => b.Division)
+            .Where(b => b.DivisionId == divisionId && b.IsActive)
+            .OrderBy(b => b.Priority)
+            .Select(b => new DivisionCourtBlockDto
+            {
+                Id = b.Id,
+                DivisionId = b.DivisionId,
+                DivisionName = b.Division != null ? b.Division.Name : null,
+                TournamentCourtId = b.TournamentCourtId,
+                CourtLabel = b.TournamentCourt != null ? b.TournamentCourt.CourtLabel : null,
+                Priority = b.Priority,
+                IntendedStartTime = b.IntendedStartTime,
+                IntendedEndTime = b.IntendedEndTime,
+                Notes = b.Notes,
+                IsActive = b.IsActive,
+                CreatedAt = b.CreatedAt
+            })
+            .ToListAsync();
+
+        return Ok(new ApiResponse<List<DivisionCourtBlockDto>> { Success = true, Data = blocks });
+    }
+
+    /// <summary>
+    /// Add a court block to a division
+    /// </summary>
+    [Authorize]
+    [HttpPost("division/{divisionId}/court-blocks")]
+    public async Task<ActionResult<ApiResponse<DivisionCourtBlockDto>>> CreateDivisionCourtBlock(
+        int divisionId,
+        [FromBody] CreateDivisionCourtBlockDto dto)
+    {
+        var division = await _context.EventDivisions.FindAsync(divisionId);
+        if (division == null)
+            return NotFound(new ApiResponse<DivisionCourtBlockDto> { Success = false, Message = "Division not found" });
+
+        var userId = GetUserId();
+        if (!userId.HasValue)
+            return Unauthorized(new ApiResponse<DivisionCourtBlockDto> { Success = false, Message = "User not authenticated" });
+
+        // Check permission
+        var evt = await _context.Events.FindAsync(division.EventId);
+        if (evt == null || (evt.OrganizedByUserId != userId.Value && !await IsAdminAsync()))
+            return Forbid();
+
+        // Check if court exists and belongs to the same event
+        var court = await _context.TournamentCourts.FindAsync(dto.TournamentCourtId);
+        if (court == null || court.EventId != division.EventId)
+            return BadRequest(new ApiResponse<DivisionCourtBlockDto> { Success = false, Message = "Invalid court" });
+
+        // Check if already assigned
+        var existing = await _context.DivisionCourtBlocks
+            .FirstOrDefaultAsync(b => b.DivisionId == divisionId && b.TournamentCourtId == dto.TournamentCourtId);
+        if (existing != null)
+            return BadRequest(new ApiResponse<DivisionCourtBlockDto> { Success = false, Message = "Court is already assigned to this division" });
+
+        var block = new DivisionCourtBlock
+        {
+            DivisionId = divisionId,
+            TournamentCourtId = dto.TournamentCourtId,
+            Priority = dto.Priority,
+            IntendedStartTime = dto.IntendedStartTime,
+            IntendedEndTime = dto.IntendedEndTime,
+            Notes = dto.Notes
+        };
+
+        _context.DivisionCourtBlocks.Add(block);
+        await _context.SaveChangesAsync();
+
+        await _context.Entry(block).Reference(b => b.TournamentCourt).LoadAsync();
+        await _context.Entry(block).Reference(b => b.Division).LoadAsync();
+
+        var result = new DivisionCourtBlockDto
+        {
+            Id = block.Id,
+            DivisionId = block.DivisionId,
+            DivisionName = block.Division?.Name,
+            TournamentCourtId = block.TournamentCourtId,
+            CourtLabel = block.TournamentCourt?.CourtLabel,
+            Priority = block.Priority,
+            IntendedStartTime = block.IntendedStartTime,
+            IntendedEndTime = block.IntendedEndTime,
+            Notes = block.Notes,
+            IsActive = block.IsActive,
+            CreatedAt = block.CreatedAt
+        };
+
+        return Ok(new ApiResponse<DivisionCourtBlockDto> { Success = true, Data = result });
+    }
+
+    /// <summary>
+    /// Update a court block
+    /// </summary>
+    [Authorize]
+    [HttpPut("division/{divisionId}/court-blocks/{blockId}")]
+    public async Task<ActionResult<ApiResponse<DivisionCourtBlockDto>>> UpdateDivisionCourtBlock(
+        int divisionId,
+        int blockId,
+        [FromBody] UpdateDivisionCourtBlockDto dto)
+    {
+        var block = await _context.DivisionCourtBlocks
+            .Include(b => b.Division)
+            .Include(b => b.TournamentCourt)
+            .FirstOrDefaultAsync(b => b.Id == blockId && b.DivisionId == divisionId);
+
+        if (block == null)
+            return NotFound(new ApiResponse<DivisionCourtBlockDto> { Success = false, Message = "Court block not found" });
+
+        var userId = GetUserId();
+        if (!userId.HasValue)
+            return Unauthorized(new ApiResponse<DivisionCourtBlockDto> { Success = false, Message = "User not authenticated" });
+
+        // Check permission
+        var evt = await _context.Events.FindAsync(block.Division!.EventId);
+        if (evt == null || (evt.OrganizedByUserId != userId.Value && !await IsAdminAsync()))
+            return Forbid();
+
+        // Update fields
+        if (dto.Priority.HasValue)
+            block.Priority = dto.Priority.Value;
+        if (dto.IntendedStartTime.HasValue)
+            block.IntendedStartTime = dto.IntendedStartTime;
+        if (dto.IntendedEndTime.HasValue)
+            block.IntendedEndTime = dto.IntendedEndTime;
+        if (dto.Notes != null)
+            block.Notes = dto.Notes;
+        if (dto.IsActive.HasValue)
+            block.IsActive = dto.IsActive.Value;
+
+        block.UpdatedAt = DateTime.Now;
+        await _context.SaveChangesAsync();
+
+        var result = new DivisionCourtBlockDto
+        {
+            Id = block.Id,
+            DivisionId = block.DivisionId,
+            DivisionName = block.Division?.Name,
+            TournamentCourtId = block.TournamentCourtId,
+            CourtLabel = block.TournamentCourt?.CourtLabel,
+            Priority = block.Priority,
+            IntendedStartTime = block.IntendedStartTime,
+            IntendedEndTime = block.IntendedEndTime,
+            Notes = block.Notes,
+            IsActive = block.IsActive,
+            CreatedAt = block.CreatedAt
+        };
+
+        return Ok(new ApiResponse<DivisionCourtBlockDto> { Success = true, Data = result });
+    }
+
+    /// <summary>
+    /// Delete a court block
+    /// </summary>
+    [Authorize]
+    [HttpDelete("division/{divisionId}/court-blocks/{blockId}")]
+    public async Task<ActionResult<ApiResponse<bool>>> DeleteDivisionCourtBlock(int divisionId, int blockId)
+    {
+        var block = await _context.DivisionCourtBlocks
+            .Include(b => b.Division)
+            .FirstOrDefaultAsync(b => b.Id == blockId && b.DivisionId == divisionId);
+
+        if (block == null)
+            return NotFound(new ApiResponse<bool> { Success = false, Message = "Court block not found" });
+
+        var userId = GetUserId();
+        if (!userId.HasValue)
+            return Unauthorized(new ApiResponse<bool> { Success = false, Message = "User not authenticated" });
+
+        // Check permission
+        var evt = await _context.Events.FindAsync(block.Division!.EventId);
+        if (evt == null || (evt.OrganizedByUserId != userId.Value && !await IsAdminAsync()))
+            return Forbid();
+
+        _context.DivisionCourtBlocks.Remove(block);
+        await _context.SaveChangesAsync();
+
+        return Ok(new ApiResponse<bool> { Success = true, Data = true });
+    }
+
+    /// <summary>
+    /// Bulk update court blocks for a division (replaces all blocks)
+    /// </summary>
+    [Authorize]
+    [HttpPut("division/{divisionId}/court-blocks")]
+    public async Task<ActionResult<ApiResponse<List<DivisionCourtBlockDto>>>> BulkUpdateDivisionCourtBlocks(
+        int divisionId,
+        [FromBody] BulkUpdateDivisionCourtBlocksDto dto)
+    {
+        var division = await _context.EventDivisions.FindAsync(divisionId);
+        if (division == null)
+            return NotFound(new ApiResponse<List<DivisionCourtBlockDto>> { Success = false, Message = "Division not found" });
+
+        var userId = GetUserId();
+        if (!userId.HasValue)
+            return Unauthorized(new ApiResponse<List<DivisionCourtBlockDto>> { Success = false, Message = "User not authenticated" });
+
+        // Check permission
+        var evt = await _context.Events.FindAsync(division.EventId);
+        if (evt == null || (evt.OrganizedByUserId != userId.Value && !await IsAdminAsync()))
+            return Forbid();
+
+        // Validate all courts
+        var courtIds = dto.CourtBlocks.Select(b => b.TournamentCourtId).ToList();
+        var validCourts = await _context.TournamentCourts
+            .Where(c => courtIds.Contains(c.Id) && c.EventId == division.EventId)
+            .Select(c => c.Id)
+            .ToListAsync();
+
+        var invalidCourts = courtIds.Except(validCourts).ToList();
+        if (invalidCourts.Any())
+            return BadRequest(new ApiResponse<List<DivisionCourtBlockDto>> { Success = false, Message = $"Invalid court IDs: {string.Join(", ", invalidCourts)}" });
+
+        // Remove existing blocks
+        var existingBlocks = await _context.DivisionCourtBlocks
+            .Where(b => b.DivisionId == divisionId)
+            .ToListAsync();
+        _context.DivisionCourtBlocks.RemoveRange(existingBlocks);
+
+        // Add new blocks
+        var newBlocks = dto.CourtBlocks.Select(b => new DivisionCourtBlock
+        {
+            DivisionId = divisionId,
+            TournamentCourtId = b.TournamentCourtId,
+            Priority = b.Priority,
+            IntendedStartTime = b.IntendedStartTime,
+            IntendedEndTime = b.IntendedEndTime,
+            Notes = b.Notes
+        }).ToList();
+
+        _context.DivisionCourtBlocks.AddRange(newBlocks);
+        await _context.SaveChangesAsync();
+
+        // Load and return results
+        var blocks = await _context.DivisionCourtBlocks
+            .Include(b => b.TournamentCourt)
+            .Include(b => b.Division)
+            .Where(b => b.DivisionId == divisionId)
+            .OrderBy(b => b.Priority)
+            .Select(b => new DivisionCourtBlockDto
+            {
+                Id = b.Id,
+                DivisionId = b.DivisionId,
+                DivisionName = b.Division != null ? b.Division.Name : null,
+                TournamentCourtId = b.TournamentCourtId,
+                CourtLabel = b.TournamentCourt != null ? b.TournamentCourt.CourtLabel : null,
+                Priority = b.Priority,
+                IntendedStartTime = b.IntendedStartTime,
+                IntendedEndTime = b.IntendedEndTime,
+                Notes = b.Notes,
+                IsActive = b.IsActive,
+                CreatedAt = b.CreatedAt
+            })
+            .ToListAsync();
+
+        return Ok(new ApiResponse<List<DivisionCourtBlockDto>> { Success = true, Data = blocks });
     }
 }

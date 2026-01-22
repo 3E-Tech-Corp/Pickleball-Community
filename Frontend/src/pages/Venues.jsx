@@ -2042,26 +2042,127 @@ function AddCourtModal({ onClose, onCourtAdded, userLocation, courtTypes }) {
   const [error, setError] = useState(null);
   const [nearbyCourts, setNearbyCourts] = useState([]);
 
-  // Form data
-  const [formData, setFormData] = useState({
-    name: '',
-    addr1: '',
-    addr2: '',
-    city: '',
-    state: '',
-    zip: '',
-    country: 'USA',
-    phone: '',
-    website: '',
-    email: '',
-    indoorNum: 0,
-    outdoorNum: 0,
-    coveredNum: 0,
-    hasLights: false,
-    courtTypeId: '',
-    latitude: userLocation?.lat || 0,
-    longitude: userLocation?.lng || 0
+  // Address geocoding state
+  const [addressInput, setAddressInput] = useState('');
+  const [geocoding, setGeocoding] = useState(false);
+  const [geocodeError, setGeocodeError] = useState(null);
+
+  // Storage key for persisting form data
+  const STORAGE_KEY = 'venue-add-form-draft';
+
+  // Track if we had a saved draft (for showing "draft restored" message)
+  const [hadSavedDraft, setHadSavedDraft] = useState(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      return saved && JSON.parse(saved).name; // Only consider it a draft if there's meaningful data
+    } catch (e) {
+      return false;
+    }
   });
+
+  // Load saved form data from localStorage on mount
+  const getInitialFormData = () => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        // Restore saved data but update location if user location changed
+        return {
+          ...parsed,
+          latitude: parsed.latitude || userLocation?.lat || 0,
+          longitude: parsed.longitude || userLocation?.lng || 0
+        };
+      }
+    } catch (e) {
+      console.error('Error loading saved venue form:', e);
+    }
+    return {
+      name: '',
+      addr1: '',
+      addr2: '',
+      city: '',
+      state: '',
+      zip: '',
+      country: 'USA',
+      phone: '',
+      website: '',
+      email: '',
+      indoorNum: 0,
+      outdoorNum: 0,
+      coveredNum: 0,
+      hasLights: false,
+      courtTypeId: '',
+      latitude: userLocation?.lat || 0,
+      longitude: userLocation?.lng || 0
+    };
+  };
+
+  // Form data
+  const [formData, setFormData] = useState(getInitialFormData);
+
+  // Also restore step from localStorage
+  useEffect(() => {
+    try {
+      const savedStep = localStorage.getItem(STORAGE_KEY + '-step');
+      if (savedStep && ['location', 'duplicates', 'details'].includes(savedStep)) {
+        setStep(savedStep);
+      }
+    } catch (e) {
+      console.error('Error loading saved step:', e);
+    }
+  }, []);
+
+  // Save form data to localStorage whenever it changes
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(formData));
+    } catch (e) {
+      console.error('Error saving venue form:', e);
+    }
+  }, [formData]);
+
+  // Save step to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY + '-step', step);
+    } catch (e) {
+      console.error('Error saving step:', e);
+    }
+  }, [step]);
+
+  // Clear saved data when modal closes successfully (on submit)
+  const clearSavedData = () => {
+    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(STORAGE_KEY + '-step');
+    setHadSavedDraft(false);
+  };
+
+  // Start over with a fresh form
+  const startOver = () => {
+    clearSavedData();
+    setStep('location');
+    setFormData({
+      name: '',
+      addr1: '',
+      addr2: '',
+      city: '',
+      state: '',
+      zip: '',
+      country: 'USA',
+      phone: '',
+      website: '',
+      email: '',
+      indoorNum: 0,
+      outdoorNum: 0,
+      coveredNum: 0,
+      hasLights: false,
+      courtTypeId: '',
+      latitude: userLocation?.lat || 0,
+      longitude: userLocation?.lng || 0
+    });
+    setNearbyCourts([]);
+    setError(null);
+  };
 
   // Map for location selection
   const mapRef = useRef(null);
@@ -2122,6 +2223,210 @@ function AddCourtModal({ onClose, onCourtAdded, userLocation, courtTypes }) {
     };
   }, [step, userLocation]);
 
+  // Reverse geocode coordinates to get address components
+  const reverseGeocode = async (lat, lng) => {
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&addressdetails=1`,
+        {
+          headers: {
+            'Accept': 'application/json',
+            'User-Agent': 'PickleballCommunity/1.0'
+          }
+        }
+      );
+
+      if (!response.ok) return null;
+
+      const result = await response.json();
+      if (result) {
+        const addr = result.address || {};
+        const displayName = result.display_name || '';
+
+        // Build street address from house number and street
+        let streetAddress = [addr.house_number || '', addr.road || addr.street || addr.pedestrian || ''].filter(Boolean).join(' ');
+        let city = addr.city || addr.town || addr.village || addr.municipality || addr.hamlet || '';
+        let state = addr.state || addr.province || addr.region || '';
+
+        // If address components are empty, try to parse from display_name
+        if (displayName && (!streetAddress || !city || !state)) {
+          const parts = displayName.split(',').map(p => p.trim());
+          if (parts.length >= 1 && !streetAddress) {
+            streetAddress = parts[0];
+          }
+          if (parts.length >= 3 && !city) {
+            city = parts[parts.length - 3] || parts[parts.length - 2] || '';
+          }
+          if (parts.length >= 2 && !state) {
+            state = parts[parts.length - 2] || '';
+          }
+        }
+
+        return {
+          addr1: streetAddress,
+          city: city,
+          state: state,
+          zip: addr.postcode || '',
+          country: addr.country || 'USA'
+        };
+      }
+    } catch (err) {
+      console.error('Reverse geocoding error:', err);
+    }
+    return null;
+  };
+
+  // Use current GPS location and reverse geocode for address
+  const useCurrentLocation = async () => {
+    if (!userLocation) return;
+
+    // Update coordinates immediately
+    setFormData(prev => ({
+      ...prev,
+      latitude: userLocation.lat,
+      longitude: userLocation.lng
+    }));
+
+    // Update marker and map if initialized
+    if (markerRef.current && mapInstanceRef.current) {
+      markerRef.current.setLatLng([userLocation.lat, userLocation.lng]);
+      mapInstanceRef.current.setView([userLocation.lat, userLocation.lng], 16);
+    }
+
+    // Reverse geocode to get address (async, don't block)
+    const addressData = await reverseGeocode(userLocation.lat, userLocation.lng);
+    if (addressData) {
+      setFormData(prev => ({
+        ...prev,
+        addr1: prev.addr1 || addressData.addr1,
+        city: prev.city || addressData.city,
+        state: prev.state || addressData.state,
+        zip: prev.zip || addressData.zip,
+        country: prev.country === 'USA' && addressData.country !== 'USA' ? addressData.country : prev.country
+      }));
+    }
+  };
+
+  // Geocode address using OpenStreetMap Nominatim API
+  const geocodeAddress = async () => {
+    if (!addressInput.trim()) {
+      setGeocodeError('Please enter an address');
+      return;
+    }
+
+    setGeocoding(true);
+    setGeocodeError(null);
+
+    try {
+      const encodedAddress = encodeURIComponent(addressInput.trim());
+      // Request address details for pre-filling form fields
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodedAddress}&limit=1&addressdetails=1`,
+        {
+          headers: {
+            'Accept': 'application/json',
+            'User-Agent': 'PickleballCommunity/1.0'
+          }
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Geocoding service unavailable');
+      }
+
+      const results = await response.json();
+
+      if (results && results.length > 0) {
+        const { lat, lon, address, display_name } = results[0];
+        const latitude = parseFloat(lat);
+        const longitude = parseFloat(lon);
+
+        // Parse address components from Nominatim response
+        const addr = address || {};
+        // Build street address from house number and street
+        const houseNumber = addr.house_number || '';
+        const street = addr.road || addr.street || addr.pedestrian || '';
+        let streetAddress = [houseNumber, street].filter(Boolean).join(' ');
+
+        // Get city from various possible fields
+        let city = addr.city || addr.town || addr.village || addr.municipality || addr.hamlet || '';
+
+        // Get state/province
+        let state = addr.state || addr.province || addr.region || '';
+
+        // Get postal code
+        const zip = addr.postcode || '';
+
+        // Get country (use short code if available, default to USA)
+        const country = addr.country || 'USA';
+
+        // If address components are empty, try to parse from display_name
+        // display_name format is typically: "123 Main St, City, State, ZIP, Country"
+        if (display_name && (!streetAddress || !city || !state)) {
+          const parts = display_name.split(',').map(p => p.trim());
+          if (parts.length >= 1 && !streetAddress) {
+            // First part is usually the most specific location (street address or place name)
+            streetAddress = parts[0];
+          }
+          // Try to find city and state from the remaining parts
+          if (parts.length >= 3 && !city) {
+            // Usually city is 2nd or 3rd from the end (before state/country)
+            city = parts[parts.length - 3] || parts[parts.length - 2] || '';
+          }
+          if (parts.length >= 2 && !state) {
+            // State is often 2nd from the end
+            state = parts[parts.length - 2] || '';
+          }
+        }
+
+        // If user pasted a full address, extract the street portion to use as addr1
+        // This preserves the user's exact input rather than relying on Nominatim parsing
+        const userInput = addressInput.trim();
+        if (userInput.includes(',')) {
+          // User pasted a full address like "123 Main St, City, State 12345"
+          // Use the first comma-separated part as the street address
+          const userParts = userInput.split(',').map(p => p.trim());
+          if (userParts[0]) {
+            streetAddress = userParts[0];
+          }
+        } else if (userInput && !streetAddress) {
+          // User typed something without commas and we couldn't parse an address
+          // Use display_name's first part as fallback
+          streetAddress = display_name ? display_name.split(',')[0].trim() : userInput;
+        }
+
+        // Update form data with geocoded coordinates AND address components
+        // Always use the geocoded values since user explicitly searched for a new address
+        setFormData(prev => ({
+          ...prev,
+          latitude,
+          longitude,
+          addr1: streetAddress || prev.addr1,
+          city: city || prev.city,
+          state: state || prev.state,
+          zip: zip || prev.zip,
+          country: country && country !== 'USA' ? country : prev.country
+        }));
+
+        // Update marker and map if initialized
+        if (markerRef.current && mapInstanceRef.current) {
+          markerRef.current.setLatLng([latitude, longitude]);
+          mapInstanceRef.current.setView([latitude, longitude], 16);
+        }
+
+        // Clear address input after successful geocoding
+        setAddressInput('');
+      } else {
+        setGeocodeError('Address not found. Try a more specific address.');
+      }
+    } catch (err) {
+      console.error('Geocoding error:', err);
+      setGeocodeError('Failed to find address. Please try again.');
+    } finally {
+      setGeocoding(false);
+    }
+  };
+
   // Check for nearby courts
   const checkForDuplicates = async () => {
     if (!formData.latitude || !formData.longitude) {
@@ -2167,6 +2472,7 @@ function AddCourtModal({ onClose, onCourtAdded, userLocation, courtTypes }) {
     try {
       const response = await venuesApi.addCourt(formData);
       if (response.success) {
+        clearSavedData(); // Clear draft on successful submission
         onCourtAdded(response.data);
       } else {
         setError(response.message || 'Failed to add court');
@@ -2202,6 +2508,19 @@ function AddCourtModal({ onClose, onCourtAdded, userLocation, courtTypes }) {
         </div>
 
         <div className="p-6">
+          {/* Draft restored notice */}
+          {hadSavedDraft && (
+            <div className="mb-4 p-3 bg-blue-50 border border-blue-200 text-blue-700 rounded-lg text-sm flex items-center justify-between">
+              <span>Your previous draft has been restored.</span>
+              <button
+                onClick={startOver}
+                className="text-blue-600 hover:text-blue-800 font-medium underline"
+              >
+                Start Over
+              </button>
+            </div>
+          )}
+
           {error && (
             <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
               {error}
@@ -2217,23 +2536,58 @@ function AddCourtModal({ onClose, onCourtAdded, userLocation, courtTypes }) {
               {/* Use My Location button */}
               {userLocation && (
                 <button
-                  onClick={() => {
-                    setFormData(prev => ({
-                      ...prev,
-                      latitude: userLocation.lat,
-                      longitude: userLocation.lng
-                    }));
-                    // Update marker and map if initialized
-                    if (markerRef.current && mapInstanceRef.current) {
-                      markerRef.current.setLatLng([userLocation.lat, userLocation.lng]);
-                      mapInstanceRef.current.setView([userLocation.lat, userLocation.lng], 16);
-                    }
-                  }}
+                  onClick={useCurrentLocation}
                   className="w-full py-3 bg-blue-50 border-2 border-blue-200 text-blue-700 rounded-lg font-medium hover:bg-blue-100 transition-colors flex items-center justify-center gap-2"
                 >
                   <Locate className="w-5 h-5" />
                   I'm at the venue - Use my current location
                 </button>
+              )}
+
+              {/* Or search by address */}
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-gray-200"></div>
+                </div>
+                <div className="relative flex justify-center text-sm">
+                  <span className="px-2 bg-white text-gray-500">or search by address</span>
+                </div>
+              </div>
+
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={addressInput}
+                  onChange={(e) => setAddressInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      geocodeAddress();
+                    }
+                  }}
+                  placeholder="Paste or type an address..."
+                  className="flex-1 border border-gray-300 rounded-lg px-3 py-2 focus:ring-green-500 focus:border-green-500"
+                  disabled={geocoding}
+                />
+                <button
+                  onClick={geocodeAddress}
+                  disabled={geocoding || !addressInput.trim()}
+                  className="px-4 py-2 bg-gray-100 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                >
+                  {geocoding ? (
+                    <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-gray-600"></div>
+                  ) : (
+                    <Search className="w-4 h-4" />
+                  )}
+                  Find
+                </button>
+              </div>
+
+              {geocodeError && (
+                <div className="text-sm text-red-600 flex items-center gap-2">
+                  <X className="w-4 h-4" />
+                  {geocodeError}
+                </div>
               )}
 
               {/* Map */}

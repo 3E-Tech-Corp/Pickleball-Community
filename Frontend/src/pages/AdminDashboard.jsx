@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
-import { userApi, themeApi, notificationTemplateApi, getAssetUrl, sharedAssetApi, getSharedAssetUrl, SHARED_AUTH_URL, notificationsApi } from '../services/api'
+import { userApi, themeApi, notificationTemplateApi, getAssetUrl, sharedAssetApi, getSharedAssetUrl, SHARED_AUTH_URL, notificationsApi, API_BASE_URL } from '../services/api'
 import {
   Users, BookOpen, Calendar, DollarSign, Search, Edit2, Trash2,
   ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Filter, MoreVertical, Eye, X,
@@ -97,6 +97,11 @@ const AdminDashboard = () => {
   const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false)
   const [previewContent, setPreviewContent] = useState({ subject: '', body: '' })
   const [isNewTemplate, setIsNewTemplate] = useState(false)
+
+  // API Key test state
+  const [apiKeyTestResult, setApiKeyTestResult] = useState(null)
+  const [testingApiKey, setTestingApiKey] = useState(false)
+  const [apiKeyTestError, setApiKeyTestError] = useState(null)
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1)
@@ -374,6 +379,28 @@ const AdminDashboard = () => {
       console.error('Error fetching notification templates:', error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  // Test API key connection to Funtime-Shared
+  // Uses only the API key from backend appsettings, no JWT auth required
+  const testApiKey = async () => {
+    setTestingApiKey(true)
+    setApiKeyTestError(null)
+    setApiKeyTestResult(null)
+    try {
+      const response = await fetch(`${API_BASE_URL}/auth/test-apikey`)
+      const data = await response.json()
+      if (response.ok) {
+        setApiKeyTestResult(data)
+      } else {
+        setApiKeyTestError(data.message || data.details || 'API key test failed')
+      }
+    } catch (error) {
+      console.error('Error testing API key:', error)
+      setApiKeyTestError(error.message || 'Failed to test API key')
+    } finally {
+      setTestingApiKey(false)
     }
   }
 
@@ -837,7 +864,8 @@ const AdminDashboard = () => {
       items: [
         { id: 'users', label: 'Users', icon: Users, count: users.length },
         { id: 'theme', label: 'Theme', icon: Palette },
-        { id: 'notifications', label: 'Notifications', icon: Bell }
+        { id: 'notifications', label: 'Notifications', icon: Bell },
+        { id: 'system', label: 'System', icon: Settings }
       ]
     },
     {
@@ -2464,6 +2492,133 @@ const AdminDashboard = () => {
           {activeTab === 'leagueRoles' && <LeagueRolesAdmin embedded />}
 
           {activeTab === 'releaseNotes' && <ReleaseNotesAdmin embedded />}
+
+          {/* System Tab - API Key Testing */}
+          {activeTab === 'system' && (
+            <div>
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-2xl font-bold text-gray-900">System Settings</h2>
+              </div>
+
+              {/* API Key Test Section */}
+              <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900">Funtime-Shared API Key</h3>
+                    <p className="text-sm text-gray-500">Test your API key connection to the shared authentication service</p>
+                  </div>
+                  <button
+                    onClick={testApiKey}
+                    disabled={testingApiKey}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+                  >
+                    {testingApiKey ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                        Testing...
+                      </>
+                    ) : (
+                      <>
+                        <Play className="w-4 h-4 mr-2" />
+                        Test API Key
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                {/* Error Display */}
+                {apiKeyTestError && (
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
+                    <div className="flex items-center">
+                      <XCircle className="w-5 h-5 text-red-500 mr-2" />
+                      <span className="text-red-700 font-medium">Test Failed</span>
+                    </div>
+                    <p className="text-red-600 mt-1">{apiKeyTestError}</p>
+                  </div>
+                )}
+
+                {/* Success Display */}
+                {apiKeyTestResult && apiKeyTestResult.success && (
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                    <div className="flex items-center mb-3">
+                      <CheckCircle className="w-5 h-5 text-green-500 mr-2" />
+                      <span className="text-green-700 font-medium">{apiKeyTestResult.message}</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <span className="text-gray-500">Partner Key:</span>
+                        <span className="ml-2 font-mono text-gray-900">{apiKeyTestResult.partnerKey}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-500">Partner Name:</span>
+                        <span className="ml-2 text-gray-900">{apiKeyTestResult.partnerName}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-500">Rate Limit:</span>
+                        <span className="ml-2 text-gray-900">{apiKeyTestResult.rateLimitPerMinute} req/min</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-500">Status:</span>
+                        <span className={`ml-2 px-2 py-0.5 rounded-full text-xs font-medium ${apiKeyTestResult.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                          {apiKeyTestResult.isActive ? 'Active' : 'Inactive'}
+                        </span>
+                      </div>
+                      <div className="col-span-2">
+                        <span className="text-gray-500">Scopes:</span>
+                        <div className="mt-1 flex flex-wrap gap-1">
+                          {apiKeyTestResult.scopes?.map((scope, index) => (
+                            <span key={index} className="px-2 py-0.5 bg-blue-100 text-blue-800 rounded-full text-xs font-medium">
+                              {scope}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                      {apiKeyTestResult.clientIp && (
+                        <div>
+                          <span className="text-gray-500">Client IP:</span>
+                          <span className="ml-2 font-mono text-gray-900">{apiKeyTestResult.clientIp}</span>
+                        </div>
+                      )}
+                      {apiKeyTestResult.lastUsedAt && (
+                        <div>
+                          <span className="text-gray-500">Last Used:</span>
+                          <span className="ml-2 text-gray-900">{new Date(apiKeyTestResult.lastUsedAt).toLocaleString()}</span>
+                        </div>
+                      )}
+                      {apiKeyTestResult.expiresAt && (
+                        <div>
+                          <span className="text-gray-500">Expires:</span>
+                          <span className="ml-2 text-gray-900">{new Date(apiKeyTestResult.expiresAt).toLocaleString()}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Initial State */}
+                {!apiKeyTestResult && !apiKeyTestError && !testingApiKey && (
+                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-center">
+                    <Settings className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                    <p className="text-gray-500">Click "Test API Key" to verify your connection to Funtime-Shared</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Configuration Info */}
+              <div className="bg-white rounded-xl shadow-sm p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Configuration</h3>
+                <div className="space-y-3 text-sm">
+                  <div className="flex items-center justify-between py-2 border-b border-gray-100">
+                    <span className="text-gray-500">Shared Auth URL</span>
+                    <span className="font-mono text-gray-900">{SHARED_AUTH_URL}</span>
+                  </div>
+                  <p className="text-gray-500 text-xs mt-2">
+                    API key is stored securely in backend configuration and is not exposed to the frontend.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Notification Testing */}
           {activeTab === 'notifications' && (
