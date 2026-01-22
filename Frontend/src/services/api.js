@@ -2252,7 +2252,22 @@ export const scoreboardApi = {
   getBracket: (eventId, divisionId) => api.get(`/scoreboard/bracket/${eventId}/${divisionId}`),
 
   // Get pools
-  getPools: (eventId, divisionId) => api.get(`/scoreboard/pools/${eventId}/${divisionId}`)
+  getPools: (eventId, divisionId) => api.get(`/scoreboard/pools/${eventId}/${divisionId}`),
+
+  // Get registrations for spectator view
+  getRegistrations: (eventId, divisionId = null) => {
+    const params = divisionId ? `?divisionId=${divisionId}` : ''
+    return api.get(`/scoreboard/registrations/${eventId}${params}`)
+  },
+
+  // Get schedule for spectator view
+  getSchedule: (eventId, params = {}) => {
+    const queryParams = new URLSearchParams()
+    if (params.divisionId) queryParams.append('divisionId', params.divisionId)
+    if (params.date) queryParams.append('date', params.date)
+    const queryString = queryParams.toString()
+    return api.get(`/scoreboard/schedule/${eventId}${queryString ? `?${queryString}` : ''}`)
+  }
 }
 
 // Object Types API (admin)
