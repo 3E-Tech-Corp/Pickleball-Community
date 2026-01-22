@@ -580,6 +580,211 @@ public class EventStaffController : ControllerBase
     }
 
     /// <summary>
+    /// Get staff dashboard data for current user based on their permissions
+    /// </summary>
+    [Authorize]
+    [HttpGet("event/{eventId}/dashboard")]
+    public async Task<ActionResult<ApiResponse<StaffDashboardDto>>> GetStaffDashboard(int eventId)
+    {
+        var userId = GetUserId();
+        if (!userId.HasValue)
+            return Unauthorized(new ApiResponse<StaffDashboardDto> { Success = false, Message = "User not authenticated" });
+
+        // Get staff assignment with role
+        var staff = await _context.EventStaff
+            .Include(s => s.Role)
+            .Include(s => s.User)
+            .FirstOrDefaultAsync(s => s.EventId == eventId && s.UserId == userId.Value && s.Status == "Active");
+
+        var isOrganizer = await IsEventOrganizerAsync(eventId);
+        var isAdmin = await IsAdminAsync();
+
+        // Build permissions object
+        var permissions = new StaffPermissionsDto
+        {
+            CanManageSchedule = isOrganizer || isAdmin || (staff?.Role?.CanManageSchedule ?? false),
+            CanManageCourts = isOrganizer || isAdmin || (staff?.Role?.CanManageCourts ?? false),
+            CanRecordScores = isOrganizer || isAdmin || (staff?.Role?.CanRecordScores ?? false),
+            CanCheckInPlayers = isOrganizer || isAdmin || (staff?.Role?.CanCheckInPlayers ?? false),
+            CanManageLineups = isOrganizer || isAdmin || (staff?.Role?.CanManageLineups ?? false),
+            CanViewAllData = isOrganizer || isAdmin || (staff?.Role?.CanViewAllData ?? false),
+            CanFullyManageEvent = isOrganizer || isAdmin || (staff?.Role?.CanFullyManageEvent ?? false),
+            IsOrganizer = isOrganizer,
+            IsAdmin = isAdmin
+        };
+
+        // If no permissions at all, return empty dashboard
+        if (!permissions.CanManageSchedule && !permissions.CanManageCourts &&
+            !permissions.CanRecordScores && !permissions.CanCheckInPlayers &&
+            !permissions.CanManageLineups && !permissions.CanViewAllData)
+        {
+            return Ok(new ApiResponse<StaffDashboardDto>
+            {
+                Success = true,
+                Data = new StaffDashboardDto
+                {
+                    RoleName = staff?.Role?.Name,
+                    UserName = staff?.User != null ? $"{staff.User.FirstName} {staff.User.LastName}" : null,
+                    Permissions = permissions
+                }
+            });
+        }
+
+        var dashboard = new StaffDashboardDto
+        {
+            RoleName = isOrganizer ? "Event Organizer" : (isAdmin ? "Admin" : staff?.Role?.Name),
+            UserName = staff?.User != null ? $"{staff.User.FirstName} {staff.User.LastName}" : null,
+            Permissions = permissions
+        };
+
+        // Get event info
+        var evt = await _context.Events.FindAsync(eventId);
+        if (evt != null)
+        {
+            dashboard.EventName = evt.Name;
+            dashboard.EventDate = evt.StartDate;
+        }
+
+        // Load data based on permissions
+        if (permissions.CanRecordScores || permissions.CanViewAllData)
+        {
+            // Get encounters awaiting scores (InProgress or scheduled)
+            var scoringEncounters = await _context.EventEncounters
+                .Where(e => e.Event!.Id == eventId &&
+                           (e.Status == "InProgress" || e.Status == "Scheduled" || e.Status == "Ready"))
+                .Include(e => e.Unit1)
+                .Include(e => e.Unit2)
+                .Include(e => e.TournamentCourt)
+                .Include(e => e.Division)
+                .OrderBy(e => e.EstimatedStartTime ?? e.ScheduledTime)
+                .Take(20)
+                .Select(e => new EncounterSummaryDto
+                {
+                    Id = e.Id,
+                    Unit1Name = e.Unit1 != null ? e.Unit1.UnitName : "TBD",
+                    Unit2Name = e.Unit2 != null ? e.Unit2.UnitName : "TBD",
+                    CourtLabel = e.TournamentCourt != null ? e.TournamentCourt.CourtLabel : null,
+                    DivisionName = e.Division != null ? e.Division.Name : null,
+                    Status = e.Status,
+                    ScheduledTime = e.EstimatedStartTime ?? e.ScheduledTime,
+                    RoundNumber = e.RoundNumber
+                })
+                .ToListAsync();
+
+            dashboard.ScoringEncounters = scoringEncounters;
+        }
+
+        if (permissions.CanCheckInPlayers || permissions.CanViewAllData)
+        {
+            // Get registrations awaiting check-in
+            var pendingCheckIns = await _context.EventRegistrations
+                .Where(r => r.EventId == eventId &&
+                           r.Status == "Approved" &&
+                           r.CheckedIn != true)
+                .Include(r => r.User)
+                .Include(r => r.Division)
+                .OrderBy(r => r.Division!.Name)
+                .ThenBy(r => r.User!.LastName)
+                .Take(50)
+                .Select(r => new CheckInItemDto
+                {
+                    RegistrationId = r.Id,
+                    UserId = r.UserId,
+                    UserName = r.User != null ? $"{r.User.FirstName} {r.User.LastName}" : "Unknown",
+                    DivisionName = r.Division != null ? r.Division.Name : null,
+                    DivisionId = r.DivisionId
+                })
+                .ToListAsync();
+
+            dashboard.PendingCheckIns = pendingCheckIns;
+
+            // Get check-in stats
+            var totalApproved = await _context.EventRegistrations
+                .CountAsync(r => r.EventId == eventId && r.Status == "Approved");
+            var checkedIn = await _context.EventRegistrations
+                .CountAsync(r => r.EventId == eventId && r.Status == "Approved" && r.CheckedIn == true);
+
+            dashboard.CheckInStats = new CheckInStatsDto
+            {
+                TotalApproved = totalApproved,
+                CheckedIn = checkedIn,
+                Remaining = totalApproved - checkedIn
+            };
+        }
+
+        if (permissions.CanManageCourts || permissions.CanViewAllData)
+        {
+            // Get court status
+            var courts = await _context.TournamentCourts
+                .Where(c => c.EventId == eventId && c.IsActive)
+                .OrderBy(c => c.SortOrder)
+                .Select(c => new CourtStatusDto
+                {
+                    CourtId = c.Id,
+                    CourtLabel = c.CourtLabel,
+                    Status = c.Status,
+                    LocationDescription = c.LocationDescription,
+                    CurrentEncounterId = _context.EventEncounters
+                        .Where(e => e.TournamentCourtId == c.Id && e.Status == "InProgress")
+                        .Select(e => (int?)e.Id)
+                        .FirstOrDefault(),
+                    CurrentMatchDescription = _context.EventEncounters
+                        .Where(e => e.TournamentCourtId == c.Id && e.Status == "InProgress")
+                        .Select(e => (e.Unit1 != null ? e.Unit1.UnitName : "TBD") + " vs " + (e.Unit2 != null ? e.Unit2.UnitName : "TBD"))
+                        .FirstOrDefault()
+                })
+                .ToListAsync();
+
+            dashboard.CourtStatuses = courts;
+        }
+
+        if (permissions.CanManageSchedule || permissions.CanViewAllData)
+        {
+            // Get upcoming encounters
+            var upcomingEncounters = await _context.EventEncounters
+                .Where(e => e.Event!.Id == eventId &&
+                           (e.Status == "Scheduled" || e.Status == "Ready"))
+                .Include(e => e.Unit1)
+                .Include(e => e.Unit2)
+                .Include(e => e.TournamentCourt)
+                .Include(e => e.Division)
+                .OrderBy(e => e.EstimatedStartTime ?? e.ScheduledTime)
+                .Take(30)
+                .Select(e => new EncounterSummaryDto
+                {
+                    Id = e.Id,
+                    Unit1Name = e.Unit1 != null ? e.Unit1.UnitName : "TBD",
+                    Unit2Name = e.Unit2 != null ? e.Unit2.UnitName : "TBD",
+                    CourtLabel = e.TournamentCourt != null ? e.TournamentCourt.CourtLabel : null,
+                    DivisionName = e.Division != null ? e.Division.Name : null,
+                    Status = e.Status,
+                    ScheduledTime = e.EstimatedStartTime ?? e.ScheduledTime,
+                    RoundNumber = e.RoundNumber
+                })
+                .ToListAsync();
+
+            dashboard.UpcomingEncounters = upcomingEncounters;
+
+            // Get schedule stats by division
+            var divisionStats = await _context.EventDivisions
+                .Where(d => d.EventId == eventId)
+                .Select(d => new DivisionScheduleStatsDto
+                {
+                    DivisionId = d.Id,
+                    DivisionName = d.Name,
+                    TotalEncounters = _context.EventEncounters.Count(e => e.DivisionId == d.Id),
+                    CompletedEncounters = _context.EventEncounters.Count(e => e.DivisionId == d.Id && e.Status == "Completed"),
+                    InProgressEncounters = _context.EventEncounters.Count(e => e.DivisionId == d.Id && e.Status == "InProgress")
+                })
+                .ToListAsync();
+
+            dashboard.DivisionStats = divisionStats;
+        }
+
+        return Ok(new ApiResponse<StaffDashboardDto> { Success = true, Data = dashboard });
+    }
+
+    /// <summary>
     /// Check if current user has specific staff permission for an event
     /// </summary>
     [Authorize]

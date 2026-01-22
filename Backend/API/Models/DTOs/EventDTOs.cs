@@ -831,3 +831,111 @@ public class BulkUpdateDivisionCourtBlocksDto
 {
     public List<CreateDivisionCourtBlockDto> CourtBlocks { get; set; } = new();
 }
+
+// =====================================================
+// Staff Dashboard DTOs
+// =====================================================
+
+/// <summary>
+/// Staff dashboard data based on user's permissions
+/// </summary>
+public class StaffDashboardDto
+{
+    public string? RoleName { get; set; }
+    public string? UserName { get; set; }
+    public string? EventName { get; set; }
+    public DateTime? EventDate { get; set; }
+    public StaffPermissionsDto Permissions { get; set; } = new();
+
+    // Scoring data (for scorekeepers)
+    public List<EncounterSummaryDto>? ScoringEncounters { get; set; }
+
+    // Check-in data (for check-in staff)
+    public List<CheckInItemDto>? PendingCheckIns { get; set; }
+    public CheckInStatsDto? CheckInStats { get; set; }
+
+    // Court management data (for court managers)
+    public List<CourtStatusDto>? CourtStatuses { get; set; }
+
+    // Schedule management data (for schedule managers)
+    public List<EncounterSummaryDto>? UpcomingEncounters { get; set; }
+    public List<DivisionScheduleStatsDto>? DivisionStats { get; set; }
+}
+
+/// <summary>
+/// Staff permissions summary
+/// </summary>
+public class StaffPermissionsDto
+{
+    public bool CanManageSchedule { get; set; }
+    public bool CanManageCourts { get; set; }
+    public bool CanRecordScores { get; set; }
+    public bool CanCheckInPlayers { get; set; }
+    public bool CanManageLineups { get; set; }
+    public bool CanViewAllData { get; set; }
+    public bool CanFullyManageEvent { get; set; }
+    public bool IsOrganizer { get; set; }
+    public bool IsAdmin { get; set; }
+}
+
+/// <summary>
+/// Encounter summary for dashboard
+/// </summary>
+public class EncounterSummaryDto
+{
+    public int Id { get; set; }
+    public string Unit1Name { get; set; } = "TBD";
+    public string Unit2Name { get; set; } = "TBD";
+    public string? CourtLabel { get; set; }
+    public string? DivisionName { get; set; }
+    public string? Status { get; set; }
+    public DateTime? ScheduledTime { get; set; }
+    public int? RoundNumber { get; set; }
+}
+
+/// <summary>
+/// Check-in item for dashboard
+/// </summary>
+public class CheckInItemDto
+{
+    public int RegistrationId { get; set; }
+    public int UserId { get; set; }
+    public string UserName { get; set; } = string.Empty;
+    public string? DivisionName { get; set; }
+    public int? DivisionId { get; set; }
+}
+
+/// <summary>
+/// Check-in statistics
+/// </summary>
+public class CheckInStatsDto
+{
+    public int TotalApproved { get; set; }
+    public int CheckedIn { get; set; }
+    public int Remaining { get; set; }
+}
+
+/// <summary>
+/// Court status for dashboard
+/// </summary>
+public class CourtStatusDto
+{
+    public int CourtId { get; set; }
+    public string CourtLabel { get; set; } = string.Empty;
+    public string? Status { get; set; }
+    public string? LocationDescription { get; set; }
+    public int? CurrentEncounterId { get; set; }
+    public string? CurrentMatchDescription { get; set; }
+}
+
+/// <summary>
+/// Division schedule statistics
+/// </summary>
+public class DivisionScheduleStatsDto
+{
+    public int DivisionId { get; set; }
+    public string DivisionName { get; set; } = string.Empty;
+    public int TotalEncounters { get; set; }
+    public int CompletedEncounters { get; set; }
+    public int InProgressEncounters { get; set; }
+}

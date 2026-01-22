@@ -3970,6 +3970,19 @@ function EventDetailModal({ event, isAuthenticated, isAdmin, currentUserId, user
                         <div className="text-xs text-green-600 truncate">Live scores & courts</div>
                       </div>
                     </Link>
+                    {/* Staff Dashboard - For staff members (scorekeeper, check-in, etc.) */}
+                    {isAuthenticated && (
+                      <Link
+                        to={`/event/${event.id}/staff-dashboard`}
+                        className="flex items-center gap-2 p-3 bg-purple-50 border border-purple-200 rounded-lg text-purple-700 hover:bg-purple-100 transition-colors"
+                      >
+                        <Shield className="w-5 h-5" />
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium text-sm">Staff Dashboard</div>
+                          <div className="text-xs text-purple-600 truncate">Score, check-in, courts</div>
+                        </div>
+                      </Link>
+                    )}
                   </div>
                 </div>
               )}

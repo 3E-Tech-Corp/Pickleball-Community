@@ -26,6 +26,7 @@ import EventView from './pages/EventView'
 import TournamentManage from './pages/TournamentManage'
 import CourtPlanning from './pages/CourtPlanning'
 import GameDayManage from './pages/GameDayManage'
+import StaffDashboard from './pages/StaffDashboard'
 import EventManage from './pages/EventManage'
 import EventDashboard from './pages/EventDashboard'
 import EventRunningAdmin from './pages/EventRunningAdmin'
@@ -87,6 +88,11 @@ function App() {
       <Route path="/event/:eventId/court-planning" element={
         <ProtectedRoute>
           <CourtPlanning />
+        </ProtectedRoute>
+      } />
+      <Route path="/event/:eventId/staff-dashboard" element={
+        <ProtectedRoute>
+          <StaffDashboard />
         </ProtectedRoute>
       } />
       <Route path="/gameday/:eventId/manage" element={

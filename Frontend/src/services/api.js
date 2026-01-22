@@ -2378,7 +2378,10 @@ export const eventStaffApi = {
   getMyStatus: (eventId) => api.get(`/eventstaff/event/${eventId}/my-status`),
 
   // Permission check
-  hasPermission: (eventId, permission) => api.get(`/eventstaff/event/${eventId}/has-permission/${permission}`)
+  hasPermission: (eventId, permission) => api.get(`/eventstaff/event/${eventId}/has-permission/${permission}`),
+
+  // Staff dashboard
+  getDashboard: (eventId) => api.get(`/eventstaff/event/${eventId}/dashboard`)
 }
 
 export default api
