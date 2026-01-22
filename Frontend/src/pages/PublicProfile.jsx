@@ -197,9 +197,9 @@ const PublicProfile = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-gradient-to-r from-blue-600 to-purple-700">
+    <div className="h-screen bg-gray-50 flex flex-col overflow-hidden">
+      {/* Header - Fixed */}
+      <div className="flex-shrink-0 bg-gradient-to-r from-blue-600 to-purple-700">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <button
             onClick={() => navigate(-1)}
@@ -337,8 +337,9 @@ const PublicProfile = () => {
         </div>
       </div>
 
-      {/* Content */}
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      {/* Content - Scrollable */}
+      <div className="flex-1 overflow-y-auto">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="grid gap-6 md:grid-cols-2">
           {/* Bio Section */}
           {profile.bio && (
@@ -503,6 +504,7 @@ const PublicProfile = () => {
               </div>
             </div>
           )}
+        </div>
         </div>
       </div>
 
