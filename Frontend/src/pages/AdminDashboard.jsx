@@ -388,7 +388,7 @@ const AdminDashboard = () => {
     setApiKeyTestError(null)
     setApiKeyTestResult(null)
     try {
-      const token = localStorage.getItem('token')
+      const token = localStorage.getItem('jwtToken')
       const response = await fetch('/api/auth/test-apikey', {
         headers: {
           'Authorization': `Bearer ${token}`
