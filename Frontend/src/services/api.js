@@ -35,6 +35,13 @@ export const getSharedAssetUrl = (path) => {
   const assetMatch = path.match(/^\/asset\/(\d+)/)
   if (assetMatch) {
     const assetId = assetMatch[1]
+    // In dev mode, API_BASE_URL is full URL (https://localhost:7009) - need absolute URL
+    // In production, API_BASE_URL is '/api' - need relative URL with /api prefix
+    if (API_BASE_URL && API_BASE_URL.startsWith('http')) {
+      // Development: direct to backend without /api prefix (no IIS virtual app)
+      return `${API_BASE_URL}/assets/shared/${assetId}`
+    }
+    // Production: relative path with /api prefix (IIS virtual app adds /api)
     return `/api/assets/shared/${assetId}`
   }
 
@@ -943,7 +950,27 @@ export const eventsApi = {
     api.delete(`/events/${eventId}/documents/${docId}`),
 
   // Get user's active event registrations (for dashboard notices)
-  getMyActiveEvents: () => api.get('/events/my-active-events')
+  getMyActiveEvents: () => api.get('/events/my-active-events'),
+
+  // Admin event management
+  adminSearch: (params = {}) => {
+    const queryParams = new URLSearchParams();
+    if (params.search) queryParams.append('search', params.search);
+    if (params.status) queryParams.append('status', params.status);
+    if (params.isPublished !== undefined) queryParams.append('isPublished', params.isPublished);
+    if (params.isActive !== undefined) queryParams.append('isActive', params.isActive);
+    if (params.hasVenue !== undefined) queryParams.append('hasVenue', params.hasVenue);
+    if (params.eventTypeId) queryParams.append('eventTypeId', params.eventTypeId);
+    if (params.startDateFrom) queryParams.append('startDateFrom', params.startDateFrom);
+    if (params.startDateTo) queryParams.append('startDateTo', params.startDateTo);
+    if (params.sortBy) queryParams.append('sortBy', params.sortBy);
+    if (params.sortDesc !== undefined) queryParams.append('sortDesc', params.sortDesc);
+    if (params.page) queryParams.append('page', params.page);
+    if (params.pageSize) queryParams.append('pageSize', params.pageSize);
+    return api.get(`/events/admin/search?${queryParams.toString()}`);
+  },
+  adminGet: (eventId) => api.get(`/events/admin/${eventId}`),
+  adminUpdate: (eventId, data) => api.put(`/events/admin/${eventId}`, data)
 }
 
 // Clubs API
@@ -1435,6 +1462,14 @@ export const tournamentApi = {
   getJoinableUnits: (eventId, divisionId) =>
     api.get(`/tournament/events/${eventId}/divisions/${divisionId}/joinable-units`),
 
+  // Join code feature
+  getJoinableUnitsV2: (eventId, divisionId) =>
+    api.get(`/tournament/events/${eventId}/divisions/${divisionId}/joinable-units-v2`),
+  joinByCode: (joinCode) =>
+    api.post('/tournament/units/join-by-code', { joinCode }),
+  regenerateJoinCode: (unitId) =>
+    api.post(`/tournament/units/${unitId}/regenerate-code`),
+
   // Payment
   getPaymentSummary: (eventId) =>
     api.get(`/tournament/events/${eventId}/payment-summary`),
@@ -1492,6 +1527,12 @@ export const tournamentApi = {
   getDivisionUnits: (divisionId) =>
     api.get(`/tournament/divisions/${divisionId}/units`),
 
+  // Pre-assign courts to encounters (schedule planning)
+  preAssignCourt: (encounterId, courtId) =>
+    api.post('/tournament/encounters/pre-assign-court', { encounterId, tournamentCourtId: courtId }),
+  bulkPreAssignCourts: (eventId, assignments) =>
+    api.post('/tournament/encounters/bulk-pre-assign-courts', { eventId, assignments }),
+
   // Check-in
   checkIn: (eventId, divisionId = null) =>
     api.post(`/tournament/events/${eventId}/check-in`, { eventId, divisionId }),
@@ -1515,7 +1556,56 @@ export const tournamentApi = {
   endDrawingMode: (eventId) => api.post(`/tournament/events/${eventId}/drawing/end-mode`),
 
   // Tournament Reset (for testing/dry runs)
-  resetTournament: (eventId) => api.post(`/tournament/reset-tournament/${eventId}`)
+  resetTournament: (eventId) => api.post(`/tournament/reset-tournament/${eventId}`),
+
+  // =====================================================
+  // Division Phases (multi-phase tournament scheduling)
+  // =====================================================
+
+  // Phase CRUD
+  getDivisionPhases: (divisionId) => api.get(`/divisionphases/division/${divisionId}`),
+  getPhase: (phaseId) => api.get(`/divisionphases/${phaseId}`),
+  createPhase: (data) => api.post('/divisionphases', data),
+  updatePhase: (phaseId, data) => api.put(`/divisionphases/${phaseId}`, data),
+  deletePhase: (phaseId) => api.delete(`/divisionphases/${phaseId}`),
+
+  // Schedule Generation
+  generatePhaseSchedule: (phaseId) => api.post(`/divisionphases/${phaseId}/generate-schedule`),
+  getPhaseSchedule: (phaseId) => api.get(`/divisionphases/${phaseId}/schedule`),
+
+  // Advancement Rules
+  setAdvancementRules: (phaseId, rules) => api.post(`/divisionphases/${phaseId}/advancement-rules`, rules),
+
+  // Court Assignments
+  setPhaseCourtAssignments: (phaseId, assignments) => api.post(`/divisionphases/${phaseId}/court-assignments`, assignments),
+  autoAssignPhaseCourts: (phaseId) => api.post(`/divisionphases/${phaseId}/auto-assign-courts`),
+  calculatePhaseTimes: (phaseId) => api.post(`/divisionphases/${phaseId}/calculate-times`),
+
+  // =====================================================
+  // Court Groups
+  // =====================================================
+
+  getCourtGroups: (eventId) => api.get(`/courtgroups/event/${eventId}`),
+  getCourtGroup: (groupId) => api.get(`/courtgroups/${groupId}`),
+  createCourtGroup: (data) => api.post('/courtgroups', data),
+  updateCourtGroup: (groupId, data) => api.put(`/courtgroups/${groupId}`, data),
+  deleteCourtGroup: (groupId) => api.delete(`/courtgroups/${groupId}`),
+  assignCourtsToGroup: (groupId, courtIds) => api.post(`/courtgroups/${groupId}/courts`, { courtIds }),
+  autoCreateCourtGroups: (eventId, groupSize = 4) => api.post(`/courtgroups/event/${eventId}/auto-create?groupSize=${groupSize}`),
+
+  // =====================================================
+  // Court Planning (Dedicated Court Pre-Assignment)
+  // =====================================================
+
+  getCourtPlanningData: (eventId) => api.get(`/tournament/court-planning/${eventId}`),
+  bulkAssignCourtsAndTimes: (eventId, assignments) =>
+    api.post('/tournament/court-planning/bulk-assign', { eventId, assignments }),
+  assignCourtGroupsToDivision: (divisionId, courtGroupIds, validFromTime = null, validToTime = null) =>
+    api.post('/tournament/court-planning/division-courts', { divisionId, courtGroupIds, validFromTime, validToTime }),
+  autoAssignDivisionCourts: (divisionId, options = null) =>
+    api.post(`/tournament/court-planning/auto-assign/${divisionId}`, options),
+  clearDivisionCourtAssignments: (divisionId) =>
+    api.post(`/tournament/court-planning/clear/${divisionId}`)
 }
 
 // Messaging API
@@ -2125,7 +2215,11 @@ export const gameDayApi = {
     api.post(`/tournament-gameday/reset-pools/${eventId}/${divisionId}`),
 
   // Send notification
-  sendNotification: (eventId, data) => api.post(`/tournament-gameday/notify/${eventId}`, data)
+  sendNotification: (eventId, data) => api.post(`/tournament-gameday/notify/${eventId}`, data),
+
+  // Score History (TD, admin, scorekeeper only)
+  getGameScoreHistory: (eventId, gameId) => api.get(`/eventrunning/${eventId}/games/${gameId}/history`),
+  getEncounterScoreHistory: (eventId, encounterId) => api.get(`/eventrunning/${eventId}/encounters/${encounterId}/history`)
 }
 
 // Spectator API
@@ -2182,7 +2276,22 @@ export const scoreboardApi = {
   getBracket: (eventId, divisionId) => api.get(`/scoreboard/bracket/${eventId}/${divisionId}`),
 
   // Get pools
-  getPools: (eventId, divisionId) => api.get(`/scoreboard/pools/${eventId}/${divisionId}`)
+  getPools: (eventId, divisionId) => api.get(`/scoreboard/pools/${eventId}/${divisionId}`),
+
+  // Get registrations for spectator view
+  getRegistrations: (eventId, divisionId = null) => {
+    const params = divisionId ? `?divisionId=${divisionId}` : ''
+    return api.get(`/scoreboard/registrations/${eventId}${params}`)
+  },
+
+  // Get schedule for spectator view
+  getSchedule: (eventId, params = {}) => {
+    const queryParams = new URLSearchParams()
+    if (params.divisionId) queryParams.append('divisionId', params.divisionId)
+    if (params.date) queryParams.append('date', params.date)
+    const queryString = queryParams.toString()
+    return api.get(`/scoreboard/schedule/${eventId}${queryString ? `?${queryString}` : ''}`)
+  }
 }
 
 // Object Types API (admin)
@@ -2244,6 +2353,35 @@ export const locationApi = {
   // Get a specific state by country and state code
   getState: (countryCode, stateCode) =>
     api.get(`/location/countries/${encodeURIComponent(countryCode)}/states/${encodeURIComponent(stateCode)}`)
+}
+
+// Event Staff API
+export const eventStaffApi = {
+  // Global staff roles (admin-managed templates)
+  getGlobalRoles: () => api.get('/eventstaff/roles/global'),
+  createGlobalRole: (data) => api.post('/eventstaff/roles/global', data),
+  updateGlobalRole: (roleId, data) => api.put(`/eventstaff/roles/global/${roleId}`, data),
+  deleteGlobalRole: (roleId) => api.delete(`/eventstaff/roles/global/${roleId}`),
+
+  // Event-specific roles
+  getEventRoles: (eventId) => api.get(`/eventstaff/event/${eventId}/roles`),
+  createEventRole: (eventId, data) => api.post(`/eventstaff/event/${eventId}/roles`, data),
+
+  // Staff management
+  getEventStaff: (eventId) => api.get(`/eventstaff/event/${eventId}`),
+  assignStaff: (eventId, data) => api.post(`/eventstaff/event/${eventId}`, data),
+  updateStaff: (eventId, staffId, data) => api.put(`/eventstaff/event/${eventId}/staff/${staffId}`, data),
+  removeStaff: (eventId, staffId) => api.delete(`/eventstaff/event/${eventId}/staff/${staffId}`),
+
+  // Self-registration
+  selfRegister: (eventId, data) => api.post(`/eventstaff/event/${eventId}/self-register`, data),
+  getMyStatus: (eventId) => api.get(`/eventstaff/event/${eventId}/my-status`),
+
+  // Permission check
+  hasPermission: (eventId, permission) => api.get(`/eventstaff/event/${eventId}/has-permission/${permission}`),
+
+  // Staff dashboard
+  getDashboard: (eventId) => api.get(`/eventstaff/event/${eventId}/dashboard`)
 }
 
 export default api

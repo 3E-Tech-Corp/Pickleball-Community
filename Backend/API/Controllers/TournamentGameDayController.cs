@@ -279,7 +279,7 @@ public class TournamentGameDayController : ControllerBase
         {
             // Fetch all non-completed matches for event, then filter client-side
             // This avoids EF Core SQL generation issues with Contains() + OR in WHERE clause
-            var allEventMatches = await _context.EventMatches
+            var allEventMatches = await _context.EventEncounters
                 .Include(m => m.Unit1)
                 .Include(m => m.Unit2)
                 .Include(m => m.Division)
@@ -945,7 +945,7 @@ public class TournamentGameDayController : ControllerBase
         }
 
         // Reset playoff bracket match assignments (only first round, and only if no games played)
-        var playoffMatches = await _context.EventMatches
+        var playoffMatches = await _context.EventEncounters
             .Where(m => m.DivisionId == divisionId && m.RoundType == "Bracket" && m.RoundNumber == 1)
             .ToListAsync();
 
@@ -989,7 +989,7 @@ public class TournamentGameDayController : ControllerBase
         }
 
         // Get all completed pool encounters with their games
-        var poolEncounters = await _context.EventMatches
+        var poolEncounters = await _context.EventEncounters
             .Where(m => m.DivisionId == divisionId && m.RoundType == "Pool" && m.Status == "Completed")
             .Include(m => m.Matches)
                 .ThenInclude(em => em.Games)
@@ -1227,7 +1227,7 @@ public class TournamentGameDayController : ControllerBase
         division.ScheduleStatus = "PoolsFinalized";
 
         // Get playoff matches and assign units based on seeding
-        var playoffMatches = await _context.EventMatches
+        var playoffMatches = await _context.EventEncounters
             .Where(m => m.DivisionId == divisionId && m.RoundType == "Bracket" && m.RoundNumber == 1)
             .OrderBy(m => m.BracketPosition)
             .ToListAsync();
@@ -1319,7 +1319,7 @@ public class TournamentGameDayController : ControllerBase
             return NotFound(new ApiResponse<object> { Success = false, Message = "Division not found" });
 
         // Check if any playoff matches have been played
-        var playedPlayoffMatches = await _context.EventMatches
+        var playedPlayoffMatches = await _context.EventEncounters
             .AnyAsync(m => m.DivisionId == divisionId && m.RoundType == "Bracket" && m.Status == "Completed");
 
         if (playedPlayoffMatches)
@@ -1339,7 +1339,7 @@ public class TournamentGameDayController : ControllerBase
         }
 
         // Clear playoff match assignments
-        var playoffMatches = await _context.EventMatches
+        var playoffMatches = await _context.EventEncounters
             .Where(m => m.DivisionId == divisionId && m.RoundType == "Bracket" && m.RoundNumber == 1)
             .ToListAsync();
 
@@ -1420,7 +1420,7 @@ public class TournamentGameDayController : ControllerBase
         }
 
         // Get playoff first round matches
-        var playoffMatches = await _context.EventMatches
+        var playoffMatches = await _context.EventEncounters
             .Where(m => m.DivisionId == divisionId && m.RoundType == "Bracket" && m.RoundNumber == 1)
             .OrderBy(m => m.BracketPosition)
             .ToListAsync();
@@ -1607,7 +1607,7 @@ public class TournamentGameDayController : ControllerBase
     private async Task HandlePlayoffByes(int divisionId)
     {
         // Get all bracket matches for this division, ordered by round
-        var allBracketMatches = await _context.EventMatches
+        var allBracketMatches = await _context.EventEncounters
             .Where(m => m.DivisionId == divisionId && (m.RoundType == "Bracket" || m.RoundType == "Final" || m.RoundType == "ThirdPlace"))
             .Include(m => m.Matches)
                 .ThenInclude(em => em.Games)
@@ -1781,7 +1781,7 @@ public class TournamentGameDayController : ControllerBase
     private async Task NotifyPlayersGameQueued(EventGame game, TournamentCourt court)
     {
         var encounterId = game.EncounterMatch?.EncounterId ?? 0;
-        var encounter = await _context.EventMatches
+        var encounter = await _context.EventEncounters
             .Include(m => m.Unit1)
                 .ThenInclude(u => u!.Members)
             .Include(m => m.Unit2)
@@ -1814,7 +1814,7 @@ public class TournamentGameDayController : ControllerBase
     private async Task NotifyPlayersGameStarted(EventGame game)
     {
         var encounterId = game.EncounterMatch?.EncounterId ?? 0;
-        var encounter = await _context.EventMatches
+        var encounter = await _context.EventEncounters
             .Include(m => m.Unit1)
                 .ThenInclude(u => u!.Members)
             .Include(m => m.Unit2)
@@ -1918,7 +1918,7 @@ public class TournamentGameDayController : ControllerBase
 
     private async Task CheckMatchCompletion(int matchId)
     {
-        var match = await _context.EventMatches
+        var match = await _context.EventEncounters
             .Include(m => m.Matches).ThenInclude(match => match.Games)
             .Include(m => m.Unit1)
             .Include(m => m.Unit2)
@@ -1965,7 +1965,7 @@ public class TournamentGameDayController : ControllerBase
                 (match.RoundType == "Bracket" || match.RoundType == "Final" || match.RoundType == "ThirdPlace"))
             {
                 // Load all bracket matches for this division to find the next match
-                var allBracketMatches = await _context.EventMatches
+                var allBracketMatches = await _context.EventEncounters
                     .Where(m => m.DivisionId == match.DivisionId &&
                                (m.RoundType == "Bracket" || m.RoundType == "Final" || m.RoundType == "ThirdPlace"))
                     .ToListAsync();
@@ -2054,7 +2054,7 @@ public class TournamentGameDayController : ControllerBase
         var busyPlayerIds = playersCurrentlyPlaying.Concat(playersInQueue).Distinct().ToHashSet();
 
         // Get all pool encounters for this event grouped by division and pool
-        var poolEncounters = await _context.EventMatches
+        var poolEncounters = await _context.EventEncounters
             .Where(m => m.EventId == eventId && m.RoundType == "Pool")
             .Include(m => m.Division)
             .Include(m => m.Unit1)

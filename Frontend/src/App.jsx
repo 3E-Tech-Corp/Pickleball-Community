@@ -24,7 +24,9 @@ import FeedbackAdmin from './pages/FeedbackAdmin'
 import Events from './pages/Events'
 import EventView from './pages/EventView'
 import TournamentManage from './pages/TournamentManage'
+import CourtPlanning from './pages/CourtPlanning'
 import GameDayManage from './pages/GameDayManage'
+import StaffDashboard from './pages/StaffDashboard'
 import EventManage from './pages/EventManage'
 import EventDashboard from './pages/EventDashboard'
 import EventRunningAdmin from './pages/EventRunningAdmin'
@@ -46,7 +48,6 @@ import BlogAdmin from './pages/BlogAdmin'
 import MyBlog from './pages/MyBlog'
 import Friends from './pages/Friends'
 import Messages from './pages/Messages'
-import PublicProfile from './pages/PublicProfile'
 import PlayerHistory from './pages/PlayerHistory'
 import ProtectedRoute from './components/ProtectedRoute'
 import ActiveEventNotices from './components/ActiveEventNotices'
@@ -81,6 +82,16 @@ function App() {
       <Route path="/tournament/:eventId/manage" element={
         <ProtectedRoute>
           <TournamentManage />
+        </ProtectedRoute>
+      } />
+      <Route path="/event/:eventId/court-planning" element={
+        <ProtectedRoute>
+          <CourtPlanning />
+        </ProtectedRoute>
+      } />
+      <Route path="/event/:eventId/staff-dashboard" element={
+        <ProtectedRoute>
+          <StaffDashboard />
         </ProtectedRoute>
       } />
       <Route path="/gameday/:eventId/manage" element={
@@ -194,13 +205,6 @@ function App() {
       <Route path="/messages" element={
         <ProtectedRoute>
           <Messages />
-        </ProtectedRoute>
-      } />
-
-      {/* Public Profile - View other users */}
-      <Route path="/users/:userId" element={
-        <ProtectedRoute>
-          <PublicProfile />
         </ProtectedRoute>
       } />
 

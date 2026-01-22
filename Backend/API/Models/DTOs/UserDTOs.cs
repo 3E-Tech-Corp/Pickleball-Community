@@ -34,6 +34,14 @@ public class UserProfileDto
     public DateTime? CreatedAt { get; set; }
     public bool IsActive { get; set; }
 
+    // Verification status
+    public bool EmailVerified { get; set; }
+    public bool PhoneVerified { get; set; }
+
+    // Profile visibility preferences
+    public bool ShowEmailInProfile { get; set; }
+    public bool ShowPhoneInProfile { get; set; }
+
     // Social media links
     public List<SocialLinkDto>? SocialLinks { get; set; }
 }
@@ -65,6 +73,10 @@ public class UpdateProfileRequest
     public string? TournamentLevel { get; set; }
     public string? FavoriteShot { get; set; }
     public string? IntroVideo { get; set; }
+
+    // Profile visibility preferences
+    public bool? ShowEmailInProfile { get; set; }
+    public bool? ShowPhoneInProfile { get; set; }
 }
 
 public class AdminUpdateUserRequest
@@ -87,7 +99,15 @@ public class PublicProfileDto
     public int Id { get; set; }
     public string? FirstName { get; set; }
     public string? LastName { get; set; }
+
+    // Contact info (conditional based on user settings, always shown to admins)
     public string? Email { get; set; }
+    public string? Phone { get; set; }
+
+    // Verification status (shown when email/phone are visible)
+    public bool? EmailVerified { get; set; }
+    public bool? PhoneVerified { get; set; }
+
     public string? Bio { get; set; }
     public string? ProfileImageUrl { get; set; }
 

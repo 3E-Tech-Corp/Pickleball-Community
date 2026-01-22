@@ -41,7 +41,7 @@ public class ScoreboardController : ControllerBase
         if (evt == null)
             return NotFound(new ApiResponse<ScoreboardDto> { Success = false, Message = "Event not found" });
 
-        var query = _context.EventMatches
+        var query = _context.EventEncounters
             .Where(m => m.EventId == eventId);
 
         if (divisionId.HasValue)
@@ -293,7 +293,7 @@ public class ScoreboardController : ControllerBase
         if (division == null)
             return NotFound(new ApiResponse<BracketDto> { Success = false, Message = "Division not found" });
 
-        var matches = await _context.EventMatches
+        var matches = await _context.EventEncounters
             .Where(m => m.DivisionId == divisionId && m.RoundType == "Bracket")
             .Include(m => m.Unit1)
             .Include(m => m.Unit2)
@@ -340,6 +340,194 @@ public class ScoreboardController : ControllerBase
                 DivisionName = division.Name,
                 BracketType = division.BracketType,
                 Rounds = rounds
+            }
+        });
+    }
+
+    /// <summary>
+    /// Get registered units/teams for spectator view
+    /// </summary>
+    [HttpGet("registrations/{eventId}")]
+    public async Task<ActionResult<ApiResponse<EventRegistrationsDto>>> GetRegistrations(
+        int eventId,
+        [FromQuery] int? divisionId = null)
+    {
+        var evt = await _context.Events
+            .Include(e => e.Divisions)
+            .FirstOrDefaultAsync(e => e.Id == eventId);
+
+        if (evt == null)
+            return NotFound(new ApiResponse<EventRegistrationsDto> { Success = false, Message = "Event not found" });
+
+        var query = _context.EventUnits
+            .Where(u => u.EventId == eventId && u.Status != "Cancelled");
+
+        if (divisionId.HasValue)
+            query = query.Where(u => u.DivisionId == divisionId.Value);
+
+        var units = await query
+            .Include(u => u.Division)
+            .Include(u => u.Members)
+                .ThenInclude(m => m.User)
+            .OrderBy(u => u.DivisionId)
+            .ThenBy(u => u.Seed ?? 999)
+            .ThenBy(u => u.Name)
+            .Select(u => new RegistrationUnitDto
+            {
+                UnitId = u.Id,
+                UnitName = u.Name,
+                DivisionId = u.DivisionId,
+                DivisionName = u.Division!.Name,
+                Seed = u.Seed,
+                Status = u.Status,
+                Players = u.Members
+                    .Where(m => m.InviteStatus == "Accepted")
+                    .Select(m => new RegistrationPlayerDto
+                    {
+                        UserId = m.UserId,
+                        Name = m.User!.FirstName + " " + m.User.LastName,
+                        IsCaptain = m.Role == "Captain"
+                    })
+                    .ToList()
+            })
+            .ToListAsync();
+
+        // Group by division
+        var byDivision = units
+            .GroupBy(u => new { u.DivisionId, u.DivisionName })
+            .Select(g => new DivisionRegistrationsDto
+            {
+                DivisionId = g.Key.DivisionId,
+                DivisionName = g.Key.DivisionName,
+                UnitCount = g.Count(),
+                Units = g.ToList()
+            })
+            .ToList();
+
+        return Ok(new ApiResponse<EventRegistrationsDto>
+        {
+            Success = true,
+            Data = new EventRegistrationsDto
+            {
+                EventId = eventId,
+                EventName = evt.Name,
+                TotalUnits = units.Count,
+                Divisions = byDivision
+            }
+        });
+    }
+
+    /// <summary>
+    /// Get event schedule with court assignments for spectator view
+    /// </summary>
+    [HttpGet("schedule/{eventId}")]
+    public async Task<ActionResult<ApiResponse<EventScheduleDto>>> GetSchedule(
+        int eventId,
+        [FromQuery] int? divisionId = null,
+        [FromQuery] string? date = null)
+    {
+        var evt = await _context.Events
+            .Include(e => e.Divisions)
+            .FirstOrDefaultAsync(e => e.Id == eventId);
+
+        if (evt == null)
+            return NotFound(new ApiResponse<EventScheduleDto> { Success = false, Message = "Event not found" });
+
+        var query = _context.EventEncounters
+            .Where(m => m.EventId == eventId);
+
+        if (divisionId.HasValue)
+            query = query.Where(m => m.DivisionId == divisionId.Value);
+
+        // Filter by date if provided
+        if (!string.IsNullOrEmpty(date) && DateTime.TryParse(date, out var filterDate))
+        {
+            query = query.Where(m =>
+                (m.ScheduledTime.HasValue && m.ScheduledTime.Value.Date == filterDate.Date) ||
+                (m.EstimatedStartTime.HasValue && m.EstimatedStartTime.Value.Date == filterDate.Date));
+        }
+
+        var encounters = await query
+            .Include(m => m.Division)
+            .Include(m => m.Unit1)
+            .Include(m => m.Unit2)
+            .Include(m => m.TournamentCourt)
+                .ThenInclude(c => c!.CourtGroup)
+            .Include(m => m.Phase)
+            .OrderBy(m => m.ScheduledTime ?? m.EstimatedStartTime ?? DateTime.MaxValue)
+            .ThenBy(m => m.TournamentCourt != null ? m.TournamentCourt.SortOrder : 999)
+            .ThenBy(m => m.RoundNumber)
+            .Select(m => new ScheduleEncounterDto
+            {
+                EncounterId = m.Id,
+                DivisionId = m.DivisionId,
+                DivisionName = m.Division!.Name,
+                PhaseName = m.Phase != null ? m.Phase.Name : null,
+                RoundType = m.RoundType,
+                RoundNumber = m.RoundNumber,
+                RoundName = m.RoundName,
+                EncounterLabel = m.EncounterLabel,
+                Unit1Id = m.Unit1Id,
+                Unit1Name = m.Unit1 != null ? m.Unit1.Name : null,
+                Unit1Seed = m.Unit1 != null ? m.Unit1.Seed : null,
+                Unit2Id = m.Unit2Id,
+                Unit2Name = m.Unit2 != null ? m.Unit2.Name : null,
+                Unit2Seed = m.Unit2 != null ? m.Unit2.Seed : null,
+                Status = m.Status,
+                ScheduledTime = m.ScheduledTime,
+                EstimatedStartTime = m.EstimatedStartTime,
+                StartedAt = m.StartedAt,
+                CompletedAt = m.CompletedAt,
+                CourtId = m.TournamentCourtId,
+                CourtName = m.TournamentCourt != null ? m.TournamentCourt.CourtLabel : null,
+                CourtNumber = m.TournamentCourt != null ? m.TournamentCourt.SortOrder : null,
+                CourtGroupName = m.TournamentCourt != null && m.TournamentCourt.CourtGroup != null
+                    ? m.TournamentCourt.CourtGroup.GroupName : null,
+                WinnerUnitId = m.WinnerUnitId
+            })
+            .ToListAsync();
+
+        // Get unique dates for filtering
+        var scheduleDates = encounters
+            .Where(e => e.ScheduledTime.HasValue || e.EstimatedStartTime.HasValue)
+            .Select(e => (e.ScheduledTime ?? e.EstimatedStartTime)!.Value.Date)
+            .Distinct()
+            .OrderBy(d => d)
+            .ToList();
+
+        // Get courts for the event
+        var courts = await _context.TournamentCourts
+            .Where(c => c.EventId == eventId && c.IsActive)
+            .Include(c => c.CourtGroup)
+            .OrderBy(c => c.SortOrder)
+            .Select(c => new ScheduleCourtDto
+            {
+                CourtId = c.Id,
+                CourtName = c.CourtLabel,
+                CourtNumber = c.SortOrder,
+                GroupName = c.CourtGroup != null ? c.CourtGroup.GroupName : null,
+                Location = c.LocationDescription
+            })
+            .ToListAsync();
+
+        return Ok(new ApiResponse<EventScheduleDto>
+        {
+            Success = true,
+            Data = new EventScheduleDto
+            {
+                EventId = eventId,
+                EventName = evt.Name,
+                EventStartDate = evt.StartDate,
+                EventEndDate = evt.EndDate,
+                TotalEncounters = encounters.Count,
+                ScheduleDates = scheduleDates,
+                Courts = courts,
+                Divisions = evt.Divisions.Select(d => new DivisionFilterDto
+                {
+                    Id = d.Id,
+                    Name = d.Name
+                }).ToList(),
+                Encounters = encounters
             }
         });
     }
@@ -411,7 +599,7 @@ public class ScoreboardController : ControllerBase
             .ToList();
 
         // Get pool matches
-        var poolMatches = await _context.EventMatches
+        var poolMatches = await _context.EventEncounters
             .Where(m => m.DivisionId == divisionId && m.RoundType == "Pool")
             .Include(m => m.Unit1)
             .Include(m => m.Unit2)
@@ -641,4 +829,90 @@ public class PoolMatchDto
     public string Status { get; set; } = string.Empty;
     public int? WinnerUnitId { get; set; }
     public List<ScoreboardGameDto> Games { get; set; } = new();
+}
+
+// DTOs for Registrations endpoint
+public class EventRegistrationsDto
+{
+    public int EventId { get; set; }
+    public string EventName { get; set; } = string.Empty;
+    public int TotalUnits { get; set; }
+    public List<DivisionRegistrationsDto> Divisions { get; set; } = new();
+}
+
+public class DivisionRegistrationsDto
+{
+    public int DivisionId { get; set; }
+    public string DivisionName { get; set; } = string.Empty;
+    public int UnitCount { get; set; }
+    public List<RegistrationUnitDto> Units { get; set; } = new();
+}
+
+public class RegistrationUnitDto
+{
+    public int UnitId { get; set; }
+    public string UnitName { get; set; } = string.Empty;
+    public int DivisionId { get; set; }
+    public string DivisionName { get; set; } = string.Empty;
+    public int? Seed { get; set; }
+    public string Status { get; set; } = string.Empty;
+    public List<RegistrationPlayerDto> Players { get; set; } = new();
+}
+
+public class RegistrationPlayerDto
+{
+    public int UserId { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public bool IsCaptain { get; set; }
+}
+
+// DTOs for Schedule endpoint
+public class EventScheduleDto
+{
+    public int EventId { get; set; }
+    public string EventName { get; set; } = string.Empty;
+    public DateTime EventStartDate { get; set; }
+    public DateTime? EventEndDate { get; set; }
+    public int TotalEncounters { get; set; }
+    public List<DateTime> ScheduleDates { get; set; } = new();
+    public List<ScheduleCourtDto> Courts { get; set; } = new();
+    public List<DivisionFilterDto> Divisions { get; set; } = new();
+    public List<ScheduleEncounterDto> Encounters { get; set; } = new();
+}
+
+public class ScheduleCourtDto
+{
+    public int CourtId { get; set; }
+    public string CourtName { get; set; } = string.Empty;
+    public int? CourtNumber { get; set; }
+    public string? GroupName { get; set; }
+    public string? Location { get; set; }
+}
+
+public class ScheduleEncounterDto
+{
+    public int EncounterId { get; set; }
+    public int DivisionId { get; set; }
+    public string DivisionName { get; set; } = string.Empty;
+    public string? PhaseName { get; set; }
+    public string RoundType { get; set; } = string.Empty;
+    public int RoundNumber { get; set; }
+    public string? RoundName { get; set; }
+    public string? EncounterLabel { get; set; }
+    public int? Unit1Id { get; set; }
+    public string? Unit1Name { get; set; }
+    public int? Unit1Seed { get; set; }
+    public int? Unit2Id { get; set; }
+    public string? Unit2Name { get; set; }
+    public int? Unit2Seed { get; set; }
+    public string Status { get; set; } = string.Empty;
+    public DateTime? ScheduledTime { get; set; }
+    public DateTime? EstimatedStartTime { get; set; }
+    public DateTime? StartedAt { get; set; }
+    public DateTime? CompletedAt { get; set; }
+    public int? CourtId { get; set; }
+    public string? CourtName { get; set; }
+    public int? CourtNumber { get; set; }
+    public string? CourtGroupName { get; set; }
+    public int? WinnerUnitId { get; set; }
 }

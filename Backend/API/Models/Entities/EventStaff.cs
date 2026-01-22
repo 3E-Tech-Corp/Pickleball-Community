@@ -23,6 +23,13 @@ public class EventStaffRole
     [MaxLength(500)]
     public string? Description { get; set; }
 
+    /// <summary>
+    /// Category of role: Staff, Spectator, Volunteer, VIP, Media, etc.
+    /// Used to distinguish working staff from non-working attendees.
+    /// </summary>
+    [MaxLength(50)]
+    public string RoleCategory { get; set; } = "Staff";
+
     // Permission flags
     public bool CanManageSchedule { get; set; } = false;
     public bool CanManageCourts { get; set; } = false;
@@ -30,6 +37,16 @@ public class EventStaffRole
     public bool CanCheckInPlayers { get; set; } = false;
     public bool CanManageLineups { get; set; } = false;
     public bool CanViewAllData { get; set; } = false;
+
+    /// <summary>
+    /// Full event admin - can do everything the organizer can do
+    /// </summary>
+    public bool CanFullyManageEvent { get; set; } = false;
+
+    /// <summary>
+    /// Whether this role is available for user self-registration
+    /// </summary>
+    public bool AllowSelfRegistration { get; set; } = true;
 
     public int SortOrder { get; set; } = 0;
     public bool IsActive { get; set; } = true;

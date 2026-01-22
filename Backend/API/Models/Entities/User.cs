@@ -88,6 +88,14 @@ public class User
     public bool AllowDirectMessages { get; set; } = true;
     public bool AllowClubMessages { get; set; } = true;
 
+    // Verification status (synced from Funtime-Shared)
+    public bool EmailVerified { get; set; } = false;
+    public bool PhoneVerified { get; set; } = false;
+
+    // Profile visibility preferences
+    public bool ShowEmailInProfile { get; set; } = false;
+    public bool ShowPhoneInProfile { get; set; } = false;
+
     // Navigation
     public virtual ICollection<BlogPost> BlogPosts { get; set; } = new List<BlogPost>();
     public virtual ICollection<BlogComment> BlogComments { get; set; } = new List<BlogComment>();

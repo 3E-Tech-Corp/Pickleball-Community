@@ -31,6 +31,8 @@ import GameFormatsAdmin from './GameFormatsAdmin'
 import ScoreMethodsAdmin from './ScoreMethodsAdmin'
 import HelpTopicsAdmin from './HelpTopicsAdmin'
 import ObjectAssetTypesAdmin from './ObjectAssetTypesAdmin'
+import EventsAdmin from './EventsAdmin'
+import StaffRolesAdmin from './StaffRolesAdmin'
 
 const AdminDashboard = () => {
   const { user } = useAuth()
@@ -882,6 +884,7 @@ const AdminDashboard = () => {
     {
       title: 'Organization',
       items: [
+        { id: 'events', label: 'Events', icon: Calendar },
         { id: 'leagues', label: 'Leagues', icon: Network },
         { id: 'leagueRoles', label: 'League Roles', icon: Shield }
       ]
@@ -893,6 +896,7 @@ const AdminDashboard = () => {
         { id: 'venueTypes', label: 'Venue Types', icon: Building2 },
         { id: 'assetTypes', label: 'Asset Types', icon: FileText },
         { id: 'clubRoles', label: 'Club Roles', icon: UserCog },
+        { id: 'staffRoles', label: 'Staff Roles', icon: Shield },
         { id: 'teamUnits', label: 'Team Units', icon: Users },
         { id: 'skillLevels', label: 'Skill Levels', icon: Award },
         { id: 'scoreMethods', label: 'Score Methods', icon: Play },
@@ -902,7 +906,6 @@ const AdminDashboard = () => {
     {
       title: 'Coming Soon',
       items: [
-        { id: 'events', label: 'Events', icon: Calendar, count: 0, disabled: true },
         { id: 'transactions', label: 'Transactions', icon: DollarSign, count: 0, disabled: true }
       ]
     }
@@ -2428,14 +2431,8 @@ const AdminDashboard = () => {
             </div>
           )}
 
-          {/* Events Tab (Coming Soon) */}
-          {activeTab === 'events' && (
-            <div className="bg-white rounded-xl shadow-sm p-12 text-center">
-              <Calendar className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-              <h3 className="text-xl font-semibold text-gray-900 mb-2">Events Management</h3>
-              <p className="text-gray-500">Coming soon. Manage tournaments, workshops, and events.</p>
-            </div>
-          )}
+          {/* Events Admin */}
+          {activeTab === 'events' && <EventsAdmin embedded />}
 
           {/* Transactions Tab (Coming Soon) */}
           {activeTab === 'transactions' && (
@@ -2472,6 +2469,9 @@ const AdminDashboard = () => {
 
           {/* Club Roles Admin */}
           {activeTab === 'clubRoles' && <ClubMemberRolesAdmin embedded />}
+
+          {/* Staff Roles Admin */}
+          {activeTab === 'staffRoles' && <StaffRolesAdmin embedded />}
 
           {/* Team Units Admin */}
           {activeTab === 'teamUnits' && <TeamUnitsAdmin embedded />}

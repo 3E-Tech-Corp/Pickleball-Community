@@ -1753,6 +1753,10 @@ function EventDetailModal({ event, isAuthenticated, isAdmin, currentUserId, user
   const [selectedDivisionForRegistration, setSelectedDivisionForRegistration] = useState(null);
   const [unitsLookingForPartners, setUnitsLookingForPartners] = useState([]);
   const [loadingUnits, setLoadingUnits] = useState(false);
+  const [selectedJoinMethod, setSelectedJoinMethod] = useState('Approval');
+  const [joinCodeInput, setJoinCodeInput] = useState('');
+  const [joiningByCode, setJoiningByCode] = useState(false);
+  const [newJoinCode, setNewJoinCode] = useState(null); // Code to show after registration
 
   // Registration viewer state (expandable per division)
   const [expandedDivisions, setExpandedDivisions] = useState({});
@@ -2273,6 +2277,8 @@ function EventDetailModal({ event, isAuthenticated, isAdmin, currentUserId, user
 
     const start = extractDateTime(event.startDate);
     const end = extractDateTime(event.endDate);
+    const regOpen = extractDateTime(event.registrationOpenDate);
+    const regClose = extractDateTime(event.registrationCloseDate);
 
     setEditFormData({
       name: event.name || '',
@@ -2282,6 +2288,10 @@ function EventDetailModal({ event, isAuthenticated, isAdmin, currentUserId, user
       startTime: start.time || '09:00',
       endDate: end.date,
       endTime: end.time || '17:00',
+      registrationOpenDate: regOpen.date,
+      registrationOpenTime: regOpen.time || '00:00',
+      registrationCloseDate: regClose.date,
+      registrationCloseTime: regClose.time || '23:59',
       courtId: event.courtId,
       venueName: event.venueName || '',
       address: event.address || '',
@@ -2567,6 +2577,14 @@ function EventDetailModal({ event, isAuthenticated, isAdmin, currentUserId, user
         ? `${editFormData.endDate}T${editFormData.endTime}:00`
         : `${editFormData.startDate}T${editFormData.endTime}:00`;
 
+      // Registration dates (optional)
+      const registrationOpenDate = editFormData.registrationOpenDate
+        ? `${editFormData.registrationOpenDate}T${editFormData.registrationOpenTime || '00:00'}:00`
+        : null;
+      const registrationCloseDate = editFormData.registrationCloseDate
+        ? `${editFormData.registrationCloseDate}T${editFormData.registrationCloseTime || '23:59'}:00`
+        : null;
+
       // Prepare divisions for update - use null for new divisions, number for existing
       const divisionsToSave = editDivisions.map(d => ({
         id: d.isNew ? null : (typeof d.id === 'number' ? d.id : parseInt(d.id) || null),
@@ -2590,6 +2608,8 @@ function EventDetailModal({ event, isAuthenticated, isAdmin, currentUserId, user
         ...editFormData,
         startDate: startDateTime,
         endDate: endDateTime,
+        registrationOpenDate,
+        registrationCloseDate,
         registrationFee: parseFloat(editFormData.registrationFee) || 0,
         perDivisionFee: parseFloat(editFormData.perDivisionFee) || 0,
         maxParticipants: editFormData.maxParticipants ? parseInt(editFormData.maxParticipants) : null,
@@ -3009,7 +3029,7 @@ function EventDetailModal({ event, isAuthenticated, isAdmin, currentUserId, user
     return true;
   };
 
-  const handleRegister = async (divisionId, partnerUserId = null) => {
+  const handleRegister = async (divisionId, partnerUserId = null, joinMethod = 'Approval') => {
     if (!isAuthenticated) return;
 
     // Check upfront if user can register
@@ -3028,6 +3048,9 @@ function EventDetailModal({ event, isAuthenticated, isAdmin, currentUserId, user
     if (teamSize > 1 && !partnerUserId) {
       setSelectedDivisionForRegistration(division);
       setShowTeamRegistration(true);
+      setSelectedJoinMethod('Approval'); // Reset to default
+      setJoinCodeInput('');
+      setNewJoinCode(null);
       // Load units looking for partners
       loadUnitsLookingForPartners(divisionId);
       return;
@@ -3039,7 +3062,8 @@ function EventDetailModal({ event, isAuthenticated, isAdmin, currentUserId, user
       const response = await tournamentApi.registerForEvent(event.id, {
         eventId: event.id,
         divisionIds: [divisionId],
-        partnerUserId: partnerUserId > 0 ? partnerUserId : null
+        partnerUserId: partnerUserId > 0 ? partnerUserId : null,
+        joinMethod: teamSize > 1 ? joinMethod : 'Approval'
       });
       if (response.success) {
         toast.success('Successfully registered for division!');
@@ -3049,9 +3073,18 @@ function EventDetailModal({ event, isAuthenticated, isAdmin, currentUserId, user
             toast.warning(warning);
           });
         }
-        onUpdate();
-        setShowTeamRegistration(false);
-        setSelectedDivisionForRegistration(null);
+
+        // If code-based join, show the join code
+        if (joinMethod === 'Code' && response.data?.[0]?.joinCode) {
+          setNewJoinCode(response.data[0].joinCode);
+          // Don't close modal yet - show the code
+        } else {
+          onUpdate();
+          setShowTeamRegistration(false);
+          setSelectedDivisionForRegistration(null);
+          setSelectedJoinMethod('Approval');
+        }
+
         // Refresh event data
         const updated = await eventsApi.getEvent(event.id);
         if (updated.success) {
@@ -3066,6 +3099,36 @@ function EventDetailModal({ event, isAuthenticated, isAdmin, currentUserId, user
       toast.error(err?.message || 'Failed to register. Please try again.');
     } finally {
       setRegisteringDivision(null);
+    }
+  };
+
+  // Join by code handler
+  const handleJoinByCode = async () => {
+    if (!joinCodeInput.trim()) {
+      toast.error('Please enter a join code');
+      return;
+    }
+    setJoiningByCode(true);
+    try {
+      const response = await tournamentApi.joinByCode(joinCodeInput.trim());
+      if (response.success) {
+        toast.success(response.message || 'Successfully joined the team!');
+        onUpdate();
+        setShowTeamRegistration(false);
+        setSelectedDivisionForRegistration(null);
+        setJoinCodeInput('');
+        // Refresh event data
+        const updated = await eventsApi.getEvent(event.id);
+        if (updated.success) {
+          Object.assign(event, updated.data);
+        }
+      } else {
+        toast.error(response.message || 'Failed to join');
+      }
+    } catch (err) {
+      toast.error(err?.message || 'Invalid join code. Please check and try again.');
+    } finally {
+      setJoiningByCode(false);
     }
   };
 
@@ -3907,6 +3970,19 @@ function EventDetailModal({ event, isAuthenticated, isAdmin, currentUserId, user
                         <div className="text-xs text-green-600 truncate">Live scores & courts</div>
                       </div>
                     </Link>
+                    {/* Staff Dashboard - For staff members (scorekeeper, check-in, etc.) */}
+                    {isAuthenticated && (
+                      <Link
+                        to={`/event/${event.id}/staff-dashboard`}
+                        className="flex items-center gap-2 p-3 bg-purple-50 border border-purple-200 rounded-lg text-purple-700 hover:bg-purple-100 transition-colors"
+                      >
+                        <Shield className="w-5 h-5" />
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium text-sm">Staff Dashboard</div>
+                          <div className="text-xs text-purple-600 truncate">Score, check-in, courts</div>
+                        </div>
+                      </Link>
+                    )}
                   </div>
                 </div>
               )}
@@ -5182,6 +5258,35 @@ function EventDetailModal({ event, isAuthenticated, isAdmin, currentUserId, user
                     </div>
                   </div>
 
+                  {/* Registration Window */}
+                  <div className="border-t pt-4 mt-4">
+                    <h4 className="text-sm font-medium text-gray-900 mb-3 flex items-center gap-2">
+                      <Clock className="w-4 h-4 text-orange-600" />
+                      Registration Window
+                      <span className="text-xs font-normal text-gray-500">(optional)</span>
+                    </h4>
+                    <div className="grid grid-cols-2 gap-4 mb-3">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Registration Opens</label>
+                        <input type="date" value={editFormData?.registrationOpenDate || ''} onChange={(e) => setEditFormData({ ...editFormData, registrationOpenDate: e.target.value })} className="w-full border border-gray-300 rounded-lg p-2" />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Open Time</label>
+                        <input type="time" value={editFormData?.registrationOpenTime || ''} onChange={(e) => setEditFormData({ ...editFormData, registrationOpenTime: e.target.value })} className="w-full border border-gray-300 rounded-lg p-2" />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Registration Closes</label>
+                        <input type="date" value={editFormData?.registrationCloseDate || ''} onChange={(e) => setEditFormData({ ...editFormData, registrationCloseDate: e.target.value })} className="w-full border border-gray-300 rounded-lg p-2" />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Close Time</label>
+                        <input type="time" value={editFormData?.registrationCloseTime || ''} onChange={(e) => setEditFormData({ ...editFormData, registrationCloseTime: e.target.value })} className="w-full border border-gray-300 rounded-lg p-2" />
+                      </div>
+                    </div>
+                  </div>
+
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Registration Fee ($)</label>
@@ -5862,6 +5967,9 @@ function EventDetailModal({ event, isAuthenticated, isAdmin, currentUserId, user
                 onClick={() => {
                   setShowTeamRegistration(false);
                   setSelectedDivisionForRegistration(null);
+                  setSelectedJoinMethod('Approval');
+                  setJoinCodeInput('');
+                  setNewJoinCode(null);
                 }}
                 className="text-gray-400 hover:text-gray-600"
               >
@@ -5877,42 +5985,145 @@ function EventDetailModal({ event, isAuthenticated, isAdmin, currentUserId, user
                 </span>
               </div>
 
-              {/* Create New Team/Pair Option */}
-              <div>
-                <h4 className="font-medium text-gray-900 mb-3 flex items-center gap-2">
-                  <Plus className="w-4 h-4" />
-                  {selectedDivisionForRegistration.teamSize === 2 ? 'Register & Find Partner' : 'Create New Team'}
-                </h4>
-                <p className="text-sm text-gray-600 mb-3">
-                  {selectedDivisionForRegistration.teamSize === 2
-                    ? 'Register now and find or invite a partner later.'
-                    : 'Register as team captain and find or invite players later.'}
-                </p>
-                <button
-                  onClick={() => handleRegister(selectedDivisionForRegistration.id, -1)}
-                  disabled={registeringDivision === selectedDivisionForRegistration.id}
-                  className="w-full px-4 py-3 bg-orange-600 text-white rounded-lg font-medium hover:bg-orange-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-                >
-                  {registeringDivision === selectedDivisionForRegistration.id ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      Registering...
-                    </>
-                  ) : (
-                    <>
-                      <Plus className="w-4 h-4" />
-                      {selectedDivisionForRegistration.teamSize === 2 ? 'Register & Find Partner Later' : 'Create Team & Find Players Later'}
-                    </>
-                  )}
-                </button>
-              </div>
+              {/* Show join code if just registered with Code method */}
+              {newJoinCode && (
+                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                  <h4 className="font-medium text-green-800 mb-2">Registration Successful!</h4>
+                  <p className="text-sm text-green-700 mb-3">
+                    Share this code with your partner to join your team:
+                  </p>
+                  <div className="bg-white border-2 border-green-300 rounded-lg p-4 text-center">
+                    <span className="text-3xl font-mono font-bold tracking-widest text-green-700">
+                      {newJoinCode}
+                    </span>
+                  </div>
+                  <p className="text-xs text-green-600 mt-2 text-center">
+                    This code can only be used once
+                  </p>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(newJoinCode);
+                      toast.success('Code copied to clipboard!');
+                    }}
+                    className="w-full mt-3 px-4 py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors"
+                  >
+                    Copy Code
+                  </button>
+                  <button
+                    onClick={() => {
+                      setNewJoinCode(null);
+                      setShowTeamRegistration(false);
+                      setSelectedDivisionForRegistration(null);
+                      setSelectedJoinMethod('Approval');
+                      onUpdate();
+                    }}
+                    className="w-full mt-2 px-4 py-2 border border-green-300 text-green-700 rounded-lg font-medium hover:bg-green-50 transition-colors"
+                  >
+                    Done
+                  </button>
+                </div>
+              )}
 
-              {/* Join Existing Team/Pair */}
+              {/* Create New Team/Pair Option - hide if showing join code */}
+              {!newJoinCode && (
+                <div>
+                  <h4 className="font-medium text-gray-900 mb-3 flex items-center gap-2">
+                    <Plus className="w-4 h-4" />
+                    {selectedDivisionForRegistration.teamSize === 2 ? 'Register & Find Partner' : 'Create New Team'}
+                  </h4>
+                  <p className="text-sm text-gray-600 mb-3">
+                    {selectedDivisionForRegistration.teamSize === 2
+                      ? 'Register now and find or invite a partner later.'
+                      : 'Register as team captain and find or invite players later.'}
+                  </p>
+
+                  {/* Join Method Selection */}
+                  <div className="mb-4 space-y-2">
+                    <p className="text-sm font-medium text-gray-700">How will your partner join?</p>
+                    <label className="flex items-center gap-3 p-3 border rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
+                      <input
+                        type="radio"
+                        name="joinMethod"
+                        value="Approval"
+                        checked={selectedJoinMethod === 'Approval'}
+                        onChange={() => setSelectedJoinMethod('Approval')}
+                        className="w-4 h-4 text-orange-600 focus:ring-orange-500"
+                      />
+                      <div className="flex-1">
+                        <div className="font-medium text-gray-900">I will approve join requests</div>
+                        <div className="text-sm text-gray-500">Others can find you and request to join</div>
+                      </div>
+                    </label>
+                    <label className="flex items-center gap-3 p-3 border rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
+                      <input
+                        type="radio"
+                        name="joinMethod"
+                        value="Code"
+                        checked={selectedJoinMethod === 'Code'}
+                        onChange={() => setSelectedJoinMethod('Code')}
+                        className="w-4 h-4 text-orange-600 focus:ring-orange-500"
+                      />
+                      <div className="flex-1">
+                        <div className="font-medium text-gray-900">I will send my partner a join code</div>
+                        <div className="text-sm text-gray-500">Get a code to share directly with your partner</div>
+                      </div>
+                    </label>
+                  </div>
+
+                  <button
+                    onClick={() => handleRegister(selectedDivisionForRegistration.id, -1, selectedJoinMethod)}
+                    disabled={registeringDivision === selectedDivisionForRegistration.id}
+                    className="w-full px-4 py-3 bg-orange-600 text-white rounded-lg font-medium hover:bg-orange-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                  >
+                    {registeringDivision === selectedDivisionForRegistration.id ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Registering...
+                      </>
+                    ) : (
+                      <>
+                        <Plus className="w-4 h-4" />
+                        {selectedDivisionForRegistration.teamSize === 2 ? 'Register & Find Partner Later' : 'Create Team & Find Players Later'}
+                      </>
+                    )}
+                  </button>
+                </div>
+              )}
+
+              {/* Join Existing Team/Pair - hide if showing join code */}
+              {!newJoinCode && (
               <div>
                 <h4 className="font-medium text-gray-900 mb-3 flex items-center gap-2">
                   <UserPlus className="w-4 h-4" />
                   {selectedDivisionForRegistration.teamSize === 2 ? 'Partner with Someone' : 'Join Existing Team'}
                 </h4>
+
+                {/* Join by Code Input */}
+                <div className="mb-4 p-3 bg-purple-50 border border-purple-200 rounded-lg">
+                  <p className="text-sm font-medium text-purple-800 mb-2">Have a join code?</p>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={joinCodeInput}
+                      onChange={(e) => setJoinCodeInput(e.target.value.toUpperCase())}
+                      placeholder="Enter 6-digit code"
+                      maxLength={6}
+                      className="flex-1 px-3 py-2 border border-purple-300 rounded-lg font-mono text-center text-lg tracking-widest focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                    />
+                    <button
+                      onClick={handleJoinByCode}
+                      disabled={joiningByCode || joinCodeInput.length < 6}
+                      className="px-4 py-2 bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700 transition-colors disabled:opacity-50 flex items-center gap-2"
+                    >
+                      {joiningByCode ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        'Join'
+                      )}
+                    </button>
+                  </div>
+                </div>
+
                 {loadingUnits ? (
                   <div className="flex items-center justify-center py-6">
                     <Loader2 className="w-6 h-6 animate-spin text-orange-600" />
@@ -5943,12 +6154,24 @@ function EventDetailModal({ event, isAuthenticated, isAdmin, currentUserId, user
                             <div>
                               {selectedDivisionForRegistration.teamSize === 2 ? (
                                 <>
-                                  <div className="font-medium text-gray-900">{unit.captainName || 'Unknown'}</div>
-                                  <div className="text-sm text-gray-500">Looking for partner</div>
+                                  <div className="font-medium text-gray-900 flex items-center gap-2">
+                                    {unit.captainName || 'Unknown'}
+                                    {unit.joinMethod === 'Code' && (
+                                      <span className="text-xs px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded">Code</span>
+                                    )}
+                                  </div>
+                                  <div className="text-sm text-gray-500">
+                                    {unit.joinMethod === 'Code' ? 'Has join code' : 'Looking for partner'}
+                                  </div>
                                 </>
                               ) : (
                                 <>
-                                  <div className="font-medium text-gray-900">{unit.name}</div>
+                                  <div className="font-medium text-gray-900 flex items-center gap-2">
+                                    {unit.name}
+                                    {unit.joinMethod === 'Code' && (
+                                      <span className="text-xs px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded">Code</span>
+                                    )}
+                                  </div>
                                   <div className="text-sm text-gray-500">
                                     Captain: {unit.captainName || 'Unknown'}
                                   </div>
@@ -5959,18 +6182,22 @@ function EventDetailModal({ event, isAuthenticated, isAdmin, currentUserId, user
                               )}
                             </div>
                           </div>
-                          <button
-                            onClick={() => handleJoinUnit(unit.id)}
-                            className="px-3 py-1.5 bg-orange-100 text-orange-700 rounded-lg text-sm font-medium hover:bg-orange-200 transition-colors"
-                          >
-                            Request to Join
-                          </button>
+                          {unit.joinMethod !== 'Code' && (
+                            <button
+                              onClick={() => handleJoinUnit(unit.id)}
+                              className="px-3 py-1.5 bg-orange-100 text-orange-700 rounded-lg text-sm font-medium hover:bg-orange-200 transition-colors"
+                            >
+                              Request to Join
+                            </button>
+                          )}
                         </div>
                       </div>
                     ))}
                   </div>
                 )}
               </div>
+              )}
+
             </div>
 
             <div className="p-4 border-t bg-gray-50">
@@ -5978,6 +6205,9 @@ function EventDetailModal({ event, isAuthenticated, isAdmin, currentUserId, user
                 onClick={() => {
                   setShowTeamRegistration(false);
                   setSelectedDivisionForRegistration(null);
+                  setSelectedJoinMethod('Approval');
+                  setJoinCodeInput('');
+                  setNewJoinCode(null);
                 }}
                 className="w-full px-4 py-2 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-100 transition-colors"
               >
@@ -6826,6 +7056,10 @@ function CreateEventModal({ eventTypes, teamUnits = [], skillLevels = [], courtI
     startTime: '09:00',
     endDate: '',
     endTime: '17:00',
+    registrationOpenDate: '',
+    registrationOpenTime: '00:00',
+    registrationCloseDate: '',
+    registrationCloseTime: '23:59',
     venueName: courtName ? decodeURIComponent(courtName) : '',
     city: '',
     state: '',
@@ -7019,10 +7253,20 @@ function CreateEventModal({ eventTypes, teamUnits = [], skillLevels = [], courtI
         ? `${formData.endDate}T${formData.endTime}:00`
         : `${formData.startDate}T${formData.endTime}:00`;
 
+      // Registration dates (optional)
+      const registrationOpenDate = formData.registrationOpenDate
+        ? `${formData.registrationOpenDate}T${formData.registrationOpenTime}:00`
+        : null;
+      const registrationCloseDate = formData.registrationCloseDate
+        ? `${formData.registrationCloseDate}T${formData.registrationCloseTime}:00`
+        : null;
+
       const response = await eventsApi.create({
         ...formData,
         startDate: startDateTime,
         endDate: endDateTime,
+        registrationOpenDate,
+        registrationCloseDate,
         courtId: selectedCourt?.courtId || undefined
       });
 
@@ -7517,6 +7761,60 @@ function CreateEventModal({ eventTypes, teamUnits = [], skillLevels = [], courtI
                     onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
                     className="w-full border border-gray-300 rounded-lg p-2"
                   />
+                </div>
+              </div>
+
+              {/* Registration Window */}
+              <div className="border-t pt-4 mt-4">
+                <h4 className="text-sm font-medium text-gray-900 mb-3 flex items-center gap-2">
+                  <Clock className="w-4 h-4 text-orange-600" />
+                  Registration Window
+                  <span className="text-xs font-normal text-gray-500">(optional)</span>
+                </h4>
+                <p className="text-xs text-gray-500 mb-3">
+                  Set when registration opens and closes. Leave blank for no restrictions.
+                </p>
+
+                <div className="grid grid-cols-2 gap-4 mb-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Registration Opens</label>
+                    <input
+                      type="date"
+                      value={formData.registrationOpenDate}
+                      onChange={(e) => setFormData({ ...formData, registrationOpenDate: e.target.value })}
+                      className="w-full border border-gray-300 rounded-lg p-2"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Open Time</label>
+                    <input
+                      type="time"
+                      value={formData.registrationOpenTime}
+                      onChange={(e) => setFormData({ ...formData, registrationOpenTime: e.target.value })}
+                      className="w-full border border-gray-300 rounded-lg p-2"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Registration Closes</label>
+                    <input
+                      type="date"
+                      value={formData.registrationCloseDate}
+                      onChange={(e) => setFormData({ ...formData, registrationCloseDate: e.target.value })}
+                      className="w-full border border-gray-300 rounded-lg p-2"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Close Time</label>
+                    <input
+                      type="time"
+                      value={formData.registrationCloseTime}
+                      onChange={(e) => setFormData({ ...formData, registrationCloseTime: e.target.value })}
+                      className="w-full border border-gray-300 rounded-lg p-2"
+                    />
+                  </div>
                 </div>
               </div>
             </>

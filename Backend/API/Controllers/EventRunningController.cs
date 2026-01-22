@@ -4,7 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Pickleball.Community.Database;
 using Pickleball.Community.Models.Entities;
 using Pickleball.Community.Services;
-using System.Security.Claims;
+using Pickleball.Community.Controllers.Base;
 
 namespace Pickleball.Community.API.Controllers;
 
@@ -14,9 +14,8 @@ namespace Pickleball.Community.API.Controllers;
 [ApiController]
 [Route("event-running")]
 [Authorize]
-public class EventRunningController : ControllerBase
+public class EventRunningController : EventControllerBase
 {
-    private readonly ApplicationDbContext _context;
     private readonly INotificationService _notificationService;
     private readonly ILogger<EventRunningController> _logger;
 
@@ -24,32 +23,10 @@ public class EventRunningController : ControllerBase
         ApplicationDbContext context,
         INotificationService notificationService,
         ILogger<EventRunningController> logger)
+        : base(context)
     {
-        _context = context;
         _notificationService = notificationService;
         _logger = logger;
-    }
-
-    private int? GetUserId()
-    {
-        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        if (!string.IsNullOrEmpty(userIdClaim) && int.TryParse(userIdClaim, out int userId))
-            return userId;
-        return null;
-    }
-
-    private async Task<bool> IsEventOrganizerAsync(int eventId, int userId)
-    {
-        var evt = await _context.Events.FindAsync(eventId);
-        return evt != null && evt.OrganizedByUserId == userId;
-    }
-
-    private async Task<bool> IsAdminAsync()
-    {
-        var userId = GetUserId();
-        if (!userId.HasValue) return false;
-        var user = await _context.Users.FindAsync(userId.Value);
-        return user?.Role == "Admin";
     }
 
     // ==========================================
@@ -132,7 +109,7 @@ public class EventRunningController : ControllerBase
 
         // Get all matches for user's units
         var unitIds = myUnits.Select(u => u.Id).ToList();
-        var matches = await _context.EventMatches
+        var matches = await _context.EventEncounters
             .Include(m => m.Unit1).ThenInclude(u => u!.Members).ThenInclude(mem => mem.User)
             .Include(m => m.Unit2).ThenInclude(u => u!.Members).ThenInclude(mem => mem.User)
             .Include(m => m.Division)
@@ -188,7 +165,7 @@ public class EventRunningController : ControllerBase
                     }).ToList()
             }).ToList(),
             Schedule = matches.Select(m => MapToMatchDto(m, unitIds)).ToList(),
-            Courts = courts.Select(c => new CourtStatusDto
+            Courts = courts.Select(c => new DashboardCourtStatusDto
             {
                 Id = c.Id,
                 Label = c.CourtLabel,
@@ -535,7 +512,7 @@ public class EventRunningController : ControllerBase
             .ToListAsync();
 
         // Get all matches
-        var matches = await _context.EventMatches
+        var matches = await _context.EventEncounters
             .Include(m => m.Unit1).ThenInclude(u => u!.Members).ThenInclude(mem => mem.User)
             .Include(m => m.Unit2).ThenInclude(u => u!.Members).ThenInclude(mem => mem.User)
             .Include(m => m.Division)
@@ -712,7 +689,7 @@ public class EventRunningController : ControllerBase
         if (!await IsEventOrganizerAsync(eventId, userId.Value) && !await IsAdminAsync())
             return Forbid();
 
-        var match = await _context.EventMatches
+        var match = await _context.EventEncounters
             .Include(m => m.Matches).ThenInclude(match => match.Games)
             .Include(m => m.Unit1).ThenInclude(u => u!.Members)
             .Include(m => m.Unit2).ThenInclude(u => u!.Members)
@@ -779,7 +756,7 @@ public class EventRunningController : ControllerBase
         if (!await IsEventOrganizerAsync(eventId, userId.Value) && !await IsAdminAsync())
             return Forbid();
 
-        var match = await _context.EventMatches
+        var match = await _context.EventEncounters
             .Include(m => m.Matches).ThenInclude(match => match.Games)
             .Include(m => m.TournamentCourt)
             .Include(m => m.Unit1).ThenInclude(u => u!.Members)
@@ -850,7 +827,7 @@ public class EventRunningController : ControllerBase
         if (!await IsEventOrganizerAsync(eventId, userId.Value) && !await IsAdminAsync())
             return Forbid();
 
-        var match = await _context.EventMatches
+        var match = await _context.EventEncounters
             .Include(m => m.Matches).ThenInclude(match => match.Games)
             .Include(m => m.TournamentCourt)
             .Include(m => m.Unit1).ThenInclude(u => u!.Members)
@@ -987,7 +964,7 @@ public class EventRunningController : ControllerBase
     }
 
     /// <summary>
-    /// Get score history for a game (admin only)
+    /// Get score history for a game (TD, admin, or scorekeeper)
     /// </summary>
     [HttpGet("{eventId}/games/{gameId}/history")]
     public async Task<IActionResult> GetGameScoreHistory(int eventId, int gameId)
@@ -996,7 +973,12 @@ public class EventRunningController : ControllerBase
         if (!userId.HasValue)
             return Unauthorized(new { success = false, message = "Unauthorized" });
 
-        if (!await IsEventOrganizerAsync(eventId, userId.Value) && !await IsAdminAsync())
+        // Check authorization: admin, organizer, or staff with CanRecordScores
+        var isAuthorized = await IsAdminAsync() ||
+                           await IsEventOrganizerAsync(eventId, userId.Value) ||
+                           await HasStaffPermissionAsync(eventId, userId.Value, "CanRecordScores");
+
+        if (!isAuthorized)
             return Forbid();
 
         var game = await _context.EventGames
@@ -1028,6 +1010,72 @@ public class EventRunningController : ControllerBase
             .ToListAsync();
 
         return Ok(new { success = true, data = history });
+    }
+
+    /// <summary>
+    /// Get score history for all games in an encounter (TD, admin, or scorekeeper)
+    /// </summary>
+    [HttpGet("{eventId}/encounters/{encounterId}/history")]
+    public async Task<IActionResult> GetEncounterScoreHistory(int eventId, int encounterId)
+    {
+        var userId = GetUserId();
+        if (!userId.HasValue)
+            return Unauthorized(new { success = false, message = "Unauthorized" });
+
+        // Check authorization: admin, organizer, or staff with CanRecordScores
+        var isAuthorized = await IsAdminAsync() ||
+                           await IsEventOrganizerAsync(eventId, userId.Value) ||
+                           await HasStaffPermissionAsync(eventId, userId.Value, "CanRecordScores");
+
+        if (!isAuthorized)
+            return Forbid();
+
+        var encounter = await _context.EventEncounters
+            .Include(e => e.Unit1)
+            .Include(e => e.Unit2)
+            .Include(e => e.Matches).ThenInclude(m => m.Games)
+            .FirstOrDefaultAsync(e => e.Id == encounterId && e.EventId == eventId);
+
+        if (encounter == null)
+            return NotFound(new { success = false, message = "Encounter not found" });
+
+        var gameIds = encounter.Matches.SelectMany(m => m.Games).Select(g => g.Id).ToList();
+
+        var history = await _context.EventGameScoreHistories
+            .Include(h => h.ChangedByUser)
+            .Include(h => h.Game)
+            .Where(h => gameIds.Contains(h.GameId))
+            .OrderByDescending(h => h.CreatedAt)
+            .Select(h => new EncounterScoreHistoryDto
+            {
+                Id = h.Id,
+                GameId = h.GameId,
+                GameNumber = h.Game!.GameNumber,
+                ChangeType = h.ChangeType,
+                Unit1Score = h.Unit1Score,
+                Unit2Score = h.Unit2Score,
+                PreviousUnit1Score = h.PreviousUnit1Score,
+                PreviousUnit2Score = h.PreviousUnit2Score,
+                ChangedByUserId = h.ChangedByUserId,
+                ChangedByName = Utility.FormatName(h.ChangedByUser!.LastName, h.ChangedByUser.FirstName),
+                ChangedByUnitId = h.ChangedByUnitId,
+                Reason = h.Reason,
+                IsAdminOverride = h.IsAdminOverride,
+                CreatedAt = h.CreatedAt
+            })
+            .ToListAsync();
+
+        return Ok(new
+        {
+            success = true,
+            data = new
+            {
+                encounterId,
+                unit1Name = encounter.Unit1?.Name,
+                unit2Name = encounter.Unit2?.Name,
+                history
+            }
+        });
     }
 
     /// <summary>
@@ -1206,7 +1254,7 @@ public class EventRunningController : ControllerBase
     private async Task UpdateMatchAfterGameComplete(EventGame game)
     {
         var encounterId = game.EncounterMatch?.EncounterId ?? 0;
-        var encounter = await _context.EventMatches
+        var encounter = await _context.EventEncounters
             .Include(m => m.Matches).ThenInclude(match => match.Games)
             .Include(m => m.TournamentCourt)
             .Include(m => m.Unit1)
@@ -1409,7 +1457,7 @@ public class PlayerEventDashboardDto
     public string? VenueName { get; set; }
     public List<PlayerUnitDto> MyUnits { get; set; } = new();
     public List<PlayerMatchDto> Schedule { get; set; } = new();
-    public List<CourtStatusDto> Courts { get; set; } = new();
+    public List<DashboardCourtStatusDto> Courts { get; set; } = new();
     public List<EventNotificationDto> Notifications { get; set; } = new();
 }
 
@@ -1472,7 +1520,7 @@ public class PlayerGameDto
     public int? WinnerUnitId { get; set; }
 }
 
-public class CourtStatusDto
+public class DashboardCourtStatusDto
 {
     public int Id { get; set; }
     public string Label { get; set; } = string.Empty;
@@ -1672,6 +1720,24 @@ public class BroadcastMessageDto
 public class ScoreHistoryDto
 {
     public int Id { get; set; }
+    public string ChangeType { get; set; } = string.Empty;
+    public int Unit1Score { get; set; }
+    public int Unit2Score { get; set; }
+    public int? PreviousUnit1Score { get; set; }
+    public int? PreviousUnit2Score { get; set; }
+    public int ChangedByUserId { get; set; }
+    public string ChangedByName { get; set; } = string.Empty;
+    public int? ChangedByUnitId { get; set; }
+    public string? Reason { get; set; }
+    public bool IsAdminOverride { get; set; }
+    public DateTime CreatedAt { get; set; }
+}
+
+public class EncounterScoreHistoryDto
+{
+    public int Id { get; set; }
+    public int GameId { get; set; }
+    public int GameNumber { get; set; }
     public string ChangeType { get; set; } = string.Empty;
     public int Unit1Score { get; set; }
     public int Unit2Score { get; set; }

@@ -1,6 +1,6 @@
-import { useState } from 'react';
-import { X, CheckCircle, Play, User, Edit2 } from 'lucide-react';
-import { getSharedAssetUrl } from '../../services/api';
+import { useState, useEffect } from 'react';
+import { X, CheckCircle, Play, User, Edit2, History, ChevronDown, ChevronUp } from 'lucide-react';
+import { getSharedAssetUrl, gameDayApi } from '../../services/api';
 
 const STATUS_COLORS = {
   Scheduled: 'bg-gray-100 text-gray-600',
@@ -29,6 +29,8 @@ const STATUS_COLORS = {
  * - showStatusControl: Whether to show status buttons (default true)
  * - readOnly: If true, disable all editing
  * - isAdmin: If true, show admin-only features like unit changing
+ * - showScoreHistory: If true, show score history section for admin/TD/scorekeeper
+ * - eventId: Event ID needed for fetching score history
  */
 export default function GameScoreModal({
   game,
@@ -45,7 +47,9 @@ export default function GameScoreModal({
   showStatusControl = true,
   showAllCourts = false,
   readOnly = false,
-  isAdmin = false
+  isAdmin = false,
+  showScoreHistory = false,
+  eventId = null
 }) {
   const [unit1Score, setUnit1Score] = useState(game.unit1Score || 0);
   const [unit2Score, setUnit2Score] = useState(game.unit2Score || 0);
@@ -54,6 +58,31 @@ export default function GameScoreModal({
   const [editingUnits, setEditingUnits] = useState(false);
   const [selectedUnit1Id, setSelectedUnit1Id] = useState(game.unit1?.id || '');
   const [selectedUnit2Id, setSelectedUnit2Id] = useState(game.unit2?.id || '');
+
+  // Score history state
+  const [showHistory, setShowHistory] = useState(false);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [scoreHistory, setScoreHistory] = useState([]);
+
+  // Load score history when toggled open
+  useEffect(() => {
+    const loadHistory = async () => {
+      if (showHistory && eventId && game.id && scoreHistory.length === 0) {
+        setHistoryLoading(true);
+        try {
+          const res = await gameDayApi.getGameScoreHistory(eventId, game.id);
+          if (res.success) {
+            setScoreHistory(res.data);
+          }
+        } catch (err) {
+          console.error('Error loading score history:', err);
+        } finally {
+          setHistoryLoading(false);
+        }
+      }
+    };
+    loadHistory();
+  }, [showHistory, eventId, game.id, scoreHistory.length]);
 
   const availableCourts = showAllCourts
     ? courts
@@ -461,6 +490,71 @@ export default function GameScoreModal({
                 </button>
               ))}
             </div>
+          </div>
+        )}
+
+        {/* Score History (for admin/TD/scorekeeper) */}
+        {showScoreHistory && eventId && (
+          <div className="mb-4 border rounded-lg overflow-hidden">
+            <button
+              onClick={() => setShowHistory(!showHistory)}
+              className="w-full px-4 py-3 bg-gray-50 flex items-center justify-between hover:bg-gray-100 transition-colors"
+            >
+              <span className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                <History className="w-4 h-4" />
+                Score History
+              </span>
+              {showHistory ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+            </button>
+            {showHistory && (
+              <div className="p-4 bg-white border-t max-h-48 overflow-y-auto">
+                {historyLoading ? (
+                  <div className="text-center text-gray-500 py-2">Loading...</div>
+                ) : scoreHistory.length === 0 ? (
+                  <div className="text-center text-gray-400 py-2 text-sm">No score changes recorded</div>
+                ) : (
+                  <div className="space-y-2">
+                    {scoreHistory.map(h => (
+                      <div key={h.id} className="flex items-start gap-3 text-sm py-2 border-b last:border-0">
+                        <div className="flex-shrink-0">
+                          <span className={`px-2 py-0.5 rounded text-xs ${
+                            h.changeType === 'AdminOverride' ? 'bg-red-100 text-red-700' :
+                            h.changeType === 'ScoreConfirmed' ? 'bg-green-100 text-green-700' :
+                            h.changeType === 'ScoreDisputed' ? 'bg-yellow-100 text-yellow-700' :
+                            'bg-blue-100 text-blue-700'
+                          }`}>
+                            {h.changeType.replace(/([A-Z])/g, ' $1').trim()}
+                          </span>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium">
+                            {h.unit1Score} - {h.unit2Score}
+                            {h.previousUnit1Score !== null && h.previousUnit1Score !== undefined && (
+                              <span className="text-gray-400 ml-2">
+                                (was {h.previousUnit1Score} - {h.previousUnit2Score})
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-gray-500 text-xs">
+                            {h.changedByName}
+                            {h.isAdminOverride && <span className="text-red-500 ml-1">(Admin)</span>}
+                          </div>
+                          {h.reason && (
+                            <div className="text-gray-400 text-xs mt-0.5 italic">"{h.reason}"</div>
+                          )}
+                        </div>
+                        <div className="text-xs text-gray-400 flex-shrink-0">
+                          {new Date(h.createdAt).toLocaleTimeString('en-US', {
+                            hour: 'numeric',
+                            minute: '2-digit'
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
 

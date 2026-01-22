@@ -98,15 +98,16 @@ public class AssetsController : ControllerBase
 
             var httpClient = _httpClientFactory.CreateClient("SharedAuth");
 
-            // Add API key for authentication
+            // Create request with API key header (don't modify DefaultRequestHeaders on pooled client)
+            var request = new HttpRequestMessage(HttpMethod.Get, $"asset/{assetId}");
             var apiKey = _configuration["SharedAuth:ApiKey"];
             if (!string.IsNullOrEmpty(apiKey))
             {
-                httpClient.DefaultRequestHeaders.Add("X-Api-Key", apiKey);
+                request.Headers.Add("X-Api-Key", apiKey);
             }
 
             // Fetch asset from Funtime-Shared
-            var response = await httpClient.GetAsync($"asset/{assetId}");
+            var response = await httpClient.SendAsync(request);
 
             if (!response.IsSuccessStatusCode)
             {
