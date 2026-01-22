@@ -256,9 +256,9 @@ export default function PublicProfileModal({ userId, onClose, onFriendshipChange
 
                   {/* Email (shown if user enabled or viewer is admin/self) */}
                   {profile.email && (
-                    <div className="flex items-center justify-center sm:justify-start gap-2 text-white/70 mt-1 text-sm">
+                    <div className="flex items-center justify-center sm:justify-start gap-2 text-white mt-2 text-sm">
                       <Mail className="w-4 h-4" />
-                      <a href={`mailto:${profile.email}`} className="hover:text-white hover:underline">{profile.email}</a>
+                      <a href={`mailto:${profile.email}`} className="text-white font-medium hover:underline">{profile.email}</a>
                       {profile.emailVerified && (
                         <BadgeCheck className="w-4 h-4 text-green-300" title="Verified email" />
                       )}
@@ -267,9 +267,9 @@ export default function PublicProfileModal({ userId, onClose, onFriendshipChange
 
                   {/* Phone (shown if user enabled or viewer is admin/self) */}
                   {profile.phone && (
-                    <div className="flex items-center justify-center sm:justify-start gap-2 text-white/70 mt-1 text-sm">
+                    <div className="flex items-center justify-center sm:justify-start gap-2 text-white mt-1 text-sm">
                       <Phone className="w-4 h-4" />
-                      <a href={`tel:${profile.phone}`} className="hover:text-white hover:underline">{profile.phone}</a>
+                      <a href={`tel:${profile.phone}`} className="text-white font-medium hover:underline">{profile.phone}</a>
                       {profile.phoneVerified && (
                         <BadgeCheck className="w-4 h-4 text-green-300" title="Verified phone" />
                       )}
