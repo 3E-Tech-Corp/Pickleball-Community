@@ -207,6 +207,61 @@ public class AuthController : ControllerBase
             return BadRequest(ex.Message);
         }
     }
+
+    /// <summary>
+    /// Tests the API key connection to Funtime-Shared service (Admin only)
+    /// </summary>
+    [HttpGet("test-apikey")]
+    [Authorize(Roles = "Admin")]
+    public async Task<ActionResult> TestApiKey()
+    {
+        try
+        {
+            var baseUrl = _configuration["SharedAuth:BaseUrl"];
+            var apiKey = _configuration["SharedAuth:ApiKey"];
+
+            if (string.IsNullOrEmpty(baseUrl))
+            {
+                return BadRequest(new { success = false, message = "SharedAuth:BaseUrl not configured" });
+            }
+
+            if (string.IsNullOrEmpty(apiKey))
+            {
+                return BadRequest(new { success = false, message = "SharedAuth:ApiKey not configured" });
+            }
+
+            using var httpClient = new HttpClient();
+            httpClient.DefaultRequestHeaders.Add("X-Api-Key", apiKey);
+
+            var response = await httpClient.GetAsync($"{baseUrl}/apikey/test");
+            var content = await response.Content.ReadAsStringAsync();
+
+            if (response.IsSuccessStatusCode)
+            {
+                // Parse and return the JSON response
+                var result = System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.JsonElement>(content);
+                return Ok(result);
+            }
+            else
+            {
+                return StatusCode((int)response.StatusCode, new
+                {
+                    success = false,
+                    message = $"API key test failed with status {response.StatusCode}",
+                    details = content
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new
+            {
+                success = false,
+                message = "Failed to test API key",
+                error = ex.Message
+            });
+        }
+    }
 }
 
 public class SyncUserRequest
