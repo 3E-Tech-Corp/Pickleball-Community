@@ -3,10 +3,10 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
   Calendar, MapPin, Clock, Users, DollarSign, ChevronLeft,
   UserPlus, Building2, Phone, Mail, User, Image, ExternalLink,
-  Loader2, AlertCircle, FileText, Radio, Settings
+  Loader2, AlertCircle, FileText, Radio, Settings, Trophy, Medal
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { eventsApi, objectAssetsApi, getSharedAssetUrl } from '../services/api';
+import { eventsApi, objectAssetsApi, scoreboardApi, getSharedAssetUrl } from '../services/api';
 import { getIconByName } from '../utils/iconMap';
 import { getColorValues } from '../utils/colorMap';
 import PublicProfileModal from '../components/ui/PublicProfileModal';
@@ -19,6 +19,7 @@ export default function EventView() {
 
   const [event, setEvent] = useState(null);
   const [adAssets, setAdAssets] = useState([]);
+  const [eventResults, setEventResults] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedProfileUserId, setSelectedProfileUserId] = useState(null);
@@ -62,6 +63,27 @@ export default function EventView() {
       loadEvent();
     }
   }, [eventId]);
+
+  // Load event results when event is finished
+  useEffect(() => {
+    const loadResults = async () => {
+      if (!event || !event.endDate) return;
+
+      const isEventPast = new Date(event.endDate) < new Date();
+      if (!isEventPast) return;
+
+      try {
+        const response = await scoreboardApi.getResults(eventId);
+        if (response.success && response.data) {
+          setEventResults(response.data);
+        }
+      } catch (err) {
+        console.log('No results available:', err);
+      }
+    };
+
+    loadResults();
+  }, [event, eventId]);
 
   const formatDate = (dateString) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -516,6 +538,87 @@ export default function EventView() {
                       </div>
                     );
                   })}
+                </div>
+              </div>
+            )}
+
+            {/* Final Rankings - Show when event is finished */}
+            {isEventPast && eventResults?.standings && eventResults.standings.length > 0 && (
+              <div className="mt-6 pt-6 border-t border-gray-100">
+                <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                  <Trophy className="w-5 h-5 text-yellow-500" />
+                  Final Rankings
+                </h2>
+                <div className="space-y-6">
+                  {/* Group standings by division */}
+                  {(() => {
+                    const byDivision = eventResults.standings.reduce((acc, standing) => {
+                      const divId = standing.divisionId;
+                      if (!acc[divId]) {
+                        acc[divId] = {
+                          divisionName: standing.divisionName,
+                          standings: []
+                        };
+                      }
+                      acc[divId].standings.push(standing);
+                      return acc;
+                    }, {});
+
+                    return Object.entries(byDivision).map(([divId, { divisionName, standings }]) => (
+                      <div key={divId} className="bg-gray-50 rounded-lg p-4">
+                        <h3 className="text-sm font-semibold text-gray-800 mb-3">{divisionName}</h3>
+                        <div className="space-y-2">
+                          {standings.slice(0, 8).map((standing, index) => {
+                            const placement = standing.finalPlacement || standing.overallRank || (index + 1);
+                            const isTopThree = placement <= 3;
+                            const medalColors = {
+                              1: 'text-yellow-500',
+                              2: 'text-gray-400',
+                              3: 'text-amber-600'
+                            };
+
+                            return (
+                              <div
+                                key={standing.unitId}
+                                className={`flex items-center gap-3 p-2 rounded-lg ${isTopThree ? 'bg-white shadow-sm' : ''}`}
+                              >
+                                {/* Placement */}
+                                <div className="w-8 flex-shrink-0 text-center">
+                                  {isTopThree ? (
+                                    <Medal className={`w-5 h-5 mx-auto ${medalColors[placement]}`} />
+                                  ) : (
+                                    <span className="text-sm font-medium text-gray-500">{placement}</span>
+                                  )}
+                                </div>
+
+                                {/* Team/Unit Info */}
+                                <div className="flex-1 min-w-0">
+                                  <p className={`text-sm font-medium truncate ${isTopThree ? 'text-gray-900' : 'text-gray-700'}`}>
+                                    {standing.unitName}
+                                  </p>
+                                  {standing.players && standing.players.length > 0 && (
+                                    <p className="text-xs text-gray-500 truncate">
+                                      {standing.players.join(' / ')}
+                                    </p>
+                                  )}
+                                </div>
+
+                                {/* Stats */}
+                                <div className="flex-shrink-0 text-right">
+                                  <p className="text-xs font-medium text-gray-700">
+                                    {standing.matchesWon}-{standing.matchesLost}
+                                  </p>
+                                  <p className="text-xs text-gray-500">
+                                    W-L
+                                  </p>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ));
+                  })()}
                 </div>
               </div>
             )}
