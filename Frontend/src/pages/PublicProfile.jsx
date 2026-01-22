@@ -6,7 +6,7 @@ import {
   User, MapPin, Calendar, ArrowLeft, UserPlus, UserCheck, Clock,
   Award, Target, Zap, Heart, Activity, Play, X, Check,
   Twitter, Instagram, Facebook, Linkedin, Youtube, Globe, Link as LinkIcon, ExternalLink,
-  KeyRound
+  KeyRound, Mail, Phone, BadgeCheck
 } from 'lucide-react'
 import AdminEditCredentialsModal from '../components/ui/AdminEditCredentialsModal'
 
@@ -233,6 +233,28 @@ const PublicProfile = () => {
                 <div className="flex items-center justify-center sm:justify-start gap-2 text-white/80 mt-2">
                   <MapPin className="w-4 h-4" />
                   <span>{getLocation()}</span>
+                </div>
+              )}
+
+              {/* Email (shown if user enabled or viewer is admin) */}
+              {profile.email && (
+                <div className="flex items-center justify-center sm:justify-start gap-2 text-white/80 mt-2">
+                  <Mail className="w-4 h-4" />
+                  <a href={`mailto:${profile.email}`} className="hover:text-white hover:underline">{profile.email}</a>
+                  {profile.emailVerified && (
+                    <BadgeCheck className="w-4 h-4 text-green-300" title="Verified email" />
+                  )}
+                </div>
+              )}
+
+              {/* Phone (shown if user enabled or viewer is admin) */}
+              {profile.phone && (
+                <div className="flex items-center justify-center sm:justify-start gap-2 text-white/80 mt-2">
+                  <Phone className="w-4 h-4" />
+                  <a href={`tel:${profile.phone}`} className="hover:text-white hover:underline">{profile.phone}</a>
+                  {profile.phoneVerified && (
+                    <BadgeCheck className="w-4 h-4 text-green-300" title="Verified phone" />
+                  )}
                 </div>
               )}
 

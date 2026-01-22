@@ -37,6 +37,14 @@ public class UsersController : ControllerBase
         return int.TryParse(userIdClaim, out var userId) ? userId : null;
     }
 
+    private async Task<bool> IsCurrentUserAdminAsync()
+    {
+        var userId = GetCurrentUserId();
+        if (!userId.HasValue) return false;
+        var user = await _context.Users.FindAsync(userId.Value);
+        return user?.Role == "Admin";
+    }
+
     // GET: api/Users/profile
     [HttpGet("profile")]
     public async Task<ActionResult<ApiResponse<UserProfileDto>>> GetProfile()
@@ -134,12 +142,21 @@ public class UsersController : ControllerBase
                 })
                 .ToListAsync();
 
+            // Check if viewer is admin (admins can see email/phone regardless of settings)
+            var isViewerAdmin = await IsCurrentUserAdminAsync();
+
             var publicProfile = new PublicProfileDto
             {
                 Id = user.Id,
                 FirstName = user.FirstName,
                 LastName = user.LastName,
-                Email = user.Email,
+                // Show email if user enabled it or viewer is admin
+                Email = (user.ShowEmailInProfile || isViewerAdmin) ? user.Email : null,
+                // Show phone if user enabled it or viewer is admin
+                Phone = (user.ShowPhoneInProfile || isViewerAdmin) ? user.Phone : null,
+                // Show verification status when contact info is visible
+                EmailVerified = (user.ShowEmailInProfile || isViewerAdmin) ? user.EmailVerified : null,
+                PhoneVerified = (user.ShowPhoneInProfile || isViewerAdmin) ? user.PhoneVerified : null,
                 Bio = user.Bio,
                 ProfileImageUrl = user.ProfileImageUrl,
                 City = user.City,
@@ -295,6 +312,12 @@ public class UsersController : ControllerBase
                 user.FavoriteShot = request.FavoriteShot;
             if (request.IntroVideo != null)
                 user.IntroVideo = request.IntroVideo;
+
+            // Update profile visibility preferences
+            if (request.ShowEmailInProfile.HasValue)
+                user.ShowEmailInProfile = request.ShowEmailInProfile.Value;
+            if (request.ShowPhoneInProfile.HasValue)
+                user.ShowPhoneInProfile = request.ShowPhoneInProfile.Value;
 
             user.UpdatedAt = DateTime.Now;
 
@@ -778,6 +801,10 @@ public class UsersController : ControllerBase
             IntroVideo = user.IntroVideo,
             CreatedAt = user.CreatedAt,
             IsActive = user.IsActive,
+            EmailVerified = user.EmailVerified,
+            PhoneVerified = user.PhoneVerified,
+            ShowEmailInProfile = user.ShowEmailInProfile,
+            ShowPhoneInProfile = user.ShowPhoneInProfile,
             SocialLinks = socialLinks
         };
     }

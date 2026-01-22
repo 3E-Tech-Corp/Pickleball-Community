@@ -11,7 +11,8 @@ import {
   Edit2, Save, Upload, X, Play, Award, Target,
   Zap, Heart, Activity, TrendingUp, ChevronRight,
   MessageCircle, Shield, Eye, Mail, Link, Plus, Trash2,
-  Twitter, Instagram, Facebook, Linkedin, Youtube, Globe, ExternalLink
+  Twitter, Instagram, Facebook, Linkedin, Youtube, Globe, ExternalLink,
+  BadgeCheck
 } from 'lucide-react'
 import HelpIcon from '../components/ui/HelpIcon'
 
@@ -50,6 +51,14 @@ const Profile = () => {
   const [allowDirectMessages, setAllowDirectMessages] = useState(true)
   const [allowClubMessages, setAllowClubMessages] = useState(true)
   const [savingMessagingSettings, setSavingMessagingSettings] = useState(false)
+
+  // Verification status (read-only, from Funtime-Shared)
+  const [emailVerified, setEmailVerified] = useState(false)
+  const [phoneVerified, setPhoneVerified] = useState(false)
+
+  // Profile visibility preferences
+  const [showEmailInProfile, setShowEmailInProfile] = useState(false)
+  const [showPhoneInProfile, setShowPhoneInProfile] = useState(false)
 
   // Social links state
   const [socialLinks, setSocialLinks] = useState([])
@@ -153,6 +162,14 @@ const Profile = () => {
       // Set messaging settings
       setAllowDirectMessages(user.allowDirectMessages !== false) // default true
       setAllowClubMessages(user.allowClubMessages !== false) // default true
+
+      // Set verification status
+      setEmailVerified(user.emailVerified || false)
+      setPhoneVerified(user.phoneVerified || false)
+
+      // Set profile visibility preferences
+      setShowEmailInProfile(user.showEmailInProfile || false)
+      setShowPhoneInProfile(user.showPhoneInProfile || false)
 
       // Set avatar preview from either avatar or profileImageUrl (from Funtime-Shared)
       const avatarUrl = user.avatar || user.profileImageUrl
@@ -396,15 +413,25 @@ const Profile = () => {
       } else if (setting === 'allowClubMessages') {
         setAllowClubMessages(value)
         toast.success(`Club chat auto-join ${value ? 'enabled' : 'disabled'}`)
+      } else if (setting === 'showEmailInProfile') {
+        setShowEmailInProfile(value)
+        toast.success(`Email ${value ? 'visible' : 'hidden'} on public profile`)
+      } else if (setting === 'showPhoneInProfile') {
+        setShowPhoneInProfile(value)
+        toast.success(`Phone ${value ? 'visible' : 'hidden'} on public profile`)
       }
     } catch (error) {
       console.error('Error updating messaging settings:', error)
-      toast.error('Failed to update messaging setting')
+      toast.error('Failed to update setting')
       // Revert the toggle on error
       if (setting === 'allowDirectMessages') {
         setAllowDirectMessages(!value)
       } else if (setting === 'allowClubMessages') {
         setAllowClubMessages(!value)
+      } else if (setting === 'showEmailInProfile') {
+        setShowEmailInProfile(!value)
+      } else if (setting === 'showPhoneInProfile') {
+        setShowPhoneInProfile(!value)
       }
     } finally {
       setSavingMessagingSettings(false)
@@ -1096,7 +1123,12 @@ const Profile = () => {
                     </div>
                     <div>
                       <div className="flex items-center justify-between mb-1">
-                        <label className="text-sm font-medium text-gray-700">Email</label>
+                        <div className="flex items-center gap-1">
+                          <label className="text-sm font-medium text-gray-700">Email</label>
+                          {emailVerified && (
+                            <BadgeCheck className="w-4 h-4 text-blue-500" title="Verified" />
+                          )}
+                        </div>
                         <button
                           type="button"
                           onClick={() => {
@@ -1114,10 +1146,20 @@ const Profile = () => {
                         disabled
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-600"
                       />
+                      {emailVerified && (
+                        <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
+                          <BadgeCheck className="w-3 h-3" /> Verified email
+                        </p>
+                      )}
                     </div>
                     <div>
                       <div className="flex items-center justify-between mb-1">
-                        <label className="text-sm font-medium text-gray-700">Phone</label>
+                        <div className="flex items-center gap-1">
+                          <label className="text-sm font-medium text-gray-700">Phone</label>
+                          {phoneVerified && (
+                            <BadgeCheck className="w-4 h-4 text-blue-500" title="Verified" />
+                          )}
+                        </div>
                         <button
                           type="button"
                           onClick={() => {
@@ -1136,6 +1178,11 @@ const Profile = () => {
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-600"
                         placeholder="(123) 456-7890"
                       />
+                      {phoneVerified && (
+                        <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
+                          <BadgeCheck className="w-3 h-3" /> Verified phone
+                        </p>
+                      )}
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Gender</label>
@@ -1411,6 +1458,72 @@ const Profile = () => {
                       <span
                         className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
                           allowClubMessages ? 'translate-x-5' : 'translate-x-0'
+                        }`}
+                      />
+                    </button>
+                  </div>
+
+                  {/* Profile Visibility - Section Header */}
+                  <div className="pt-4 border-t border-gray-200">
+                    <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                      <Eye className="w-4 h-4 text-gray-500" />
+                      Public Profile Visibility
+                    </h4>
+                  </div>
+
+                  {/* Show Email in Public Profile */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <Mail className="w-5 h-5 text-blue-500" />
+                        <span className="font-medium text-gray-900">Show Email in Profile</span>
+                        {emailVerified && (
+                          <BadgeCheck className="w-4 h-4 text-blue-500" title="Verified" />
+                        )}
+                      </div>
+                      <p className="text-sm text-gray-500 mt-1 ml-7">
+                        Display your email address on your public profile
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => handleMessagingSettingChange('showEmailInProfile', !showEmailInProfile)}
+                      disabled={savingMessagingSettings}
+                      className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 ${
+                        showEmailInProfile ? 'bg-blue-600' : 'bg-gray-200'
+                      }`}
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                          showEmailInProfile ? 'translate-x-5' : 'translate-x-0'
+                        }`}
+                      />
+                    </button>
+                  </div>
+
+                  {/* Show Phone in Public Profile */}
+                  <div className="flex items-center justify-between pt-4 border-t border-gray-100">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <Phone className="w-5 h-5 text-green-500" />
+                        <span className="font-medium text-gray-900">Show Phone in Profile</span>
+                        {phoneVerified && (
+                          <BadgeCheck className="w-4 h-4 text-blue-500" title="Verified" />
+                        )}
+                      </div>
+                      <p className="text-sm text-gray-500 mt-1 ml-7">
+                        Display your phone number on your public profile
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => handleMessagingSettingChange('showPhoneInProfile', !showPhoneInProfile)}
+                      disabled={savingMessagingSettings}
+                      className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 ${
+                        showPhoneInProfile ? 'bg-blue-600' : 'bg-gray-200'
+                      }`}
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                          showPhoneInProfile ? 'translate-x-5' : 'translate-x-0'
                         }`}
                       />
                     </button>
