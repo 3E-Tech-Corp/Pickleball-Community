@@ -21,6 +21,7 @@ public class TournamentController : ControllerBase
     private readonly INotificationService _notificationService;
     private readonly IBracketProgressionService _bracketProgressionService;
     private readonly IScoreBroadcaster _scoreBroadcaster;
+    private readonly ICourtAssignmentService _courtAssignmentService;
 
     public TournamentController(
         ApplicationDbContext context,
@@ -28,7 +29,8 @@ public class TournamentController : ControllerBase
         IDrawingBroadcaster drawingBroadcaster,
         INotificationService notificationService,
         IBracketProgressionService bracketProgressionService,
-        IScoreBroadcaster scoreBroadcaster)
+        IScoreBroadcaster scoreBroadcaster,
+        ICourtAssignmentService courtAssignmentService)
     {
         _context = context;
         _logger = logger;
@@ -36,6 +38,7 @@ public class TournamentController : ControllerBase
         _notificationService = notificationService;
         _bracketProgressionService = bracketProgressionService;
         _scoreBroadcaster = scoreBroadcaster;
+        _courtAssignmentService = courtAssignmentService;
     }
 
     private int? GetUserId()
@@ -1434,7 +1437,7 @@ public class TournamentController : ControllerBase
         var unit = membership.Unit;
 
         // Check if tournament has started (matches scheduled)
-        var hasScheduledMatches = await _context.EventMatches
+        var hasScheduledMatches = await _context.EventEncounters
             .AnyAsync(m => m.DivisionId == divisionId && (m.Unit1Id == unit.Id || m.Unit2Id == unit.Id) && m.Status != "Cancelled");
 
         if (hasScheduledMatches)
@@ -1489,7 +1492,7 @@ public class TournamentController : ControllerBase
             return Forbid();
 
         // Check if unit has scheduled matches
-        var hasScheduledMatches = await _context.EventMatches
+        var hasScheduledMatches = await _context.EventEncounters
             .AnyAsync(m => (m.Unit1Id == unitId || m.Unit2Id == unitId) && m.Status != "Cancelled");
 
         if (hasScheduledMatches)
@@ -3237,7 +3240,7 @@ public class TournamentController : ControllerBase
             return BadRequest(new ApiResponse<List<EventMatchDto>> { Success = false, Message = "Need at least 2 units/placeholders to generate schedule" });
 
         // Clear existing matches and games for this division
-        var existingMatches = await _context.EventMatches
+        var existingMatches = await _context.EventEncounters
             .Include(m => m.Matches).ThenInclude(match => match.Games)
             .Where(m => m.DivisionId == divisionId)
             .ToListAsync();
@@ -3250,7 +3253,7 @@ public class TournamentController : ControllerBase
                 .Where(c => c.CurrentGameId != null &&
                     _context.EventGames.Any(g => g.Id == c.CurrentGameId &&
                         _context.EncounterMatches.Any(em => em.Id == g.EncounterMatchId &&
-                            _context.EventMatches.Any(m => m.Id == em.EncounterId && m.DivisionId == divisionId))))
+                            _context.EventEncounters.Any(m => m.Id == em.EncounterId && m.DivisionId == divisionId))))
                 .ToListAsync();
 
             foreach (var court in courtsWithGames)
@@ -3292,7 +3295,7 @@ public class TournamentController : ControllerBase
                 _context.EventGames.RemoveRange(allGames);
                 _context.EncounterMatches.RemoveRange(encounter.Matches);
             }
-            _context.EventMatches.RemoveRange(existingMatches);
+            _context.EventEncounters.RemoveRange(existingMatches);
             await _context.SaveChangesAsync();
         }
 
@@ -3329,7 +3332,7 @@ public class TournamentController : ControllerBase
             matches.AddRange(GenerateDoubleEliminationMatchesForTarget(division, targetUnitCount, request));
         }
 
-        _context.EventMatches.AddRange(matches);
+        _context.EventEncounters.AddRange(matches);
         await _context.SaveChangesAsync();
 
         // Determine phase-specific configurations
@@ -3403,7 +3406,7 @@ public class TournamentController : ControllerBase
         await _context.SaveChangesAsync();
 
         // Reload with games
-        var result = await _context.EventMatches
+        var result = await _context.EventEncounters
             .Include(m => m.Matches).ThenInclude(match => match.Games)
             .Where(m => m.DivisionId == divisionId)
             .OrderBy(m => m.RoundNumber)
@@ -3525,7 +3528,7 @@ public class TournamentController : ControllerBase
         }
 
         // Update matches with actual unit IDs based on assigned numbers
-        var matches = await _context.EventMatches
+        var matches = await _context.EventEncounters
             .Where(m => m.DivisionId == divisionId)
             .ToListAsync();
 
@@ -3581,7 +3584,7 @@ public class TournamentController : ControllerBase
         if (division == null)
             return NotFound(new ApiResponse<ScheduleExportDto> { Success = false, Message = "Division not found" });
 
-        var matches = await _context.EventMatches
+        var matches = await _context.EventEncounters
             .Include(m => m.Unit1)
             .Include(m => m.Unit2)
             .Include(m => m.Winner)
@@ -3819,7 +3822,7 @@ public class TournamentController : ControllerBase
         if (division == null)
             return NotFound(new ApiResponse<bool> { Success = false, Message = "Division not found" });
 
-        var encounters = await _context.EventMatches
+        var encounters = await _context.EventEncounters
             .Include(m => m.Unit1).ThenInclude(u => u!.Members).ThenInclude(m => m.User)
             .Include(m => m.Unit2).ThenInclude(u => u!.Members).ThenInclude(m => m.User)
             .Include(m => m.Matches).ThenInclude(match => match.Games)
@@ -4015,7 +4018,7 @@ public class TournamentController : ControllerBase
     [HttpPost("encounters/pre-assign-court")]
     public async Task<ActionResult<ApiResponse<object>>> PreAssignCourtToEncounter([FromBody] PreAssignCourtRequest request)
     {
-        var encounter = await _context.EventMatches
+        var encounter = await _context.EventEncounters
             .Include(e => e.Event)
             .FirstOrDefaultAsync(e => e.Id == request.EncounterId);
 
@@ -4067,7 +4070,7 @@ public class TournamentController : ControllerBase
             return BadRequest(new ApiResponse<object> { Success = false, Message = "No assignments provided" });
 
         var encounterIds = request.Assignments.Select(a => a.EncounterId).ToList();
-        var encounters = await _context.EventMatches
+        var encounters = await _context.EventEncounters
             .Where(e => encounterIds.Contains(e.Id) && e.EventId == request.EventId)
             .ToListAsync();
 
@@ -4184,7 +4187,7 @@ public class TournamentController : ControllerBase
                 Name = d.Name,
                 BracketType = d.BracketType,
                 UnitCount = d.Units.Count(u => u.Status != "Cancelled"),
-                EncounterCount = _context.EventMatches.Count(e => e.DivisionId == d.Id),
+                EncounterCount = _context.EventEncounters.Count(e => e.DivisionId == d.Id),
                 EstimatedMatchDurationMinutes = d.EstimatedMatchDurationMinutes,
                 AssignedCourtGroups = _context.DivisionCourtAssignments
                     .Where(a => a.DivisionId == d.Id && a.PhaseId == null && a.IsActive)
@@ -4201,7 +4204,7 @@ public class TournamentController : ControllerBase
             .ToListAsync();
 
         // Get all encounters grouped by division
-        var encounters = await _context.EventMatches
+        var encounters = await _context.EventEncounters
             .Where(e => e.EventId == eventId)
             .OrderBy(e => e.DivisionId)
             .ThenBy(e => e.ScheduledTime ?? e.EstimatedStartTime ?? DateTime.MaxValue)
@@ -4266,7 +4269,7 @@ public class TournamentController : ControllerBase
             return BadRequest(new ApiResponse<object> { Success = false, Message = "No assignments provided" });
 
         var encounterIds = request.Assignments.Select(a => a.EncounterId).ToList();
-        var encounters = await _context.EventMatches
+        var encounters = await _context.EventEncounters
             .Where(e => encounterIds.Contains(e.Id) && e.EventId == request.EventId)
             .ToListAsync();
 
@@ -4382,100 +4385,36 @@ public class TournamentController : ControllerBase
         if (!userId.HasValue)
             return Unauthorized(new ApiResponse<object> { Success = false, Message = "Unauthorized" });
 
-        var division = await _context.EventDivisions
-            .Include(d => d.Event)
-            .FirstOrDefaultAsync(d => d.Id == divisionId);
-
+        var division = await _context.EventDivisions.FindAsync(divisionId);
         if (division == null)
             return NotFound(new ApiResponse<object> { Success = false, Message = "Division not found" });
 
         if (!await IsAdminAsync() && !await IsEventOrganizerAsync(division.EventId, userId.Value))
             return Forbid();
 
-        // Get court groups assigned to this division
-        var courtAssignments = await _context.DivisionCourtAssignments
-            .Where(a => a.DivisionId == divisionId && a.PhaseId == null && a.IsActive)
-            .OrderBy(a => a.Priority)
-            .Include(a => a.CourtGroup)
-                .ThenInclude(g => g!.Courts)
-            .ToListAsync();
-
-        // Get available courts (from assigned groups or all event courts if none assigned)
-        List<TournamentCourt> availableCourts;
-        if (courtAssignments.Any())
+        var options = new CourtAssignmentOptions
         {
-            availableCourts = courtAssignments
-                .SelectMany(a => a.CourtGroup?.Courts ?? new List<TournamentCourt>())
-                .Where(c => c.IsActive)
-                .OrderBy(c => c.SortOrder)
-                .ToList();
-        }
-        else
-        {
-            availableCourts = await _context.TournamentCourts
-                .Where(c => c.EventId == division.EventId && c.IsActive)
-                .OrderBy(c => c.SortOrder)
-                .ToListAsync();
-        }
+            StartTime = request?.StartTime,
+            MatchDurationMinutes = request?.MatchDurationMinutes,
+            ClearExisting = request?.ClearExisting ?? true
+        };
 
-        if (!availableCourts.Any())
-            return BadRequest(new ApiResponse<object> { Success = false, Message = "No courts available" });
+        var result = await _courtAssignmentService.AutoAssignDivisionAsync(divisionId, options);
 
-        // Get unassigned encounters for this division
-        var encounters = await _context.EventMatches
-            .Where(e => e.DivisionId == divisionId && e.Status != "Bye" && e.Status != "Completed")
-            .OrderBy(e => e.RoundNumber)
-            .ThenBy(e => e.EncounterNumber)
-            .ToListAsync();
-
-        if (!encounters.Any())
-            return BadRequest(new ApiResponse<object> { Success = false, Message = "No encounters to assign" });
-
-        // Settings
-        var startTime = request?.StartTime ?? division.Event?.StartDate.Date.AddHours(8) ?? DateTime.Today.AddHours(8);
-        var matchDuration = request?.MatchDurationMinutes ?? division.EstimatedMatchDurationMinutes ?? 20;
-        var clearExisting = request?.ClearExisting ?? true;
-
-        // Track court availability
-        var courtNextAvailable = availableCourts.ToDictionary(c => c.Id, c => startTime);
-
-        // Assign courts and times
-        int assigned = 0;
-        foreach (var encounter in encounters)
-        {
-            if (!clearExisting && encounter.TournamentCourtId.HasValue)
-                continue; // Skip already assigned
-
-            // Find the court available soonest
-            var bestCourt = availableCourts
-                .OrderBy(c => courtNextAvailable[c.Id])
-                .ThenBy(c => c.SortOrder)
-                .First();
-
-            encounter.TournamentCourtId = bestCourt.Id;
-            encounter.EstimatedStartTime = courtNextAvailable[bestCourt.Id];
-            encounter.UpdatedAt = DateTime.Now;
-
-            // Update court availability
-            courtNextAvailable[bestCourt.Id] = courtNextAvailable[bestCourt.Id].AddMinutes(matchDuration);
-            assigned++;
-        }
-
-        await _context.SaveChangesAsync();
-
-        var estimatedEndTime = courtNextAvailable.Values.Max();
+        if (!result.Success)
+            return BadRequest(new ApiResponse<object> { Success = false, Message = result.Message });
 
         return Ok(new ApiResponse<object>
         {
             Success = true,
             Data = new
             {
-                Assigned = assigned,
-                CourtsUsed = availableCourts.Count,
-                StartTime = startTime,
-                EstimatedEndTime = estimatedEndTime
+                Assigned = result.AssignedCount,
+                CourtsUsed = result.CourtsUsed,
+                StartTime = result.StartTime,
+                EstimatedEndTime = result.EstimatedEndTime
             },
-            Message = $"{assigned} encounters assigned to {availableCourts.Count} courts"
+            Message = result.Message
         });
     }
 
@@ -4497,24 +4436,7 @@ public class TournamentController : ControllerBase
         if (!await IsAdminAsync() && !await IsEventOrganizerAsync(division.EventId, userId.Value))
             return Forbid();
 
-        var encounters = await _context.EventMatches
-            .Where(e => e.DivisionId == divisionId && e.Status != "Completed" && e.Status != "InProgress")
-            .ToListAsync();
-
-        int cleared = 0;
-        foreach (var encounter in encounters)
-        {
-            if (encounter.TournamentCourtId.HasValue || encounter.EstimatedStartTime.HasValue || encounter.ScheduledTime.HasValue)
-            {
-                encounter.TournamentCourtId = null;
-                encounter.EstimatedStartTime = null;
-                encounter.ScheduledTime = null;
-                encounter.UpdatedAt = DateTime.Now;
-                cleared++;
-            }
-        }
-
-        await _context.SaveChangesAsync();
+        var cleared = await _courtAssignmentService.ClearDivisionAssignmentsAsync(divisionId);
 
         return Ok(new ApiResponse<object>
         {
@@ -5086,7 +5008,7 @@ public class TournamentController : ControllerBase
             .Where(u => u.EventId == eventId)
             .ToListAsync();
 
-        var matches = await _context.EventMatches
+        var matches = await _context.EventEncounters
             .Where(m => m.EventId == eventId)
             .ToListAsync();
 
@@ -6186,7 +6108,7 @@ public class TournamentController : ControllerBase
 
     private async Task CheckMatchComplete(int matchId)
     {
-        var match = await _context.EventMatches
+        var match = await _context.EventEncounters
             .Include(m => m.Matches).ThenInclude(match => match.Games)
             .Include(m => m.Unit1)
             .Include(m => m.Unit2)
@@ -6615,7 +6537,7 @@ public class TournamentController : ControllerBase
             .Where(u => u.DivisionId == divisionId && u.Status != "Cancelled" && u.Status != "Waitlisted")
             .ToListAsync();
 
-        var matches = await _context.EventMatches
+        var matches = await _context.EventEncounters
             .Where(m => m.DivisionId == divisionId)
             .ToListAsync();
 
@@ -6726,7 +6648,7 @@ public class TournamentController : ControllerBase
 
         // Clear Unit1Id/Unit2Id from pool encounters to prevent stale pool assignments
         // This ensures GetSchedule derives pools correctly after a new drawing
-        var poolEncounters = await _context.EventMatches
+        var poolEncounters = await _context.EventEncounters
             .Where(m => m.DivisionId == divisionId && m.RoundType == "Pool")
             .ToListAsync();
 
@@ -7219,7 +7141,7 @@ public class TournamentController : ControllerBase
             }
 
             // Reset all encounters (keep structure, reset results and unit assignments for playoff rounds)
-            var encounters = await _context.EventMatches
+            var encounters = await _context.EventEncounters
                 .Where(e => e.EventId == eventId)
                 .ToListAsync();
             foreach (var encounter in encounters)

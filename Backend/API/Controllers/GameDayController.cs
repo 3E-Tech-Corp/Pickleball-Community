@@ -84,7 +84,7 @@ public class GameDayController : ControllerBase
             .ToListAsync();
 
         // Get all games (via matches)
-        var matches = await _context.EventMatches
+        var matches = await _context.EventEncounters
             .Include(m => m.Unit1)
                 .ThenInclude(u => u.Members)
                     .ThenInclude(mem => mem.User)
@@ -352,7 +352,7 @@ public class GameDayController : ControllerBase
             UpdatedAt = DateTime.Now
         };
 
-        _context.EventMatches.Add(match);
+        _context.EventEncounters.Add(match);
         await _context.SaveChangesAsync();
 
         // Create default EncounterMatch for this encounter
@@ -392,7 +392,7 @@ public class GameDayController : ControllerBase
         await _context.SaveChangesAsync();
 
         // Reload match with all relations
-        match = await _context.EventMatches
+        match = await _context.EventEncounters
             .Include(m => m.Unit1).ThenInclude(u => u.Members).ThenInclude(mem => mem.User)
             .Include(m => m.Unit2).ThenInclude(u => u.Members).ThenInclude(mem => mem.User)
             .Include(m => m.Division)
@@ -413,7 +413,7 @@ public class GameDayController : ControllerBase
         if (!userId.HasValue)
             return Unauthorized(new { success = false, message = "Unauthorized" });
 
-        var match = await _context.EventMatches
+        var match = await _context.EventEncounters
             .Include(m => m.Matches).ThenInclude(match => match.Games)
             .Include(m => m.TournamentCourt)
             .FirstOrDefaultAsync(m => m.Id == matchId);
@@ -475,7 +475,7 @@ public class GameDayController : ControllerBase
         if (!userId.HasValue)
             return Unauthorized(new { success = false, message = "Unauthorized" });
 
-        var match = await _context.EventMatches
+        var match = await _context.EventEncounters
             .Include(m => m.Matches).ThenInclude(match => match.Games)
             .Include(m => m.TournamentCourt)
             .Include(m => m.Unit1)
@@ -588,7 +588,7 @@ public class GameDayController : ControllerBase
         if (!userId.HasValue)
             return Unauthorized(new { success = false, message = "Unauthorized" });
 
-        var match = await _context.EventMatches
+        var match = await _context.EventEncounters
             .Include(m => m.Matches).ThenInclude(match => match.Games)
             .Include(m => m.TournamentCourt)
             .FirstOrDefaultAsync(m => m.Id == matchId);
@@ -644,7 +644,7 @@ public class GameDayController : ControllerBase
         if (!userId.HasValue)
             return Unauthorized(new { success = false, message = "Unauthorized" });
 
-        var match = await _context.EventMatches
+        var match = await _context.EventEncounters
             .Include(m => m.Matches).ThenInclude(match => match.Games)
             .Include(m => m.TournamentCourt)
             .FirstOrDefaultAsync(m => m.Id == matchId);
@@ -666,7 +666,7 @@ public class GameDayController : ControllerBase
         var allGames = match.Matches.SelectMany(m => m.Games).ToList();
         _context.EventGames.RemoveRange(allGames);
         _context.EncounterMatches.RemoveRange(match.Matches);
-        _context.EventMatches.Remove(match);
+        _context.EventEncounters.Remove(match);
         await _context.SaveChangesAsync();
 
         return Ok(new { success = true });
@@ -845,7 +845,7 @@ public class GameDayController : ControllerBase
         {
             foreach (var court in availableCourts)
             {
-                var lastGame = await _context.EventMatches
+                var lastGame = await _context.EventEncounters
                     .Where(m => m.TournamentCourtId == court.Id && m.Status == "Finished")
                     .OrderByDescending(m => m.CompletedAt)
                     .FirstOrDefaultAsync();
@@ -993,7 +993,7 @@ public class GameDayController : ControllerBase
                 BestOf = dto.BestOf ?? 1,
                 CreatedAt = DateTime.Now
             };
-            _context.EventMatches.Add(encounter);
+            _context.EventEncounters.Add(encounter);
             await _context.SaveChangesAsync(); // Save to get encounter.Id
 
             // Create default EncounterMatch for this encounter
@@ -1034,7 +1034,7 @@ public class GameDayController : ControllerBase
         // Load the created matches with all related data for response
         // Use HashSet for efficient Contains check in memory (avoids EF Core CTE generation issues)
         var matchIdSet = createdMatches.Select(m => m.Id).ToHashSet();
-        var loadedMatches = (await _context.EventMatches
+        var loadedMatches = (await _context.EventEncounters
             .Include(m => m.Unit1).ThenInclude(u => u.Members).ThenInclude(mem => mem.User)
             .Include(m => m.Unit2).ThenInclude(u => u.Members).ThenInclude(mem => mem.User)
             .Include(m => m.TournamentCourt)
@@ -1106,7 +1106,7 @@ public class GameDayController : ControllerBase
         }
 
         // Get players currently in active games
-        var activeMatches = await _context.EventMatches
+        var activeMatches = await _context.EventEncounters
             .Where(m => m.EventId == eventId && (m.Status == "InProgress" || m.Status == "Scheduled" || m.Status == "Queued"))
             .Include(m => m.Unit1).ThenInclude(u => u!.Members)
             .Include(m => m.Unit2).ThenInclude(u => u!.Members)
@@ -1259,7 +1259,7 @@ public class GameDayController : ControllerBase
             CreatedAt = DateTime.Now,
             UpdatedAt = DateTime.Now
         };
-        _context.EventMatches.Add(encounter);
+        _context.EventEncounters.Add(encounter);
 
         // Update court status if assigned
         if (court != null)
@@ -1299,7 +1299,7 @@ public class GameDayController : ControllerBase
         await _context.SaveChangesAsync();
 
         // Load the created encounter with all related data
-        var loadedEncounter = await _context.EventMatches
+        var loadedEncounter = await _context.EventEncounters
             .Include(m => m.Unit1).ThenInclude(u => u.Members).ThenInclude(mem => mem.User)
             .Include(m => m.Unit2).ThenInclude(u => u.Members).ThenInclude(mem => mem.User)
             .Include(m => m.TournamentCourt)

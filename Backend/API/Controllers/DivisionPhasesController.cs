@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Pickleball.Community.Database;
 using Pickleball.Community.Models.Entities;
+using Pickleball.Community.Services;
 
 namespace Pickleball.Community.Controllers;
 
@@ -16,11 +17,16 @@ public class DivisionPhasesController : ControllerBase
 {
     private readonly ApplicationDbContext _context;
     private readonly ILogger<DivisionPhasesController> _logger;
+    private readonly ICourtAssignmentService _courtAssignmentService;
 
-    public DivisionPhasesController(ApplicationDbContext context, ILogger<DivisionPhasesController> logger)
+    public DivisionPhasesController(
+        ApplicationDbContext context,
+        ILogger<DivisionPhasesController> logger,
+        ICourtAssignmentService courtAssignmentService)
     {
         _context = context;
         _logger = logger;
+        _courtAssignmentService = courtAssignmentService;
     }
 
     #region Phase CRUD
@@ -497,53 +503,12 @@ public class DivisionPhasesController : ControllerBase
     [Authorize(Roles = "Admin,Organizer")]
     public async Task<IActionResult> AutoAssignCourts(int id)
     {
-        var phase = await _context.DivisionPhases
-            .Include(p => p.Division)
-            .FirstOrDefaultAsync(p => p.Id == id);
+        var result = await _courtAssignmentService.AutoAssignPhaseAsync(id);
 
-        if (phase == null)
-            return NotFound(new { success = false, message = "Phase not found" });
+        if (!result.Success)
+            return BadRequest(new { success = false, message = result.Message });
 
-        // Get court assignments for this phase (or division-level)
-        var courtAssignments = await _context.DivisionCourtAssignments
-            .Where(a => a.DivisionId == phase.DivisionId && (a.PhaseId == id || a.PhaseId == null))
-            .OrderBy(a => a.Priority)
-            .Include(a => a.CourtGroup)
-                .ThenInclude(g => g!.Courts)
-            .ToListAsync();
-
-        if (!courtAssignments.Any())
-            return BadRequest(new { success = false, message = "No court groups assigned to this phase" });
-
-        // Get available courts from assigned groups
-        var availableCourts = courtAssignments
-            .SelectMany(a => a.CourtGroup?.Courts ?? new List<TournamentCourt>())
-            .Where(c => c.IsActive)
-            .OrderBy(c => c.SortOrder)
-            .ToList();
-
-        if (!availableCourts.Any())
-            return BadRequest(new { success = false, message = "No active courts in assigned groups" });
-
-        // Get encounters without court assignments
-        var encounters = await _context.EventEncounters
-            .Where(e => e.PhaseId == id && e.TournamentCourtId == null)
-            .OrderBy(e => e.PoolId).ThenBy(e => e.RoundNumber).ThenBy(e => e.EncounterNumber)
-            .ToListAsync();
-
-        // Simple round-robin court assignment
-        int courtIndex = 0;
-        int assigned = 0;
-        foreach (var encounter in encounters)
-        {
-            encounter.TournamentCourtId = availableCourts[courtIndex].Id;
-            courtIndex = (courtIndex + 1) % availableCourts.Count;
-            assigned++;
-        }
-
-        await _context.SaveChangesAsync();
-
-        return Ok(new { success = true, data = new { assigned, totalCourts = availableCourts.Count } });
+        return Ok(new { success = true, data = new { assigned = result.AssignedCount, totalCourts = result.CourtsUsed } });
     }
 
     /// <summary>
@@ -553,54 +518,12 @@ public class DivisionPhasesController : ControllerBase
     [Authorize(Roles = "Admin,Organizer")]
     public async Task<IActionResult> CalculateEstimatedTimes(int id)
     {
-        var phase = await _context.DivisionPhases
-            .Include(p => p.Division)
-            .FirstOrDefaultAsync(p => p.Id == id);
+        var result = await _courtAssignmentService.CalculatePhaseTimesAsync(id);
 
-        if (phase == null)
-            return NotFound(new { success = false, message = "Phase not found" });
+        if (!result.Success)
+            return BadRequest(new { success = false, message = result.Message });
 
-        if (!phase.StartTime.HasValue)
-            return BadRequest(new { success = false, message = "Phase start time not set" });
-
-        var matchDuration = phase.EstimatedMatchDurationMinutes
-            ?? phase.Division?.EstimatedMatchDurationMinutes
-            ?? 20;
-
-        // Get encounters grouped by court
-        var encounters = await _context.EventEncounters
-            .Where(e => e.PhaseId == id && e.TournamentCourtId != null)
-            .OrderBy(e => e.TournamentCourtId).ThenBy(e => e.RoundNumber).ThenBy(e => e.EncounterNumber)
-            .ToListAsync();
-
-        // Calculate times per court
-        var courtTimes = new Dictionary<int, DateTime>();
-        int updated = 0;
-
-        foreach (var encounter in encounters)
-        {
-            var courtId = encounter.TournamentCourtId!.Value;
-
-            if (!courtTimes.ContainsKey(courtId))
-            {
-                courtTimes[courtId] = phase.StartTime.Value;
-            }
-
-            encounter.EstimatedStartTime = courtTimes[courtId];
-            courtTimes[courtId] = courtTimes[courtId].AddMinutes(matchDuration);
-            updated++;
-        }
-
-        await _context.SaveChangesAsync();
-
-        // Update phase end time
-        if (courtTimes.Any())
-        {
-            phase.EstimatedEndTime = courtTimes.Values.Max();
-            await _context.SaveChangesAsync();
-        }
-
-        return Ok(new { success = true, data = new { updated, estimatedEndTime = phase.EstimatedEndTime } });
+        return Ok(new { success = true, data = new { updated = result.UpdatedCount, estimatedEndTime = result.EstimatedEndTime } });
     }
 
     #endregion
