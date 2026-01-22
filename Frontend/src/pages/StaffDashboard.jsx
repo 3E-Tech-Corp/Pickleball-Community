@@ -126,10 +126,132 @@ const StaffDashboard = () => {
     );
   }
 
-  const { permissions } = dashboard;
+  const { permissions, roleCategory } = dashboard;
   const hasAnyPermission = permissions.canRecordScores || permissions.canCheckInPlayers ||
     permissions.canManageCourts || permissions.canManageSchedule || permissions.canViewAllData;
 
+  // Check if this is a non-staff role (spectator, volunteer, VIP, etc.)
+  const isNonStaffRole = roleCategory && roleCategory !== 'Staff';
+
+  // For non-staff roles (spectators, etc.) show a simplified dashboard
+  if (!hasAnyPermission && isNonStaffRole) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        {/* Header */}
+        <div className="bg-white shadow-sm">
+          <div className="max-w-7xl mx-auto px-4 py-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <button
+                  onClick={() => navigate(-1)}
+                  className="p-2 hover:bg-gray-100 rounded-lg"
+                >
+                  <ArrowLeft className="h-5 w-5" />
+                </button>
+                <div>
+                  <h1 className="text-xl font-bold text-gray-900">{roleCategory} Dashboard</h1>
+                  <p className="text-sm text-gray-500">
+                    {dashboard.eventName} - {dashboard.roleName || roleCategory}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={handleRefresh}
+                disabled={refreshing}
+                className="flex items-center gap-2 px-3 py-2 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg"
+              >
+                <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+                Refresh
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Spectator Content */}
+        <div className="max-w-7xl mx-auto px-4 py-6">
+          {/* Welcome Card */}
+          <div className="bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl p-6 text-white mb-6">
+            <h2 className="text-2xl font-bold mb-2">Welcome, {dashboard.userName || 'Guest'}!</h2>
+            <p className="text-blue-100">
+              You're registered as a <strong>{dashboard.roleName || roleCategory}</strong> for this event.
+            </p>
+            {dashboard.eventDate && (
+              <p className="text-blue-100 mt-2">
+                <Calendar className="inline-block w-4 h-4 mr-1" />
+                {new Date(dashboard.eventDate).toLocaleDateString('en-US', {
+                  weekday: 'long',
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric'
+                })}
+              </p>
+            )}
+          </div>
+
+          {/* Info Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Event Schedule */}
+            <div className="bg-white rounded-xl shadow-sm p-6">
+              <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                <Calendar className="h-5 w-5 text-blue-600" />
+                Event Information
+              </h3>
+              <div className="space-y-3 text-sm">
+                <p className="text-gray-600">
+                  Check the main event page for the latest schedule and match results.
+                </p>
+                <Link
+                  to={`/event/${eventId}`}
+                  className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-700 font-medium"
+                >
+                  View Event Page
+                  <ChevronRight className="h-4 w-4" />
+                </Link>
+              </div>
+            </div>
+
+            {/* Announcements placeholder */}
+            <div className="bg-white rounded-xl shadow-sm p-6">
+              <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                <AlertCircle className="h-5 w-5 text-amber-500" />
+                Announcements
+              </h3>
+              <p className="text-gray-500 text-sm">
+                Event announcements will appear here. Check back for updates from the organizers.
+              </p>
+            </div>
+          </div>
+
+          {/* Quick Actions */}
+          <div className="mt-6 bg-white rounded-xl shadow-sm p-6">
+            <h3 className="font-semibold text-gray-900 mb-4">Quick Links</h3>
+            <div className="flex flex-wrap gap-3">
+              <Link
+                to={`/event/${eventId}`}
+                className="px-4 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors"
+              >
+                Event Page
+              </Link>
+              <Link
+                to={`/event/${eventId}/schedule`}
+                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                Full Schedule
+              </Link>
+              <Link
+                to={`/event/${eventId}/results`}
+                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                Results
+              </Link>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // For staff without permissions (shouldn't happen normally)
   if (!hasAnyPermission) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">

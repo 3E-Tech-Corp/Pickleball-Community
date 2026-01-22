@@ -568,18 +568,23 @@ public class EventStaffController : EventControllerBase
             IsAdmin = isAdmin
         };
 
-        // If no permissions at all, return empty dashboard
+        // If no permissions at all, return dashboard (could be spectator/non-staff role)
         if (!permissions.CanManageSchedule && !permissions.CanManageCourts &&
             !permissions.CanRecordScores && !permissions.CanCheckInPlayers &&
             !permissions.CanManageLineups && !permissions.CanViewAllData)
         {
+            // Get event info for spectators too
+            var eventInfo = await _context.Events.FindAsync(eventId);
             return Ok(new ApiResponse<StaffDashboardDto>
             {
                 Success = true,
                 Data = new StaffDashboardDto
                 {
                     RoleName = staff?.Role?.Name,
+                    RoleCategory = staff?.Role?.RoleCategory ?? "Staff",
                     UserName = staff?.User != null ? $"{staff.User.FirstName} {staff.User.LastName}" : null,
+                    EventName = eventInfo?.Name,
+                    EventDate = eventInfo?.StartDate,
                     Permissions = permissions
                 }
             });
@@ -588,6 +593,7 @@ public class EventStaffController : EventControllerBase
         var dashboard = new StaffDashboardDto
         {
             RoleName = isOrganizer ? "Event Organizer" : (isAdmin ? "Admin" : staff?.Role?.Name),
+            RoleCategory = isOrganizer || isAdmin ? "Staff" : (staff?.Role?.RoleCategory ?? "Staff"),
             UserName = staff?.User != null ? $"{staff.User.FirstName} {staff.User.LastName}" : null,
             Permissions = permissions
         };

@@ -23,6 +23,13 @@ public class EventStaffRole
     [MaxLength(500)]
     public string? Description { get; set; }
 
+    /// <summary>
+    /// Category of role: Staff, Spectator, Volunteer, VIP, Media, etc.
+    /// Used to distinguish working staff from non-working attendees.
+    /// </summary>
+    [MaxLength(50)]
+    public string RoleCategory { get; set; } = "Staff";
+
     // Permission flags
     public bool CanManageSchedule { get; set; } = false;
     public bool CanManageCourts { get; set; } = false;

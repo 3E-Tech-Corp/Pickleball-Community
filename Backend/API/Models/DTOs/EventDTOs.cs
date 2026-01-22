@@ -674,6 +674,7 @@ public class EventStaffRoleDto
     public int? EventId { get; set; }
     public string Name { get; set; } = string.Empty;
     public string? Description { get; set; }
+    public string RoleCategory { get; set; } = "Staff";
     public bool CanManageSchedule { get; set; }
     public bool CanManageCourts { get; set; }
     public bool CanRecordScores { get; set; }
@@ -699,6 +700,7 @@ public class EventStaffDto
     public string? UserProfileImageUrl { get; set; }
     public int? RoleId { get; set; }
     public string? RoleName { get; set; }
+    public string? RoleCategory { get; set; }
     public bool IsSelfRegistered { get; set; }
     public string Status { get; set; } = "Pending";
     public int Priority { get; set; }
@@ -767,6 +769,7 @@ public class CreateEventStaffRoleDto
 {
     public string Name { get; set; } = string.Empty;
     public string? Description { get; set; }
+    public string RoleCategory { get; set; } = "Staff";
     public bool CanManageSchedule { get; set; }
     public bool CanManageCourts { get; set; }
     public bool CanRecordScores { get; set; }
@@ -842,6 +845,7 @@ public class BulkUpdateDivisionCourtBlocksDto
 public class StaffDashboardDto
 {
     public string? RoleName { get; set; }
+    public string? RoleCategory { get; set; }
     public string? UserName { get; set; }
     public string? EventName { get; set; }
     public DateTime? EventDate { get; set; }

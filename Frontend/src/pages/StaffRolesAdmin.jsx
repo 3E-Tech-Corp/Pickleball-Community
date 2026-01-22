@@ -16,6 +16,7 @@ const StaffRolesAdmin = ({ embedded = false }) => {
   const [formData, setFormData] = useState({
     name: '',
     description: '',
+    roleCategory: 'Staff',
     canManageSchedule: false,
     canManageCourts: false,
     canRecordScores: false,
@@ -26,6 +27,14 @@ const StaffRolesAdmin = ({ embedded = false }) => {
     allowSelfRegistration: true,
     sortOrder: 0
   })
+
+  const roleCategories = [
+    { value: 'Staff', label: 'Staff', description: 'Working staff with event duties' },
+    { value: 'Spectator', label: 'Spectator', description: 'Non-playing attendee/observer' },
+    { value: 'Volunteer', label: 'Volunteer', description: 'Volunteer helper' },
+    { value: 'VIP', label: 'VIP', description: 'VIP guest or sponsor' },
+    { value: 'Media', label: 'Media', description: 'Press/media personnel' }
+  ]
 
   // Load global staff roles
   const loadRoles = async () => {
@@ -54,6 +63,7 @@ const StaffRolesAdmin = ({ embedded = false }) => {
     setFormData({
       name: '',
       description: '',
+      roleCategory: 'Staff',
       canManageSchedule: false,
       canManageCourts: false,
       canRecordScores: false,
@@ -73,6 +83,7 @@ const StaffRolesAdmin = ({ embedded = false }) => {
     setFormData({
       name: role.name,
       description: role.description || '',
+      roleCategory: role.roleCategory || 'Staff',
       canManageSchedule: role.canManageSchedule,
       canManageCourts: role.canManageCourts,
       canRecordScores: role.canRecordScores,
@@ -221,6 +232,16 @@ const StaffRolesAdmin = ({ embedded = false }) => {
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
                       <h3 className="font-semibold text-gray-900">{role.name}</h3>
+                      {/* Role Category Badge */}
+                      <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${
+                        role.roleCategory === 'Spectator' ? 'bg-yellow-100 text-yellow-700' :
+                        role.roleCategory === 'Volunteer' ? 'bg-green-100 text-green-700' :
+                        role.roleCategory === 'VIP' ? 'bg-amber-100 text-amber-700' :
+                        role.roleCategory === 'Media' ? 'bg-pink-100 text-pink-700' :
+                        'bg-blue-100 text-blue-700'
+                      }`}>
+                        {role.roleCategory || 'Staff'}
+                      </span>
                       {role.canFullyManageEvent && (
                         <span className="px-2 py-0.5 bg-purple-100 text-purple-700 text-xs font-medium rounded-full">
                           Full Admin
@@ -332,33 +353,71 @@ const StaffRolesAdmin = ({ embedded = false }) => {
                 />
               </div>
 
-              {/* Full Admin Toggle */}
-              <div className="border-t pt-4">
-                <PermissionToggle
-                  label="Full Event Admin"
-                  icon={Settings}
-                  checked={formData.canFullyManageEvent}
-                  onChange={(e) => setFormData(prev => ({
-                    ...prev,
-                    canFullyManageEvent: e.target.checked,
-                    // If full admin, enable all other permissions
-                    ...(e.target.checked ? {
-                      canManageSchedule: true,
-                      canManageCourts: true,
-                      canRecordScores: true,
-                      canCheckInPlayers: true,
-                      canManageLineups: true,
-                      canViewAllData: true
-                    } : {})
-                  }))}
-                  description="Has all permissions of the event organizer - can fully manage the event"
-                />
+              {/* Role Category */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Role Category *</label>
+                <select
+                  value={formData.roleCategory}
+                  onChange={(e) => {
+                    const category = e.target.value
+                    // If selecting Spectator, disable all permissions
+                    if (category === 'Spectator') {
+                      setFormData(prev => ({
+                        ...prev,
+                        roleCategory: category,
+                        canManageSchedule: false,
+                        canManageCourts: false,
+                        canRecordScores: false,
+                        canCheckInPlayers: false,
+                        canManageLineups: false,
+                        canViewAllData: false,
+                        canFullyManageEvent: false
+                      }))
+                    } else {
+                      setFormData(prev => ({ ...prev, roleCategory: category }))
+                    }
+                  }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                >
+                  {roleCategories.map(cat => (
+                    <option key={cat.value} value={cat.value}>{cat.label}</option>
+                  ))}
+                </select>
+                <p className="text-xs text-gray-500 mt-1">
+                  {roleCategories.find(c => c.value === formData.roleCategory)?.description}
+                </p>
               </div>
 
-              {/* Individual Permissions */}
-              <div className="border-t pt-4">
-                <label className="block text-sm font-medium text-gray-700 mb-3">Permissions</label>
-                <div className="space-y-2">
+              {/* Full Admin Toggle - only for Staff category */}
+              {formData.roleCategory === 'Staff' && (
+                <div className="border-t pt-4">
+                  <PermissionToggle
+                    label="Full Event Admin"
+                    icon={Settings}
+                    checked={formData.canFullyManageEvent}
+                    onChange={(e) => setFormData(prev => ({
+                      ...prev,
+                      canFullyManageEvent: e.target.checked,
+                      // If full admin, enable all other permissions
+                      ...(e.target.checked ? {
+                        canManageSchedule: true,
+                        canManageCourts: true,
+                        canRecordScores: true,
+                        canCheckInPlayers: true,
+                        canManageLineups: true,
+                        canViewAllData: true
+                      } : {})
+                    }))}
+                    description="Has all permissions of the event organizer - can fully manage the event"
+                  />
+                </div>
+              )}
+
+              {/* Individual Permissions - only for Staff category */}
+              {formData.roleCategory === 'Staff' ? (
+                <div className="border-t pt-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-3">Permissions</label>
+                  <div className="space-y-2">
                   <PermissionToggle
                     label="Manage Schedule"
                     icon={Calendar}
@@ -403,6 +462,18 @@ const StaffRolesAdmin = ({ embedded = false }) => {
                   />
                 </div>
               </div>
+              ) : (
+                <div className="border-t pt-4">
+                  <div className="bg-gray-50 rounded-lg p-4 text-center">
+                    <p className="text-sm text-gray-600">
+                      <strong>{formData.roleCategory}</strong> roles do not have staff permissions.
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      They can view the event schedule and receive announcements via their dashboard.
+                    </p>
+                  </div>
+                </div>
+              )}
 
               {/* Self Registration */}
               <div className="border-t pt-4">
