@@ -1527,6 +1527,12 @@ export const tournamentApi = {
   getDivisionUnits: (divisionId) =>
     api.get(`/tournament/divisions/${divisionId}/units`),
 
+  // Pre-assign courts to encounters (schedule planning)
+  preAssignCourt: (encounterId, courtId) =>
+    api.post('/tournament/encounters/pre-assign-court', { encounterId, tournamentCourtId: courtId }),
+  bulkPreAssignCourts: (eventId, assignments) =>
+    api.post('/tournament/encounters/bulk-pre-assign-courts', { eventId, assignments }),
+
   // Check-in
   checkIn: (eventId, divisionId = null) =>
     api.post(`/tournament/events/${eventId}/check-in`, { eventId, divisionId }),
@@ -2195,7 +2201,11 @@ export const gameDayApi = {
     api.post(`/tournament-gameday/reset-pools/${eventId}/${divisionId}`),
 
   // Send notification
-  sendNotification: (eventId, data) => api.post(`/tournament-gameday/notify/${eventId}`, data)
+  sendNotification: (eventId, data) => api.post(`/tournament-gameday/notify/${eventId}`, data),
+
+  // Score History (TD, admin, scorekeeper only)
+  getGameScoreHistory: (eventId, gameId) => api.get(`/eventrunning/${eventId}/games/${gameId}/history`),
+  getEncounterScoreHistory: (eventId, encounterId) => api.get(`/eventrunning/${eventId}/encounters/${encounterId}/history`)
 }
 
 // Spectator API

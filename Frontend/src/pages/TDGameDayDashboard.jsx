@@ -437,6 +437,9 @@ export default function TDGameDayDashboard() {
           }}
           showCourtAssignment={false}
           showStatusControl={false}
+          showScoreHistory={true}
+          eventId={parseInt(eventId)}
+          isAdmin={true}
         />
       )}
     </div>

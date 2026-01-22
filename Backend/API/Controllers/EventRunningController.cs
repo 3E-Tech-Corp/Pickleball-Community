@@ -987,7 +987,7 @@ public class EventRunningController : ControllerBase
     }
 
     /// <summary>
-    /// Get score history for a game (admin only)
+    /// Get score history for a game (TD, admin, or scorekeeper)
     /// </summary>
     [HttpGet("{eventId}/games/{gameId}/history")]
     public async Task<IActionResult> GetGameScoreHistory(int eventId, int gameId)
@@ -996,7 +996,12 @@ public class EventRunningController : ControllerBase
         if (!userId.HasValue)
             return Unauthorized(new { success = false, message = "Unauthorized" });
 
-        if (!await IsEventOrganizerAsync(eventId, userId.Value) && !await IsAdminAsync())
+        // Check authorization: admin, organizer, or staff with CanRecordScores
+        var isAuthorized = await IsAdminAsync() ||
+                           await IsEventOrganizerAsync(eventId, userId.Value) ||
+                           await HasStaffPermissionAsync(eventId, userId.Value, "CanRecordScores");
+
+        if (!isAuthorized)
             return Forbid();
 
         var game = await _context.EventGames
@@ -1028,6 +1033,97 @@ public class EventRunningController : ControllerBase
             .ToListAsync();
 
         return Ok(new { success = true, data = history });
+    }
+
+    /// <summary>
+    /// Get score history for all games in an encounter (TD, admin, or scorekeeper)
+    /// </summary>
+    [HttpGet("{eventId}/encounters/{encounterId}/history")]
+    public async Task<IActionResult> GetEncounterScoreHistory(int eventId, int encounterId)
+    {
+        var userId = GetUserId();
+        if (!userId.HasValue)
+            return Unauthorized(new { success = false, message = "Unauthorized" });
+
+        // Check authorization: admin, organizer, or staff with CanRecordScores
+        var isAuthorized = await IsAdminAsync() ||
+                           await IsEventOrganizerAsync(eventId, userId.Value) ||
+                           await HasStaffPermissionAsync(eventId, userId.Value, "CanRecordScores");
+
+        if (!isAuthorized)
+            return Forbid();
+
+        var encounter = await _context.EventMatches
+            .Include(e => e.Unit1)
+            .Include(e => e.Unit2)
+            .Include(e => e.Matches).ThenInclude(m => m.Games)
+            .FirstOrDefaultAsync(e => e.Id == encounterId && e.EventId == eventId);
+
+        if (encounter == null)
+            return NotFound(new { success = false, message = "Encounter not found" });
+
+        var gameIds = encounter.Matches.SelectMany(m => m.Games).Select(g => g.Id).ToList();
+
+        var history = await _context.EventGameScoreHistories
+            .Include(h => h.ChangedByUser)
+            .Include(h => h.Game)
+            .Where(h => gameIds.Contains(h.GameId))
+            .OrderByDescending(h => h.CreatedAt)
+            .Select(h => new EncounterScoreHistoryDto
+            {
+                Id = h.Id,
+                GameId = h.GameId,
+                GameNumber = h.Game!.GameNumber,
+                ChangeType = h.ChangeType,
+                Unit1Score = h.Unit1Score,
+                Unit2Score = h.Unit2Score,
+                PreviousUnit1Score = h.PreviousUnit1Score,
+                PreviousUnit2Score = h.PreviousUnit2Score,
+                ChangedByUserId = h.ChangedByUserId,
+                ChangedByName = Utility.FormatName(h.ChangedByUser!.LastName, h.ChangedByUser.FirstName),
+                ChangedByUnitId = h.ChangedByUnitId,
+                Reason = h.Reason,
+                IsAdminOverride = h.IsAdminOverride,
+                CreatedAt = h.CreatedAt
+            })
+            .ToListAsync();
+
+        return Ok(new
+        {
+            success = true,
+            data = new
+            {
+                encounterId,
+                unit1Name = encounter.Unit1?.Name,
+                unit2Name = encounter.Unit2?.Name,
+                history
+            }
+        });
+    }
+
+    /// <summary>
+    /// Helper to check if user has a specific staff permission for an event
+    /// </summary>
+    private async Task<bool> HasStaffPermissionAsync(int eventId, int userId, string permission)
+    {
+        var staff = await _context.EventStaff
+            .Include(s => s.Role)
+            .FirstOrDefaultAsync(s => s.EventId == eventId
+                                   && s.UserId == userId
+                                   && s.Status == "Active"
+                                   && s.Role != null);
+
+        if (staff?.Role == null) return false;
+
+        return permission switch
+        {
+            "CanRecordScores" => staff.Role.CanRecordScores,
+            "CanManageSchedule" => staff.Role.CanManageSchedule,
+            "CanManageCourts" => staff.Role.CanManageCourts,
+            "CanCheckInPlayers" => staff.Role.CanCheckInPlayers,
+            "CanFullyManageEvent" => staff.Role.CanFullyManageEvent,
+            _ => false
+        };
     }
 
     /// <summary>
@@ -1672,6 +1768,24 @@ public class BroadcastMessageDto
 public class ScoreHistoryDto
 {
     public int Id { get; set; }
+    public string ChangeType { get; set; } = string.Empty;
+    public int Unit1Score { get; set; }
+    public int Unit2Score { get; set; }
+    public int? PreviousUnit1Score { get; set; }
+    public int? PreviousUnit2Score { get; set; }
+    public int ChangedByUserId { get; set; }
+    public string ChangedByName { get; set; } = string.Empty;
+    public int? ChangedByUnitId { get; set; }
+    public string? Reason { get; set; }
+    public bool IsAdminOverride { get; set; }
+    public DateTime CreatedAt { get; set; }
+}
+
+public class EncounterScoreHistoryDto
+{
+    public int Id { get; set; }
+    public int GameId { get; set; }
+    public int GameNumber { get; set; }
     public string ChangeType { get; set; } = string.Empty;
     public int Unit1Score { get; set; }
     public int Unit2Score { get; set; }

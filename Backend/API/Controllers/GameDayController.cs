@@ -492,6 +492,10 @@ public class GameDayController : ControllerBase
         if (game == null)
             return BadRequest(new { success = false, message = "Invalid game number" });
 
+        // Store previous scores for history
+        var previousUnit1Score = game.Unit1Score;
+        var previousUnit2Score = game.Unit2Score;
+
         var now = DateTime.Now;
         game.Unit1Score = dto.Unit1Score;
         game.Unit2Score = dto.Unit2Score;
@@ -551,6 +555,22 @@ public class GameDayController : ControllerBase
                 }
             }
         }
+
+        // Create score history record
+        var history = new EventGameScoreHistory
+        {
+            GameId = game.Id,
+            ChangeType = dto.IsFinished == true ? ScoreChangeType.ScoreSubmitted : ScoreChangeType.ScoreEdited,
+            Unit1Score = dto.Unit1Score,
+            Unit2Score = dto.Unit2Score,
+            PreviousUnit1Score = previousUnit1Score,
+            PreviousUnit2Score = previousUnit2Score,
+            ChangedByUserId = userId.Value,
+            IsAdminOverride = true,
+            Reason = dto.Reason,
+            IpAddress = HttpContext.Connection.RemoteIpAddress?.ToString()
+        };
+        _context.EventGameScoreHistories.Add(history);
 
         match.UpdatedAt = now;
         await _context.SaveChangesAsync();
@@ -1820,6 +1840,7 @@ public class UpdateScoreDto
     public int Unit1Score { get; set; }
     public int Unit2Score { get; set; }
     public bool? IsFinished { get; set; }
+    public string? Reason { get; set; }
 }
 
 public class AssignCourtDto

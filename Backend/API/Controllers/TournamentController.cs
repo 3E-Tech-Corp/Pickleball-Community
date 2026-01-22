@@ -4002,6 +4002,108 @@ public class TournamentController : ControllerBase
         });
     }
 
+    /// <summary>
+    /// Pre-assign a court to an encounter (schedule planning, not starting the game)
+    /// </summary>
+    [Authorize]
+    [HttpPost("encounters/pre-assign-court")]
+    public async Task<ActionResult<ApiResponse<object>>> PreAssignCourtToEncounter([FromBody] PreAssignCourtRequest request)
+    {
+        var encounter = await _context.EventMatches
+            .Include(e => e.Event)
+            .FirstOrDefaultAsync(e => e.Id == request.EncounterId);
+
+        if (encounter == null)
+            return NotFound(new ApiResponse<object> { Success = false, Message = "Encounter not found" });
+
+        // Verify user is organizer or admin
+        var userId = GetUserId();
+        if (!userId.HasValue)
+            return Unauthorized(new ApiResponse<object> { Success = false, Message = "Unauthorized" });
+
+        if (!await IsAdminAsync() && !await IsEventOrganizerAsync(encounter.EventId, userId.Value))
+            return Forbid();
+
+        if (request.TournamentCourtId.HasValue)
+        {
+            var court = await _context.TournamentCourts.FindAsync(request.TournamentCourtId.Value);
+            if (court == null || court.EventId != encounter.EventId)
+                return NotFound(new ApiResponse<object> { Success = false, Message = "Court not found" });
+        }
+
+        encounter.TournamentCourtId = request.TournamentCourtId;
+        encounter.UpdatedAt = DateTime.Now;
+
+        await _context.SaveChangesAsync();
+
+        return Ok(new ApiResponse<object>
+        {
+            Success = true,
+            Message = request.TournamentCourtId.HasValue ? "Court pre-assigned" : "Court assignment removed"
+        });
+    }
+
+    /// <summary>
+    /// Bulk pre-assign courts to multiple encounters (schedule planning)
+    /// </summary>
+    [Authorize]
+    [HttpPost("encounters/bulk-pre-assign-courts")]
+    public async Task<ActionResult<ApiResponse<object>>> BulkPreAssignCourts([FromBody] BulkPreAssignCourtsRequest request)
+    {
+        var userId = GetUserId();
+        if (!userId.HasValue)
+            return Unauthorized(new ApiResponse<object> { Success = false, Message = "Unauthorized" });
+
+        if (!await IsAdminAsync() && !await IsEventOrganizerAsync(request.EventId, userId.Value))
+            return Forbid();
+
+        if (request.Assignments == null || request.Assignments.Count == 0)
+            return BadRequest(new ApiResponse<object> { Success = false, Message = "No assignments provided" });
+
+        var encounterIds = request.Assignments.Select(a => a.EncounterId).ToList();
+        var encounters = await _context.EventMatches
+            .Where(e => encounterIds.Contains(e.Id) && e.EventId == request.EventId)
+            .ToListAsync();
+
+        if (encounters.Count != encounterIds.Count)
+            return BadRequest(new ApiResponse<object> { Success = false, Message = "Some encounters not found or don't belong to this event" });
+
+        // Validate all courts exist for this event
+        var courtIds = request.Assignments
+            .Where(a => a.TournamentCourtId.HasValue)
+            .Select(a => a.TournamentCourtId!.Value)
+            .Distinct()
+            .ToList();
+
+        if (courtIds.Count > 0)
+        {
+            var validCourts = await _context.TournamentCourts
+                .Where(c => courtIds.Contains(c.Id) && c.EventId == request.EventId)
+                .Select(c => c.Id)
+                .ToListAsync();
+
+            if (validCourts.Count != courtIds.Count)
+                return BadRequest(new ApiResponse<object> { Success = false, Message = "Some courts not found or don't belong to this event" });
+        }
+
+        // Apply assignments
+        var now = DateTime.Now;
+        foreach (var assignment in request.Assignments)
+        {
+            var encounter = encounters.First(e => e.Id == assignment.EncounterId);
+            encounter.TournamentCourtId = assignment.TournamentCourtId;
+            encounter.UpdatedAt = now;
+        }
+
+        await _context.SaveChangesAsync();
+
+        return Ok(new ApiResponse<object>
+        {
+            Success = true,
+            Message = $"{request.Assignments.Count} court assignments updated"
+        });
+    }
+
     [Authorize]
     [HttpPost("games/update-status")]
     public async Task<ActionResult<ApiResponse<EventGameDto>>> UpdateGameStatus([FromBody] UpdateGameStatusRequest request)

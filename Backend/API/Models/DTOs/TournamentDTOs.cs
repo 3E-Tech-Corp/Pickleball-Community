@@ -486,6 +486,18 @@ public class AssignGameToCourtRequest
     public int TournamentCourtId { get; set; }
 }
 
+public class PreAssignCourtRequest
+{
+    public int EncounterId { get; set; }
+    public int? TournamentCourtId { get; set; } // null to unassign
+}
+
+public class BulkPreAssignCourtsRequest
+{
+    public int EventId { get; set; }
+    public List<PreAssignCourtRequest> Assignments { get; set; } = new();
+}
+
 public class SubmitScoreRequest
 {
     public int GameId { get; set; }

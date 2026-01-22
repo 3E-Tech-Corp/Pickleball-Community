@@ -1920,6 +1920,27 @@ export default function TournamentManage() {
                                       </span>
                                     </div>
                                   </div>
+                                  {/* Court pre-assignment */}
+                                  <select
+                                    value={match.courtId || ''}
+                                    onChange={async (e) => {
+                                      const courtId = e.target.value ? parseInt(e.target.value) : null;
+                                      try {
+                                        await tournamentApi.preAssignCourt(match.encounterId, courtId);
+                                        toast.success(courtId ? 'Court assigned' : 'Court unassigned');
+                                        loadSchedule(selectedDivision?.id);
+                                      } catch (err) {
+                                        toast.error('Failed to assign court');
+                                      }
+                                    }}
+                                    className="px-2 py-1 text-xs border border-gray-200 rounded bg-white min-w-[80px]"
+                                    title="Pre-assign court"
+                                  >
+                                    <option value="">No Court</option>
+                                    {dashboard?.courts?.map(c => (
+                                      <option key={c.id} value={c.id}>{c.courtLabel}</option>
+                                    ))}
+                                  </select>
                                   <span className={`px-2 py-1 text-xs font-medium rounded-full ${
                                     match.status === 'Completed' ? 'bg-green-100 text-green-700' :
                                     match.status === 'InProgress' ? 'bg-orange-100 text-orange-700' :
@@ -2032,6 +2053,29 @@ export default function TournamentManage() {
                                       )}
                                     </div>
                                   </div>
+                                  {/* Court pre-assignment */}
+                                  {!match.isBye && (
+                                    <select
+                                      value={match.courtId || ''}
+                                      onChange={async (e) => {
+                                        const courtId = e.target.value ? parseInt(e.target.value) : null;
+                                        try {
+                                          await tournamentApi.preAssignCourt(match.encounterId, courtId);
+                                          toast.success(courtId ? 'Court assigned' : 'Court unassigned');
+                                          loadSchedule(selectedDivision?.id);
+                                        } catch (err) {
+                                          toast.error('Failed to assign court');
+                                        }
+                                      }}
+                                      className="px-2 py-1 text-xs border border-gray-200 rounded bg-white min-w-[80px]"
+                                      title="Pre-assign court"
+                                    >
+                                      <option value="">No Court</option>
+                                      {dashboard?.courts?.map(c => (
+                                        <option key={c.id} value={c.id}>{c.courtLabel}</option>
+                                      ))}
+                                    </select>
+                                  )}
                                   <span className={`px-2 py-1 text-xs font-medium rounded-full ${
                                     match.status === 'Completed' ? 'bg-green-100 text-green-700' :
                                     match.status === 'InProgress' ? 'bg-orange-100 text-orange-700' :
@@ -2130,6 +2174,29 @@ export default function TournamentManage() {
                                   )}
                                 </div>
                               </div>
+                              {/* Court pre-assignment */}
+                              {!match.isBye && (
+                                <select
+                                  value={match.courtId || ''}
+                                  onChange={async (e) => {
+                                    const courtId = e.target.value ? parseInt(e.target.value) : null;
+                                    try {
+                                      await tournamentApi.preAssignCourt(match.encounterId, courtId);
+                                      toast.success(courtId ? 'Court assigned' : 'Court unassigned');
+                                      loadSchedule(selectedDivision?.id);
+                                    } catch (err) {
+                                      toast.error('Failed to assign court');
+                                    }
+                                  }}
+                                  className="px-2 py-1 text-xs border border-gray-200 rounded bg-white min-w-[80px]"
+                                  title="Pre-assign court"
+                                >
+                                  <option value="">No Court</option>
+                                  {dashboard?.courts?.map(c => (
+                                    <option key={c.id} value={c.id}>{c.courtLabel}</option>
+                                  ))}
+                                </select>
+                              )}
                               <span className={`px-2 py-1 text-xs font-medium rounded-full ${
                                 match.status === 'Completed' ? 'bg-green-100 text-green-700' :
                                 match.status === 'InProgress' ? 'bg-orange-100 text-orange-700' :
@@ -3223,6 +3290,8 @@ export default function TournamentManage() {
           readOnly={false}
           isAdmin={user?.role === 'Admin'}
           showAllCourts={true}
+          showScoreHistory={true}
+          eventId={parseInt(eventId)}
         />
       )}
 
