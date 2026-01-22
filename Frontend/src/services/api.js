@@ -35,6 +35,13 @@ export const getSharedAssetUrl = (path) => {
   const assetMatch = path.match(/^\/asset\/(\d+)/)
   if (assetMatch) {
     const assetId = assetMatch[1]
+    // In dev mode, API_BASE_URL is full URL (https://localhost:7009) - need absolute URL
+    // In production, API_BASE_URL is '/api' - need relative URL with /api prefix
+    if (API_BASE_URL && API_BASE_URL.startsWith('http')) {
+      // Development: direct to backend without /api prefix (no IIS virtual app)
+      return `${API_BASE_URL}/assets/shared/${assetId}`
+    }
+    // Production: relative path with /api prefix (IIS virtual app adds /api)
     return `/api/assets/shared/${assetId}`
   }
 
