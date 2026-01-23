@@ -22,7 +22,7 @@ public class EventPublicViewDto
     public string? Country { get; set; }
     public double? Latitude { get; set; }
     public double? Longitude { get; set; }
-    public int? CourtId { get; set; }
+    public int? VenueId { get; set; }
     public string? PosterImageUrl { get; set; }
     public string? BannerImageUrl { get; set; }
     public decimal RegistrationFee { get; set; }

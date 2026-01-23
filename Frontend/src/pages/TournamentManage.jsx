@@ -16,6 +16,7 @@ import ScheduleConfigModal from '../components/ScheduleConfigModal';
 import PublicProfileModal from '../components/ui/PublicProfileModal';
 import GameScoreModal from '../components/ui/GameScoreModal';
 import VenuePicker from '../components/ui/VenuePicker';
+import EventFeesEditor from '../components/EventFeesEditor';
 
 export default function TournamentManage() {
   const { eventId } = useParams();
@@ -1538,6 +1539,14 @@ export default function TournamentManage() {
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-orange-500 focus:border-orange-500"
                   />
                 </div>
+              </div>
+
+              {/* Event Fee Options */}
+              <div className="mt-6">
+                <EventFeesEditor
+                  eventId={parseInt(eventId)}
+                  onFeesChange={() => loadDashboard()}
+                />
               </div>
             </div>
           </div>
