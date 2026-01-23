@@ -315,7 +315,7 @@ export default function CourtPlanning() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <Link
-                to={`/events/${eventId}/manage`}
+                to={`/event/${eventId}/manage`}
                 className="p-2 hover:bg-gray-100 rounded-lg"
               >
                 <ArrowLeft className="w-5 h-5" />

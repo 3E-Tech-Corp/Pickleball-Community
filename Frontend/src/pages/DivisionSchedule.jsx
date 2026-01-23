@@ -232,7 +232,7 @@ export default function DivisionSchedule() {
           <h2 className="text-xl font-semibold text-white mb-2">Error</h2>
           <p className="text-gray-400 mb-6">{error}</p>
           <Link
-            to={`/events/${eventId}`}
+            to={`/event/${eventId}`}
             className="inline-flex items-center gap-2 px-6 py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors"
           >
             <ChevronLeft className="w-5 h-5" />

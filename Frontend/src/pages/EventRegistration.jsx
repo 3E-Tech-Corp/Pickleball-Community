@@ -444,7 +444,7 @@ export default function EventRegistration() {
       if (res.success) {
         toast.success('Staff registration submitted! Awaiting admin approval.');
         // Navigate to event detail or my-events
-        navigate(`/events/${eventId}`);
+        navigate(`/event/${eventId}`);
       }
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to register as staff');
@@ -961,7 +961,7 @@ export default function EventRegistration() {
               : 'Registration is no longer available for this event.'}
           </p>
           <Link
-            to={`/events/${eventId}`}
+            to={`/event/${eventId}`}
             className="inline-flex items-center gap-2 px-6 py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-700"
           >
             View Event Details
@@ -978,7 +978,7 @@ export default function EventRegistration() {
         {/* Header */}
         <div className="bg-white border-b">
           <div className="max-w-3xl mx-auto px-4 py-4">
-            <Link to={`/events/${eventId}`} className="flex items-center gap-2 text-gray-600 hover:text-gray-900">
+            <Link to={`/event/${eventId}`} className="flex items-center gap-2 text-gray-600 hover:text-gray-900">
               <ChevronLeft className="w-5 h-5" />
               Back to Event
             </Link>
@@ -1048,7 +1048,7 @@ export default function EventRegistration() {
       <div className="bg-white border-b sticky top-0 z-10">
         <div className="max-w-3xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
-            <Link to={`/events/${eventId}`} className="flex items-center gap-2 text-gray-600 hover:text-gray-900">
+            <Link to={`/event/${eventId}`} className="flex items-center gap-2 text-gray-600 hover:text-gray-900">
               <ChevronLeft className="w-5 h-5" />
               <span className="hidden sm:inline">Back to Event</span>
             </Link>
@@ -1169,7 +1169,7 @@ export default function EventRegistration() {
                     <LogIn className="w-12 h-12 text-gray-300 mx-auto mb-3" />
                     <p className="text-gray-600 mb-4">Please log in to register as staff</p>
                     <Link
-                      to={`/login?redirect=/events/${eventId}/register`}
+                      to={`/login?redirect=/event/${eventId}/register`}
                       className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700"
                     >
                       Log In
@@ -1742,7 +1742,7 @@ export default function EventRegistration() {
 
                   <div className="flex flex-col sm:flex-row gap-3 justify-center">
                     <Link
-                      to={`/events/${eventId}`}
+                      to={`/event/${eventId}`}
                       className="px-6 py-3 bg-orange-600 text-white rounded-lg font-medium hover:bg-orange-700"
                     >
                       View Event

@@ -842,7 +842,7 @@ export default function TournamentManage() {
               </Link>
               {/* Event logo/image - links to event detail */}
               {event?.posterImageUrl && (
-                <Link to={`/events/${eventId}`} className="shrink-0">
+                <Link to={`/event/${eventId}`} className="shrink-0">
                   <img
                     src={getSharedAssetUrl(event.posterImageUrl)}
                     alt={event.name || 'Event'}
@@ -851,7 +851,7 @@ export default function TournamentManage() {
                 </Link>
               )}
               <div>
-                <Link to={`/events/${eventId}`} className="hover:text-orange-600 transition-colors">
+                <Link to={`/event/${eventId}`} className="hover:text-orange-600 transition-colors">
                   <h1 className="text-xl font-bold text-gray-900">{dashboard?.eventName || 'Tournament'}</h1>
                 </Link>
                 <div className="flex items-center gap-3 mt-1">
@@ -870,7 +870,7 @@ export default function TournamentManage() {
               {/* Status-based action buttons */}
               {(dashboard?.tournamentStatus === 'Draft' || dashboard?.tournamentStatus === 'RegistrationOpen') && (
                 <Link
-                  to={`/events/${eventId}`}
+                  to={`/event/${eventId}`}
                   className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors font-medium text-sm flex items-center gap-2"
                 >
                   <Users className="w-4 h-4" />

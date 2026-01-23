@@ -443,7 +443,7 @@ export default function Events() {
 
   const handleViewDetails = (event) => {
     // Navigate to the public event view page
-    navigate(`/events/${event.id}`);
+    navigate(`/event/${event.id}`);
   };
 
   // Open the detail modal (for comparison/legacy access)

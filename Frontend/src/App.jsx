@@ -81,7 +81,7 @@ function App() {
 
       {/* Community Features - Public */}
       <Route path="/events" element={<Events />} />
-      <Route path="/events/:eventId" element={<EventView />} />
+      <Route path="/event/:eventId" element={<EventView />} />
       <Route path="/event/:eventId/register" element={<EventRegistration />} />
       <Route path="/tournament/:eventId/manage" element={
         <ProtectedRoute>
