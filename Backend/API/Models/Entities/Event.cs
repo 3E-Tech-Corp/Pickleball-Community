@@ -118,6 +118,30 @@ public class Event
     [MaxLength(20)]
     public string TournamentStatus { get; set; } = "Draft";
 
+    // =====================================================
+    // Schedule Publishing
+    // =====================================================
+
+    /// <summary>
+    /// When the schedule was published for players/spectators to view
+    /// </summary>
+    public DateTime? SchedulePublishedAt { get; set; }
+
+    /// <summary>
+    /// User who published the schedule
+    /// </summary>
+    public int? SchedulePublishedByUserId { get; set; }
+
+    /// <summary>
+    /// When the schedule was last validated for conflicts
+    /// </summary>
+    public DateTime? ScheduleValidatedAt { get; set; }
+
+    /// <summary>
+    /// Number of schedule conflicts detected during last validation
+    /// </summary>
+    public int? ScheduleConflictCount { get; set; } = 0;
+
     public DateTime CreatedAt { get; set; } = DateTime.Now;
     public DateTime UpdatedAt { get; set; } = DateTime.Now;
     public bool IsActive { get; set; } = true;
@@ -139,13 +163,15 @@ public class Event
     public ScoreFormat? DefaultScoreFormat { get; set; }
 
     public ICollection<EventDivision> Divisions { get; set; } = new List<EventDivision>();
-    public ICollection<EventRegistration> Registrations { get; set; } = new List<EventRegistration>();
+    // Registrations collection removed - use Units and EventUnitMembers instead
     public ICollection<EventUnit> Units { get; set; } = new List<EventUnit>();
     public ICollection<TournamentCourt> TournamentCourts { get; set; } = new List<TournamentCourt>();
     public ICollection<EventEncounter> Encounters { get; set; } = new List<EventEncounter>();
     public ICollection<EventDocument> Documents { get; set; } = new List<EventDocument>();
     public ICollection<EventStaff> Staff { get; set; } = new List<EventStaff>();
     public ICollection<EventStaffRole> StaffRoles { get; set; } = new List<EventStaffRole>();
+    public ICollection<DivisionFee> Fees { get; set; } = new List<DivisionFee>(); // Event-level fees (DivisionId = 0)
+    public ICollection<EventFeeType> FeeTypes { get; set; } = new List<EventFeeType>(); // Fee type templates for this event
 }
 
 public class EventDivision
@@ -274,6 +300,20 @@ public class EventDivision
     /// </summary>
     public int? EstimatedMatchDurationMinutes { get; set; } = 20;
 
+    // =====================================================
+    // Schedule Publishing
+    // =====================================================
+
+    /// <summary>
+    /// When the schedule was published for players/spectators to view
+    /// </summary>
+    public DateTime? SchedulePublishedAt { get; set; }
+
+    /// <summary>
+    /// User who published the schedule
+    /// </summary>
+    public int? SchedulePublishedByUserId { get; set; }
+
     public int SortOrder { get; set; } = 0;
     public bool IsActive { get; set; } = true;
 
@@ -313,7 +353,7 @@ public class EventDivision
     [ForeignKey("DefaultScoreFormatId")]
     public ScoreFormat? DefaultScoreFormat { get; set; }
 
-    public ICollection<EventRegistration> Registrations { get; set; } = new List<EventRegistration>();
+    // Registrations collection removed - use Units and EventUnitMembers instead
     public ICollection<EventPartnerRequest> PartnerRequests { get; set; } = new List<EventPartnerRequest>();
     public ICollection<DivisionReward> Rewards { get; set; } = new List<DivisionReward>();
     public ICollection<EventUnit> Units { get; set; } = new List<EventUnit>();
@@ -321,51 +361,11 @@ public class EventDivision
     public ICollection<EncounterMatchFormat> EncounterMatchFormats { get; set; } = new List<EncounterMatchFormat>();
     public ICollection<DivisionCourtBlock> CourtBlocks { get; set; } = new List<DivisionCourtBlock>();
     public ICollection<DivisionPhase> Phases { get; set; } = new List<DivisionPhase>();
+    // Note: DivisionFee uses DivisionId=0 for event-level fees, so navigation removed
+    // to prevent EF Core from creating shadow FK. Query fees via _context.DivisionFees.Where(f => f.DivisionId == divisionId)
 }
 
-public class EventRegistration
-{
-    public int Id { get; set; }
-
-    public int EventId { get; set; }
-    public int DivisionId { get; set; }
-    public int UserId { get; set; }
-
-    // Team info - null for singles, team ID for doubles/mixed
-    public int? TeamId { get; set; }
-
-    [MaxLength(100)]
-    public string? TeamName { get; set; }
-
-    // Payment
-    [MaxLength(20)]
-    public string PaymentStatus { get; set; } = "Pending"; // Pending, Paid, Refunded
-
-    [Column(TypeName = "decimal(10,2)")]
-    public decimal AmountPaid { get; set; } = 0;
-
-    public DateTime? PaidAt { get; set; }
-
-    [MaxLength(100)]
-    public string? PaymentReference { get; set; }
-
-    // Status
-    [MaxLength(20)]
-    public string Status { get; set; } = "Registered"; // Registered, Confirmed, Waitlisted, Cancelled, CheckedIn
-
-    public DateTime RegisteredAt { get; set; } = DateTime.Now;
-    public DateTime? CheckedInAt { get; set; }
-
-    // Navigation
-    [ForeignKey("EventId")]
-    public Event? Event { get; set; }
-
-    [ForeignKey("DivisionId")]
-    public EventDivision? Division { get; set; }
-
-    [ForeignKey("UserId")]
-    public User? User { get; set; }
-}
+// NOTE: EventRegistration entity removed - registration now uses EventUnits + EventUnitMembers
 
 public class EventPartnerRequest
 {

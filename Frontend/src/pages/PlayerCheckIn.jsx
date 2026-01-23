@@ -145,7 +145,7 @@ export default function PlayerCheckIn() {
           <h2 className="text-xl font-semibold text-gray-900 mb-2">Not Registered</h2>
           <p className="text-gray-600 mb-4">You are not registered for this event.</p>
           <Link
-            to={`/events/${eventId}`}
+            to={`/event/${eventId}`}
             className="text-orange-600 hover:text-orange-700 font-medium"
           >
             View Event Details

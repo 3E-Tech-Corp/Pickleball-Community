@@ -3,10 +3,11 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
   Calendar, MapPin, Clock, Users, DollarSign, ChevronLeft,
   UserPlus, Building2, Phone, Mail, User, Image, ExternalLink,
-  Loader2, AlertCircle, FileText, Radio, Settings
+  Loader2, AlertCircle, FileText, Radio, Settings, Trophy, Medal,
+  Edit3, Check
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { eventsApi, objectAssetsApi, getSharedAssetUrl } from '../services/api';
+import { eventsApi, objectAssetsApi, scoreboardApi, tournamentApi, eventStaffApi, getSharedAssetUrl } from '../services/api';
 import { getIconByName } from '../utils/iconMap';
 import { getColorValues } from '../utils/colorMap';
 import PublicProfileModal from '../components/ui/PublicProfileModal';
@@ -19,9 +20,12 @@ export default function EventView() {
 
   const [event, setEvent] = useState(null);
   const [adAssets, setAdAssets] = useState([]);
+  const [eventResults, setEventResults] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedProfileUserId, setSelectedProfileUserId] = useState(null);
+  const [userRegistrations, setUserRegistrations] = useState([]);
+  const [staffStatus, setStaffStatus] = useState(null); // { isStaff: boolean, status: string, roleName: string }
 
   // Load event data
   useEffect(() => {
@@ -63,6 +67,65 @@ export default function EventView() {
     }
   }, [eventId]);
 
+  // Load event results when event is finished
+  useEffect(() => {
+    const loadResults = async () => {
+      if (!event || !event.endDate) return;
+
+      const isEventPast = new Date(event.endDate) < new Date();
+      if (!isEventPast) return;
+
+      try {
+        const response = await scoreboardApi.getResults(eventId);
+        if (response.success && response.data) {
+          setEventResults(response.data);
+        }
+      } catch (err) {
+        console.log('No results available:', err);
+      }
+    };
+
+    loadResults();
+  }, [event, eventId]);
+
+  // Load user's registrations (player and staff) for this event
+  useEffect(() => {
+    const loadUserRegistrations = async () => {
+      if (!isAuthenticated || !user?.id || !eventId) {
+        setUserRegistrations([]);
+        setStaffStatus(null);
+        return;
+      }
+
+      // Load player and staff registrations in parallel
+      try {
+        const [unitsResponse, staffResponse] = await Promise.all([
+          tournamentApi.getEventUnits(eventId).catch(() => ({ success: false })),
+          eventStaffApi.getMyStatus(eventId).catch(() => ({ success: false }))
+        ]);
+
+        // Player registrations
+        if (unitsResponse.success && unitsResponse.data) {
+          const myUnits = unitsResponse.data.filter(u =>
+            u.members?.some(m => m.userId === user.id && m.inviteStatus === 'Accepted')
+          );
+          setUserRegistrations(myUnits);
+        }
+
+        // Staff registration status
+        if (staffResponse.success && staffResponse.data) {
+          setStaffStatus(staffResponse.data);
+        } else {
+          setStaffStatus(null);
+        }
+      } catch (err) {
+        console.log('Could not load user registrations:', err);
+      }
+    };
+
+    loadUserRegistrations();
+  }, [isAuthenticated, user?.id, eventId]);
+
   const formatDate = (dateString) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       weekday: 'short',
@@ -80,13 +143,9 @@ export default function EventView() {
   };
 
   const handleRegister = () => {
-    if (isAuthenticated) {
-      // Go to events page and open the event modal
-      navigate('/events', { state: { openEventId: event.id } });
-    } else {
-      // Redirect to login with return path
-      navigate('/login', { state: { from: `/events/${eventId}` } });
-    }
+    // Navigate to standalone registration page
+    // The registration page handles auth check internally
+    navigate(`/event/${eventId}/register`);
   };
 
   const getEventTypeStyle = () => {
@@ -165,6 +224,19 @@ export default function EventView() {
           <ChevronLeft className="w-5 h-5" />
           <span className="text-sm font-medium">Events</span>
         </Link>
+
+        {/* Admin Manage Button - Show for admins and organizers */}
+        {isAuthenticated && (isAdmin || user?.id === event.organizedByUserId) && (
+          <Link
+            to={event.eventTypeName?.toLowerCase() === 'tournament'
+              ? `/tournament/${eventId}/manage`
+              : `/event/${eventId}/manage`}
+            className="absolute top-4 right-4 flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-lg shadow-sm hover:bg-blue-700 transition-colors"
+          >
+            <Settings className="w-5 h-5" />
+            <span className="text-sm font-medium">Admin Manage</span>
+          </Link>
+        )}
       </div>
 
       {/* Main Content */}
@@ -184,6 +256,26 @@ export default function EventView() {
             ) : !isRegistrationOpen ? (
               <div className="text-center text-gray-600">
                 <p className="font-medium">Registration opens {formatDate(event.registrationOpenDate)}</p>
+              </div>
+            ) : isAuthenticated && (userRegistrations.length > 0 || staffStatus?.isStaff) ? (
+              <div className="space-y-2">
+                <div className="flex items-center justify-center gap-2 text-green-700 bg-green-100 py-2 px-4 rounded-lg">
+                  <Check className="w-5 h-5" />
+                  <span className="font-medium">
+                    {userRegistrations.length > 0 && staffStatus?.isStaff
+                      ? "You're registered as Player & Staff!"
+                      : staffStatus?.isStaff
+                      ? "You're registered as Staff!"
+                      : "You're registered!"}
+                  </span>
+                </div>
+                <button
+                  onClick={handleRegister}
+                  className="w-full py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+                >
+                  <Edit3 className="w-5 h-5" />
+                  View/Edit my Registration
+                </button>
               </div>
             ) : (
               <button
@@ -451,6 +543,19 @@ export default function EventView() {
                       p => p.divisionName === division.name
                     ) || [];
 
+                    // Group players by team/unit
+                    const playersByTeam = divisionPlayers.reduce((acc, player) => {
+                      const teamName = player.teamName || 'Individual';
+                      if (!acc[teamName]) {
+                        acc[teamName] = [];
+                      }
+                      acc[teamName].push(player);
+                      return acc;
+                    }, {});
+
+                    const teamNames = Object.keys(playersByTeam);
+                    const hasTeams = teamNames.length > 0 && !(teamNames.length === 1 && teamNames[0] === 'Individual');
+
                     return (
                       <div
                         key={division.id}
@@ -486,31 +591,70 @@ export default function EventView() {
                           </div>
                         </div>
 
-                        {/* Players in this division */}
+                        {/* Players grouped by unit/team */}
                         {divisionPlayers.length > 0 && (
-                          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-1.5 mt-2">
-                            {divisionPlayers.map((player) => (
-                              <button
-                                key={player.userId}
-                                onClick={() => setSelectedProfileUserId(player.userId)}
-                                className="flex items-center gap-2 p-1.5 bg-white rounded hover:bg-gray-100 transition-colors text-left"
-                              >
-                                {player.profileImageUrl ? (
-                                  <img
-                                    src={getSharedAssetUrl(player.profileImageUrl)}
-                                    alt={player.name}
-                                    className="w-7 h-7 rounded-full object-cover flex-shrink-0"
-                                  />
-                                ) : (
-                                  <div className="w-7 h-7 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0">
-                                    <User className="w-3.5 h-3.5 text-gray-400" />
+                          <div className="mt-2 space-y-2">
+                            {hasTeams ? (
+                              // Show players grouped by team
+                              teamNames.map((teamName) => (
+                                <div key={teamName} className="bg-white rounded p-2">
+                                  <div className="text-xs font-medium text-gray-600 mb-1.5 flex items-center gap-1">
+                                    <Users className="w-3 h-3" />
+                                    {teamName}
                                   </div>
-                                )}
-                                <span className="text-xs text-gray-700 truncate">
-                                  {player.name}
-                                </span>
-                              </button>
-                            ))}
+                                  <div className="flex flex-wrap gap-1">
+                                    {playersByTeam[teamName].map((player) => (
+                                      <button
+                                        key={player.userId}
+                                        onClick={() => setSelectedProfileUserId(player.userId)}
+                                        className="flex items-center gap-1.5 px-2 py-1 bg-gray-50 rounded hover:bg-gray-100 transition-colors text-left"
+                                      >
+                                        {player.profileImageUrl ? (
+                                          <img
+                                            src={getSharedAssetUrl(player.profileImageUrl)}
+                                            alt={player.name}
+                                            className="w-6 h-6 rounded-full object-cover flex-shrink-0"
+                                          />
+                                        ) : (
+                                          <div className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0">
+                                            <User className="w-3 h-3 text-gray-400" />
+                                          </div>
+                                        )}
+                                        <span className="text-xs text-gray-700">
+                                          {player.name}
+                                        </span>
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+                              ))
+                            ) : (
+                              // Show players as flat grid (no teams)
+                              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-1.5">
+                                {divisionPlayers.map((player) => (
+                                  <button
+                                    key={player.userId}
+                                    onClick={() => setSelectedProfileUserId(player.userId)}
+                                    className="flex items-center gap-2 p-1.5 bg-white rounded hover:bg-gray-100 transition-colors text-left"
+                                  >
+                                    {player.profileImageUrl ? (
+                                      <img
+                                        src={getSharedAssetUrl(player.profileImageUrl)}
+                                        alt={player.name}
+                                        className="w-7 h-7 rounded-full object-cover flex-shrink-0"
+                                      />
+                                    ) : (
+                                      <div className="w-7 h-7 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0">
+                                        <User className="w-3.5 h-3.5 text-gray-400" />
+                                      </div>
+                                    )}
+                                    <span className="text-xs text-gray-700 truncate">
+                                      {player.name}
+                                    </span>
+                                  </button>
+                                ))}
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>
@@ -519,18 +663,109 @@ export default function EventView() {
                 </div>
               </div>
             )}
+
+            {/* Final Rankings - Show when event is finished */}
+            {isEventPast && eventResults?.standings && eventResults.standings.length > 0 && (
+              <div className="mt-6 pt-6 border-t border-gray-100">
+                <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                  <Trophy className="w-5 h-5 text-yellow-500" />
+                  Final Rankings
+                </h2>
+                <div className="space-y-6">
+                  {/* Group standings by division */}
+                  {(() => {
+                    const byDivision = eventResults.standings.reduce((acc, standing) => {
+                      const divId = standing.divisionId;
+                      if (!acc[divId]) {
+                        acc[divId] = {
+                          divisionName: standing.divisionName,
+                          standings: []
+                        };
+                      }
+                      acc[divId].standings.push(standing);
+                      return acc;
+                    }, {});
+
+                    return Object.entries(byDivision).map(([divId, { divisionName, standings }]) => (
+                      <div key={divId} className="bg-gray-50 rounded-lg p-4">
+                        <h3 className="text-sm font-semibold text-gray-800 mb-3">{divisionName}</h3>
+                        <div className="space-y-2">
+                          {standings.slice(0, 8).map((standing, index) => {
+                            const placement = standing.finalPlacement || standing.overallRank || (index + 1);
+                            const isTopThree = placement <= 3;
+                            const medalColors = {
+                              1: 'text-yellow-500',
+                              2: 'text-gray-400',
+                              3: 'text-amber-600'
+                            };
+
+                            return (
+                              <div
+                                key={standing.unitId}
+                                className={`flex items-center gap-3 p-2 rounded-lg ${isTopThree ? 'bg-white shadow-sm' : ''}`}
+                              >
+                                {/* Placement */}
+                                <div className="w-8 flex-shrink-0 text-center">
+                                  {isTopThree ? (
+                                    <Medal className={`w-5 h-5 mx-auto ${medalColors[placement]}`} />
+                                  ) : (
+                                    <span className="text-sm font-medium text-gray-500">{placement}</span>
+                                  )}
+                                </div>
+
+                                {/* Team/Unit Info */}
+                                <div className="flex-1 min-w-0">
+                                  <p className={`text-sm font-medium truncate ${isTopThree ? 'text-gray-900' : 'text-gray-700'}`}>
+                                    {standing.unitName}
+                                  </p>
+                                  {standing.players && standing.players.length > 0 && (
+                                    <p className="text-xs text-gray-500 truncate">
+                                      {standing.players.join(' / ')}
+                                    </p>
+                                  )}
+                                </div>
+
+                                {/* Stats */}
+                                <div className="flex-shrink-0 text-right">
+                                  <p className="text-xs font-medium text-gray-700">
+                                    {standing.matchesWon}-{standing.matchesLost}
+                                  </p>
+                                  <p className="text-xs text-gray-500">
+                                    W-L
+                                  </p>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ));
+                  })()}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Bottom Register Button (mobile) */}
           <div className="p-4 bg-gray-50 border-t border-gray-100 sm:hidden">
             {!isEventPast && isRegistrationOpen && !isRegistrationClosed && (
-              <button
-                onClick={handleRegister}
-                className="w-full py-3 bg-orange-600 text-white rounded-lg font-semibold hover:bg-orange-700 transition-colors flex items-center justify-center gap-2"
-              >
-                <UserPlus className="w-5 h-5" />
-                {isAuthenticated ? 'Register for Event' : 'Login to Register'}
-              </button>
+              isAuthenticated && (userRegistrations.length > 0 || staffStatus?.isStaff) ? (
+                <button
+                  onClick={handleRegister}
+                  className="w-full py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+                >
+                  <Edit3 className="w-5 h-5" />
+                  View/Edit my Registration
+                </button>
+              ) : (
+                <button
+                  onClick={handleRegister}
+                  className="w-full py-3 bg-orange-600 text-white rounded-lg font-semibold hover:bg-orange-700 transition-colors flex items-center justify-center gap-2"
+                >
+                  <UserPlus className="w-5 h-5" />
+                  {isAuthenticated ? 'Register for Event' : 'Login to Register'}
+                </button>
+              )
             )}
           </div>
         </div>

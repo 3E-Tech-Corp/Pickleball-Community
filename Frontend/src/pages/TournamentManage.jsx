@@ -6,15 +6,18 @@ import {
   AlertCircle, Loader2, Plus, Edit2, DollarSign, Eye, Share2, LayoutGrid,
   Award, ArrowRight, Lock, Unlock, Save, Map, ExternalLink, FileText, User,
   CheckCircle, XCircle, MoreVertical, Upload, Send, Info, Radio, ClipboardList,
-  Download, Lightbulb
+  Download, Lightbulb, Shield, Trash2, Building2, Layers, UserCheck, Grid3X3
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import { useNotifications } from '../hooks/useNotifications';
-import { tournamentApi, gameDayApi, eventsApi, objectAssetsApi, checkInApi, sharedAssetApi, getSharedAssetUrl } from '../services/api';
+import { tournamentApi, gameDayApi, eventsApi, objectAssetsApi, checkInApi, sharedAssetApi, getSharedAssetUrl, eventTypesApi, eventStaffApi } from '../services/api';
 import ScheduleConfigModal from '../components/ScheduleConfigModal';
 import PublicProfileModal from '../components/ui/PublicProfileModal';
 import GameScoreModal from '../components/ui/GameScoreModal';
+import VenuePicker from '../components/ui/VenuePicker';
+import EventFeesEditor from '../components/EventFeesEditor';
+import EventFeeTypesEditor from '../components/EventFeeTypesEditor';
 
 export default function TournamentManage() {
   const { eventId } = useParams();
@@ -36,7 +39,7 @@ export default function TournamentManage() {
   const [standingsViewMode, setStandingsViewMode] = useState('grouped'); // 'grouped' or 'flat'
   const [standingsSortBy, setStandingsSortBy] = useState('pool'); // 'pool', 'rank', 'matchesWon', 'gameDiff', 'pointDiff'
   const [event, setEvent] = useState(null);
-  const [activeTab, setActiveTab] = useState('overview');
+  const [activeTab, setActiveTab] = useState('eventinfo');
   const [selectedDivision, setSelectedDivision] = useState(null);
   const selectedDivisionRef = useRef(null); // Ref to track selectedDivision for SignalR listener
   const [error, setError] = useState(null);
@@ -84,6 +87,40 @@ export default function TournamentManage() {
   const [savingPayment, setSavingPayment] = useState(false);
   const [uploadingPaymentProof, setUploadingPaymentProof] = useState(false);
   const [sendingWaiverRequest, setSendingWaiverRequest] = useState(null); // userId
+
+  // Event Info editing state
+  const [eventTypes, setEventTypes] = useState([]);
+  const [editForm, setEditForm] = useState({});
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [savingEvent, setSavingEvent] = useState(false);
+
+  // Staff management state
+  const [staffList, setStaffList] = useState([]);
+  const [staffRoles, setStaffRoles] = useState([]);
+  const [loadingStaff, setLoadingStaff] = useState(false);
+  const [showAddStaffModal, setShowAddStaffModal] = useState(false);
+  const [addStaffForm, setAddStaffForm] = useState({ email: '', roleId: '' });
+  const [addingStaff, setAddingStaff] = useState(false);
+  const [pendingStaff, setPendingStaff] = useState([]);
+
+  // Court groups state
+  const [courtGroups, setCourtGroups] = useState([]);
+  const [loadingCourtGroups, setLoadingCourtGroups] = useState(false);
+
+  // Unit management state
+  const [unitsData, setUnitsData] = useState(null); // All units grouped by division
+  const [loadingUnits, setLoadingUnits] = useState(false);
+  const [selectedUnitsForMerge, setSelectedUnitsForMerge] = useState([]);
+  const [processingUnitAction, setProcessingUnitAction] = useState(null); // { unitId, action }
+  const [expandedUnit, setExpandedUnit] = useState(null); // unitId for expanded view
+  const [movingUnitToDivision, setMovingUnitToDivision] = useState(null); // { unit, targetDivisionId }
+
+  // Payment management state
+  const [paymentSummary, setPaymentSummary] = useState(null);
+  const [loadingPayments, setLoadingPayments] = useState(false);
+  const [expandedPayment, setExpandedPayment] = useState(null);
+  const [verifyingPayment, setVerifyingPayment] = useState(null);
+  const [viewingProofUrl, setViewingProofUrl] = useState(null); // URL to display in modal
 
   // Payment methods for dropdown
   const PAYMENT_METHODS = [
@@ -193,18 +230,246 @@ export default function TournamentManage() {
 
   const loadEvent = async () => {
     try {
-      const response = await eventsApi.getEvent(eventId);
-      if (response.success) {
-        setEvent(response.data);
+      const [eventRes, typesRes, assetsRes] = await Promise.all([
+        eventsApi.getEvent(eventId),
+        eventTypesApi.list(),
+        objectAssetsApi.getAssets('Event', eventId)
+      ]);
+
+      if (eventRes.success) {
+        setEvent(eventRes.data);
+        populateEventForm(eventRes.data);
       }
-      // Load map asset for the event (TypeName is lowercase 'map' in database)
-      const assetsResponse = await objectAssetsApi.getAssets('Event', eventId);
-      if (assetsResponse.success && assetsResponse.data) {
-        const map = assetsResponse.data.find(a => a.assetTypeName?.toLowerCase() === 'map');
+
+      if (typesRes.success) {
+        setEventTypes(typesRes.data || []);
+      }
+
+      if (assetsRes.success && assetsRes.data) {
+        const map = assetsRes.data.find(a => a.assetTypeName?.toLowerCase() === 'map');
         setMapAsset(map || null);
       }
     } catch (err) {
       console.error('Error loading event:', err);
+    }
+  };
+
+  // Helper to extract date and time from ISO date string
+  const extractDateTime = (isoString) => {
+    if (!isoString) return { date: '', time: '' };
+    try {
+      const dt = new Date(isoString);
+      const date = dt.toISOString().split('T')[0];
+      const time = dt.toTimeString().slice(0, 5);
+      return { date, time };
+    } catch {
+      return { date: '', time: '' };
+    }
+  };
+
+  const populateEventForm = (eventData) => {
+    const regOpen = extractDateTime(eventData.registrationOpenDate);
+    const regClose = extractDateTime(eventData.registrationCloseDate);
+    const startDate = extractDateTime(eventData.startDate);
+    const endDate = extractDateTime(eventData.endDate);
+
+    setEditForm({
+      name: eventData.name || '',
+      description: eventData.description || '',
+      eventTypeId: eventData.eventTypeId || '',
+      isPublished: eventData.isPublished || false,
+      isPrivate: eventData.isPrivate || false,
+      venueId: eventData.venueId || '',
+      venueName: eventData.venueName || '',
+      address: eventData.address || '',
+      city: eventData.city || '',
+      state: eventData.state || '',
+      country: eventData.country || '',
+      registrationFee: eventData.registrationFee || 0,
+      perDivisionFee: eventData.perDivisionFee || 0,
+      registrationOpenDate: regOpen.date,
+      registrationOpenTime: regOpen.time || '00:00',
+      registrationCloseDate: regClose.date,
+      registrationCloseTime: regClose.time || '23:59',
+      startDate: startDate.date,
+      startTime: startDate.time || '08:00',
+      endDate: endDate.date,
+      endTime: endDate.time || '18:00',
+    });
+    setHasUnsavedChanges(false);
+  };
+
+  const handleFormChange = (field, value) => {
+    setEditForm(prev => ({ ...prev, [field]: value }));
+    setHasUnsavedChanges(true);
+  };
+
+  const handleSaveEvent = async () => {
+    setSavingEvent(true);
+    try {
+      const registrationOpenDate = editForm.registrationOpenDate
+        ? `${editForm.registrationOpenDate}T${editForm.registrationOpenTime || '00:00'}:00`
+        : null;
+      const registrationCloseDate = editForm.registrationCloseDate
+        ? `${editForm.registrationCloseDate}T${editForm.registrationCloseTime || '23:59'}:00`
+        : null;
+      const startDate = editForm.startDate
+        ? `${editForm.startDate}T${editForm.startTime || '08:00'}:00`
+        : event.startDate;
+      const endDate = editForm.endDate
+        ? `${editForm.endDate}T${editForm.endTime || '18:00'}:00`
+        : event.endDate;
+
+      const updateData = {
+        name: editForm.name,
+        description: editForm.description,
+        eventTypeId: editForm.eventTypeId ? parseInt(editForm.eventTypeId) : event.eventTypeId,
+        startDate,
+        endDate,
+        registrationOpenDate,
+        registrationCloseDate,
+        isPublished: editForm.isPublished,
+        isPrivate: editForm.isPrivate,
+        allowMultipleDivisions: event.allowMultipleDivisions ?? true,
+        venueId: editForm.venueId ? parseInt(editForm.venueId) : null,
+        venueName: editForm.venueName || null,
+        address: editForm.address || null,
+        city: editForm.city || null,
+        state: editForm.state || null,
+        country: editForm.country || null,
+        registrationFee: editForm.registrationFee ? parseFloat(editForm.registrationFee) : 0,
+        perDivisionFee: editForm.perDivisionFee ? parseFloat(editForm.perDivisionFee) : 0,
+      };
+
+      const response = await eventsApi.update(eventId, updateData);
+      if (!response.success) {
+        toast.error(response.message || 'Failed to save event');
+        return;
+      }
+
+      toast.success('Event saved successfully');
+      setHasUnsavedChanges(false);
+      loadEvent();
+    } catch (err) {
+      console.error('Error saving event:', err);
+      toast.error('Failed to save event');
+    } finally {
+      setSavingEvent(false);
+    }
+  };
+
+  // Staff management functions
+  const loadStaff = async () => {
+    setLoadingStaff(true);
+    try {
+      const [staffRes, rolesRes, pendingRes] = await Promise.all([
+        eventStaffApi.getEventStaff(eventId),
+        eventStaffApi.getEventRoles(eventId),
+        eventStaffApi.getPendingStaff(eventId).catch(() => ({ success: false }))
+      ]);
+
+      if (staffRes.success) {
+        setStaffList(staffRes.data || []);
+      }
+      if (rolesRes.success) {
+        setStaffRoles(rolesRes.data || []);
+      }
+      if (pendingRes.success) {
+        setPendingStaff(pendingRes.data || []);
+      }
+    } catch (err) {
+      console.error('Error loading staff:', err);
+      toast.error('Failed to load staff');
+    } finally {
+      setLoadingStaff(false);
+    }
+  };
+
+  const handleAddStaff = async () => {
+    if (!addStaffForm.email || !addStaffForm.roleId) {
+      toast.error('Please enter email and select a role');
+      return;
+    }
+
+    setAddingStaff(true);
+    try {
+      const response = await eventStaffApi.assignStaff(eventId, {
+        email: addStaffForm.email,
+        roleId: parseInt(addStaffForm.roleId)
+      });
+      if (response.success) {
+        toast.success('Staff member added');
+        setShowAddStaffModal(false);
+        setAddStaffForm({ email: '', roleId: '' });
+        loadStaff();
+      } else {
+        toast.error(response.message || 'Failed to add staff');
+      }
+    } catch (err) {
+      console.error('Error adding staff:', err);
+      toast.error('Failed to add staff');
+    } finally {
+      setAddingStaff(false);
+    }
+  };
+
+  const handleRemoveStaff = async (staffId) => {
+    if (!confirm('Remove this staff member?')) return;
+
+    try {
+      const response = await eventStaffApi.removeStaff(eventId, staffId);
+      if (response.success) {
+        toast.success('Staff member removed');
+        loadStaff();
+      } else {
+        toast.error(response.message || 'Failed to remove staff');
+      }
+    } catch (err) {
+      console.error('Error removing staff:', err);
+      toast.error('Failed to remove staff');
+    }
+  };
+
+  const handleApproveStaff = async (staffId) => {
+    try {
+      const response = await eventStaffApi.approveStaff(eventId, staffId, {});
+      if (response.success) {
+        toast.success('Staff approved');
+        loadStaff();
+      } else {
+        toast.error(response.message || 'Failed to approve staff');
+      }
+    } catch (err) {
+      toast.error('Failed to approve staff');
+    }
+  };
+
+  const handleDeclineStaff = async (staffId) => {
+    try {
+      const response = await eventStaffApi.declineStaff(eventId, staffId, 'Declined by organizer');
+      if (response.success) {
+        toast.success('Staff declined');
+        loadStaff();
+      } else {
+        toast.error(response.message || 'Failed to decline staff');
+      }
+    } catch (err) {
+      toast.error('Failed to decline staff');
+    }
+  };
+
+  // Court groups management
+  const loadCourtGroups = async () => {
+    setLoadingCourtGroups(true);
+    try {
+      const response = await tournamentApi.getCourtPlanningData(eventId);
+      if (response.success) {
+        setCourtGroups(response.data?.courtGroups || []);
+      }
+    } catch (err) {
+      console.error('Error loading court groups:', err);
+    } finally {
+      setLoadingCourtGroups(false);
     }
   };
 
@@ -279,6 +544,30 @@ export default function TournamentManage() {
     } catch (err) {
       console.error('Error deleting court:', err);
       toast.error('Failed to delete court');
+    }
+  };
+
+  const handleToggleDivisionActive = async (division) => {
+    const newStatus = !division.isActive;
+    const action = newStatus ? 'activate' : 'deactivate';
+
+    if (!newStatus && division.registeredUnits > 0) {
+      if (!confirm(`This division has ${division.registeredUnits} registered teams. Deactivating will hide it from public view. Continue?`)) {
+        return;
+      }
+    }
+
+    try {
+      const response = await eventsApi.updateDivision(eventId, division.id, { isActive: newStatus });
+      if (response.success) {
+        toast.success(`Division ${newStatus ? 'activated' : 'deactivated'}`);
+        loadDashboard();
+      } else {
+        toast.error(response.message || `Failed to ${action} division`);
+      }
+    } catch (err) {
+      console.error(`Error ${action}ing division:`, err);
+      toast.error(`Failed to ${action} division`);
     }
   };
 
@@ -676,6 +965,205 @@ export default function TournamentManage() {
     return Object.values(grouped);
   };
 
+  // Unit Management functions
+  const loadUnits = async () => {
+    setLoadingUnits(true);
+    try {
+      const response = await tournamentApi.getEventUnits(eventId);
+      if (response.success) {
+        // Group units by division
+        const grouped = {};
+        (response.data || []).forEach(unit => {
+          if (unit.status === 'Cancelled') return;
+          const divId = unit.divisionId;
+          if (!grouped[divId]) {
+            grouped[divId] = {
+              divisionId: divId,
+              divisionName: unit.divisionName || 'Unknown Division',
+              units: []
+            };
+          }
+          grouped[divId].units.push(unit);
+        });
+        setUnitsData(grouped);
+      } else {
+        toast.error(response.message || 'Failed to load units');
+      }
+    } catch (err) {
+      console.error('Error loading units:', err);
+      toast.error('Failed to load units');
+    } finally {
+      setLoadingUnits(false);
+    }
+  };
+
+  const handleBreakUnit = async (unit) => {
+    if (!confirm(`Break "${unit.name}" apart? Each member will become their own registration.`)) return;
+    setProcessingUnitAction({ unitId: unit.id, action: 'break' });
+    try {
+      const response = await tournamentApi.adminBreakUnit(unit.id);
+      if (response.success) {
+        toast.success('Unit broken apart - members now have individual registrations');
+        loadUnits();
+        loadDashboard();
+      } else {
+        toast.error(response.message || 'Failed to break unit');
+      }
+    } catch (err) {
+      console.error('Error breaking unit:', err);
+      toast.error(err.message || 'Failed to break unit');
+    } finally {
+      setProcessingUnitAction(null);
+    }
+  };
+
+  const handleMergeUnits = async () => {
+    if (selectedUnitsForMerge.length !== 2) {
+      toast.error('Select exactly 2 units to merge');
+      return;
+    }
+    const [target, source] = selectedUnitsForMerge;
+    if (target.divisionId !== source.divisionId) {
+      toast.error('Units must be in the same division to merge');
+      return;
+    }
+    if (!confirm(`Merge "${source.name}" into "${target.name}"? Members from the second unit will join the first.`)) return;
+
+    setProcessingUnitAction({ unitId: target.id, action: 'merge' });
+    try {
+      const response = await tournamentApi.mergeRegistrations(eventId, target.id, source.id);
+      if (response.success) {
+        toast.success('Units merged successfully');
+        setSelectedUnitsForMerge([]);
+        loadUnits();
+        loadDashboard();
+      } else {
+        toast.error(response.message || 'Failed to merge units');
+      }
+    } catch (err) {
+      console.error('Error merging units:', err);
+      toast.error(err.message || 'Failed to merge units');
+    } finally {
+      setProcessingUnitAction(null);
+    }
+  };
+
+  const handleMoveUnitToDivision = async (unit, newDivisionId) => {
+    if (!confirm(`Move "${unit.name}" to a different division? Fees will be adjusted if possible.`)) return;
+    setProcessingUnitAction({ unitId: unit.id, action: 'move' });
+    try {
+      const response = await tournamentApi.moveRegistration(eventId, unit.id, newDivisionId);
+      if (response.success) {
+        const feeWarning = response.message?.includes('Warning') ? ' ' + response.message : '';
+        toast.success('Unit moved to new division.' + feeWarning);
+        setMovingUnitToDivision(null);
+        loadUnits();
+        loadDashboard();
+      } else {
+        toast.error(response.message || 'Failed to move unit');
+      }
+    } catch (err) {
+      console.error('Error moving unit:', err);
+      toast.error(err.message || 'Failed to move unit');
+    } finally {
+      setProcessingUnitAction(null);
+    }
+  };
+
+  const handleRemoveMember = async (unit, member) => {
+    if (!confirm(`Remove ${member.firstName} ${member.lastName} from "${unit.name}"?`)) return;
+    setProcessingUnitAction({ unitId: unit.id, action: 'remove-member' });
+    try {
+      const response = await tournamentApi.removeRegistration(eventId, unit.id, member.userId);
+      if (response.success) {
+        toast.success('Member removed from unit');
+        loadUnits();
+        loadDashboard();
+        loadCheckIns();
+      } else {
+        toast.error(response.message || 'Failed to remove member');
+      }
+    } catch (err) {
+      console.error('Error removing member:', err);
+      toast.error(err.message || 'Failed to remove member');
+    } finally {
+      setProcessingUnitAction(null);
+    }
+  };
+
+  const toggleUnitForMerge = (unit) => {
+    setSelectedUnitsForMerge(prev => {
+      const exists = prev.find(u => u.id === unit.id);
+      if (exists) {
+        return prev.filter(u => u.id !== unit.id);
+      }
+      if (prev.length >= 2) {
+        return [prev[1], unit]; // Replace oldest selection
+      }
+      return [...prev, unit];
+    });
+  };
+
+  const getUnitsByDivision = () => {
+    if (!unitsData) return [];
+    return Object.values(unitsData).filter(d => d.units.length > 0);
+  };
+
+  // Payment Management functions
+  const loadPaymentSummary = async () => {
+    setLoadingPayments(true);
+    try {
+      const response = await tournamentApi.getPaymentSummary(eventId);
+      if (response.success) {
+        setPaymentSummary(response.data);
+      } else {
+        toast.error(response.message || 'Failed to load payments');
+      }
+    } catch (err) {
+      console.error('Error loading payments:', err);
+      toast.error('Failed to load payments');
+    } finally {
+      setLoadingPayments(false);
+    }
+  };
+
+  const handleVerifyPayment = async (paymentId) => {
+    setVerifyingPayment(paymentId);
+    try {
+      const response = await tournamentApi.verifyPayment(paymentId);
+      if (response.success) {
+        toast.success('Payment verified');
+        loadPaymentSummary();
+      } else {
+        toast.error(response.message || 'Failed to verify payment');
+      }
+    } catch (err) {
+      console.error('Error verifying payment:', err);
+      toast.error('Failed to verify payment');
+    } finally {
+      setVerifyingPayment(null);
+    }
+  };
+
+  const handleUnverifyPayment = async (paymentId) => {
+    if (!confirm('Unverify this payment? The payment will be marked as pending again.')) return;
+    setVerifyingPayment(paymentId);
+    try {
+      const response = await tournamentApi.unverifyPayment(paymentId);
+      if (response.success) {
+        toast.success('Payment unverified');
+        loadPaymentSummary();
+      } else {
+        toast.error(response.message || 'Failed to unverify payment');
+      }
+    } catch (err) {
+      console.error('Error unverifying payment:', err);
+      toast.error('Failed to unverify payment');
+    } finally {
+      setVerifyingPayment(null);
+    }
+  };
+
   const handleOverrideRank = async (unitId, poolRank) => {
     try {
       const response = await gameDayApi.overrideRank(unitId, { poolRank });
@@ -842,7 +1330,7 @@ export default function TournamentManage() {
               </Link>
               {/* Event logo/image - links to event detail */}
               {event?.posterImageUrl && (
-                <Link to={`/events/${eventId}`} className="shrink-0">
+                <Link to={`/event/${eventId}`} className="shrink-0">
                   <img
                     src={getSharedAssetUrl(event.posterImageUrl)}
                     alt={event.name || 'Event'}
@@ -851,7 +1339,7 @@ export default function TournamentManage() {
                 </Link>
               )}
               <div>
-                <Link to={`/events/${eventId}`} className="hover:text-orange-600 transition-colors">
+                <Link to={`/event/${eventId}`} className="hover:text-orange-600 transition-colors">
                   <h1 className="text-xl font-bold text-gray-900">{dashboard?.eventName || 'Tournament'}</h1>
                 </Link>
                 <div className="flex items-center gap-3 mt-1">
@@ -870,7 +1358,7 @@ export default function TournamentManage() {
               {/* Status-based action buttons */}
               {(dashboard?.tournamentStatus === 'Draft' || dashboard?.tournamentStatus === 'RegistrationOpen') && (
                 <Link
-                  to={`/events/${eventId}`}
+                  to={`/event/${eventId}`}
                   className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors font-medium text-sm flex items-center gap-2"
                 >
                   <Users className="w-4 h-4" />
@@ -925,15 +1413,15 @@ export default function TournamentManage() {
                 </Link>
               )}
 
-              {/* Court Planning link - organizers only */}
+              {/* Send Notification link - organizers only */}
               {isOrganizer && (
                 <Link
-                  to={`/event/${eventId}/court-planning`}
+                  to={`/event/${eventId}/notifications`}
                   className="px-3 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors font-medium text-sm flex items-center gap-2"
-                  title="Court Planning"
+                  title="Send Notification"
                 >
-                  <MapPin className="w-4 h-4" />
-                  <span className="hidden sm:inline">Court Planning</span>
+                  <Send className="w-4 h-4" />
+                  <span className="hidden sm:inline">Notify</span>
                 </Link>
               )}
 
@@ -959,39 +1447,44 @@ export default function TournamentManage() {
         </div>
       </div>
 
-      {/* Tabs - Left (operational) and Right (secondary) groups */}
+      {/* Tabs - organized by workflow */}
       <div className="bg-white border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between overflow-x-auto">
-            {/* Left group: operational tabs */}
+          <div className="flex overflow-x-auto">
+            {/* Tab navigation */}
             <div className="flex">
-              {['checkin', 'courts', 'divisions', 'schedule'].map(tab => (
+              {[
+                { key: 'eventinfo', label: 'Event Info' },
+                { key: 'divisions', label: 'Divisions' },
+                { key: 'courts', label: 'Courts' },
+                { key: 'registrations', label: 'Registrations' },
+                { key: 'payments', label: 'Payments' },
+                { key: 'staff', label: 'Staff' },
+                { key: 'schedule', label: 'Schedule' },
+                { key: 'overview', label: 'Overview' },
+                { key: 'gameday', label: 'Game Day' }
+              ].map(tab => (
                 <button
-                  key={tab}
-                  onClick={() => setActiveTab(tab)}
+                  key={tab.key}
+                  onClick={() => {
+                    setActiveTab(tab.key);
+                    if (tab.key === 'staff' && staffList.length === 0) {
+                      loadStaff();
+                    }
+                    if (tab.key === 'payments' && !paymentSummary) {
+                      loadPaymentSummary();
+                    }
+                    if (tab.key === 'courts' && courtGroups.length === 0) {
+                      loadCourtGroups();
+                    }
+                  }}
                   className={`px-4 py-3 font-medium text-sm border-b-2 transition-colors whitespace-nowrap ${
-                    activeTab === tab
+                    activeTab === tab.key
                       ? 'border-orange-600 text-orange-600'
                       : 'border-transparent text-gray-500 hover:text-gray-700'
                   }`}
                 >
-                  {tab === 'checkin' ? 'Check-in' : tab.charAt(0).toUpperCase() + tab.slice(1)}
-                </button>
-              ))}
-            </div>
-            {/* Right group: secondary/overview tabs */}
-            <div className="flex">
-              {['overview', 'scoring', 'gameday'].map(tab => (
-                <button
-                  key={tab}
-                  onClick={() => setActiveTab(tab)}
-                  className={`px-4 py-3 font-medium text-sm border-b-2 transition-colors whitespace-nowrap ${
-                    activeTab === tab
-                      ? 'border-orange-600 text-orange-600'
-                      : 'border-transparent text-gray-500 hover:text-gray-700'
-                  }`}
-                >
-                  {tab === 'gameday' ? 'Game Day' : tab.charAt(0).toUpperCase() + tab.slice(1)}
+                  {tab.label}
                 </button>
               ))}
             </div>
@@ -1000,6 +1493,268 @@ export default function TournamentManage() {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        {/* Event Info Tab */}
+        {activeTab === 'eventinfo' && (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-gray-900">Event Information</h2>
+              <div className="flex items-center gap-3">
+                {hasUnsavedChanges && (
+                  <span className="text-sm text-orange-600">Unsaved changes</span>
+                )}
+                <button
+                  onClick={handleSaveEvent}
+                  disabled={savingEvent || !hasUnsavedChanges}
+                  className="flex items-center gap-2 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {savingEvent ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                  Save Changes
+                </button>
+              </div>
+            </div>
+
+            {/* Basic Details */}
+            <div className="bg-white rounded-xl shadow-sm p-6">
+              <h3 className="font-medium text-gray-900 mb-4 flex items-center gap-2">
+                <FileText className="w-5 h-5 text-gray-500" />
+                Basic Details
+              </h3>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Event Name</label>
+                  <input
+                    type="text"
+                    value={editForm.name || ''}
+                    onChange={(e) => handleFormChange('name', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-orange-500 focus:border-orange-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                  <textarea
+                    value={editForm.description || ''}
+                    onChange={(e) => handleFormChange('description', e.target.value)}
+                    rows={3}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-orange-500 focus:border-orange-500"
+                  />
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Event Type</label>
+                    <select
+                      value={editForm.eventTypeId || ''}
+                      onChange={(e) => handleFormChange('eventTypeId', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-orange-500 focus:border-orange-500"
+                    >
+                      <option value="">Select type...</option>
+                      {eventTypes.map(t => (
+                        <option key={t.id} value={t.id}>{t.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="flex items-center gap-6 pt-6">
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={editForm.isPublished || false}
+                        onChange={(e) => handleFormChange('isPublished', e.target.checked)}
+                        className="rounded border-gray-300 text-orange-600 focus:ring-orange-500"
+                      />
+                      <span className="text-sm text-gray-700">Published</span>
+                    </label>
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={editForm.isPrivate || false}
+                        onChange={(e) => handleFormChange('isPrivate', e.target.checked)}
+                        className="rounded border-gray-300 text-orange-600 focus:ring-orange-500"
+                      />
+                      <span className="text-sm text-gray-700">Private</span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Venue & Location */}
+            <div className="bg-white rounded-xl shadow-sm p-6">
+              <h3 className="font-medium text-gray-900 mb-4 flex items-center gap-2">
+                <MapPin className="w-5 h-5 text-gray-500" />
+                Venue & Location
+              </h3>
+              <div className="space-y-4">
+                <VenuePicker
+                  value={editForm.venueId ? { id: editForm.venueId, name: editForm.venueName, city: editForm.city, state: editForm.state } : null}
+                  onChange={(venue) => {
+                    if (venue) {
+                      handleFormChange('venueId', venue.id);
+                      handleFormChange('venueName', venue.name);
+                      handleFormChange('address', venue.address);
+                      handleFormChange('city', venue.city);
+                      handleFormChange('state', venue.state);
+                      handleFormChange('country', venue.country);
+                    } else {
+                      handleFormChange('venueId', '');
+                    }
+                  }}
+                />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Venue Name (if not listed)</label>
+                    <input
+                      type="text"
+                      value={editForm.venueName || ''}
+                      onChange={(e) => handleFormChange('venueName', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-orange-500 focus:border-orange-500"
+                      placeholder="Custom venue name"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
+                    <input
+                      type="text"
+                      value={editForm.address || ''}
+                      onChange={(e) => handleFormChange('address', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-orange-500 focus:border-orange-500"
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">City</label>
+                    <input
+                      type="text"
+                      value={editForm.city || ''}
+                      onChange={(e) => handleFormChange('city', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-orange-500 focus:border-orange-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">State</label>
+                    <input
+                      type="text"
+                      value={editForm.state || ''}
+                      onChange={(e) => handleFormChange('state', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-orange-500 focus:border-orange-500"
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Country</label>
+                    <input
+                      type="text"
+                      value={editForm.country || ''}
+                      onChange={(e) => handleFormChange('country', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-orange-500 focus:border-orange-500"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Dates & Times */}
+            <div className="bg-white rounded-xl shadow-sm p-6">
+              <h3 className="font-medium text-gray-900 mb-4 flex items-center gap-2">
+                <Calendar className="w-5 h-5 text-gray-500" />
+                Dates & Times
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Event Start</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="date"
+                      value={editForm.startDate || ''}
+                      onChange={(e) => handleFormChange('startDate', e.target.value)}
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-orange-500 focus:border-orange-500"
+                    />
+                    <input
+                      type="time"
+                      value={editForm.startTime || ''}
+                      onChange={(e) => handleFormChange('startTime', e.target.value)}
+                      className="w-28 px-3 py-2 border border-gray-300 rounded-lg focus:ring-orange-500 focus:border-orange-500"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Event End</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="date"
+                      value={editForm.endDate || ''}
+                      onChange={(e) => handleFormChange('endDate', e.target.value)}
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-orange-500 focus:border-orange-500"
+                    />
+                    <input
+                      type="time"
+                      value={editForm.endTime || ''}
+                      onChange={(e) => handleFormChange('endTime', e.target.value)}
+                      className="w-28 px-3 py-2 border border-gray-300 rounded-lg focus:ring-orange-500 focus:border-orange-500"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Registration Opens</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="date"
+                      value={editForm.registrationOpenDate || ''}
+                      onChange={(e) => handleFormChange('registrationOpenDate', e.target.value)}
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-orange-500 focus:border-orange-500"
+                    />
+                    <input
+                      type="time"
+                      value={editForm.registrationOpenTime || ''}
+                      onChange={(e) => handleFormChange('registrationOpenTime', e.target.value)}
+                      className="w-28 px-3 py-2 border border-gray-300 rounded-lg focus:ring-orange-500 focus:border-orange-500"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Registration Closes</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="date"
+                      value={editForm.registrationCloseDate || ''}
+                      onChange={(e) => handleFormChange('registrationCloseDate', e.target.value)}
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-orange-500 focus:border-orange-500"
+                    />
+                    <input
+                      type="time"
+                      value={editForm.registrationCloseTime || ''}
+                      onChange={(e) => handleFormChange('registrationCloseTime', e.target.value)}
+                      className="w-28 px-3 py-2 border border-gray-300 rounded-lg focus:ring-orange-500 focus:border-orange-500"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Fees */}
+            <div className="bg-white rounded-xl shadow-sm p-6">
+              <h3 className="font-medium text-gray-900 mb-4 flex items-center gap-2">
+                <DollarSign className="w-5 h-5 text-gray-500" />
+                Registration Fees
+              </h3>
+
+              {/* Fee Types */}
+              <div>
+                <EventFeeTypesEditor
+                  eventId={parseInt(eventId)}
+                  onFeeTypesChange={() => loadDashboard()}
+                />
+              </div>
+
+              {/* Event Fee Options */}
+              <div className="mt-4">
+                <EventFeesEditor
+                  eventId={parseInt(eventId)}
+                  onFeesChange={() => loadDashboard()}
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Overview Tab */}
         {activeTab === 'overview' && (
           <div className="space-y-6">
@@ -1097,48 +1852,58 @@ export default function TournamentManage() {
               </div>
             )}
 
-            {/* Division Summary - only show divisions with registrations */}
+            {/* Division Summary - show all divisions */}
             <div className="bg-white rounded-xl shadow-sm p-6">
               <h2 className="text-lg font-semibold text-gray-900 mb-4">Division Status</h2>
               <div className="space-y-4">
-                {dashboard?.divisions?.filter(d => d.registeredUnits > 0).map(div => (
-                  <div key={div.id} className="border rounded-lg p-4">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h3 className="font-medium text-gray-900">{div.name}</h3>
-                        <div className="flex gap-4 text-sm text-gray-500 mt-1">
-                          <span>{div.registeredUnits} / {div.maxUnits || '∞'} teams</span>
-                          {div.waitlistedUnits > 0 && (
-                            <span className="text-yellow-600">+{div.waitlistedUnits} waitlisted</span>
+                {(!dashboard?.divisions || dashboard.divisions.length === 0) ? (
+                  <p className="text-sm text-gray-500">No divisions created yet.</p>
+                ) : (
+                  dashboard.divisions.map(div => (
+                    <div key={div.id} className={`border rounded-lg p-4 ${div.registeredUnits === 0 ? 'border-dashed border-gray-300 bg-gray-50' : ''}`}>
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h3 className="font-medium text-gray-900">{div.name}</h3>
+                          <div className="flex gap-4 text-sm text-gray-500 mt-1">
+                            <span>{div.registeredUnits} / {div.maxUnits || '∞'} teams</span>
+                            {div.waitlistedUnits > 0 && (
+                              <span className="text-yellow-600">+{div.waitlistedUnits} waitlisted</span>
+                            )}
+                            {div.registeredUnits > 0 && (
+                              <span>{div.completedMatches} / {div.totalMatches} matches</span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {div.registeredUnits === 0 ? (
+                            <span className="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-500 rounded-full">
+                              No Registrations
+                            </span>
+                          ) : div.scheduleReady ? (
+                            <span className="px-2 py-1 text-xs font-medium bg-green-100 text-green-700 rounded-full">
+                              Schedule Ready
+                            </span>
+                          ) : (
+                            <span className="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-700 rounded-full">
+                              No Schedule
+                            </span>
                           )}
-                          <span>{div.completedMatches} / {div.totalMatches} matches</span>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        {div.scheduleReady ? (
-                          <span className="px-2 py-1 text-xs font-medium bg-green-100 text-green-700 rounded-full">
-                            Schedule Ready
-                          </span>
-                        ) : (
-                          <span className="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-700 rounded-full">
-                            No Schedule
-                          </span>
-                        )}
-                      </div>
+                      {/* Progress bar */}
+                      {div.totalMatches > 0 && (
+                        <div className="mt-3">
+                          <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-orange-500 transition-all"
+                              style={{ width: `${(div.completedMatches / div.totalMatches) * 100}%` }}
+                            />
+                          </div>
+                        </div>
+                      )}
                     </div>
-                    {/* Progress bar */}
-                    {div.totalMatches > 0 && (
-                      <div className="mt-3">
-                        <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                          <div
-                            className="h-full bg-orange-500 transition-all"
-                            style={{ width: `${(div.completedMatches / div.totalMatches) * 100}%` }}
-                          />
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ))}
+                  ))
+                )}
               </div>
             </div>
 
@@ -1177,7 +1942,7 @@ export default function TournamentManage() {
           </div>
         )}
 
-        {/* Divisions Tab - only show divisions with registrations */}
+        {/* Divisions Tab - show all divisions for organizers */}
         {activeTab === 'divisions' && (
           <div className="space-y-6">
             {/* Reset Tournament Button - for testing/dry runs */}
@@ -1201,11 +1966,36 @@ export default function TournamentManage() {
               </div>
             )}
 
-            {dashboard?.divisions?.filter(d => d.registeredUnits > 0).map(div => (
-              <div key={div.id} className="bg-white rounded-xl shadow-sm p-6">
+            {/* Show message if no divisions exist */}
+            {(!dashboard?.divisions || dashboard.divisions.length === 0) && (
+              <div className="bg-gray-50 border border-gray-200 rounded-xl p-8 text-center">
+                <Layers className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 mb-2">No Divisions Created</h3>
+                <p className="text-sm text-gray-500 mb-4">
+                  Create divisions to organize your tournament by skill level, age group, or format.
+                </p>
+                <Link
+                  to={`/event/${eventId}/edit`}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+                >
+                  <Plus className="w-4 h-4" />
+                  Add Divisions
+                </Link>
+              </div>
+            )}
+
+            {dashboard?.divisions?.map(div => (
+              <div key={div.id} className={`bg-white rounded-xl shadow-sm p-6 ${!div.isActive ? 'opacity-60 border-2 border-dashed border-gray-300' : ''}`}>
                 <div className="flex items-center justify-between mb-4">
                   <div>
-                    <h2 className="text-lg font-semibold text-gray-900">{div.name}</h2>
+                    <div className="flex items-center gap-2">
+                      <h2 className="text-lg font-semibold text-gray-900">{div.name}</h2>
+                      {!div.isActive && (
+                        <span className="px-2 py-0.5 text-xs font-medium bg-gray-200 text-gray-600 rounded-full">
+                          Inactive
+                        </span>
+                      )}
+                    </div>
                     <p className="text-sm text-gray-500">
                       {div.registeredUnits} teams registered
                       {div.scheduleReady && div.totalMatches > 0 && (
@@ -1215,8 +2005,22 @@ export default function TournamentManage() {
                   </div>
                   {isOrganizer && (
                     <div className="flex items-center gap-2 flex-wrap justify-end">
+                      {/* Toggle Active Status */}
+                      <button
+                        onClick={() => handleToggleDivisionActive(div)}
+                        className={`px-3 py-2 text-sm font-medium rounded-lg flex items-center gap-2 ${
+                          div.isActive
+                            ? 'text-gray-600 border border-gray-300 hover:bg-gray-50'
+                            : 'text-green-700 border border-green-300 bg-green-50 hover:bg-green-100'
+                        }`}
+                        title={div.isActive ? 'Deactivate division' : 'Activate division'}
+                      >
+                        {div.isActive ? <Eye className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        {div.isActive ? 'Active' : 'Activate'}
+                      </button>
+
                       {/* Generate/Re-generate Schedule - disabled after event starts */}
-                      {!['Running', 'Started'].includes(dashboard?.tournamentStatus) && (
+                      {div.isActive && !['Running', 'Started'].includes(dashboard?.tournamentStatus) && (
                         <button
                           onClick={() => handleOpenScheduleConfig(div)}
                           disabled={generatingSchedule}
@@ -1236,7 +2040,7 @@ export default function TournamentManage() {
                       )}
 
                       {/* View Schedule - links to printable schedule page */}
-                      {div.scheduleReady && (
+                      {div.isActive && div.scheduleReady && (
                         <Link
                           to={`/event/${eventId}/division/${div.id}/schedule`}
                           className="px-3 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-2"
@@ -1312,6 +2116,36 @@ export default function TournamentManage() {
         {/* Courts Tab */}
         {activeTab === 'courts' && (
           <div className="space-y-6">
+            {/* Court Groups Summary */}
+            {courtGroups.length > 0 && (
+              <div className="bg-white rounded-xl shadow-sm p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="font-medium text-gray-900 flex items-center gap-2">
+                    <Layers className="w-5 h-5 text-blue-600" />
+                    Court Groups ({courtGroups.length})
+                  </h3>
+                  <Link
+                    to={`/event/${eventId}/court-planning`}
+                    className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-1"
+                  >
+                    <Settings className="w-4 h-4" />
+                    Manage Groups
+                  </Link>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {courtGroups.map(group => (
+                    <div
+                      key={group.id}
+                      className="px-3 py-2 bg-gray-100 rounded-lg text-sm"
+                    >
+                      <span className="font-medium">{group.groupName}</span>
+                      <span className="text-gray-500 ml-2">({group.courts?.length || 0} courts)</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
                 <h2 className="text-lg font-semibold text-gray-900">Tournament Courts</h2>
@@ -2581,11 +3415,11 @@ export default function TournamentManage() {
           </div>
         )}
 
-        {/* Check-in Tab */}
-        {activeTab === 'checkin' && (
+        {/* Registrations Tab */}
+        {activeTab === 'registrations' && (
           <div className="space-y-6">
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-gray-900">Player Check-in</h2>
+              <h2 className="text-lg font-semibold text-gray-900">Player Registrations & Check-in</h2>
               <button
                 onClick={() => { loadCheckIns(); loadDashboard(); }}
                 disabled={loadingCheckIns}
@@ -3101,10 +3935,768 @@ export default function TournamentManage() {
                 Check-in is typically enabled when the tournament status is set to "Running".
               </p>
             </div>
+
+            {/* Unit Management Section - Events.jsx Style */}
+            <div className="mt-8 pt-6 border-t border-gray-200">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                  <Layers className="w-5 h-5 text-purple-600" />
+                  Registration Management
+                </h2>
+                <button
+                  onClick={loadUnits}
+                  disabled={loadingUnits}
+                  className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 disabled:opacity-50"
+                >
+                  <RefreshCw className={`w-5 h-5 ${loadingUnits ? 'animate-spin' : ''}`} />
+                </button>
+              </div>
+
+              {!unitsData ? (
+                <div className="bg-white rounded-xl shadow-sm p-8 text-center">
+                  <Layers className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                  <p className="text-gray-500 mb-4">Click refresh to load registrations</p>
+                  <button
+                    onClick={loadUnits}
+                    disabled={loadingUnits}
+                    className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 flex items-center gap-2 mx-auto"
+                  >
+                    {loadingUnits ? <Loader2 className="w-4 h-4 animate-spin" /> : <Layers className="w-4 h-4" />}
+                    Load Registrations
+                  </button>
+                </div>
+              ) : getUnitsByDivision().length === 0 ? (
+                <div className="bg-white rounded-xl shadow-sm p-8 text-center">
+                  <Layers className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                  <p className="text-gray-500">No registered units found</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {getUnitsByDivision().map(divGroup => {
+                    const teamSize = divGroup.units[0]?.requiredPlayers || 2;
+                    const sortedUnits = [...divGroup.units].sort((a, b) => {
+                      const aComplete = a.isComplete ? 1 : 0;
+                      const bComplete = b.isComplete ? 1 : 0;
+                      return bComplete - aComplete;
+                    });
+
+                    return (
+                      <div key={divGroup.divisionId} className="border rounded-lg overflow-hidden bg-white">
+                        {/* Division Header */}
+                        <div className="p-4 bg-gray-50 border-b">
+                          <div className="flex items-start justify-between gap-4">
+                            <div>
+                              <h4 className="font-semibold text-gray-900 text-lg">{divGroup.divisionName}</h4>
+                            </div>
+                            <span className="px-3 py-1 bg-green-100 text-green-700 rounded-lg text-sm font-medium whitespace-nowrap flex items-center gap-1.5">
+                              <CheckCircle className="w-4 h-4" />
+                              Registered
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Units count and merge toolbar */}
+                        <div className="px-4 py-3 border-b bg-gray-50/50 flex items-center justify-between">
+                          <h5 className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                            <Users className="w-4 h-4" />
+                            {divGroup.units.length} {teamSize > 2 ? 'Teams' : teamSize === 2 ? 'Pairs' : 'Players'} Registered
+                          </h5>
+
+                          {/* Merge toolbar */}
+                          {selectedUnitsForMerge.length > 0 && selectedUnitsForMerge[0]?.divisionId === divGroup.divisionId && (
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-gray-500">{selectedUnitsForMerge.length} selected</span>
+                              <button
+                                onClick={handleMergeUnits}
+                                disabled={selectedUnitsForMerge.length !== 2 || processingUnitAction?.action === 'merge'}
+                                className="px-3 py-1 text-xs font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-1"
+                              >
+                                {processingUnitAction?.action === 'merge' ? <Loader2 className="w-3 h-3 animate-spin" /> : <Users className="w-3 h-3" />}
+                                Merge
+                              </button>
+                              <button
+                                onClick={() => setSelectedUnitsForMerge([])}
+                                className="px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100 rounded-lg"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Unit rows */}
+                        <div className="divide-y divide-gray-100">
+                          {sortedUnits.map((unit, idx) => {
+                            const isComplete = unit.isComplete;
+                            const isSelected = selectedUnitsForMerge.some(u => u.id === unit.id);
+                            const isProcessing = processingUnitAction?.unitId === unit.id;
+                            const acceptedMembers = unit.members?.filter(m => m.inviteStatus === 'Accepted') || [];
+
+                            return (
+                              <div
+                                key={unit.id}
+                                className={`px-2 sm:px-4 py-2 sm:py-3 flex items-center gap-2 sm:gap-3 ${
+                                  isComplete ? 'bg-white' : 'bg-amber-50/50'
+                                } ${idx % 2 === 1 && isComplete ? 'bg-gray-50/50' : ''} ${isSelected ? 'ring-2 ring-blue-500 ring-inset' : ''}`}
+                              >
+                                {/* Checkbox for merge (incomplete units only) */}
+                                {!isComplete && (
+                                  <input
+                                    type="checkbox"
+                                    checked={isSelected}
+                                    onChange={() => toggleUnitForMerge({ ...unit, divisionId: divGroup.divisionId })}
+                                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 shrink-0"
+                                  />
+                                )}
+
+                                {/* Unit number */}
+                                <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-medium shrink-0 ${
+                                  isComplete ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
+                                }`}>
+                                  {idx + 1}
+                                </div>
+
+                                {/* Members inline */}
+                                <div className="flex-1 flex flex-wrap items-center gap-2 min-w-0">
+                                  {acceptedMembers.map((member, mIdx) => (
+                                    <div key={mIdx} className="flex items-center gap-1 shrink-0">
+                                      <button
+                                        onClick={() => member.userId && setProfileModalUserId(member.userId)}
+                                        className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-white border border-gray-200 hover:border-orange-300 hover:bg-orange-50 transition-colors"
+                                      >
+                                        {member.profileImageUrl ? (
+                                          <img src={getSharedAssetUrl(member.profileImageUrl)} alt="" className="w-5 h-5 rounded-full object-cover" />
+                                        ) : (
+                                          <div className="w-5 h-5 rounded-full bg-orange-100 text-orange-700 flex items-center justify-center text-xs font-medium">
+                                            {(member.firstName || 'P')[0].toUpperCase()}
+                                          </div>
+                                        )}
+                                        <span className="text-sm max-w-[80px] sm:max-w-[150px] truncate text-gray-700">
+                                          {member.lastName && member.firstName
+                                            ? `${member.lastName}, ${member.firstName}`
+                                            : member.lastName || member.firstName || 'Player'}
+                                        </span>
+                                      </button>
+                                      {/* Payment status $ icon */}
+                                      <span className={`text-sm ${member.hasPaid ? 'text-green-600' : 'text-gray-400'}`} title={member.hasPaid ? 'Paid' : 'Unpaid'}>
+                                        <DollarSign className="w-4 h-4" />
+                                      </span>
+                                      {/* Remove member button */}
+                                      {acceptedMembers.length > 1 && (
+                                        <button
+                                          onClick={() => handleRemoveMember(unit, member)}
+                                          disabled={isProcessing}
+                                          className="p-0.5 rounded text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
+                                          title="Remove player"
+                                        >
+                                          <Trash2 className="w-4 h-4" />
+                                        </button>
+                                      )}
+                                    </div>
+                                  ))}
+
+                                  {/* Empty slots for incomplete units */}
+                                  {!isComplete && Array.from({ length: Math.max(0, (unit.requiredPlayers || 2) - acceptedMembers.length) }).map((_, i) => (
+                                    <div key={`empty-${i}`} className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-gray-100 border border-dashed border-gray-300 shrink-0">
+                                      <div className="w-5 h-5 bg-gray-200 rounded-full flex items-center justify-center text-gray-400 text-xs">?</div>
+                                      <span className="hidden sm:inline text-sm text-gray-400">Needed</span>
+                                    </div>
+                                  ))}
+                                </div>
+
+                                {/* Status badge and actions */}
+                                <div className="shrink-0 flex items-center gap-2">
+                                  {isComplete ? (
+                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium text-green-700 bg-green-100 rounded-full">
+                                      <Check className="w-3 h-3" />
+                                      <span className="hidden sm:inline">Team Complete</span>
+                                    </span>
+                                  ) : (
+                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium text-amber-700 bg-amber-100 rounded-full">
+                                      <Clock className="w-3 h-3" />
+                                      <span className="hidden sm:inline">Looking</span>
+                                    </span>
+                                  )}
+
+                                  {/* Break unit button (for complete units with >1 member) */}
+                                  {isComplete && acceptedMembers.length > 1 && (
+                                    <button
+                                      onClick={() => handleBreakUnit(unit)}
+                                      disabled={isProcessing}
+                                      className="p-1 text-orange-500 hover:text-orange-700 hover:bg-orange-50 rounded transition-colors disabled:opacity-50"
+                                      title="Break unit apart"
+                                    >
+                                      {isProcessing && processingUnitAction?.action === 'break' ? (
+                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                      ) : (
+                                        <Shuffle className="w-4 h-4" />
+                                      )}
+                                    </button>
+                                  )}
+
+                                  {/* Move to different division */}
+                                  {dashboard?.divisions?.filter(d => d.id !== divGroup.divisionId).length > 0 && (
+                                    <button
+                                      onClick={() => setMovingUnitToDivision({ unit: { ...unit, divisionId: divGroup.divisionId }, targetDivisionId: null })}
+                                      className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded"
+                                      title="Move to different division"
+                                    >
+                                      <ArrowRight className="w-4 h-4" />
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {/* Move Division Modal */}
+                  {movingUnitToDivision && (
+                    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                      <div className="bg-white rounded-lg p-6 max-w-md w-full">
+                        <h3 className="font-semibold text-lg mb-4">Move to Different Division</h3>
+                        <p className="text-sm text-gray-600 mb-4">
+                          Move "{movingUnitToDivision.unit?.name}" to a different division. Fees will be adjusted automatically.
+                        </p>
+                        <select
+                          value={movingUnitToDivision.targetDivisionId || ''}
+                          onChange={(e) => setMovingUnitToDivision({
+                            ...movingUnitToDivision,
+                            targetDivisionId: parseInt(e.target.value)
+                          })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 mb-4"
+                        >
+                          <option value="">Select division...</option>
+                          {dashboard?.divisions?.filter(d => d.id !== movingUnitToDivision.unit?.divisionId).map(d => (
+                            <option key={d.id} value={d.id}>{d.name}</option>
+                          ))}
+                        </select>
+                        <div className="flex justify-end gap-2">
+                          <button
+                            onClick={() => setMovingUnitToDivision(null)}
+                            className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            onClick={() => movingUnitToDivision.targetDivisionId && handleMoveUnitToDivision(movingUnitToDivision.unit, movingUnitToDivision.targetDivisionId)}
+                            disabled={!movingUnitToDivision.targetDivisionId || processingUnitAction?.action === 'move'}
+                            className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 flex items-center gap-2"
+                          >
+                            {processingUnitAction?.action === 'move' ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : null}
+                            Move
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         )}
 
-        {/* Scoring Tab */}
+        {/* Payments Tab */}
+        {activeTab === 'payments' && (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-gray-900">Payment Management</h2>
+              <button
+                onClick={loadPaymentSummary}
+                disabled={loadingPayments}
+                className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 disabled:opacity-50"
+              >
+                <RefreshCw className={`w-5 h-5 ${loadingPayments ? 'animate-spin' : ''}`} />
+              </button>
+            </div>
+
+            {loadingPayments && !paymentSummary ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
+              </div>
+            ) : paymentSummary ? (
+              <>
+                {/* Payment Stats */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="bg-white rounded-xl shadow-sm p-4">
+                    <div className="text-2xl font-bold text-gray-900">${paymentSummary.totalPaid?.toFixed(2) || '0.00'}</div>
+                    <div className="text-sm text-gray-500">Total Collected</div>
+                  </div>
+                  <div className="bg-white rounded-xl shadow-sm p-4">
+                    <div className="text-2xl font-bold text-gray-900">${paymentSummary.totalExpected?.toFixed(2) || '0.00'}</div>
+                    <div className="text-sm text-gray-500">Total Expected</div>
+                  </div>
+                  <div className="bg-white rounded-xl shadow-sm p-4">
+                    <div className={`text-2xl font-bold ${paymentSummary.totalOutstanding > 0 ? 'text-orange-600' : 'text-green-600'}`}>
+                      ${paymentSummary.totalOutstanding?.toFixed(2) || '0.00'}
+                    </div>
+                    <div className="text-sm text-gray-500">Outstanding</div>
+                  </div>
+                  <div className="bg-white rounded-xl shadow-sm p-4">
+                    <div className="text-2xl font-bold text-gray-900">
+                      {paymentSummary.unitsFullyPaid || 0} / {paymentSummary.totalUnits || 0}
+                    </div>
+                    <div className="text-sm text-gray-500">Fully Paid</div>
+                  </div>
+                </div>
+
+                {/* Recent Payments List */}
+                <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+                  <div className="px-4 py-3 bg-gray-50 border-b">
+                    <h3 className="font-semibold text-gray-900">Payment Records</h3>
+                    <p className="text-sm text-gray-500">{paymentSummary.recentPayments?.length || 0} payment{paymentSummary.recentPayments?.length !== 1 ? 's' : ''}</p>
+                  </div>
+
+                  {paymentSummary.recentPayments?.length > 0 ? (
+                    <div className="divide-y divide-gray-100">
+                      {paymentSummary.recentPayments.map(payment => {
+                        const isExpanded = expandedPayment === payment.id;
+                        const isVerifying = verifyingPayment === payment.id;
+
+                        return (
+                          <div key={payment.id} className="hover:bg-gray-50">
+                            {/* Payment row */}
+                            <div
+                              className="p-4 cursor-pointer"
+                              onClick={() => setExpandedPayment(isExpanded ? null : payment.id)}
+                            >
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                  {/* User avatar */}
+                                  <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center">
+                                    <DollarSign className="w-5 h-5 text-gray-400" />
+                                  </div>
+                                  <div>
+                                    <div className="font-medium text-gray-900">{payment.userName || 'Unknown'}</div>
+                                    <div className="text-sm text-gray-500 flex items-center gap-2">
+                                      <span>${payment.amount?.toFixed(2) || '0.00'}</span>
+                                      {payment.paymentMethod && (
+                                        <span className="text-xs px-1.5 py-0.5 bg-gray-100 rounded">{payment.paymentMethod}</span>
+                                      )}
+                                      {payment.paymentReference && (
+                                        <span className="text-xs text-gray-400">Ref: {payment.paymentReference}</span>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <span className={`text-xs px-2 py-1 rounded-full ${
+                                    payment.status === 'Verified' ? 'bg-green-100 text-green-700' :
+                                    payment.status === 'Pending' ? 'bg-yellow-100 text-yellow-700' :
+                                    payment.status === 'Rejected' ? 'bg-red-100 text-red-700' :
+                                    'bg-gray-100 text-gray-600'
+                                  }`}>
+                                    {payment.status || 'Pending'}
+                                  </span>
+                                  {payment.paymentProofUrl && (
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setViewingProofUrl(payment.paymentProofUrl);
+                                      }}
+                                      className="p-1 text-blue-600 hover:bg-blue-50 rounded"
+                                      title="View proof"
+                                    >
+                                      <Eye className="w-4 h-4" />
+                                    </button>
+                                  )}
+                                  {isExpanded ? (
+                                    <ChevronUp className="w-5 h-5 text-gray-400" />
+                                  ) : (
+                                    <ChevronDown className="w-5 h-5 text-gray-400" />
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Expanded details */}
+                            {isExpanded && (
+                              <div className="px-4 pb-4">
+                                <div className="bg-gray-50 rounded-lg p-4 space-y-4">
+                                  {/* Payment details */}
+                                  <div className="grid grid-cols-2 gap-4 text-sm">
+                                    <div>
+                                      <span className="text-gray-500">Submitted:</span>
+                                      <span className="ml-2 text-gray-900">
+                                        {payment.createdAt ? new Date(payment.createdAt).toLocaleString() : 'Unknown'}
+                                      </span>
+                                    </div>
+                                    {payment.verifiedAt && (
+                                      <div>
+                                        <span className="text-gray-500">Verified:</span>
+                                        <span className="ml-2 text-gray-900">
+                                          {new Date(payment.verifiedAt).toLocaleString()}
+                                        </span>
+                                      </div>
+                                    )}
+                                    {payment.referenceId && (
+                                      <div>
+                                        <span className="text-gray-500">System Ref:</span>
+                                        <span className="ml-2 text-gray-900 font-mono text-xs">{payment.referenceId}</span>
+                                      </div>
+                                    )}
+                                    <div>
+                                      <span className="text-gray-500">Applied:</span>
+                                      <span className="ml-2 text-gray-900">${payment.totalApplied?.toFixed(2) || '0.00'}</span>
+                                    </div>
+                                  </div>
+
+                                  {/* Applied to */}
+                                  {payment.appliedTo?.length > 0 && (
+                                    <div>
+                                      <h4 className="text-sm font-medium text-gray-700 mb-2">Applied to:</h4>
+                                      <div className="flex flex-wrap gap-2">
+                                        {payment.appliedTo.map((app, idx) => (
+                                          <span key={idx} className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded">
+                                            {app.userName} (${app.amountApplied?.toFixed(2)})
+                                          </span>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {/* Notes */}
+                                  {payment.notes && (
+                                    <div>
+                                      <h4 className="text-sm font-medium text-gray-700 mb-1">Notes:</h4>
+                                      <p className="text-sm text-gray-600">{payment.notes}</p>
+                                    </div>
+                                  )}
+
+                                  {/* Actions */}
+                                  <div className="pt-3 border-t border-gray-200 flex gap-2">
+                                    {payment.status !== 'Verified' ? (
+                                      <button
+                                        onClick={() => handleVerifyPayment(payment.id)}
+                                        disabled={isVerifying}
+                                        className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 flex items-center gap-2"
+                                      >
+                                        {isVerifying ? (
+                                          <Loader2 className="w-4 h-4 animate-spin" />
+                                        ) : (
+                                          <Check className="w-4 h-4" />
+                                        )}
+                                        Verify Payment
+                                      </button>
+                                    ) : (
+                                      <button
+                                        onClick={() => handleUnverifyPayment(payment.id)}
+                                        disabled={isVerifying}
+                                        className="px-4 py-2 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 disabled:opacity-50 flex items-center gap-2"
+                                      >
+                                        {isVerifying ? (
+                                          <Loader2 className="w-4 h-4 animate-spin" />
+                                        ) : (
+                                          <X className="w-4 h-4" />
+                                        )}
+                                        Unverify
+                                      </button>
+                                    )}
+                                    {payment.paymentProofUrl && (
+                                      <button
+                                        onClick={() => setViewingProofUrl(payment.paymentProofUrl)}
+                                        className="px-4 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 flex items-center gap-2"
+                                      >
+                                        <Eye className="w-4 h-4" />
+                                        View Proof
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="p-8 text-center text-gray-500">
+                      <DollarSign className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                      <p>No payment records yet</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Division Payment Breakdown */}
+                {paymentSummary.divisionPayments?.length > 0 && (
+                  <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+                    <div className="px-4 py-3 bg-gray-50 border-b">
+                      <h3 className="font-semibold text-gray-900">Division Breakdown</h3>
+                    </div>
+                    <div className="divide-y divide-gray-100">
+                      {paymentSummary.divisionPayments.map(div => (
+                        <div key={div.divisionId} className="p-4">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <div className="font-medium text-gray-900">{div.divisionName}</div>
+                              <div className="text-sm text-gray-500">
+                                {div.unitsFullyPaid || 0} paid / {div.totalUnits || 0} total
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <div className="font-medium text-gray-900">${div.totalPaid?.toFixed(2) || '0.00'}</div>
+                              <div className={`text-sm ${div.isBalanced ? 'text-green-600' : 'text-orange-600'}`}>
+                                {div.isBalanced ? 'Balanced' : `$${(div.totalExpected - div.totalPaid)?.toFixed(2)} outstanding`}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="bg-white rounded-xl shadow-sm p-8 text-center">
+                <DollarSign className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                <p className="text-gray-500 mb-4">Click refresh to load payment data</p>
+                <button
+                  onClick={loadPaymentSummary}
+                  disabled={loadingPayments}
+                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 flex items-center gap-2 mx-auto"
+                >
+                  {loadingPayments ? <Loader2 className="w-4 h-4 animate-spin" /> : <DollarSign className="w-4 h-4" />}
+                  Load Payments
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Payment Proof Modal */}
+        {viewingProofUrl && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg max-w-4xl max-h-[90vh] overflow-auto">
+              <div className="p-4 border-b flex items-center justify-between">
+                <h3 className="font-semibold">Payment Proof</h3>
+                <button
+                  onClick={() => setViewingProofUrl(null)}
+                  className="p-2 hover:bg-gray-100 rounded-lg"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="p-4">
+                <img
+                  src={getSharedAssetUrl(viewingProofUrl)}
+                  alt="Payment proof"
+                  className="max-w-full h-auto"
+                />
+              </div>
+              <div className="p-4 border-t flex justify-end gap-2">
+                <a
+                  href={getSharedAssetUrl(viewingProofUrl)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
+                >
+                  <ExternalLink className="w-4 h-4" />
+                  Open Full Size
+                </a>
+                <button
+                  onClick={() => setViewingProofUrl(null)}
+                  className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Staff Tab */}
+        {activeTab === 'staff' && (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-gray-900">Staff Management</h2>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={loadStaff}
+                  disabled={loadingStaff}
+                  className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 disabled:opacity-50"
+                >
+                  <RefreshCw className={`w-5 h-5 ${loadingStaff ? 'animate-spin' : ''}`} />
+                </button>
+                <button
+                  onClick={() => setShowAddStaffModal(true)}
+                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                >
+                  <Plus className="w-4 h-4" />
+                  Add Staff
+                </button>
+              </div>
+            </div>
+
+            {/* Pending Staff Approvals */}
+            {pendingStaff.length > 0 && (
+              <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4">
+                <h3 className="font-medium text-yellow-900 mb-3 flex items-center gap-2">
+                  <AlertCircle className="w-5 h-5" />
+                  Pending Approvals ({pendingStaff.length})
+                </h3>
+                <div className="space-y-2">
+                  {pendingStaff.map(staff => (
+                    <div key={staff.id} className="flex items-center justify-between bg-white rounded-lg p-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center">
+                          <User className="w-5 h-5 text-gray-500" />
+                        </div>
+                        <div>
+                          <div className="font-medium text-gray-900">{staff.userName || staff.userEmail}</div>
+                          <div className="text-sm text-gray-500">{staff.roleName}</div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => handleApproveStaff(staff.id)}
+                          className="p-2 text-green-600 hover:bg-green-50 rounded-lg"
+                          title="Approve"
+                        >
+                          <Check className="w-5 h-5" />
+                        </button>
+                        <button
+                          onClick={() => handleDeclineStaff(staff.id)}
+                          className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
+                          title="Decline"
+                        >
+                          <X className="w-5 h-5" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Staff List */}
+            <div className="bg-white rounded-xl shadow-sm">
+              <div className="p-4 border-b">
+                <h3 className="font-medium text-gray-900 flex items-center gap-2">
+                  <Shield className="w-5 h-5 text-blue-600" />
+                  Event Staff ({staffList.length})
+                </h3>
+              </div>
+              {loadingStaff ? (
+                <div className="p-8 text-center">
+                  <Loader2 className="w-8 h-8 animate-spin text-gray-400 mx-auto" />
+                  <p className="text-gray-500 mt-2">Loading staff...</p>
+                </div>
+              ) : staffList.length === 0 ? (
+                <div className="p-8 text-center">
+                  <Users className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                  <p className="text-gray-500">No staff assigned to this event</p>
+                  <p className="text-sm text-gray-400 mt-1">Click "Add Staff" to invite team members</p>
+                </div>
+              ) : (
+                <div className="divide-y">
+                  {staffList.map(staff => (
+                    <div key={staff.id} className="p-4 flex items-center justify-between hover:bg-gray-50">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
+                          <User className="w-5 h-5 text-blue-600" />
+                        </div>
+                        <div>
+                          <div className="font-medium text-gray-900">{staff.userName || staff.userEmail}</div>
+                          <div className="flex items-center gap-2 text-sm">
+                            <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full text-xs">
+                              {staff.roleName}
+                            </span>
+                            {staff.status && staff.status !== 'Active' && (
+                              <span className={`px-2 py-0.5 rounded-full text-xs ${
+                                staff.status === 'Pending' ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-700'
+                              }`}>
+                                {staff.status}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => handleRemoveStaff(staff.id)}
+                        className="p-2 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50"
+                        title="Remove staff"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Staff Roles Info */}
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-blue-700">
+              <div className="flex items-center gap-2 mb-2">
+                <Info className="w-5 h-5" />
+                <span className="font-medium">Staff Roles</span>
+              </div>
+              <p className="text-sm">
+                Staff roles define what permissions team members have during the event.
+                Roles can be configured in the Admin Settings.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Add Staff Modal */}
+        {showAddStaffModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Add Staff Member</h3>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
+                  <input
+                    type="email"
+                    value={addStaffForm.email}
+                    onChange={(e) => setAddStaffForm(prev => ({ ...prev, email: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="staff@example.com"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
+                  <select
+                    value={addStaffForm.roleId}
+                    onChange={(e) => setAddStaffForm(prev => ({ ...prev, roleId: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value="">Select role...</option>
+                    {staffRoles.map(role => (
+                      <option key={role.id} value={role.id}>{role.name}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div className="flex justify-end gap-3 mt-6">
+                <button
+                  onClick={() => {
+                    setShowAddStaffModal(false);
+                    setAddStaffForm({ email: '', roleId: '' });
+                  }}
+                  className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleAddStaff}
+                  disabled={addingStaff || !addStaffForm.email || !addStaffForm.roleId}
+                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {addingStaff ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+                  Add Staff
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Scoring Tab - merged into Overview, keeping for backwards compatibility */}
         {activeTab === 'scoring' && (
           <div className="space-y-6">
             <div className="flex items-center justify-between">

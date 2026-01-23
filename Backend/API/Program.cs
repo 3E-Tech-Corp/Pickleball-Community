@@ -137,6 +137,7 @@ builder.Services.AddScoped<IBracketProgressionService, BracketProgressionService
 builder.Services.AddScoped<ISharedAssetService, SharedAssetService>();
 builder.Services.AddScoped<IWaiverPdfService, WaiverPdfService>();
 builder.Services.AddScoped<ICourtAssignmentService, CourtAssignmentService>();
+builder.Services.AddScoped<IEmailNotificationService, EmailNotificationService>();
 
 // CORS - Load allowed origins from configuration
 var corsOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? Array.Empty<string>();

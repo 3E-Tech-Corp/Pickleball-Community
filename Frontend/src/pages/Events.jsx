@@ -14,6 +14,7 @@ import MemberPaymentModal from '../components/MemberPaymentModal';
 import PublicProfileModal from '../components/ui/PublicProfileModal';
 import HelpIcon from '../components/ui/HelpIcon';
 import WatchDrawingModal from '../components/WatchDrawingModal';
+import DivisionFeesEditor from '../components/DivisionFeesEditor';
 
 export default function Events() {
   const { user, isAuthenticated } = useAuth();
@@ -440,11 +441,16 @@ export default function Events() {
 
   const toast = useToast();
 
-  const handleViewDetails = async (event) => {
-    // Navigate to public event view page for unauthenticated users
-    if (!isAuthenticated) {
-      navigate(`/events/${event.id}`);
-      return;
+  const handleViewDetails = (event) => {
+    // Navigate to the public event view page
+    navigate(`/event/${event.id}`);
+  };
+
+  // Open the detail modal (for comparison/legacy access)
+  const handleOpenDetailModal = async (event, e) => {
+    // Prevent navigation when clicking the button
+    if (e) {
+      e.stopPropagation();
     }
 
     try {
@@ -454,19 +460,13 @@ export default function Events() {
       }
     } catch (err) {
       console.error('Error loading event details:', err);
-      // Check if this is a 401 Unauthorized - redirect to public view
-      if (err?.status === 401 || err?.response?.status === 401) {
-        navigate(`/events/${event.id}`);
-        return;
-      }
       // Check if this is a profile completion requirement (403)
       if (err?.message?.toLowerCase().includes('complete your profile')) {
         toast.warning('Please complete your profile to view event details');
         navigate('/complete-profile');
         return;
       }
-      // For other errors, still show the public view
-      navigate(`/events/${event.id}`);
+      toast.error('Failed to load event details');
     }
   };
 
@@ -898,9 +898,20 @@ export default function Events() {
                                     {index + 1}
                                   </span>
                                   <div className="flex-1 min-w-0">
-                                    <h4 className="font-medium text-gray-900 text-sm line-clamp-2">
-                                      {event.name}
-                                    </h4>
+                                    <div className="flex items-start justify-between">
+                                      <h4 className="font-medium text-gray-900 text-sm line-clamp-2">
+                                        {event.name}
+                                      </h4>
+                                      {isAuthenticated && (
+                                        <button
+                                          onClick={(e) => handleOpenDetailModal(event, e)}
+                                          className="flex-shrink-0 p-1 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                                          title="Open detail modal"
+                                        >
+                                          <ExternalLink className="w-3 h-3" />
+                                        </button>
+                                      )}
+                                    </div>
                                     <p className="text-xs text-gray-500 mt-0.5">
                                       {formatDate(event.startDate)}
                                     </p>
@@ -969,6 +980,15 @@ export default function Events() {
                                   <span className="text-sm font-medium text-gray-700">
                                     {formatPrice(event.registrationFee, event.priceUnit, event.paymentModel)}
                                   </span>
+                                )}
+                                {isAuthenticated && (
+                                  <button
+                                    onClick={(e) => handleOpenDetailModal(event, e)}
+                                    className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                                    title="Open detail modal"
+                                  >
+                                    <ExternalLink className="w-4 h-4" />
+                                  </button>
                                 )}
                                 <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-orange-600 transition-colors" />
                               </div>
@@ -1146,6 +1166,13 @@ export default function Events() {
                                     Published
                                   </span>
                                 )}
+                                <button
+                                  onClick={(e) => handleOpenDetailModal(event, e)}
+                                  className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                                  title="Open detail modal"
+                                >
+                                  <ExternalLink className="w-4 h-4" />
+                                </button>
                                 <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-orange-600 transition-colors" />
                               </div>
                             </div>
@@ -1337,7 +1364,16 @@ export default function Events() {
                               <span className="font-medium text-gray-900 group-hover:text-orange-600 transition-colors text-left">
                                 {reg.eventName}
                               </span>
-                              <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-orange-600 transition-colors flex-shrink-0" />
+                              <div className="flex items-center gap-1 flex-shrink-0">
+                                <button
+                                  onClick={(e) => handleOpenDetailModal({ id: reg.eventId }, e)}
+                                  className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                                  title="Open detail modal"
+                                >
+                                  <ExternalLink className="w-4 h-4" />
+                                </button>
+                                <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-orange-600 transition-colors" />
+                              </div>
                             </div>
                             <p className="text-sm text-gray-500">
                               {formatDate(reg.startDate)} • {reg.venueName || `${reg.city}, ${reg.state}`}
@@ -4123,65 +4159,12 @@ function EventDetailModal({ event, isAuthenticated, isAdmin, currentUserId, user
                                       : 'Looking for partner'}
                                   </span>
                                   <button
-                                    onClick={() => loadAvailableUnits(reg)}
-                                    disabled={loadingAvailableUnits && findingPartnerForReg?.unitId === reg.unitId}
-                                    className="text-xs text-orange-700 underline hover:no-underline disabled:opacity-50"
+                                    onClick={() => navigate(`/event/${event.id}/register?divisionId=${reg.divisionId}`)}
+                                    className="text-xs text-orange-700 underline hover:no-underline"
                                   >
-                                    {loadingAvailableUnits && findingPartnerForReg?.unitId === reg.unitId
-                                      ? 'Loading...'
-                                      : (reg.partners?.length > 0 ? 'Change Partner' : 'Find a partner')}
+                                    {reg.partners?.length > 0 ? 'Change Partner' : 'Find a partner'}
                                   </button>
-                                  {findingPartnerForReg?.unitId === reg.unitId && (
-                                    <button
-                                      onClick={() => { setFindingPartnerForReg(null); setAvailableUnits([]); }}
-                                      className="text-xs text-gray-500 hover:text-gray-700"
-                                    >
-                                      Close
-                                    </button>
-                                  )}
                                 </div>
-                                {/* Available units list */}
-                                {findingPartnerForReg?.unitId === reg.unitId && !loadingAvailableUnits && (
-                                  <div className="mt-2 border border-orange-200 rounded-lg overflow-hidden">
-                                    {availableUnits.length === 0 ? (
-                                      <div className="p-3 text-sm text-gray-500 text-center">
-                                        No other players looking for partners in this division yet
-                                      </div>
-                                    ) : (
-                                      <div className="divide-y divide-orange-100">
-                                        {availableUnits.map(unit => (
-                                          <div key={unit.id} className="p-3 flex items-center justify-between bg-orange-50/50">
-                                            <div className="flex items-center gap-2">
-                                              {unit.members?.map(member => (
-                                                <button
-                                                  key={member.id}
-                                                  onClick={() => setSelectedProfileUserId(member.userId)}
-                                                  className="flex items-center gap-1.5 hover:opacity-80"
-                                                >
-                                                  {member.profileImageUrl ? (
-                                                    <img src={getSharedAssetUrl(member.profileImageUrl)} alt="" className="w-6 h-6 rounded-full object-cover" />
-                                                  ) : (
-                                                    <div className="w-6 h-6 rounded-full bg-orange-200 flex items-center justify-center text-xs text-orange-700">
-                                                      {member.firstName?.charAt(0) || '?'}
-                                                    </div>
-                                                  )}
-                                                  <span className="text-sm text-gray-700">{member.firstName} {member.lastName}</span>
-                                                </button>
-                                              ))}
-                                            </div>
-                                            <button
-                                              onClick={() => handleJoinPartnerUnit(unit.id)}
-                                              disabled={joiningUnitId === unit.id}
-                                              className="px-3 py-1 text-xs bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50"
-                                            >
-                                              {joiningUnitId === unit.id ? 'Joining...' : 'Join'}
-                                            </button>
-                                          </div>
-                                        ))}
-                                      </div>
-                                    )}
-                                  </div>
-                                )}
                               </div>
                             )}
                           </div>
@@ -6029,7 +6012,7 @@ function EventDetailModal({ event, isAuthenticated, isAdmin, currentUserId, user
                 <div>
                   <h4 className="font-medium text-gray-900 mb-3 flex items-center gap-2">
                     <Plus className="w-4 h-4" />
-                    {selectedDivisionForRegistration.teamSize === 2 ? 'Register & Find Partner' : 'Create New Team'}
+                    {selectedDivisionForRegistration.teamSize === 2 ? 'Register & Let Teammate Join' : 'Create New Team'}
                   </h4>
                   <p className="text-sm text-gray-600 mb-3">
                     {selectedDivisionForRegistration.teamSize === 2
@@ -6083,7 +6066,7 @@ function EventDetailModal({ event, isAuthenticated, isAdmin, currentUserId, user
                     ) : (
                       <>
                         <Plus className="w-4 h-4" />
-                        {selectedDivisionForRegistration.teamSize === 2 ? 'Register & Find Partner Later' : 'Create Team & Find Players Later'}
+                        {selectedDivisionForRegistration.teamSize === 2 ? 'Register & Let Teammate Join Later' : 'Create Team & Find Players Later'}
                       </>
                     )}
                   </button>
@@ -6095,7 +6078,7 @@ function EventDetailModal({ event, isAuthenticated, isAdmin, currentUserId, user
               <div>
                 <h4 className="font-medium text-gray-900 mb-3 flex items-center gap-2">
                   <UserPlus className="w-4 h-4" />
-                  {selectedDivisionForRegistration.teamSize === 2 ? 'Partner with Someone' : 'Join Existing Team'}
+                  {selectedDivisionForRegistration.teamSize === 2 ? 'Join Existing Registration' : 'Join Existing Team'}
                 </h4>
 
                 {/* Join by Code Input */}
@@ -6542,8 +6525,18 @@ function EventDetailModal({ event, isAuthenticated, isAdmin, currentUserId, user
                     onChange={(e) => setEditingDivision({ ...editingDivision, divisionFee: e.target.value })}
                     className="w-full border border-gray-300 rounded-lg p-2"
                   />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Single fee for all registrations. Use "Fee Options" below for multiple fee tiers.
+                  </p>
                 </div>
               </div>
+
+              {/* Division Fee Options */}
+              <DivisionFeesEditor
+                divisionId={editingDivision.id}
+                divisionFee={editingDivision.divisionFee || 0}
+                onFeesChange={() => loadEventDetails(event.id)}
+              />
 
               {/* Schedule Configuration Link */}
               <div className="border-t pt-4 mt-4">

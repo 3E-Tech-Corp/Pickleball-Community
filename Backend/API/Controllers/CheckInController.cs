@@ -17,14 +17,22 @@ public class CheckInController : EventControllerBase
     private readonly IWaiverPdfService _waiverPdfService;
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly IConfiguration _configuration;
+    private readonly IEmailNotificationService _emailService;
 
-    public CheckInController(ApplicationDbContext context, ILogger<CheckInController> logger, IWaiverPdfService waiverPdfService, IHttpClientFactory httpClientFactory, IConfiguration configuration)
+    public CheckInController(
+        ApplicationDbContext context,
+        ILogger<CheckInController> logger,
+        IWaiverPdfService waiverPdfService,
+        IHttpClientFactory httpClientFactory,
+        IConfiguration configuration,
+        IEmailNotificationService emailService)
         : base(context)
     {
         _logger = logger;
         _waiverPdfService = waiverPdfService;
         _httpClientFactory = httpClientFactory;
         _configuration = configuration;
+        _emailService = emailService;
     }
 
     // Helper to check if file is renderable (md/html)
@@ -199,7 +207,7 @@ public class CheckInController : EventControllerBase
                 DivisionName = firstUnit.Division?.Name,
                 TeamUnitName = firstUnit.Name,
                 SkillLevelName = firstUnit.Division?.SkillLevel?.Name,
-                AmountDue = firstUnit.Division?.DivisionFee ?? 0,
+                AmountDue = firstUnit.Division?.DivisionFee ?? 0m,
                 AmountPaid = firstUnit.Members?.Where(m => m.InviteStatus == "Accepted").Sum(m => m.AmountPaid) ?? 0,
                 PaymentStatus = firstUnit.PaymentStatus ?? "Pending",
                 PaymentReference = firstReg.PaymentReference,
@@ -365,18 +373,58 @@ public class CheckInController : EventControllerBase
             // Continue - waiver can still be signed even if asset upload fails
         }
 
-        // Sign waiver for all registrations - use basic fields that always exist
+        // Create waiver signature records in the junction table
         foreach (var reg in registrations)
         {
+            // Check if this waiver was already signed by this member
+            var existingSignature = await _context.EventUnitMemberWaivers
+                .FirstOrDefaultAsync(w => w.EventUnitMemberId == reg.Id && w.WaiverId == objectAsset.Id);
+
+            if (existingSignature == null)
+            {
+                // Create new waiver signature record
+                var waiverSignature = new EventUnitMemberWaiver
+                {
+                    EventUnitMemberId = reg.Id,
+                    WaiverId = objectAsset.Id,
+                    SignedAt = signedAt,
+                    SignatureAssetUrl = signingResult?.SignatureAssetUrl,
+                    SignedPdfUrl = signingResult?.SignedWaiverPdfUrl,
+                    WaiverSignature = request.Signature.Trim(),
+                    SignerRole = request.SignerRole,
+                    ParentGuardianName = request.ParentGuardianName?.Trim(),
+                    EmergencyPhone = request.EmergencyPhone,
+                    SignerEmail = user.Email,
+                    SignerIpAddress = ipAddress,
+                    WaiverTitle = objectAsset.Title,
+                    WaiverVersion = 1
+                };
+                _context.EventUnitMemberWaivers.Add(waiverSignature);
+            }
+            else
+            {
+                // Update existing signature (re-signing)
+                existingSignature.SignedAt = signedAt;
+                existingSignature.SignatureAssetUrl = signingResult?.SignatureAssetUrl;
+                existingSignature.SignedPdfUrl = signingResult?.SignedWaiverPdfUrl;
+                existingSignature.WaiverSignature = request.Signature.Trim();
+                existingSignature.SignerRole = request.SignerRole;
+                existingSignature.ParentGuardianName = request.ParentGuardianName?.Trim();
+                existingSignature.EmergencyPhone = request.EmergencyPhone;
+                existingSignature.SignerEmail = user.Email;
+                existingSignature.SignerIpAddress = ipAddress;
+            }
+
+            // Also update the legacy fields on EventUnitMember for backward compatibility
             reg.WaiverSignedAt = signedAt;
             reg.WaiverDocumentId = objectAsset.Id;
             reg.WaiverSignature = request.Signature.Trim();
         }
 
-        // Try to save basic fields first
+        // Save junction table records
         await _context.SaveChangesAsync();
 
-        // Now try to update extended fields (may fail if columns don't exist yet)
+        // Now try to update extended fields on EventUnitMember (may fail if columns don't exist yet)
         try
         {
             foreach (var reg in registrations)
@@ -392,21 +440,115 @@ public class CheckInController : EventControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Could not save extended waiver fields - migration may not have been run");
-            // Continue - basic waiver signing succeeded
+            _logger.LogWarning(ex, "Could not save extended waiver fields on EventUnitMember - migration may not have been run");
+            // Continue - waiver signing to junction table succeeded
         }
 
-        _logger.LogInformation("User {UserId} signed waiver {WaiverId} for event {EventId} with signature '{Signature}'",
-            userId, objectAsset.Id, eventId, request.Signature);
+        // Check if all waivers for this event have been signed
+        var allEventWaivers = await _context.ObjectAssets
+            .Include(a => a.AssetType)
+            .Where(a => a.ObjectId == eventId
+                && a.AssetType != null
+                && a.AssetType.TypeName.ToLower() == "waiver")
+            .Select(a => a.Id)
+            .ToListAsync();
+
+        var signedWaiverCount = await _context.EventUnitMemberWaivers
+            .Where(w => w.EventUnitMemberId == firstReg.Id && allEventWaivers.Contains(w.WaiverId))
+            .CountAsync();
+
+        var allWaiversSigned = signedWaiverCount >= allEventWaivers.Count;
+
+        // Send waiver confirmation email with signed PDF attached
+        try
+        {
+            if (!string.IsNullOrEmpty(user.Email))
+            {
+                var emailBody = EmailTemplates.WaiverSignedConfirmation(
+                    playerName,
+                    evt.Name,
+                    objectAsset.Title ?? "Event Waiver",
+                    signedAt
+                );
+
+                await _emailService.CreateEmail(
+                    userId.Value,
+                    user.Email,
+                    $"Waiver Signed: {evt.Name}",
+                    emailBody
+                )
+                .AttachIfPresent("Signed_Waiver.pdf", "application/pdf", signingResult?.SignedWaiverPdfUrl)
+                .SendAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to send waiver confirmation email to user {UserId}", userId);
+            // Don't fail the waiver signing if email fails
+        }
+
+        _logger.LogInformation("User {UserId} signed waiver {WaiverId} for event {EventId} with signature '{Signature}'. All waivers signed: {AllSigned}",
+            userId, objectAsset.Id, eventId, request.Signature, allWaiversSigned);
 
         return Ok(new ApiResponse<object>
         {
             Success = true,
-            Message = "Waiver signed successfully",
+            Message = allWaiversSigned ? "All waivers signed successfully" : "Waiver signed successfully",
             Data = new
             {
-                SignedWaiverPdfUrl = signingResult?.SignedWaiverPdfUrl
+                SignedWaiverPdfUrl = signingResult?.SignedWaiverPdfUrl,
+                AllWaiversSigned = allWaiversSigned,
+                SignedCount = signedWaiverCount,
+                TotalCount = allEventWaivers.Count
             }
+        });
+    }
+
+    /// <summary>
+    /// Get all signed waivers for the current user at an event
+    /// </summary>
+    [HttpGet("signed-waivers/{eventId}")]
+    [Authorize]
+    public async Task<ActionResult<ApiResponse<List<SignedWaiverDto>>>> GetSignedWaivers(int eventId)
+    {
+        var userId = GetUserId();
+        if (!userId.HasValue) return Unauthorized();
+
+        // Get user's registration
+        var registration = await _context.EventUnitMembers
+            .FirstOrDefaultAsync(m => m.Unit!.EventId == eventId && m.UserId == userId.Value && m.InviteStatus == "Accepted");
+
+        if (registration == null)
+            return NotFound(new ApiResponse<List<SignedWaiverDto>> { Success = false, Message = "Not registered for this event" });
+
+        // Get all signed waivers for this member
+        var signedWaivers = await _context.EventUnitMemberWaivers
+            .Where(w => w.EventUnitMemberId == registration.Id)
+            .OrderBy(w => w.SignedAt)
+            .Select(w => new SignedWaiverDto
+            {
+                Id = w.Id,
+                WaiverId = w.WaiverId,
+                WaiverTitle = w.WaiverTitle,
+                SignedAt = w.SignedAt,
+                SignedPdfUrl = w.SignedPdfUrl,
+                SignerRole = w.SignerRole
+            })
+            .ToListAsync();
+
+        // Get total waiver count for this event
+        var totalWaivers = await _context.ObjectAssets
+            .Include(a => a.AssetType)
+            .Where(a => a.ObjectId == eventId
+                && a.AssetType != null
+                && a.AssetType.TypeName.ToLower() == "waiver")
+            .CountAsync();
+
+        return Ok(new ApiResponse<List<SignedWaiverDto>>
+        {
+            Success = true,
+            Data = signedWaivers,
+            Message = signedWaivers.Count >= totalWaivers ? "All waivers signed" : $"{signedWaivers.Count} of {totalWaivers} waivers signed"
         });
     }
 
@@ -597,7 +739,7 @@ public class CheckInController : EventControllerBase
                 return BadRequest(new ApiResponse<CheckInResultDto> { Success = false, Message = "Please sign the waiver first" });
 
             // If payment is required, verify payment info is submitted
-            if (evt.RegistrationFee > 0 || (firstReg.Unit?.Division?.DivisionFee ?? 0) > 0)
+            if (evt.RegistrationFee > 0 || (firstReg.Unit?.Division?.DivisionFee ?? 0m) > 0)
             {
                 // Payment info must be submitted (proof or reference)
                 var hasPaymentInfo = !string.IsNullOrEmpty(firstReg.PaymentProofUrl) ||
@@ -1345,7 +1487,7 @@ public class CheckInController : EventControllerBase
                 DivisionName = firstUnit.Division?.Name,
                 TeamUnitName = firstUnit.Name,
                 SkillLevelName = firstUnit.Division?.SkillLevel?.Name,
-                AmountDue = firstUnit.Division?.DivisionFee ?? 0,
+                AmountDue = firstUnit.Division?.DivisionFee ?? 0m,
                 AmountPaid = firstUnit.Members?.Where(m => m.InviteStatus == "Accepted").Sum(m => m.AmountPaid) ?? 0,
                 PaymentStatus = firstUnit.PaymentStatus ?? "Pending",
                 PaymentReference = firstReg.PaymentReference,
@@ -1800,6 +1942,19 @@ public class WaiverDto
     public bool IsRequired { get; set; }
     public bool RequiresMinorWaiver { get; set; }
     public int MinorAgeThreshold { get; set; }
+}
+
+/// <summary>
+/// Represents a signed waiver record
+/// </summary>
+public class SignedWaiverDto
+{
+    public int Id { get; set; }
+    public int WaiverId { get; set; }
+    public string? WaiverTitle { get; set; }
+    public DateTime SignedAt { get; set; }
+    public string? SignedPdfUrl { get; set; }
+    public string? SignerRole { get; set; }
 }
 
 public class SignWaiverRequest

@@ -83,6 +83,7 @@ public class ClubJoinRequestDto
     public int Id { get; set; }
     public int ClubId { get; set; }
     public string ClubName { get; set; } = string.Empty;
+    public string? ClubLogoUrl { get; set; }
     public int UserId { get; set; }
     public string UserName { get; set; } = string.Empty;
     public string? UserProfileImageUrl { get; set; }

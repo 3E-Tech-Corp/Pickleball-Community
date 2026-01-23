@@ -67,18 +67,21 @@ public class ApplicationDbContext : DbContext
     public DbSet<EventType> EventTypes { get; set; }
     public DbSet<Event> Events { get; set; }
     public DbSet<EventDivision> EventDivisions { get; set; }
-    public DbSet<EventRegistration> EventRegistrations { get; set; }
+    // EventRegistrations removed - registration now uses EventUnits + EventUnitMembers
     public DbSet<EventPartnerRequest> EventPartnerRequests { get; set; }
     public DbSet<TeamUnit> TeamUnits { get; set; }
     public DbSet<AgeGroup> AgeGroups { get; set; }
     public DbSet<SkillLevel> SkillLevels { get; set; }
     public DbSet<DivisionReward> DivisionRewards { get; set; }
+    public DbSet<DivisionFee> DivisionFees { get; set; }
+    public DbSet<EventFeeType> EventFeeTypes { get; set; }
 
     // Tournament Management
     public DbSet<ScoreMethod> ScoreMethods { get; set; }
     public DbSet<ScoreFormat> ScoreFormats { get; set; }
     public DbSet<EventUnit> EventUnits { get; set; }
     public DbSet<EventUnitMember> EventUnitMembers { get; set; }
+    public DbSet<EventUnitMemberWaiver> EventUnitMemberWaivers { get; set; }
     public DbSet<EventUnitJoinRequest> EventUnitJoinRequests { get; set; }
     public DbSet<UserPayment> UserPayments { get; set; }
     public DbSet<EventEncounter> EventEncounters { get; set; }

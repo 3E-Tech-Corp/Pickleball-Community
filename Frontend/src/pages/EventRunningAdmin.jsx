@@ -270,7 +270,7 @@ const EventRunningAdmin = () => {
               {LEFT_TABS.map(tab => (
                 <button
                   key={tab.id}
-                  onClick={() => tab.id === 'gameday' ? navigate(`/events/${eventId}/gameday`) : setActiveTab(tab.id)}
+                  onClick={() => tab.id === 'gameday' ? navigate(`/event/${eventId}/gameday`) : setActiveTab(tab.id)}
                   className={`flex items-center gap-2 px-4 py-2 rounded-lg whitespace-nowrap transition-colors ${
                     activeTab === tab.id
                       ? 'bg-blue-100 text-blue-700 font-medium'
@@ -287,7 +287,7 @@ const EventRunningAdmin = () => {
               {RIGHT_TABS.map(tab => (
                 <button
                   key={tab.id}
-                  onClick={() => tab.id === 'gameday' ? navigate(`/events/${eventId}/gameday`) : setActiveTab(tab.id)}
+                  onClick={() => tab.id === 'gameday' ? navigate(`/event/${eventId}/gameday`) : setActiveTab(tab.id)}
                   className={`flex items-center gap-2 px-4 py-2 rounded-lg whitespace-nowrap transition-colors ${
                     activeTab === tab.id
                       ? 'bg-blue-100 text-blue-700 font-medium'

@@ -23,11 +23,14 @@ import Feedback from './pages/Feedback'
 import FeedbackAdmin from './pages/FeedbackAdmin'
 import Events from './pages/Events'
 import EventView from './pages/EventView'
+import EventRegistration from './pages/EventRegistration'
 import TournamentManage from './pages/TournamentManage'
 import CourtPlanning from './pages/CourtPlanning'
+import EventMassNotification from './pages/EventMassNotification'
 import GameDayManage from './pages/GameDayManage'
 import StaffDashboard from './pages/StaffDashboard'
 import EventManage from './pages/EventManage'
+import AdminEventManage from './pages/AdminEventManage'
 import EventDashboard from './pages/EventDashboard'
 import EventRunningAdmin from './pages/EventRunningAdmin'
 import TDGameDayDashboard from './pages/TDGameDayDashboard'
@@ -78,7 +81,8 @@ function App() {
 
       {/* Community Features - Public */}
       <Route path="/events" element={<Events />} />
-      <Route path="/events/:eventId" element={<EventView />} />
+      <Route path="/event/:eventId" element={<EventView />} />
+      <Route path="/event/:eventId/register" element={<EventRegistration />} />
       <Route path="/tournament/:eventId/manage" element={
         <ProtectedRoute>
           <TournamentManage />
@@ -87,6 +91,11 @@ function App() {
       <Route path="/event/:eventId/court-planning" element={
         <ProtectedRoute>
           <CourtPlanning />
+        </ProtectedRoute>
+      } />
+      <Route path="/event/:eventId/notifications" element={
+        <ProtectedRoute>
+          <EventMassNotification />
         </ProtectedRoute>
       } />
       <Route path="/event/:eventId/staff-dashboard" element={
@@ -102,6 +111,11 @@ function App() {
       <Route path="/event/:eventId/manage" element={
         <ProtectedRoute>
           <EventManage />
+        </ProtectedRoute>
+      } />
+      <Route path="/event/:eventId/admin-manage" element={
+        <ProtectedRoute>
+          <AdminEventManage />
         </ProtectedRoute>
       } />
       <Route path="/event-dashboard/:eventId" element={

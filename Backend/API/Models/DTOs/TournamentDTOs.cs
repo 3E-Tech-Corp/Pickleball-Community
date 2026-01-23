@@ -583,6 +583,7 @@ public class DivisionStatusDto
     public int? TeamUnitId { get; set; }
     public string? TeamUnitName { get; set; }
     public int MaxUnits { get; set; }
+    public bool IsActive { get; set; } = true;
     public int RegisteredUnits { get; set; }
     public int WaitlistedUnits { get; set; }
     public int CheckedInUnits { get; set; }
@@ -723,6 +724,10 @@ public class EventRegistrationRequest
     /// How partners can join: "Approval" (default) or "Code"
     /// </summary>
     public string JoinMethod { get; set; } = "Approval";
+    /// <summary>
+    /// The selected fee option ID (if division has multiple fee options)
+    /// </summary>
+    public int? SelectedFeeId { get; set; }
 }
 
 public class EventDetailWithDivisionsDto
@@ -769,6 +774,10 @@ public class EventDivisionDetailDto
     public bool IsFull { get; set; }
     public bool HasWaitlist => WaitlistedCount > 0;
     public List<EventUnitDto> LookingForPartner { get; set; } = new(); // Units needing partners
+    /// <summary>
+    /// Available fee options for this division. If empty, use DivisionFee.
+    /// </summary>
+    public List<DivisionFeeDto> Fees { get; set; } = new();
 }
 
 // Payment DTOs
@@ -991,6 +1000,9 @@ public class CourtPlanningDto
     public string EventName { get; set; } = string.Empty;
     public DateTime EventStartDate { get; set; }
     public DateTime? EventEndDate { get; set; }
+    public DateTime? SchedulePublishedAt { get; set; }
+    public int? ScheduleConflictCount { get; set; }
+    public DateTime? ScheduleValidatedAt { get; set; }
     public List<CourtGroupPlanningDto> CourtGroups { get; set; } = new();
     public List<CourtPlanningItemDto> UnassignedCourts { get; set; } = new();
     public List<DivisionPlanningDto> Divisions { get; set; } = new();
@@ -1026,7 +1038,21 @@ public class DivisionPlanningDto
     public int UnitCount { get; set; }
     public int EncounterCount { get; set; }
     public int? EstimatedMatchDurationMinutes { get; set; }
+    public int MatchesPerEncounter { get; set; } = 1;
+    public DateTime? SchedulePublishedAt { get; set; }
     public List<DivisionCourtGroupAssignmentDto> AssignedCourtGroups { get; set; } = new();
+    public List<DivisionPhasePlanningDto> Phases { get; set; } = new();
+}
+
+public class DivisionPhasePlanningDto
+{
+    public int Id { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public string PhaseType { get; set; } = string.Empty;
+    public int SortOrder { get; set; }
+    public int EncounterCount { get; set; }
+    public DateTime? EstimatedStartTime { get; set; }
+    public DateTime? EstimatedEndTime { get; set; }
 }
 
 public class DivisionCourtGroupAssignmentDto
@@ -1037,6 +1063,10 @@ public class DivisionCourtGroupAssignmentDto
     public int Priority { get; set; }
     public TimeSpan? ValidFromTime { get; set; }
     public TimeSpan? ValidToTime { get; set; }
+    public string AssignmentMode { get; set; } = "Default";
+    public string? PoolName { get; set; }
+    public int? MatchFormatId { get; set; }
+    public string? MatchFormatName { get; set; }
 }
 
 public class EncounterPlanningDto
@@ -1044,6 +1074,8 @@ public class EncounterPlanningDto
     public int Id { get; set; }
     public int DivisionId { get; set; }
     public string DivisionName { get; set; } = string.Empty;
+    public int? PhaseId { get; set; }
+    public string? PhaseName { get; set; }
     public string RoundType { get; set; } = string.Empty;
     public int RoundNumber { get; set; }
     public string? RoundName { get; set; }
@@ -1059,6 +1091,8 @@ public class EncounterPlanningDto
     public int? CourtGroupId { get; set; }
     public DateTime? ScheduledTime { get; set; }
     public DateTime? EstimatedStartTime { get; set; }
+    public DateTime? EstimatedEndTime { get; set; }
+    public int? EstimatedDurationMinutes { get; set; }
     public bool IsBye { get; set; }
 }
 
@@ -1086,6 +1120,9 @@ public class DivisionCourtGroupsRequest
     public List<int>? CourtGroupIds { get; set; }
     public TimeSpan? ValidFromTime { get; set; }
     public TimeSpan? ValidToTime { get; set; }
+    public string AssignmentMode { get; set; } = "Default";
+    public string? PoolName { get; set; }
+    public int? MatchFormatId { get; set; }
 }
 
 public class AutoAssignRequest
@@ -1093,4 +1130,223 @@ public class AutoAssignRequest
     public DateTime? StartTime { get; set; }
     public int? MatchDurationMinutes { get; set; }
     public bool ClearExisting { get; set; } = true;
+}
+
+// ============================================
+// Schedule Publishing DTOs
+// ============================================
+
+public class SchedulePublishRequest
+{
+    public int EventId { get; set; }
+    public bool ValidateFirst { get; set; } = true;
+}
+
+public class ScheduleValidationResult
+{
+    public bool IsValid { get; set; }
+    public int ConflictCount { get; set; }
+    public int UnassignedEncounters { get; set; }
+    public int DivisionsWithoutCourts { get; set; }
+    public List<ScheduleConflictDto> Conflicts { get; set; } = new();
+    public List<string> Warnings { get; set; } = new();
+}
+
+public class ScheduleConflictDto
+{
+    public string ConflictType { get; set; } = string.Empty; // "CourtOverlap", "UnitOverlap", "TimeGap"
+    public int CourtId { get; set; }
+    public string CourtLabel { get; set; } = string.Empty;
+    public int Encounter1Id { get; set; }
+    public int? Encounter2Id { get; set; }
+    public string Encounter1Label { get; set; } = string.Empty;
+    public string? Encounter2Label { get; set; }
+    public DateTime? ConflictStartTime { get; set; }
+    public DateTime? ConflictEndTime { get; set; }
+    public string Message { get; set; } = string.Empty;
+}
+
+// ============================================
+// Timeline View DTOs
+// ============================================
+
+public class TimelineDataDto
+{
+    public int EventId { get; set; }
+    public DateTime EventStartDate { get; set; }
+    public DateTime EventEndDate { get; set; }
+    public bool IsSchedulePublished { get; set; }
+    public List<TimelineCourtDto> Courts { get; set; } = new();
+    public List<TimelineDivisionDto> Divisions { get; set; } = new();
+}
+
+public class TimelineCourtDto
+{
+    public int Id { get; set; }
+    public string CourtLabel { get; set; } = string.Empty;
+    public int? CourtGroupId { get; set; }
+    public string? CourtGroupName { get; set; }
+    public string? LocationArea { get; set; }
+    public int SortOrder { get; set; }
+    public List<TimelineBlockDto> Blocks { get; set; } = new();
+}
+
+public class TimelineBlockDto
+{
+    public int EncounterId { get; set; }
+    public int DivisionId { get; set; }
+    public string DivisionName { get; set; } = string.Empty;
+    public string? DivisionColor { get; set; }
+    public int? PhaseId { get; set; }
+    public string? PhaseName { get; set; }
+    public string? RoundName { get; set; }
+    public string? EncounterLabel { get; set; }
+    public string? Unit1Name { get; set; }
+    public string? Unit2Name { get; set; }
+    public DateTime StartTime { get; set; }
+    public DateTime EndTime { get; set; }
+    public int DurationMinutes { get; set; }
+    public string Status { get; set; } = string.Empty;
+    public bool HasConflict { get; set; }
+}
+
+public class TimelineDivisionDto
+{
+    public int Id { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public string? Color { get; set; }
+    public int EncounterCount { get; set; }
+    public int AssignedCount { get; set; }
+    public DateTime? FirstEncounterTime { get; set; }
+    public DateTime? LastEncounterTime { get; set; }
+}
+
+public class DivisionCourtAssignmentRequest
+{
+    public int DivisionId { get; set; }
+    public int CourtGroupId { get; set; }
+    public int? PhaseId { get; set; }
+    public string AssignmentMode { get; set; } = "Default";
+    public string? PoolName { get; set; }
+    public int? MatchFormatId { get; set; }
+    public TimeSpan? ValidFromTime { get; set; }
+    public TimeSpan? ValidToTime { get; set; }
+    public int Priority { get; set; } = 0;
+}
+
+// =====================================================
+// Division Fee DTOs
+// =====================================================
+
+/// <summary>
+/// Fee option for a division or event, shown during registration.
+/// DivisionId = 0 for event-level fees, actual ID for division fees.
+/// </summary>
+public class DivisionFeeDto
+{
+    public int Id { get; set; }
+    /// <summary>
+    /// Division this fee belongs to. 0 for event-level fees.
+    /// </summary>
+    public int DivisionId { get; set; }
+    public int EventId { get; set; }
+    /// <summary>
+    /// Reference to the fee type template (required)
+    /// </summary>
+    public int FeeTypeId { get; set; }
+    /// <summary>
+    /// Name from the fee type
+    /// </summary>
+    public string Name { get; set; } = string.Empty;
+    /// <summary>
+    /// Description from the fee type
+    /// </summary>
+    public string? Description { get; set; }
+    public decimal Amount { get; set; }
+    public bool IsDefault { get; set; }
+    public DateTime? AvailableFrom { get; set; }
+    public DateTime? AvailableUntil { get; set; }
+    public bool IsActive { get; set; }
+    public int SortOrder { get; set; }
+    /// <summary>
+    /// Whether this fee is currently available based on AvailableFrom/AvailableUntil dates
+    /// </summary>
+    public bool IsCurrentlyAvailable { get; set; }
+    /// <summary>
+    /// True if this is an event-level fee (DivisionId = 0)
+    /// </summary>
+    public bool IsEventFee => DivisionId == 0;
+}
+
+/// <summary>
+/// Request to create or update a division/event fee.
+/// FeeTypeId is required - name/description come from the fee type.
+/// </summary>
+public class DivisionFeeRequest
+{
+    /// <summary>
+    /// Required: Reference to the fee type (provides name/description)
+    /// </summary>
+    public int FeeTypeId { get; set; }
+    public decimal Amount { get; set; }
+    public bool IsDefault { get; set; }
+    public DateTime? AvailableFrom { get; set; }
+    public DateTime? AvailableUntil { get; set; }
+    public bool IsActive { get; set; } = true;
+    public int SortOrder { get; set; } = 0;
+}
+
+/// <summary>
+/// Bulk update request for managing multiple division fees at once
+/// </summary>
+public class BulkDivisionFeesRequest
+{
+    public int DivisionId { get; set; }
+    public List<DivisionFeeRequest> Fees { get; set; } = new();
+}
+
+// ============================================
+// Event Fee Type DTOs
+// ============================================
+
+/// <summary>
+/// Fee type template defined at event level, used by both event fees and division fees.
+/// Just a name/description - amounts are set on DivisionFees.
+/// </summary>
+public class EventFeeTypeDto
+{
+    public int Id { get; set; }
+    public int EventId { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public string? Description { get; set; }
+    public bool IsActive { get; set; }
+    public int SortOrder { get; set; }
+    public DateTime CreatedAt { get; set; }
+    /// <summary>
+    /// Event-level fee amount for this fee type (if configured)
+    /// </summary>
+    public decimal? EventFeeAmount { get; set; }
+    /// <summary>
+    /// Whether there's an event-level fee configured for this type
+    /// </summary>
+    public bool HasEventFee { get; set; }
+}
+
+/// <summary>
+/// Request to create or update an event fee type (just name/description)
+/// </summary>
+public class EventFeeTypeRequest
+{
+    public string Name { get; set; } = string.Empty;
+    public string? Description { get; set; }
+    public bool IsActive { get; set; } = true;
+    public int SortOrder { get; set; } = 0;
+}
+
+/// <summary>
+/// Bulk update request for managing all fee types for an event
+/// </summary>
+public class BulkEventFeeTypesRequest
+{
+    public List<EventFeeTypeRequest> FeeTypes { get; set; } = new();
 }

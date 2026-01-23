@@ -5,6 +5,7 @@ import {
   Search, Calendar, MapPin, Building2, Users, Filter, ChevronDown, ChevronUp,
   Edit2, ExternalLink, Eye, EyeOff, Check, X, RefreshCw, AlertTriangle, Clock
 } from 'lucide-react'
+import VenuePicker from '../components/ui/VenuePicker'
 
 const EventsAdmin = ({ embedded = false }) => {
   const navigate = useNavigate()
@@ -33,18 +34,13 @@ const EventsAdmin = ({ embedded = false }) => {
 
   // Reference data
   const [eventTypes, setEventTypes] = useState([])
-  const [venues, setVenues] = useState([])
 
   // Load reference data
   useEffect(() => {
     const loadReferenceData = async () => {
       try {
-        const [typesRes, venuesRes] = await Promise.all([
-          eventTypesApi.list(),
-          venuesApi.list()
-        ])
+        const typesRes = await eventTypesApi.list()
         if (typesRes.success) setEventTypes(typesRes.data || [])
-        if (venuesRes.success) setVenues(venuesRes.data || [])
       } catch (err) {
         console.error('Error loading reference data:', err)
       }
@@ -189,24 +185,51 @@ const EventsAdmin = ({ embedded = false }) => {
     }
   }
 
-  // Handle venue selection
-  const handleVenueChange = (venueId) => {
-    if (venueId) {
-      const venue = venues.find(v => v.id === parseInt(venueId))
-      if (venue) {
-        setEditForm(prev => ({
-          ...prev,
-          venueId: venue.id,
-          venueName: venue.name,
-          address: venue.address || '',
-          city: venue.city || '',
-          state: venue.state || '',
-          country: venue.country || ''
-        }))
-        return
+  // Handle venue selection (from VenuePicker)
+  const handleVenueChange = async (venue) => {
+    if (venue) {
+      // VenuePicker returns { id, name, city, state }
+      // Fetch full venue details to get address
+      try {
+        const response = await venuesApi.getVenue(venue.id)
+        if (response.success && response.data) {
+          const fullVenue = response.data
+          setEditForm(prev => ({
+            ...prev,
+            venueId: venue.id,
+            venueName: fullVenue.name || venue.name,
+            address: fullVenue.address || '',
+            city: fullVenue.city || venue.city || '',
+            state: fullVenue.state || venue.state || '',
+            country: fullVenue.country || ''
+          }))
+          return
+        }
+      } catch (err) {
+        console.error('Error fetching venue details:', err)
       }
+      // Fallback if API fails - use basic info from VenuePicker
+      setEditForm(prev => ({
+        ...prev,
+        venueId: venue.id,
+        venueName: venue.name,
+        address: '',
+        city: venue.city || '',
+        state: venue.state || '',
+        country: ''
+      }))
+    } else {
+      // Clear venue
+      setEditForm(prev => ({
+        ...prev,
+        venueId: '',
+        venueName: '',
+        address: '',
+        city: '',
+        state: '',
+        country: ''
+      }))
     }
-    setEditForm(prev => ({ ...prev, venueId: '' }))
   }
 
   // Status badge color
@@ -415,7 +438,12 @@ const EventsAdmin = ({ embedded = false }) => {
                 events.map(event => (
                   <tr key={event.id} className="hover:bg-gray-50">
                     <td className="px-4 py-3">
-                      <div className="font-medium text-gray-900">{event.name}</div>
+                      <button
+                        onClick={() => navigate(`/event/${event.id}`)}
+                        className="font-medium text-blue-600 hover:text-blue-800 hover:underline text-left"
+                      >
+                        {event.name}
+                      </button>
                       <div className="text-sm text-gray-500">{event.eventTypeName}</div>
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-600">
@@ -566,18 +594,17 @@ const EventsAdmin = ({ embedded = false }) => {
                   <Building2 className="w-4 h-4 inline mr-1" />
                   Venue Binding
                 </label>
-                <select
-                  value={editForm.venueId}
-                  onChange={(e) => handleVenueChange(e.target.value)}
-                  className="w-full px-3 py-2 border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white"
-                >
-                  <option value="">Select venue to bind...</option>
-                  {venues.map(venue => (
-                    <option key={venue.id} value={venue.id}>
-                      {venue.name} - {venue.city}, {venue.state}
-                    </option>
-                  ))}
-                </select>
+                <VenuePicker
+                  value={editForm.venueId ? {
+                    id: editForm.venueId,
+                    name: editForm.venueName,
+                    city: editForm.city,
+                    state: editForm.state
+                  } : null}
+                  onChange={handleVenueChange}
+                  label="Select Venue"
+                  placeholder="Select venue to bind..."
+                />
                 <p className="text-xs text-blue-700 mt-1">
                   Binding a venue will auto-fill the address fields below
                 </p>

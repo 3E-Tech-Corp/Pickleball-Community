@@ -16,17 +16,20 @@ public class EventsController : EventControllerBase
     private readonly ILogger<EventsController> _logger;
     private readonly INotificationService _notificationService;
     private readonly IActivityAwardService _activityAwardService;
+    private readonly IEmailNotificationService _emailService;
 
     public EventsController(
         ApplicationDbContext context,
         ILogger<EventsController> logger,
         INotificationService notificationService,
-        IActivityAwardService activityAwardService)
+        IActivityAwardService activityAwardService,
+        IEmailNotificationService emailService)
         : base(context)
     {
         _logger = logger;
         _notificationService = notificationService;
         _activityAwardService = activityAwardService;
+        _emailService = emailService;
     }
 
     // Check if user has completed their profile (not a "New User")
@@ -286,7 +289,7 @@ public class EventsController : EventControllerBase
                 .Include(e => e.Divisions)
                     .ThenInclude(d => d.Units)
                         .ThenInclude(u => u.JoinRequests)
-                .Where(e => e.IsActive && e.IsPublished && e.TournamentStatus != "Draft" && e.StartDate >= now)
+                .Where(e => e.IsActive && e.IsPublished && !e.IsPrivate && e.TournamentStatus != "Draft" && e.StartDate >= now)
                 .OrderBy(e => e.StartDate)
                 .Take(limit)
                 .ToListAsync();
@@ -302,7 +305,7 @@ public class EventsController : EventControllerBase
                 .Include(e => e.Divisions)
                     .ThenInclude(d => d.Units)
                         .ThenInclude(u => u.JoinRequests)
-                .Where(e => e.IsActive && e.IsPublished && e.TournamentStatus != "Draft" && e.StartDate >= now)
+                .Where(e => e.IsActive && e.IsPublished && !e.IsPrivate && e.TournamentStatus != "Draft" && e.StartDate >= now)
                 .OrderByDescending(e => e.Divisions.SelectMany(d => d.Units).Count(u => u.Status != "Cancelled"))
                 .Take(limit)
                 .ToListAsync();
@@ -318,7 +321,7 @@ public class EventsController : EventControllerBase
                 .Include(e => e.Divisions)
                     .ThenInclude(d => d.Units)
                         .ThenInclude(u => u.JoinRequests)
-                .Where(e => e.IsActive && e.IsPublished && e.TournamentStatus != "Draft" && e.StartDate < now && e.StartDate >= pastCutoff)
+                .Where(e => e.IsActive && e.IsPublished && !e.IsPrivate && e.TournamentStatus != "Draft" && e.StartDate < now && e.StartDate >= pastCutoff)
                 .OrderByDescending(e => e.StartDate)
                 .Take(limit)
                 .ToListAsync();
@@ -421,7 +424,7 @@ public class EventsController : EventControllerBase
                 Country = evt.Country,
                 Latitude = evt.Latitude,
                 Longitude = evt.Longitude,
-                CourtId = evt.CourtId,
+                VenueId = evt.CourtId,
                 PosterImageUrl = evt.PosterImageUrl,
                 BannerImageUrl = evt.BannerImageUrl,
                 RegistrationFee = evt.RegistrationFee,
@@ -442,11 +445,13 @@ public class EventsController : EventControllerBase
                 ContactPhone = evt.ContactPhone,
                 CreatedAt = evt.CreatedAt,
                 TournamentStatus = evt.TournamentStatus,
-                Divisions = evt.Divisions.OrderBy(d => d.SortOrder).Select(d => new EventDivisionPublicDto
+                AllowMultipleDivisions = evt.AllowMultipleDivisions,
+                Divisions = evt.Divisions.Where(d => d.IsActive).OrderBy(d => d.SortOrder).Select(d => new EventDivisionPublicDto
                 {
                     Id = d.Id,
                     Name = d.Name,
                     Description = d.Description,
+                    TeamUnitId = d.TeamUnitId,
                     TeamUnitName = d.TeamUnit?.Name,
                     AgeGroupName = d.AgeGroupEntity?.Name,
                     SkillLevelName = d.SkillLevel?.Name,
@@ -570,7 +575,7 @@ public class EventsController : EventControllerBase
                 Country = evt.Country,
                 Latitude = evt.Latitude,
                 Longitude = evt.Longitude,
-                CourtId = evt.CourtId,
+                VenueId = evt.CourtId,
                 CourtName = evt.Venue?.Name,
                 PosterImageUrl = evt.PosterImageUrl,
                 BannerImageUrl = evt.BannerImageUrl,
@@ -768,7 +773,7 @@ public class EventsController : EventControllerBase
                     : null,
                 IsPrivate = dto.IsPrivate,
                 AllowMultipleDivisions = dto.AllowMultipleDivisions,
-                CourtId = dto.CourtId,
+                CourtId = dto.VenueId,
                 VenueName = dto.VenueName,
                 Address = dto.Address,
                 City = dto.City,
@@ -899,7 +904,7 @@ public class EventsController : EventControllerBase
             evt.IsPublished = dto.IsPublished;
             evt.IsPrivate = dto.IsPrivate;
             evt.AllowMultipleDivisions = dto.AllowMultipleDivisions;
-            evt.CourtId = dto.CourtId;
+            evt.CourtId = dto.VenueId;
             evt.VenueName = dto.VenueName;
             evt.Address = dto.Address;
             evt.City = dto.City;
@@ -1118,195 +1123,42 @@ public class EventsController : EventControllerBase
         }
     }
 
-    // POST: /events/{id}/register - Register for an event division
+    // POST: /events/{id}/register - DEPRECATED: Use POST /tournament/events/{id}/register instead
+    [Obsolete("Use TournamentController.RegisterForEvent (POST /tournament/events/{id}/register) instead")]
     [HttpPost("{id}/register")]
     [Authorize]
-    public async Task<ActionResult<ApiResponse<EventRegistrationDto>>> RegisterForEvent(int id, [FromBody] RegisterForEventDto dto)
+    public ActionResult<ApiResponse<EventRegistrationDto>> RegisterForEvent(int id, [FromBody] RegisterForEventDto dto)
     {
-        try
+        return BadRequest(new ApiResponse<EventRegistrationDto>
         {
-            var userId = GetUserId();
-            if (!userId.HasValue)
-                return Unauthorized(new ApiResponse<EventRegistrationDto> { Success = false, Message = "User not authenticated" });
-
-            var evt = await _context.Events.FindAsync(id);
-            if (evt == null || !evt.IsActive || !evt.IsPublished || evt.TournamentStatus == "Draft")
-                return NotFound(new ApiResponse<EventRegistrationDto> { Success = false, Message = "Event not found" });
-
-            // Check registration period
-            var now = DateTime.Now;
-            if (evt.RegistrationOpenDate.HasValue && now < evt.RegistrationOpenDate.Value)
-                return BadRequest(new ApiResponse<EventRegistrationDto> { Success = false, Message = "Registration has not opened yet" });
-
-            if (evt.RegistrationCloseDate.HasValue && now > evt.RegistrationCloseDate.Value)
-                return BadRequest(new ApiResponse<EventRegistrationDto> { Success = false, Message = "Registration has closed" });
-
-            var division = await _context.EventDivisions.FindAsync(dto.DivisionId);
-            if (division == null || division.EventId != id || !division.IsActive)
-                return NotFound(new ApiResponse<EventRegistrationDto> { Success = false, Message = "Division not found" });
-
-            // Check MaxPlayers capacity
-            if (division.MaxPlayers.HasValue)
-            {
-                var currentPlayerCount = await _context.EventRegistrations
-                    .CountAsync(r => r.DivisionId == dto.DivisionId && r.Status != "Cancelled");
-
-                if (currentPlayerCount >= division.MaxPlayers.Value)
-                {
-                    return BadRequest(new ApiResponse<EventRegistrationDto>
-                    {
-                        Success = false,
-                        Message = $"Division '{division.Name}' has reached its maximum capacity of {division.MaxPlayers.Value} players."
-                    });
-                }
-            }
-
-            // Check if already registered for this division
-            var existingReg = await _context.EventRegistrations
-                .FirstOrDefaultAsync(r => r.EventId == id && r.DivisionId == dto.DivisionId && r.UserId == userId.Value);
-
-            if (existingReg != null && existingReg.Status != "Cancelled")
-                return BadRequest(new ApiResponse<EventRegistrationDto> { Success = false, Message = "Already registered for this division" });
-
-            // Check if event allows multiple divisions
-            if (!evt.AllowMultipleDivisions)
-            {
-                // Check if user is already registered for any other division in this event
-                var hasOtherRegistration = await _context.EventRegistrations
-                    .AnyAsync(r => r.EventId == id && r.UserId == userId.Value && r.Status != "Cancelled");
-
-                if (hasOtherRegistration)
-                    return BadRequest(new ApiResponse<EventRegistrationDto> { Success = false, Message = "This event only allows registration for one division" });
-            }
-
-            // Calculate fee
-            var fee = evt.RegistrationFee + (division.DivisionFee ?? evt.PerDivisionFee);
-
-            var registration = new EventRegistration
-            {
-                EventId = id,
-                DivisionId = dto.DivisionId,
-                UserId = userId.Value,
-                TeamName = dto.TeamName,
-                AmountPaid = 0,
-                PaymentStatus = fee > 0 ? "Pending" : "Paid",
-                Status = "Registered"
-            };
-
-            _context.EventRegistrations.Add(registration);
-            await _context.SaveChangesAsync();
-
-            var user = await _context.Users.FindAsync(userId.Value);
-            var userName = user != null ? Utility.FormatName(user.LastName, user.FirstName) : "Someone";
-
-            // Notify event organizer about new registration (don't notify self)
-            if (evt.OrganizedByUserId != userId.Value)
-            {
-                await _notificationService.CreateAndSendAsync(
-                    evt.OrganizedByUserId,
-                    "EventRegistration",
-                    "New Event Registration",
-                    $"{userName} registered for {evt.Name} ({division.Name})",
-                    $"/events?id={id}",
-                    "EventRegistration",
-                    registration.Id
-                );
-            }
-
-            // Grant "Event Participant" award
-            await _activityAwardService.GrantJoinedEventAwardAsync(userId.Value, id, evt.Name);
-
-            return Ok(new ApiResponse<EventRegistrationDto>
-            {
-                Success = true,
-                Data = new EventRegistrationDto
-                {
-                    Id = registration.Id,
-                    EventId = registration.EventId,
-                    DivisionId = registration.DivisionId,
-                    UserId = registration.UserId,
-                    UserName = userName,
-                    TeamName = registration.TeamName,
-                    PaymentStatus = registration.PaymentStatus,
-                    AmountPaid = registration.AmountPaid,
-                    Status = registration.Status,
-                    RegisteredAt = registration.RegisteredAt
-                },
-                Message = "Registration successful"
-            });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error registering for event");
-            return StatusCode(500, new ApiResponse<EventRegistrationDto> { Success = false, Message = "An error occurred" });
-        }
+            Success = false,
+            Message = "This endpoint is deprecated. Use POST /tournament/events/{id}/register instead."
+        });
     }
 
-    // DELETE: /events/{id}/register/{divisionId} - Cancel registration
+    // DELETE: /events/{id}/register/{divisionId} - DEPRECATED: Use DELETE /tournament/units/{unitId} instead
+    [Obsolete("Use TournamentController endpoints for registration management")]
     [HttpDelete("{id}/register/{divisionId}")]
     [Authorize]
-    public async Task<ActionResult<ApiResponse<bool>>> CancelRegistration(int id, int divisionId)
+    public ActionResult<ApiResponse<bool>> CancelRegistration(int id, int divisionId)
     {
-        try
+        return BadRequest(new ApiResponse<bool>
         {
-            var userId = GetUserId();
-            if (!userId.HasValue)
-                return Unauthorized(new ApiResponse<bool> { Success = false, Message = "User not authenticated" });
-
-            var registration = await _context.EventRegistrations
-                .FirstOrDefaultAsync(r => r.EventId == id && r.DivisionId == divisionId && r.UserId == userId.Value);
-
-            if (registration == null)
-                return NotFound(new ApiResponse<bool> { Success = false, Message = "Registration not found" });
-
-            registration.Status = "Cancelled";
-            await _context.SaveChangesAsync();
-
-            return Ok(new ApiResponse<bool> { Success = true, Data = true, Message = "Registration cancelled" });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error cancelling registration");
-            return StatusCode(500, new ApiResponse<bool> { Success = false, Message = "An error occurred" });
-        }
+            Success = false,
+            Message = "This endpoint is deprecated. Use DELETE /tournament/units/{unitId} to cancel registration."
+        });
     }
 
-    // GET: /events/{id}/divisions/{divisionId}/registrations - Get division registrations
+    // GET: /events/{id}/divisions/{divisionId}/registrations - DEPRECATED: Use GET /tournament/events/{id}/units instead
+    [Obsolete("Use TournamentController endpoints to get registrations")]
     [HttpGet("{id}/divisions/{divisionId}/registrations")]
-    public async Task<ActionResult<ApiResponse<List<EventRegistrationDto>>>> GetDivisionRegistrations(int id, int divisionId)
+    public ActionResult<ApiResponse<List<EventRegistrationDto>>> GetDivisionRegistrations(int id, int divisionId)
     {
-        try
+        return BadRequest(new ApiResponse<List<EventRegistrationDto>>
         {
-            var registrations = await _context.EventRegistrations
-                .Include(r => r.User)
-                .Where(r => r.EventId == id && r.DivisionId == divisionId && r.Status != "Cancelled")
-                .OrderBy(r => r.RegisteredAt)
-                .Select(r => new EventRegistrationDto
-                {
-                    Id = r.Id,
-                    EventId = r.EventId,
-                    DivisionId = r.DivisionId,
-                    UserId = r.UserId,
-                    UserName = r.User != null ? (r.User.FirstName + " " + r.User.LastName).Trim() : "",
-                    UserProfileImageUrl = r.User != null ? r.User.ProfileImageUrl : null,
-                    UserExperienceLevel = r.User != null ? r.User.ExperienceLevel : null,
-                    TeamId = r.TeamId,
-                    TeamName = r.TeamName,
-                    PaymentStatus = r.PaymentStatus,
-                    AmountPaid = r.AmountPaid,
-                    Status = r.Status,
-                    RegisteredAt = r.RegisteredAt,
-                    CheckedInAt = r.CheckedInAt
-                })
-                .ToListAsync();
-
-            return Ok(new ApiResponse<List<EventRegistrationDto>> { Success = true, Data = registrations });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error fetching registrations");
-            return StatusCode(500, new ApiResponse<List<EventRegistrationDto>> { Success = false, Message = "An error occurred" });
-        }
+            Success = false,
+            Message = "This endpoint is deprecated. Use GET /tournament/events/{id}/units?divisionId={divisionId} instead."
+        });
     }
 
     // POST: /events/{id}/partner-request - Create looking for partner request
@@ -1766,12 +1618,13 @@ public class EventsController : EventControllerBase
                 .Include(d => d.TeamUnit)
                 .Include(d => d.SkillLevel)
                 .Include(d => d.AgeGroupEntity)
-                .FirstOrDefaultAsync(d => d.Id == divisionId && d.EventId == id && d.IsActive);
+                .FirstOrDefaultAsync(d => d.Id == divisionId && d.EventId == id);
 
             if (division == null)
                 return NotFound(new ApiResponse<EventDivisionDto> { Success = false, Message = "Division not found" });
 
             // Update fields if provided
+            if (dto.IsActive.HasValue) division.IsActive = dto.IsActive.Value;
             if (dto.Name != null) division.Name = dto.Name;
             if (dto.Description != null) division.Description = dto.Description;
             if (dto.TeamUnitId.HasValue) division.TeamUnitId = dto.TeamUnitId;
@@ -2112,131 +1965,30 @@ public class EventsController : EventControllerBase
         }
     }
 
-    // GET: /events/{id}/registrations - Get all registrations for an event (organizer only)
+    // GET: /events/{id}/registrations - DEPRECATED: Use GET /tournament/events/{id}/units instead
+    [Obsolete("Use TournamentController endpoints for registration management")]
     [HttpGet("{id}/registrations")]
     [Authorize]
-    public async Task<ActionResult<ApiResponse<List<EventRegistrationDto>>>> GetAllEventRegistrations(int id)
+    public ActionResult<ApiResponse<List<EventRegistrationDto>>> GetAllEventRegistrations(int id)
     {
-        try
+        return BadRequest(new ApiResponse<List<EventRegistrationDto>>
         {
-            var userId = GetUserId();
-            if (!userId.HasValue)
-                return Unauthorized(new ApiResponse<List<EventRegistrationDto>> { Success = false, Message = "User not authenticated" });
-
-            var evt = await _context.Events.FindAsync(id);
-            if (evt == null || !evt.IsActive)
-                return NotFound(new ApiResponse<List<EventRegistrationDto>> { Success = false, Message = "Event not found" });
-
-            // Check if user is organizer or site admin
-            var isAdmin = await IsAdminAsync();
-            if (evt.OrganizedByUserId != userId.Value && !isAdmin)
-                return Forbid();
-
-            var registrations = await _context.EventRegistrations
-                .Include(r => r.User)
-                .Include(r => r.Division)
-                .Where(r => r.EventId == id && r.Status != "Cancelled")
-                .OrderBy(r => r.Division!.Name)
-                .ThenBy(r => r.RegisteredAt)
-                .Select(r => new EventRegistrationDto
-                {
-                    Id = r.Id,
-                    EventId = r.EventId,
-                    DivisionId = r.DivisionId,
-                    DivisionName = r.Division != null ? r.Division.Name : "",
-                    UserId = r.UserId,
-                    UserName = r.User != null ? (r.User.FirstName + " " + r.User.LastName).Trim() : "",
-                    UserProfileImageUrl = r.User != null ? r.User.ProfileImageUrl : null,
-                    UserExperienceLevel = r.User != null ? r.User.ExperienceLevel : null,
-                    TeamId = r.TeamId,
-                    TeamName = r.TeamName,
-                    PaymentStatus = r.PaymentStatus,
-                    AmountPaid = r.AmountPaid,
-                    Status = r.Status,
-                    RegisteredAt = r.RegisteredAt,
-                    CheckedInAt = r.CheckedInAt
-                })
-                .ToListAsync();
-
-            return Ok(new ApiResponse<List<EventRegistrationDto>> { Success = true, Data = registrations });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error fetching event registrations");
-            return StatusCode(500, new ApiResponse<List<EventRegistrationDto>> { Success = false, Message = "An error occurred" });
-        }
+            Success = false,
+            Message = "This endpoint is deprecated. Use GET /tournament/events/{id}/units instead."
+        });
     }
 
-    // PUT: /events/{id}/registrations/{registrationId} - Update a registration (organizer only)
+    // PUT: /events/{id}/registrations/{registrationId} - DEPRECATED: Use PUT /tournament/units/{unitId} instead
+    [Obsolete("Use TournamentController endpoints for registration management")]
     [HttpPut("{id}/registrations/{registrationId}")]
     [Authorize]
-    public async Task<ActionResult<ApiResponse<EventRegistrationDto>>> UpdateRegistration(int id, int registrationId, [FromBody] UpdateRegistrationDto dto)
+    public ActionResult<ApiResponse<EventRegistrationDto>> UpdateRegistration(int id, int registrationId, [FromBody] UpdateRegistrationDto dto)
     {
-        try
+        return BadRequest(new ApiResponse<EventRegistrationDto>
         {
-            var userId = GetUserId();
-            if (!userId.HasValue)
-                return Unauthorized(new ApiResponse<EventRegistrationDto> { Success = false, Message = "User not authenticated" });
-
-            var evt = await _context.Events.FindAsync(id);
-            if (evt == null || !evt.IsActive)
-                return NotFound(new ApiResponse<EventRegistrationDto> { Success = false, Message = "Event not found" });
-
-            // Check if user is organizer or site admin
-            var isAdmin = await IsAdminAsync();
-            if (evt.OrganizedByUserId != userId.Value && !isAdmin)
-                return Forbid();
-
-            var registration = await _context.EventRegistrations
-                .Include(r => r.User)
-                .FirstOrDefaultAsync(r => r.Id == registrationId && r.EventId == id);
-
-            if (registration == null)
-                return NotFound(new ApiResponse<EventRegistrationDto> { Success = false, Message = "Registration not found" });
-
-            // Update fields
-            if (dto.PaymentStatus != null)
-                registration.PaymentStatus = dto.PaymentStatus;
-            if (dto.AmountPaid.HasValue)
-                registration.AmountPaid = dto.AmountPaid.Value;
-            if (dto.TeamId.HasValue)
-                registration.TeamId = dto.TeamId.Value;
-            if (dto.TeamName != null)
-                registration.TeamName = dto.TeamName;
-            if (dto.Status != null)
-                registration.Status = dto.Status;
-            if (dto.CheckedIn.HasValue && dto.CheckedIn.Value)
-                registration.CheckedInAt = DateTime.Now;
-
-            await _context.SaveChangesAsync();
-
-            return Ok(new ApiResponse<EventRegistrationDto>
-            {
-                Success = true,
-                Data = new EventRegistrationDto
-                {
-                    Id = registration.Id,
-                    EventId = registration.EventId,
-                    DivisionId = registration.DivisionId,
-                    UserId = registration.UserId,
-                    UserName = registration.User != null ? Utility.FormatName(registration.User.LastName, registration.User.FirstName) : "",
-                    UserProfileImageUrl = registration.User?.ProfileImageUrl,
-                    TeamId = registration.TeamId,
-                    TeamName = registration.TeamName,
-                    PaymentStatus = registration.PaymentStatus,
-                    AmountPaid = registration.AmountPaid,
-                    Status = registration.Status,
-                    RegisteredAt = registration.RegisteredAt,
-                    CheckedInAt = registration.CheckedInAt
-                },
-                Message = "Registration updated"
-            });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error updating registration");
-            return StatusCode(500, new ApiResponse<EventRegistrationDto> { Success = false, Message = "An error occurred" });
-        }
+            Success = false,
+            Message = "This endpoint is deprecated. Use PUT /tournament/units/{unitId} or /tournament/members/{memberId} instead."
+        });
     }
 
     // Helper methods
@@ -2285,7 +2037,7 @@ public class EventsController : EventControllerBase
             Country = evt.Country,
             Latitude = latitude,
             Longitude = longitude,
-            CourtId = evt.CourtId,
+            VenueId = evt.CourtId,
             PosterImageUrl = evt.PosterImageUrl,
             RegistrationFee = evt.RegistrationFee,
             PerDivisionFee = evt.PerDivisionFee,
@@ -2720,6 +2472,323 @@ public class EventsController : EventControllerBase
         return Ok(new ApiResponse<AdminEventDto> { Success = true, Data = result });
     }
 
+    /// <summary>
+    /// Get recipients for mass notification preview
+    /// </summary>
+    [HttpPost("{eventId}/notifications/preview")]
+    [Authorize]
+    public async Task<ActionResult<ApiResponse<MassNotificationPreviewResponse>>> PreviewNotificationRecipients(
+        int eventId,
+        [FromBody] MassNotificationRequest request)
+    {
+        if (!await CanManageEventAsync(eventId))
+            return Forbid();
+
+        var recipients = await GetNotificationRecipientsAsync(eventId, request);
+
+        return Ok(new ApiResponse<MassNotificationPreviewResponse>
+        {
+            Success = true,
+            Data = new MassNotificationPreviewResponse
+            {
+                TotalRecipients = recipients.Count,
+                Recipients = recipients.Take(50).ToList(), // Preview first 50
+                HasMore = recipients.Count > 50
+            }
+        });
+    }
+
+    /// <summary>
+    /// Send mass notification to event participants
+    /// </summary>
+    [HttpPost("{eventId}/notifications/send")]
+    [Authorize]
+    public async Task<ActionResult<ApiResponse<MassNotificationResult>>> SendMassNotification(
+        int eventId,
+        [FromBody] MassNotificationRequest request)
+    {
+        if (!await CanManageEventAsync(eventId))
+            return Forbid();
+
+        if (string.IsNullOrWhiteSpace(request.Subject) || string.IsNullOrWhiteSpace(request.Message))
+            return BadRequest(new ApiResponse<MassNotificationResult>
+            {
+                Success = false,
+                Message = "Subject and message are required"
+            });
+
+        var evt = await _context.Events.FindAsync(eventId);
+        if (evt == null)
+            return NotFound(new ApiResponse<MassNotificationResult>
+            {
+                Success = false,
+                Message = "Event not found"
+            });
+
+        var recipients = await GetNotificationRecipientsAsync(eventId, request);
+
+        if (recipients.Count == 0)
+            return BadRequest(new ApiResponse<MassNotificationResult>
+            {
+                Success = false,
+                Message = "No recipients match the selected criteria"
+            });
+
+        var userId = GetUserId();
+        var sentCount = 0;
+        var failedCount = 0;
+
+        // Build HTML email body
+        var htmlBody = $@"
+            <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;'>
+                <h2 style='color: #ea580c;'>{evt.Name}</h2>
+                <div style='padding: 20px; background-color: #f9fafb; border-radius: 8px;'>
+                    {request.Message.Replace("\n", "<br/>")}
+                </div>
+                <p style='color: #6b7280; font-size: 14px; margin-top: 20px;'>
+                    This message was sent to you because you are registered for this event.
+                </p>
+            </div>";
+
+        foreach (var recipient in recipients)
+        {
+            try
+            {
+                if (!string.IsNullOrWhiteSpace(recipient.Email))
+                {
+                    await _emailService.SendSimpleAsync(
+                        recipient.UserId,
+                        recipient.Email,
+                        request.Subject,
+                        htmlBody
+                    );
+                    sentCount++;
+                }
+
+                // Also send in-app notification if requested
+                if (request.SendInAppNotification)
+                {
+                    await _notificationService.CreateAndSendAsync(
+                        recipient.UserId,
+                        "EventUpdate",
+                        request.Subject,
+                        request.Message.Length > 200 ? request.Message.Substring(0, 200) + "..." : request.Message,
+                        $"/event/{eventId}",
+                        "Event",
+                        eventId
+                    );
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to send notification to user {UserId}", recipient.UserId);
+                failedCount++;
+            }
+        }
+
+        _logger.LogInformation(
+            "Mass notification sent for event {EventId} by user {UserId}: {SentCount} sent, {FailedCount} failed",
+            eventId, userId, sentCount, failedCount);
+
+        return Ok(new ApiResponse<MassNotificationResult>
+        {
+            Success = true,
+            Data = new MassNotificationResult
+            {
+                SentCount = sentCount,
+                FailedCount = failedCount,
+                TotalRecipients = recipients.Count
+            }
+        });
+    }
+
+    /// <summary>
+    /// Get available filter options for mass notifications
+    /// </summary>
+    [HttpGet("{eventId}/notifications/filters")]
+    [Authorize]
+    public async Task<ActionResult<ApiResponse<MassNotificationFilters>>> GetNotificationFilters(int eventId)
+    {
+        if (!await CanManageEventAsync(eventId))
+            return Forbid();
+
+        // Get divisions with player counts
+        var divisions = await _context.EventDivisions
+            .Where(d => d.EventId == eventId)
+            .Select(d => new DivisionFilterOption
+            {
+                Id = d.Id,
+                Name = d.Name,
+                PlayerCount = d.Units
+                    .Where(u => u.Status != "Cancelled" && !u.IsTemporary)
+                    .SelectMany(u => u.Members)
+                    .Where(m => m.InviteStatus == "Accepted")
+                    .Select(m => m.UserId)
+                    .Distinct()
+                    .Count()
+            })
+            .ToListAsync();
+
+        // Get staff roles with counts
+        var staffRoles = await _context.EventStaffRoles
+            .Where(r => r.EventId == eventId)
+            .Select(r => new StaffRoleFilterOption
+            {
+                Id = r.Id,
+                Name = r.Name,
+                StaffCount = _context.EventStaff
+                    .Count(s => s.EventId == eventId && s.RoleId == r.Id && s.Status == "Active")
+            })
+            .ToListAsync();
+
+        // Count staff without role
+        var staffWithoutRoleCount = await _context.EventStaff
+            .CountAsync(s => s.EventId == eventId && s.RoleId == null && s.Status == "Active");
+
+        return Ok(new ApiResponse<MassNotificationFilters>
+        {
+            Success = true,
+            Data = new MassNotificationFilters
+            {
+                Divisions = divisions,
+                StaffRoles = staffRoles,
+                StaffWithoutRoleCount = staffWithoutRoleCount
+            }
+        });
+    }
+
+    private async Task<List<NotificationRecipient>> GetNotificationRecipientsAsync(
+        int eventId,
+        MassNotificationRequest request)
+    {
+        var recipients = new Dictionary<int, NotificationRecipient>();
+
+        // Get players from selected divisions
+        if (request.IncludePlayers && request.DivisionIds?.Any() == true)
+        {
+            var divisionIdSet = new HashSet<int>(request.DivisionIds);
+            var playerQuery = _context.EventUnitMembers
+                .Include(m => m.User)
+                .Include(m => m.Unit)
+                .Where(m => m.Unit.EventId == eventId
+                    && divisionIdSet.Contains(m.Unit.DivisionId)
+                    && m.Unit.Status != "Cancelled"
+                    && !m.Unit.IsTemporary
+                    && m.InviteStatus == "Accepted"
+                    && m.User != null);
+
+            var players = await playerQuery.ToListAsync();
+            foreach (var m in players)
+            {
+                if (!recipients.ContainsKey(m.UserId))
+                {
+                    recipients[m.UserId] = new NotificationRecipient
+                    {
+                        UserId = m.UserId,
+                        Name = FormatName(m.User!.LastName, m.User.FirstName),
+                        Email = m.User.Email,
+                        Type = "Player"
+                    };
+                }
+            }
+        }
+
+        // Get all players if no specific divisions
+        if (request.IncludePlayers && (request.DivisionIds == null || !request.DivisionIds.Any()))
+        {
+            var allPlayers = await _context.EventUnitMembers
+                .Include(m => m.User)
+                .Include(m => m.Unit)
+                .Where(m => m.Unit.EventId == eventId
+                    && m.Unit.Status != "Cancelled"
+                    && !m.Unit.IsTemporary
+                    && m.InviteStatus == "Accepted"
+                    && m.User != null)
+                .ToListAsync();
+
+            foreach (var m in allPlayers)
+            {
+                if (!recipients.ContainsKey(m.UserId))
+                {
+                    recipients[m.UserId] = new NotificationRecipient
+                    {
+                        UserId = m.UserId,
+                        Name = FormatName(m.User!.LastName, m.User.FirstName),
+                        Email = m.User.Email,
+                        Type = "Player"
+                    };
+                }
+            }
+        }
+
+        // Get staff from selected roles
+        if (request.IncludeStaff)
+        {
+            var staffQuery = _context.EventStaff
+                .Include(s => s.User)
+                .Where(s => s.EventId == eventId && s.Status == "Active" && s.User != null);
+
+            if (request.StaffRoleIds?.Any() == true)
+            {
+                var roleIdSet = new HashSet<int>(request.StaffRoleIds);
+                // Include null roleId if 0 is in the list (staff without role)
+                if (roleIdSet.Contains(0))
+                {
+                    staffQuery = staffQuery.Where(s => s.RoleId == null || roleIdSet.Contains(s.RoleId ?? 0));
+                }
+                else
+                {
+                    staffQuery = staffQuery.Where(s => s.RoleId.HasValue && roleIdSet.Contains(s.RoleId.Value));
+                }
+            }
+
+            var staff = await staffQuery.ToListAsync();
+            foreach (var s in staff)
+            {
+                if (!recipients.ContainsKey(s.UserId))
+                {
+                    recipients[s.UserId] = new NotificationRecipient
+                    {
+                        UserId = s.UserId,
+                        Name = FormatName(s.User!.LastName, s.User.FirstName),
+                        Email = s.User.Email,
+                        Type = "Staff"
+                    };
+                }
+                else
+                {
+                    // User is both player and staff
+                    recipients[s.UserId].Type = "Player & Staff";
+                }
+            }
+        }
+
+        // Add specific users
+        if (request.SpecificUserIds?.Any() == true)
+        {
+            var userIdSet = new HashSet<int>(request.SpecificUserIds);
+            var specificUsers = await _context.Users
+                .Where(u => userIdSet.Contains(u.Id))
+                .ToListAsync();
+
+            foreach (var u in specificUsers)
+            {
+                if (!recipients.ContainsKey(u.Id))
+                {
+                    recipients[u.Id] = new NotificationRecipient
+                    {
+                        UserId = u.Id,
+                        Name = FormatName(u.LastName, u.FirstName),
+                        Email = u.Email,
+                        Type = "Specific"
+                    };
+                }
+            }
+        }
+
+        return recipients.Values.OrderBy(r => r.Name).ToList();
+    }
+
     #endregion
 }
 
@@ -2795,6 +2864,65 @@ public class AdminEventUpdateRequest
     public string? Country { get; set; }
     public decimal? RegistrationFee { get; set; }
     public decimal? PerDivisionFee { get; set; }
+}
+
+#endregion
+
+#region Mass Notification DTOs
+
+public class MassNotificationRequest
+{
+    public string Subject { get; set; } = string.Empty;
+    public string Message { get; set; } = string.Empty;
+    public bool IncludePlayers { get; set; }
+    public bool IncludeStaff { get; set; }
+    public List<int>? DivisionIds { get; set; }
+    public List<int>? StaffRoleIds { get; set; }
+    public List<int>? SpecificUserIds { get; set; }
+    public bool SendInAppNotification { get; set; } = true;
+}
+
+public class MassNotificationPreviewResponse
+{
+    public int TotalRecipients { get; set; }
+    public List<NotificationRecipient> Recipients { get; set; } = new();
+    public bool HasMore { get; set; }
+}
+
+public class NotificationRecipient
+{
+    public int UserId { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public string? Email { get; set; }
+    public string Type { get; set; } = string.Empty; // Player, Staff, Player & Staff, Specific
+}
+
+public class MassNotificationResult
+{
+    public int SentCount { get; set; }
+    public int FailedCount { get; set; }
+    public int TotalRecipients { get; set; }
+}
+
+public class MassNotificationFilters
+{
+    public List<DivisionFilterOption> Divisions { get; set; } = new();
+    public List<StaffRoleFilterOption> StaffRoles { get; set; } = new();
+    public int StaffWithoutRoleCount { get; set; }
+}
+
+public class DivisionFilterOption
+{
+    public int Id { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public int PlayerCount { get; set; }
+}
+
+public class StaffRoleFilterOption
+{
+    public int Id { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public int StaffCount { get; set; }
 }
 
 #endregion

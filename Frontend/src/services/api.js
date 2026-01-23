@@ -213,12 +213,30 @@ const SITE_KEY = 'community' // Site identifier for multi-tenant asset storage
 
 export const sharedAssetApi = {
   /**
-   * Upload a file to Funtime-Shared asset service
+   * Upload a file to Funtime-Shared via local backend proxy (recommended)
+   * Uses server-to-server API key authentication - more reliable than direct upload
+   * @param {File} file - The file to upload
+   * @param {string} assetType - Type: 'image', 'video', 'document', 'audio'
+   * @param {string} category - Category for organization: 'avatar', 'theme', 'club', 'court', 'video', etc.
+   * @returns {Promise} - Response with asset URL { success, url, assetId }
+   */
+  uploadViaProxy: async (file, assetType = 'image', category = 'general') => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const params = new URLSearchParams({ assetType, category });
+    return api.post(`/assets/shared/upload?${params.toString()}`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+  },
+
+  /**
+   * Upload a file to Funtime-Shared asset service (direct, requires shared auth token)
    * @param {File} file - The file to upload
    * @param {string} assetType - Type: 'image', 'video', 'document', 'audio'
    * @param {string} category - Category for organization: 'avatar', 'theme', 'club', 'court', 'video', etc.
    * @param {boolean} isPublic - Whether the asset is publicly accessible (default: true)
    * @returns {Promise} - Response with asset ID and URL
+   * @deprecated Use uploadViaProxy for more reliable uploads
    */
   upload: async (file, assetType = 'image', category = 'general', isPublic = true) => {
     const formData = new FormData();
@@ -496,7 +514,16 @@ export const userApi = {
   adminUpdateEmail: (userId, newEmail) => api.put(`/users/${userId}/admin-email`, { newEmail }),
 
   // Admin: Set a user's password directly
-  adminSetPassword: (userId, newPassword) => api.put(`/users/${userId}/admin-password`, { newPassword })
+  adminSetPassword: (userId, newPassword) => api.put(`/users/${userId}/admin-password`, { newPassword }),
+
+  // Admin: Send a test email to a user
+  adminSendTestEmail: (userId, subject = null, body = null) => api.post(`/users/${userId}/admin-test-email`, { subject, body }),
+
+  // Admin: Send a test SMS to a user
+  adminSendTestSms: (userId, message = null) => api.post(`/users/${userId}/admin-test-sms`, { message }),
+
+  // Admin: Update a user's phone number
+  adminUpdatePhone: (userId, newPhone) => api.put(`/users/${userId}/admin-phone`, { newPhone })
 }
 
 // Content Types API
@@ -713,6 +740,19 @@ export const notificationTemplateApi = {
 
 // Venues API (formerly Courts - places with pickleball courts)
 export const venuesApi = {
+  // List all venues (simple list for dropdowns)
+  list: async () => {
+    const response = await api.get('/venues/search?pageSize=500&sortBy=name');
+    // Transform to normalize id field (venues use venueId)
+    if (response.success && response.data?.items) {
+      response.data = response.data.items.map(v => ({
+        ...v,
+        id: v.venueId || v.id
+      }));
+    }
+    return response;
+  },
+
   // Search venues with filters
   search: (params = {}) => {
     const queryParams = new URLSearchParams();
@@ -804,6 +844,9 @@ export const eventTypesApi = {
   // Get all event types (public)
   getAll: (includeInactive = false) =>
     api.get(`/eventtypes${includeInactive ? '?includeInactive=true' : ''}`),
+
+  // Alias for getAll (backward compatibility)
+  list: () => api.get('/eventtypes'),
 
   // Get single event type
   getById: (id) => api.get(`/eventtypes/${id}`),
@@ -970,7 +1013,12 @@ export const eventsApi = {
     return api.get(`/events/admin/search?${queryParams.toString()}`);
   },
   adminGet: (eventId) => api.get(`/events/admin/${eventId}`),
-  adminUpdate: (eventId, data) => api.put(`/events/admin/${eventId}`, data)
+  adminUpdate: (eventId, data) => api.put(`/events/admin/${eventId}`, data),
+
+  // Mass notifications
+  getNotificationFilters: (eventId) => api.get(`/events/${eventId}/notifications/filters`),
+  previewNotificationRecipients: (eventId, data) => api.post(`/events/${eventId}/notifications/preview`, data),
+  sendMassNotification: (eventId, data) => api.post(`/events/${eventId}/notifications/send`, data)
 }
 
 // Clubs API
@@ -1465,8 +1513,8 @@ export const tournamentApi = {
   // Join code feature
   getJoinableUnitsV2: (eventId, divisionId) =>
     api.get(`/tournament/events/${eventId}/divisions/${divisionId}/joinable-units-v2`),
-  joinByCode: (joinCode) =>
-    api.post('/tournament/units/join-by-code', { joinCode }),
+  joinByCode: (joinCode, selectedFeeId = null) =>
+    api.post('/tournament/units/join-by-code', { joinCode, selectedFeeId }),
   regenerateJoinCode: (unitId) =>
     api.post(`/tournament/units/${unitId}/regenerate-code`),
 
@@ -1605,7 +1653,47 @@ export const tournamentApi = {
   autoAssignDivisionCourts: (divisionId, options = null) =>
     api.post(`/tournament/court-planning/auto-assign/${divisionId}`, options),
   clearDivisionCourtAssignments: (divisionId) =>
-    api.post(`/tournament/court-planning/clear/${divisionId}`)
+    api.post(`/tournament/court-planning/clear/${divisionId}`),
+  validateSchedule: (eventId) =>
+    api.get(`/tournament/court-planning/validate/${eventId}`),
+  publishSchedule: (eventId, validateFirst = true) =>
+    api.post(`/tournament/court-planning/publish/${eventId}`, { eventId, validateFirst }),
+  unpublishSchedule: (eventId) =>
+    api.post(`/tournament/court-planning/unpublish/${eventId}`),
+  getTimelineData: (eventId) =>
+    api.get(`/tournament/court-planning/timeline/${eventId}`),
+  addDivisionCourtAssignment: (data) =>
+    api.post('/tournament/court-planning/division-assignment', data),
+  deleteDivisionCourtAssignment: (assignmentId) =>
+    api.delete(`/tournament/court-planning/division-assignment/${assignmentId}`),
+
+  // =====================================================
+  // Division Fees
+  // =====================================================
+
+  getDivisionFees: (divisionId) => api.get(`/tournament/divisions/${divisionId}/fees`),
+  createDivisionFee: (divisionId, data) => api.post(`/tournament/divisions/${divisionId}/fees`, data),
+  updateDivisionFee: (divisionId, feeId, data) => api.put(`/tournament/divisions/${divisionId}/fees/${feeId}`, data),
+  deleteDivisionFee: (divisionId, feeId) => api.delete(`/tournament/divisions/${divisionId}/fees/${feeId}`),
+  bulkUpdateDivisionFees: (divisionId, fees) => api.put(`/tournament/divisions/${divisionId}/fees`, fees),
+
+  // =====================================================
+  // Event Fees (event-level fees, not division-specific)
+  // =====================================================
+  getEventFees: (eventId) => api.get(`/tournament/events/${eventId}/fees`),
+  createEventFee: (eventId, data) => api.post(`/tournament/events/${eventId}/fees`, data),
+  updateEventFee: (eventId, feeId, data) => api.put(`/tournament/events/${eventId}/fees/${feeId}`, data),
+  deleteEventFee: (eventId, feeId) => api.delete(`/tournament/events/${eventId}/fees/${feeId}`),
+  bulkUpdateEventFees: (eventId, fees) => api.put(`/tournament/events/${eventId}/fees`, fees),
+
+  // =====================================================
+  // Event Fee Types (fee type templates at event level)
+  // =====================================================
+  getEventFeeTypes: (eventId) => api.get(`/tournament/events/${eventId}/fee-types`),
+  createEventFeeType: (eventId, data) => api.post(`/tournament/events/${eventId}/fee-types`, data),
+  updateEventFeeType: (eventId, feeTypeId, data) => api.put(`/tournament/events/${eventId}/fee-types/${feeTypeId}`, data),
+  deleteEventFeeType: (eventId, feeTypeId) => api.delete(`/tournament/events/${eventId}/fee-types/${feeTypeId}`),
+  bulkUpdateEventFeeTypes: (eventId, feeTypes) => api.put(`/tournament/events/${eventId}/fee-types`, feeTypes)
 }
 
 // Messaging API
@@ -2376,6 +2464,13 @@ export const eventStaffApi = {
   // Self-registration
   selfRegister: (eventId, data) => api.post(`/eventstaff/event/${eventId}/self-register`, data),
   getMyStatus: (eventId) => api.get(`/eventstaff/event/${eventId}/my-status`),
+  getAvailableRoles: (eventId) => api.get(`/eventstaff/event/${eventId}/available-roles`),
+
+  // Pending staff management (admin)
+  getPendingStaff: (eventId) => api.get(`/eventstaff/event/${eventId}/pending`),
+  approveStaff: (eventId, staffId, data) => api.post(`/eventstaff/event/${eventId}/staff/${staffId}/approve`, data),
+  declineStaff: (eventId, staffId, reason = null) =>
+    api.post(`/eventstaff/event/${eventId}/staff/${staffId}/decline`, { reason }),
 
   // Permission check
   hasPermission: (eventId, permission) => api.get(`/eventstaff/event/${eventId}/has-permission/${permission}`),

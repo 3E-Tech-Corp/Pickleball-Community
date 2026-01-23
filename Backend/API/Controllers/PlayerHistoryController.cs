@@ -41,22 +41,58 @@ public class PlayerHistoryController : ControllerBase
         if (user == null)
             return NotFound(new ApiResponse<PlayerHistorySummaryDto> { Success = false, Message = "User not found" });
 
-        // Game stats
-        var gameStats = await _context.Set<EventGamePlayer>()
-            .Where(gp => gp.UserId == userId && gp.Game != null && gp.Game.Status == "Finished")
-            .Select(gp => new
-            {
-                gp.UnitId,
-                WinnerUnitId = gp.Game!.WinnerUnitId,
-                FinishedAt = gp.Game.FinishedAt
-            })
-            .ToListAsync();
+        // Game stats - find games via unit membership
+        // Use IQueryable subquery to avoid OPENJSON CTE issues with Contains on List
+        var userUnitIdsQuery = _context.EventUnitMembers
+            .Where(m => m.UserId == userId && m.InviteStatus == "Accepted")
+            .Select(m => m.UnitId);
 
-        var totalGames = gameStats.Count;
-        var totalWins = gameStats.Count(g => g.UnitId == g.WinnerUnitId);
-        var totalLosses = totalGames - totalWins;
-        var winPercentage = totalGames > 0 ? Math.Round((decimal)totalWins / totalGames * 100, 1) : 0;
-        var lastGameDate = gameStats.Max(g => g.FinishedAt);
+        // Materialize for in-memory processing later
+        var userUnitIds = await userUnitIdsQuery.Distinct().ToListAsync();
+        var userUnitIdsSet = userUnitIds.ToHashSet();
+
+        int totalGames = 0;
+        int totalWins = 0;
+        int totalLosses = 0;
+        decimal winPercentage = 0;
+        DateTime? lastGameDate = null;
+
+        if (userUnitIds.Any())
+        {
+            // Use subquery-based Contains to avoid OPENJSON CTE issues
+            // Get encounter IDs via subquery (generates IN (SELECT ...) instead of OPENJSON)
+            var encounterIdsQuery = _context.EventEncounters
+                .Where(e => (e.Unit1Id != null && userUnitIdsQuery.Contains(e.Unit1Id.Value)) ||
+                            (e.Unit2Id != null && userUnitIdsQuery.Contains(e.Unit2Id.Value)))
+                .Select(e => e.Id);
+
+            // Get finished games using the subquery
+            var rawGameStats = await _context.EventGames
+                .Where(g => g.Status == "Finished" && g.EncounterMatch != null && g.EncounterMatch.EncounterId != null)
+                .Where(g => encounterIdsQuery.Contains(g.EncounterMatch!.EncounterId))
+                .Select(g => new
+                {
+                    Unit1Id = g.EncounterMatch!.Encounter!.Unit1Id,
+                    Unit2Id = g.EncounterMatch!.Encounter!.Unit2Id,
+                    WinnerUnitId = g.WinnerUnitId,
+                    FinishedAt = g.FinishedAt
+                })
+                .ToListAsync();
+
+            // Process in memory to determine player's unit for each game
+            var gameStats = rawGameStats.Select(g => new
+            {
+                PlayerUnitId = userUnitIdsSet.Contains(g.Unit1Id ?? 0) ? g.Unit1Id : g.Unit2Id,
+                WinnerUnitId = g.WinnerUnitId,
+                FinishedAt = g.FinishedAt
+            }).ToList();
+
+            totalGames = gameStats.Count;
+            totalWins = gameStats.Count(g => g.PlayerUnitId == g.WinnerUnitId);
+            totalLosses = totalGames - totalWins;
+            winPercentage = totalGames > 0 ? Math.Round((decimal)totalWins / totalGames * 100, 1) : 0;
+            lastGameDate = gameStats.Any() ? gameStats.Max(g => g.FinishedAt) : null;
+        }
 
         // Awards summary
         var awards = await _context.Set<PlayerAward>()
@@ -170,6 +206,7 @@ public class PlayerHistoryController : ControllerBase
 
     /// <summary>
     /// Get player's game history with filtering
+    /// Uses EventUnitMembers to find player's units, then finds games from encounters
     /// </summary>
     [HttpGet("{userId}/games")]
     public async Task<ActionResult<ApiResponse<GameHistoryPagedResponse>>> GetGameHistory(
@@ -182,87 +219,127 @@ public class PlayerHistoryController : ControllerBase
         if (user == null)
             return NotFound(new ApiResponse<GameHistoryPagedResponse> { Success = false, Message = "User not found" });
 
-        // Base query: get all games where this player participated
-        var query = _context.Set<EventGamePlayer>()
-            .Include(gp => gp.Game)
-                .ThenInclude(g => g!.EncounterMatch)
-                    .ThenInclude(m => m!.Encounter)
-                        .ThenInclude(e => e!.Event)
-                            .ThenInclude(ev => ev!.EventType)
-            .Include(gp => gp.Game)
-                .ThenInclude(g => g!.EncounterMatch)
-                    .ThenInclude(m => m!.Encounter)
-                        .ThenInclude(e => e!.Division)
-            .Include(gp => gp.Game)
-                .ThenInclude(g => g!.Players)
-                    .ThenInclude(p => p.User)
-            .Include(gp => gp.Unit)
-            .Where(gp => gp.UserId == userId && gp.Game != null && gp.Game.Status == "Finished");
+        // Step 1: Create IQueryable subquery for user's units (avoids OPENJSON CTE issues)
+        var userUnitIdsQuery = _context.EventUnitMembers
+            .Where(m => m.UserId == userId && m.InviteStatus == "Accepted")
+            .Select(m => m.UnitId);
+
+        // Materialize for in-memory processing later and early exit check
+        var userUnitIds = await userUnitIdsQuery.Distinct().ToListAsync();
+
+        if (!userUnitIds.Any())
+        {
+            return Ok(new ApiResponse<GameHistoryPagedResponse>
+            {
+                Success = true,
+                Data = new GameHistoryPagedResponse
+                {
+                    Games = new List<PlayerGameHistoryDto>(),
+                    TotalCount = 0,
+                    Page = request.Page,
+                    PageSize = request.PageSize,
+                    TotalGames = 0,
+                    TotalWins = 0,
+                    TotalLosses = 0,
+                    WinPercentage = 0
+                }
+            });
+        }
+
+        // Step 2: Create IQueryable subquery for encounter IDs (generates IN (SELECT ...) instead of OPENJSON)
+        var encounterIdsQuery = _context.EventEncounters
+            .Where(e => (e.Unit1Id != null && userUnitIdsQuery.Contains(e.Unit1Id.Value)) ||
+                        (e.Unit2Id != null && userUnitIdsQuery.Contains(e.Unit2Id.Value)))
+            .Select(e => e.Id);
+
+        // Step 3: Get all finished games using subquery-based filtering
+        var gamesQuery = _context.EventGames
+            .Include(g => g.EncounterMatch)
+                .ThenInclude(m => m!.Encounter)
+                    .ThenInclude(e => e!.Event)
+                        .ThenInclude(ev => ev!.EventType)
+            .Include(g => g.EncounterMatch)
+                .ThenInclude(m => m!.Encounter)
+                    .ThenInclude(e => e!.Division)
+            .Include(g => g.EncounterMatch)
+                .ThenInclude(m => m!.Encounter)
+                    .ThenInclude(e => e!.Unit1)
+                        .ThenInclude(u => u!.Members)
+                            .ThenInclude(m => m.User)
+            .Include(g => g.EncounterMatch)
+                .ThenInclude(m => m!.Encounter)
+                    .ThenInclude(e => e!.Unit2)
+                        .ThenInclude(u => u!.Members)
+                            .ThenInclude(m => m.User)
+            .Where(g => g.Status == "Finished" && g.EncounterMatch != null && g.EncounterMatch.EncounterId != null)
+            .Where(g => encounterIdsQuery.Contains(g.EncounterMatch!.EncounterId));
 
         // Apply filters
         if (request.DateFrom.HasValue)
         {
-            query = query.Where(gp => gp.Game!.FinishedAt >= request.DateFrom.Value);
+            gamesQuery = gamesQuery.Where(g => g.FinishedAt >= request.DateFrom.Value);
         }
 
         if (request.DateTo.HasValue)
         {
-            query = query.Where(gp => gp.Game!.FinishedAt <= request.DateTo.Value);
+            gamesQuery = gamesQuery.Where(g => g.FinishedAt <= request.DateTo.Value);
         }
 
         if (!string.IsNullOrEmpty(request.EventType))
         {
-            query = query.Where(gp => gp.Game!.EncounterMatch!.Encounter!.Event!.EventType!.Name == request.EventType);
+            gamesQuery = gamesQuery.Where(g => g.EncounterMatch!.Encounter!.Event!.EventType!.Name == request.EventType);
         }
 
         if (request.EventId.HasValue)
         {
-            query = query.Where(gp => gp.Game!.EncounterMatch!.Encounter!.EventId == request.EventId.Value);
+            gamesQuery = gamesQuery.Where(g => g.EncounterMatch!.Encounter!.EventId == request.EventId.Value);
         }
 
-        if (request.WinsOnly == true)
-        {
-            query = query.Where(gp => gp.Game!.WinnerUnitId == gp.UnitId);
-        }
-
-        // Partner/Opponent name filtering will be done post-query due to complexity
-        var allGames = await query
-            .OrderByDescending(gp => gp.Game!.FinishedAt)
+        var allGames = await gamesQuery
+            .OrderByDescending(g => g.FinishedAt ?? g.CreatedAt)
             .ToListAsync();
 
         // Build game history DTOs with partner/opponent info
         var gameHistoryList = new List<PlayerGameHistoryDto>();
 
-        foreach (var gp in allGames)
+        foreach (var game in allGames)
         {
-            var game = gp.Game!;
             var encounter = game.EncounterMatch!.Encounter!;
             var evt = encounter.Event!;
-            var division = encounter.Division!;
+            var division = encounter.Division;
 
-            var playerUnitId = gp.UnitId;
+            // Determine which unit the player was on
+            var playerUnitId = userUnitIds.Contains(encounter.Unit1Id ?? 0) ? encounter.Unit1Id : encounter.Unit2Id;
+            if (!playerUnitId.HasValue) continue;
+
             var isWin = game.WinnerUnitId == playerUnitId;
+
+            // Apply wins only filter
+            if (request.WinsOnly == true && !isWin)
+                continue;
 
             // Determine player's score and opponent's score
             var playerScore = encounter.Unit1Id == playerUnitId ? game.Unit1Score : game.Unit2Score;
             var opponentScore = encounter.Unit1Id == playerUnitId ? game.Unit2Score : game.Unit1Score;
 
-            // Get partner (same unit, different user)
-            var partner = game.Players
-                .Where(p => p.UnitId == playerUnitId && p.UserId != userId)
-                .Select(p => p.User)
-                .FirstOrDefault();
+            // Get partner and opponents from unit members
+            var playerUnit = encounter.Unit1Id == playerUnitId ? encounter.Unit1 : encounter.Unit2;
+            var opponentUnit = encounter.Unit1Id == playerUnitId ? encounter.Unit2 : encounter.Unit1;
 
-            // Get opponents (different unit)
-            var opponents = game.Players
-                .Where(p => p.UnitId != playerUnitId)
-                .Select(p => new GameOpponentDto
+            var partnerMember = playerUnit?.Members
+                .Where(m => m.UserId != userId && m.InviteStatus == "Accepted")
+                .FirstOrDefault();
+            var partner = partnerMember?.User;
+
+            var opponents = opponentUnit?.Members
+                .Where(m => m.InviteStatus == "Accepted")
+                .Select(m => new GameOpponentDto
                 {
-                    UserId = p.UserId,
-                    Name = p.User != null ? Utility.FormatName(p.User.LastName, p.User.FirstName) : "Unknown",
-                    ProfileImageUrl = p.User?.ProfileImageUrl
+                    UserId = m.UserId,
+                    Name = m.User != null ? Utility.FormatName(m.User.LastName, m.User.FirstName) : "Unknown",
+                    ProfileImageUrl = m.User?.ProfileImageUrl
                 })
-                .ToList();
+                .ToList() ?? new List<GameOpponentDto>();
 
             // Apply partner/opponent name filters
             if (!string.IsNullOrEmpty(request.PartnerName))
@@ -296,8 +373,8 @@ public class PlayerHistoryController : ControllerBase
                 EventId = evt.Id,
                 EventName = evt.Name,
                 EventType = evt.EventType?.Name,
-                DivisionId = division.Id,
-                DivisionName = division.Name,
+                DivisionId = division?.Id ?? 0,
+                DivisionName = division?.Name ?? "Unknown",
                 GameDate = game.FinishedAt ?? game.CreatedAt,
                 GameNumber = game.GameNumber,
                 PlayerScore = playerScore,
@@ -806,30 +883,67 @@ public class PlayerHistoryController : ControllerBase
             if (unit != null) units[unitId] = unit;
         }
 
-        // Map to DTOs
-        var payments = paymentRecords.Select(p => new PlayerPaymentHistoryDto
+        // Fetch registrations linked to these payments
+        var paymentIds = paymentRecords.Select(p => p.Id).ToList();
+        var registrationsByPayment = new Dictionary<int, List<PaymentRegistrationDto>>();
+
+        foreach (var paymentId in paymentIds)
         {
-            Id = p.Id,
-            EventId = p.RelatedObjectId,
-            EventName = p.RelatedObjectId.HasValue && events.TryGetValue(p.RelatedObjectId.Value, out var evt) ? evt.Name : "Unknown Event",
-            EventDate = p.RelatedObjectId.HasValue && events.TryGetValue(p.RelatedObjectId.Value, out var evt2) ? evt2.StartDate : null,
-            UnitId = p.SecondaryObjectId,
-            UnitName = p.SecondaryObjectId.HasValue && units.TryGetValue(p.SecondaryObjectId.Value, out var unit) ? unit.Name : null,
-            DivisionName = p.SecondaryObjectId.HasValue && units.TryGetValue(p.SecondaryObjectId.Value, out var unit2) && unit2.Division != null ? unit2.Division.Name : null,
-            Amount = p.Amount,
-            PaymentMethod = p.PaymentMethod,
-            PaymentReference = p.PaymentReference,
-            PaymentProofUrl = p.PaymentProofUrl,
-            ReferenceId = p.ReferenceId,
-            Status = p.Status,
-            IsApplied = p.IsApplied,
-            AppliedAt = p.AppliedAt,
-            VerifiedAt = p.VerifiedAt,
-            VerifiedByName = p.VerifiedByUser != null
-                ? Utility.FormatName(p.VerifiedByUser.LastName, p.VerifiedByUser.FirstName)
-                : null,
-            Notes = p.Notes,
-            CreatedAt = p.CreatedAt
+            var members = await _context.EventUnitMembers
+                .Include(m => m.Unit)
+                    .ThenInclude(u => u!.Division)
+                .Include(m => m.Unit)
+                    .ThenInclude(u => u!.Event)
+                .Include(m => m.User)
+                .Include(m => m.SelectedFee)
+                .Where(m => m.PaymentId == paymentId)
+                .ToListAsync();
+
+            registrationsByPayment[paymentId] = members.Select(m => new PaymentRegistrationDto
+            {
+                MemberId = m.Id,
+                UnitId = m.UnitId,
+                UnitName = m.Unit?.Name ?? "Unknown Unit",
+                DivisionId = m.Unit?.DivisionId ?? 0,
+                DivisionName = m.Unit?.Division?.Name ?? "Unknown Division",
+                EventId = m.Unit?.EventId ?? 0,
+                EventName = m.Unit?.Event?.Name ?? "Unknown Event",
+                PlayerName = m.User != null ? Utility.FormatName(m.User.LastName, m.User.FirstName) : "Unknown Player",
+                FeeAmount = m.SelectedFee?.Amount ?? m.AmountPaid,
+                FeeName = m.SelectedFee?.Name
+            }).ToList();
+        }
+
+        // Map to DTOs
+        var payments = paymentRecords.Select(p =>
+        {
+            var regs = registrationsByPayment.TryGetValue(p.Id, out var r) ? r : new List<PaymentRegistrationDto>();
+            return new PlayerPaymentHistoryDto
+            {
+                Id = p.Id,
+                EventId = p.RelatedObjectId,
+                EventName = p.RelatedObjectId.HasValue && events.TryGetValue(p.RelatedObjectId.Value, out var evt) ? evt.Name : "Unknown Event",
+                EventDate = p.RelatedObjectId.HasValue && events.TryGetValue(p.RelatedObjectId.Value, out var evt2) ? evt2.StartDate : null,
+                UnitId = p.SecondaryObjectId,
+                UnitName = p.SecondaryObjectId.HasValue && units.TryGetValue(p.SecondaryObjectId.Value, out var unit) ? unit.Name : null,
+                DivisionName = p.SecondaryObjectId.HasValue && units.TryGetValue(p.SecondaryObjectId.Value, out var unit2) && unit2.Division != null ? unit2.Division.Name : null,
+                Amount = p.Amount,
+                PaymentMethod = p.PaymentMethod,
+                PaymentReference = p.PaymentReference,
+                PaymentProofUrl = p.PaymentProofUrl,
+                ReferenceId = p.ReferenceId,
+                Status = p.Status,
+                IsApplied = p.IsApplied,
+                AppliedAt = p.AppliedAt,
+                VerifiedAt = p.VerifiedAt,
+                VerifiedByName = p.VerifiedByUser != null
+                    ? Utility.FormatName(p.VerifiedByUser.LastName, p.VerifiedByUser.FirstName)
+                    : null,
+                Notes = p.Notes,
+                CreatedAt = p.CreatedAt,
+                Registrations = regs,
+                TotalRegistrationFees = regs.Sum(reg => reg.FeeAmount)
+            };
         }).ToList();
 
         // Calculate summary stats for all payments (not just current page)

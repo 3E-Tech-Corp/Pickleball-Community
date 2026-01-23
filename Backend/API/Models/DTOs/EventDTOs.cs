@@ -22,7 +22,7 @@ public class EventPublicViewDto
     public string? Country { get; set; }
     public double? Latitude { get; set; }
     public double? Longitude { get; set; }
-    public int? CourtId { get; set; }
+    public int? VenueId { get; set; }
     public string? PosterImageUrl { get; set; }
     public string? BannerImageUrl { get; set; }
     public decimal RegistrationFee { get; set; }
@@ -43,6 +43,7 @@ public class EventPublicViewDto
     public string? ContactPhone { get; set; }
     public DateTime CreatedAt { get; set; }
     public string? TournamentStatus { get; set; }
+    public bool AllowMultipleDivisions { get; set; } = true;
 
     // Divisions (public info only)
     public List<EventDivisionPublicDto> Divisions { get; set; } = new();
@@ -57,6 +58,7 @@ public class EventDivisionPublicDto
     public int Id { get; set; }
     public string Name { get; set; } = string.Empty;
     public string? Description { get; set; }
+    public int? TeamUnitId { get; set; }
     public string? TeamUnitName { get; set; }
     public string? AgeGroupName { get; set; }
     public string? SkillLevelName { get; set; }
@@ -104,7 +106,7 @@ public class EventDto
     public string? Country { get; set; }
     public double? Latitude { get; set; }
     public double? Longitude { get; set; }
-    public int? CourtId { get; set; }
+    public int? VenueId { get; set; }
     public string? PosterImageUrl { get; set; }
     public decimal RegistrationFee { get; set; }
     public decimal PerDivisionFee { get; set; }
@@ -304,6 +306,9 @@ public class UpdateDivisionDto
     // Scheduling constraints
     public int? MinRestTimeMinutes { get; set; }
     public int? EstimatedMatchDurationMinutes { get; set; }
+
+    // Status
+    public bool? IsActive { get; set; }
 }
 
 // Division with registrations
@@ -375,7 +380,7 @@ public class CreateEventDto
     public DateTime? RegistrationCloseDate { get; set; }
     public bool IsPrivate { get; set; } = false;
     public bool AllowMultipleDivisions { get; set; } = true;
-    public int? CourtId { get; set; }
+    public int? VenueId { get; set; }
     public string? VenueName { get; set; }
     public string? Address { get; set; }
     public string? City { get; set; }
@@ -708,6 +713,8 @@ public class EventStaffDto
     public DateTime? AvailableTo { get; set; }
     public string? SelfRegistrationNotes { get; set; }
     public string? AdminNotes { get; set; }
+    public string? PreferredRoles { get; set; }
+    public string? ContactPhone { get; set; }
     public int? AssignedByUserId { get; set; }
     public string? AssignedByUserName { get; set; }
     public DateTime? AssignedAt { get; set; }
@@ -733,6 +740,28 @@ public class CreateEventStaffSelfRegistrationDto
     public DateTime? AvailableFrom { get; set; }
     public DateTime? AvailableTo { get; set; }
     public string? Notes { get; set; }
+    /// <summary>
+    /// JSON array of preferred role IDs the user is interested in
+    /// </summary>
+    public string? PreferredRoles { get; set; }
+    public string? ContactPhone { get; set; }
+}
+
+/// <summary>
+/// Admin approves a pending staff registration
+/// </summary>
+public class ApproveStaffRequest
+{
+    public int? RoleId { get; set; }
+    public string? AdminNotes { get; set; }
+}
+
+/// <summary>
+/// Admin declines a pending staff registration
+/// </summary>
+public class DeclineStaffRequest
+{
+    public string? Reason { get; set; }
 }
 
 /// <summary>

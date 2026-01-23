@@ -1151,6 +1151,24 @@ const Profile = () => {
                           <BadgeCheck className="w-3 h-3" /> Verified email
                         </p>
                       )}
+                      {/* Show email in public profile toggle */}
+                      <div className="flex items-center justify-between mt-2 p-2 bg-gray-50 rounded-lg">
+                        <span className="text-xs text-gray-600">Show in public profile</span>
+                        <button
+                          type="button"
+                          onClick={() => handleMessagingSettingChange('showEmailInProfile', !showEmailInProfile)}
+                          disabled={savingMessagingSettings}
+                          className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none disabled:opacity-50 ${
+                            showEmailInProfile ? 'bg-blue-600' : 'bg-gray-300'
+                          }`}
+                        >
+                          <span
+                            className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                              showEmailInProfile ? 'translate-x-4' : 'translate-x-0'
+                            }`}
+                          />
+                        </button>
+                      </div>
                     </div>
                     <div>
                       <div className="flex items-center justify-between mb-1">
@@ -1183,6 +1201,24 @@ const Profile = () => {
                           <BadgeCheck className="w-3 h-3" /> Verified phone
                         </p>
                       )}
+                      {/* Show phone in public profile toggle */}
+                      <div className="flex items-center justify-between mt-2 p-2 bg-gray-50 rounded-lg">
+                        <span className="text-xs text-gray-600">Show in public profile</span>
+                        <button
+                          type="button"
+                          onClick={() => handleMessagingSettingChange('showPhoneInProfile', !showPhoneInProfile)}
+                          disabled={savingMessagingSettings}
+                          className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none disabled:opacity-50 ${
+                            showPhoneInProfile ? 'bg-blue-600' : 'bg-gray-300'
+                          }`}
+                        >
+                          <span
+                            className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                              showPhoneInProfile ? 'translate-x-4' : 'translate-x-0'
+                            }`}
+                          />
+                        </button>
+                      </div>
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Gender</label>
@@ -1458,72 +1494,6 @@ const Profile = () => {
                       <span
                         className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
                           allowClubMessages ? 'translate-x-5' : 'translate-x-0'
-                        }`}
-                      />
-                    </button>
-                  </div>
-
-                  {/* Profile Visibility - Section Header */}
-                  <div className="pt-4 border-t border-gray-200">
-                    <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
-                      <Eye className="w-4 h-4 text-gray-500" />
-                      Public Profile Visibility
-                    </h4>
-                  </div>
-
-                  {/* Show Email in Public Profile */}
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <Mail className="w-5 h-5 text-blue-500" />
-                        <span className="font-medium text-gray-900">Show Email in Profile</span>
-                        {emailVerified && (
-                          <BadgeCheck className="w-4 h-4 text-blue-500" title="Verified" />
-                        )}
-                      </div>
-                      <p className="text-sm text-gray-500 mt-1 ml-7">
-                        Display your email address on your public profile
-                      </p>
-                    </div>
-                    <button
-                      onClick={() => handleMessagingSettingChange('showEmailInProfile', !showEmailInProfile)}
-                      disabled={savingMessagingSettings}
-                      className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 ${
-                        showEmailInProfile ? 'bg-blue-600' : 'bg-gray-200'
-                      }`}
-                    >
-                      <span
-                        className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                          showEmailInProfile ? 'translate-x-5' : 'translate-x-0'
-                        }`}
-                      />
-                    </button>
-                  </div>
-
-                  {/* Show Phone in Public Profile */}
-                  <div className="flex items-center justify-between pt-4 border-t border-gray-100">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <Phone className="w-5 h-5 text-green-500" />
-                        <span className="font-medium text-gray-900">Show Phone in Profile</span>
-                        {phoneVerified && (
-                          <BadgeCheck className="w-4 h-4 text-blue-500" title="Verified" />
-                        )}
-                      </div>
-                      <p className="text-sm text-gray-500 mt-1 ml-7">
-                        Display your phone number on your public profile
-                      </p>
-                    </div>
-                    <button
-                      onClick={() => handleMessagingSettingChange('showPhoneInProfile', !showPhoneInProfile)}
-                      disabled={savingMessagingSettings}
-                      className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 ${
-                        showPhoneInProfile ? 'bg-blue-600' : 'bg-gray-200'
-                      }`}
-                    >
-                      <span
-                        className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                          showPhoneInProfile ? 'translate-x-5' : 'translate-x-0'
                         }`}
                       />
                     </button>
