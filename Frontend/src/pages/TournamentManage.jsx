@@ -937,6 +937,18 @@ export default function TournamentManage() {
                 </Link>
               )}
 
+              {/* Send Notification link - organizers only */}
+              {isOrganizer && (
+                <Link
+                  to={`/event/${eventId}/notifications`}
+                  className="px-3 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors font-medium text-sm flex items-center gap-2"
+                  title="Send Notification"
+                >
+                  <Send className="w-4 h-4" />
+                  <span className="hidden sm:inline">Notify</span>
+                </Link>
+              )}
+
               {/* Status dropdown - organizers only */}
               {isOrganizer && (
                 <select

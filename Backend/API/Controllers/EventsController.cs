@@ -16,17 +16,20 @@ public class EventsController : EventControllerBase
     private readonly ILogger<EventsController> _logger;
     private readonly INotificationService _notificationService;
     private readonly IActivityAwardService _activityAwardService;
+    private readonly IEmailNotificationService _emailService;
 
     public EventsController(
         ApplicationDbContext context,
         ILogger<EventsController> logger,
         INotificationService notificationService,
-        IActivityAwardService activityAwardService)
+        IActivityAwardService activityAwardService,
+        IEmailNotificationService emailService)
         : base(context)
     {
         _logger = logger;
         _notificationService = notificationService;
         _activityAwardService = activityAwardService;
+        _emailService = emailService;
     }
 
     // Check if user has completed their profile (not a "New User")
@@ -2466,6 +2469,321 @@ public class EventsController : EventControllerBase
         return Ok(new ApiResponse<AdminEventDto> { Success = true, Data = result });
     }
 
+    /// <summary>
+    /// Get recipients for mass notification preview
+    /// </summary>
+    [HttpPost("{eventId}/notifications/preview")]
+    [Authorize]
+    public async Task<ActionResult<ApiResponse<MassNotificationPreviewResponse>>> PreviewNotificationRecipients(
+        int eventId,
+        [FromBody] MassNotificationRequest request)
+    {
+        if (!await CanManageEventAsync(eventId))
+            return Forbid();
+
+        var recipients = await GetNotificationRecipientsAsync(eventId, request);
+
+        return Ok(new ApiResponse<MassNotificationPreviewResponse>
+        {
+            Success = true,
+            Data = new MassNotificationPreviewResponse
+            {
+                TotalRecipients = recipients.Count,
+                Recipients = recipients.Take(50).ToList(), // Preview first 50
+                HasMore = recipients.Count > 50
+            }
+        });
+    }
+
+    /// <summary>
+    /// Send mass notification to event participants
+    /// </summary>
+    [HttpPost("{eventId}/notifications/send")]
+    [Authorize]
+    public async Task<ActionResult<ApiResponse<MassNotificationResult>>> SendMassNotification(
+        int eventId,
+        [FromBody] MassNotificationRequest request)
+    {
+        if (!await CanManageEventAsync(eventId))
+            return Forbid();
+
+        if (string.IsNullOrWhiteSpace(request.Subject) || string.IsNullOrWhiteSpace(request.Message))
+            return BadRequest(new ApiResponse<MassNotificationResult>
+            {
+                Success = false,
+                Message = "Subject and message are required"
+            });
+
+        var evt = await _context.Events.FindAsync(eventId);
+        if (evt == null)
+            return NotFound(new ApiResponse<MassNotificationResult>
+            {
+                Success = false,
+                Message = "Event not found"
+            });
+
+        var recipients = await GetNotificationRecipientsAsync(eventId, request);
+
+        if (recipients.Count == 0)
+            return BadRequest(new ApiResponse<MassNotificationResult>
+            {
+                Success = false,
+                Message = "No recipients match the selected criteria"
+            });
+
+        var userId = GetUserId();
+        var sentCount = 0;
+        var failedCount = 0;
+
+        // Build HTML email body
+        var htmlBody = $@"
+            <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;'>
+                <h2 style='color: #ea580c;'>{evt.Name}</h2>
+                <div style='padding: 20px; background-color: #f9fafb; border-radius: 8px;'>
+                    {request.Message.Replace("\n", "<br/>")}
+                </div>
+                <p style='color: #6b7280; font-size: 14px; margin-top: 20px;'>
+                    This message was sent to you because you are registered for this event.
+                </p>
+            </div>";
+
+        foreach (var recipient in recipients)
+        {
+            try
+            {
+                if (!string.IsNullOrWhiteSpace(recipient.Email))
+                {
+                    await _emailService.SendSimpleAsync(
+                        recipient.UserId,
+                        recipient.Email,
+                        request.Subject,
+                        htmlBody
+                    );
+                    sentCount++;
+                }
+
+                // Also send in-app notification if requested
+                if (request.SendInAppNotification)
+                {
+                    await _notificationService.CreateAndSendAsync(
+                        recipient.UserId,
+                        "EventUpdate",
+                        request.Subject,
+                        request.Message.Length > 200 ? request.Message.Substring(0, 200) + "..." : request.Message,
+                        eventId
+                    );
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to send notification to user {UserId}", recipient.UserId);
+                failedCount++;
+            }
+        }
+
+        _logger.LogInformation(
+            "Mass notification sent for event {EventId} by user {UserId}: {SentCount} sent, {FailedCount} failed",
+            eventId, userId, sentCount, failedCount);
+
+        return Ok(new ApiResponse<MassNotificationResult>
+        {
+            Success = true,
+            Data = new MassNotificationResult
+            {
+                SentCount = sentCount,
+                FailedCount = failedCount,
+                TotalRecipients = recipients.Count
+            }
+        });
+    }
+
+    /// <summary>
+    /// Get available filter options for mass notifications
+    /// </summary>
+    [HttpGet("{eventId}/notifications/filters")]
+    [Authorize]
+    public async Task<ActionResult<ApiResponse<MassNotificationFilters>>> GetNotificationFilters(int eventId)
+    {
+        if (!await CanManageEventAsync(eventId))
+            return Forbid();
+
+        // Get divisions with player counts
+        var divisions = await _context.EventDivisions
+            .Where(d => d.EventId == eventId)
+            .Select(d => new DivisionFilterOption
+            {
+                Id = d.Id,
+                Name = d.Name,
+                PlayerCount = d.Units
+                    .Where(u => u.Status != "Cancelled" && !u.IsTemporary)
+                    .SelectMany(u => u.Members)
+                    .Where(m => m.InviteStatus == "Accepted")
+                    .Select(m => m.UserId)
+                    .Distinct()
+                    .Count()
+            })
+            .ToListAsync();
+
+        // Get staff roles with counts
+        var staffRoles = await _context.EventStaffRoles
+            .Where(r => r.EventId == eventId)
+            .Select(r => new StaffRoleFilterOption
+            {
+                Id = r.Id,
+                Name = r.Name,
+                StaffCount = _context.EventStaff
+                    .Count(s => s.EventId == eventId && s.RoleId == r.Id && s.Status == "Active")
+            })
+            .ToListAsync();
+
+        // Count staff without role
+        var staffWithoutRoleCount = await _context.EventStaff
+            .CountAsync(s => s.EventId == eventId && s.RoleId == null && s.Status == "Active");
+
+        return Ok(new ApiResponse<MassNotificationFilters>
+        {
+            Success = true,
+            Data = new MassNotificationFilters
+            {
+                Divisions = divisions,
+                StaffRoles = staffRoles,
+                StaffWithoutRoleCount = staffWithoutRoleCount
+            }
+        });
+    }
+
+    private async Task<List<NotificationRecipient>> GetNotificationRecipientsAsync(
+        int eventId,
+        MassNotificationRequest request)
+    {
+        var recipients = new Dictionary<int, NotificationRecipient>();
+
+        // Get players from selected divisions
+        if (request.IncludePlayers && request.DivisionIds?.Any() == true)
+        {
+            var divisionIdSet = new HashSet<int>(request.DivisionIds);
+            var playerQuery = _context.EventUnitMembers
+                .Include(m => m.User)
+                .Include(m => m.Unit)
+                .Where(m => m.Unit.EventId == eventId
+                    && divisionIdSet.Contains(m.Unit.DivisionId)
+                    && m.Unit.Status != "Cancelled"
+                    && !m.Unit.IsTemporary
+                    && m.InviteStatus == "Accepted"
+                    && m.User != null);
+
+            var players = await playerQuery.ToListAsync();
+            foreach (var m in players)
+            {
+                if (!recipients.ContainsKey(m.UserId))
+                {
+                    recipients[m.UserId] = new NotificationRecipient
+                    {
+                        UserId = m.UserId,
+                        Name = FormatName(m.User!.LastName, m.User.FirstName),
+                        Email = m.User.Email,
+                        Type = "Player"
+                    };
+                }
+            }
+        }
+
+        // Get all players if no specific divisions
+        if (request.IncludePlayers && (request.DivisionIds == null || !request.DivisionIds.Any()))
+        {
+            var allPlayers = await _context.EventUnitMembers
+                .Include(m => m.User)
+                .Include(m => m.Unit)
+                .Where(m => m.Unit.EventId == eventId
+                    && m.Unit.Status != "Cancelled"
+                    && !m.Unit.IsTemporary
+                    && m.InviteStatus == "Accepted"
+                    && m.User != null)
+                .ToListAsync();
+
+            foreach (var m in allPlayers)
+            {
+                if (!recipients.ContainsKey(m.UserId))
+                {
+                    recipients[m.UserId] = new NotificationRecipient
+                    {
+                        UserId = m.UserId,
+                        Name = FormatName(m.User!.LastName, m.User.FirstName),
+                        Email = m.User.Email,
+                        Type = "Player"
+                    };
+                }
+            }
+        }
+
+        // Get staff from selected roles
+        if (request.IncludeStaff)
+        {
+            var staffQuery = _context.EventStaff
+                .Include(s => s.User)
+                .Where(s => s.EventId == eventId && s.Status == "Active" && s.User != null);
+
+            if (request.StaffRoleIds?.Any() == true)
+            {
+                var roleIdSet = new HashSet<int>(request.StaffRoleIds);
+                // Include null roleId if 0 is in the list (staff without role)
+                if (roleIdSet.Contains(0))
+                {
+                    staffQuery = staffQuery.Where(s => s.RoleId == null || roleIdSet.Contains(s.RoleId ?? 0));
+                }
+                else
+                {
+                    staffQuery = staffQuery.Where(s => s.RoleId.HasValue && roleIdSet.Contains(s.RoleId.Value));
+                }
+            }
+
+            var staff = await staffQuery.ToListAsync();
+            foreach (var s in staff)
+            {
+                if (!recipients.ContainsKey(s.UserId))
+                {
+                    recipients[s.UserId] = new NotificationRecipient
+                    {
+                        UserId = s.UserId,
+                        Name = FormatName(s.User!.LastName, s.User.FirstName),
+                        Email = s.User.Email,
+                        Type = "Staff"
+                    };
+                }
+                else
+                {
+                    // User is both player and staff
+                    recipients[s.UserId].Type = "Player & Staff";
+                }
+            }
+        }
+
+        // Add specific users
+        if (request.SpecificUserIds?.Any() == true)
+        {
+            var userIdSet = new HashSet<int>(request.SpecificUserIds);
+            var specificUsers = await _context.Users
+                .Where(u => userIdSet.Contains(u.Id))
+                .ToListAsync();
+
+            foreach (var u in specificUsers)
+            {
+                if (!recipients.ContainsKey(u.Id))
+                {
+                    recipients[u.Id] = new NotificationRecipient
+                    {
+                        UserId = u.Id,
+                        Name = FormatName(u.LastName, u.FirstName),
+                        Email = u.Email,
+                        Type = "Specific"
+                    };
+                }
+            }
+        }
+
+        return recipients.Values.OrderBy(r => r.Name).ToList();
+    }
+
     #endregion
 }
 
@@ -2541,6 +2859,65 @@ public class AdminEventUpdateRequest
     public string? Country { get; set; }
     public decimal? RegistrationFee { get; set; }
     public decimal? PerDivisionFee { get; set; }
+}
+
+#endregion
+
+#region Mass Notification DTOs
+
+public class MassNotificationRequest
+{
+    public string Subject { get; set; } = string.Empty;
+    public string Message { get; set; } = string.Empty;
+    public bool IncludePlayers { get; set; }
+    public bool IncludeStaff { get; set; }
+    public List<int>? DivisionIds { get; set; }
+    public List<int>? StaffRoleIds { get; set; }
+    public List<int>? SpecificUserIds { get; set; }
+    public bool SendInAppNotification { get; set; } = true;
+}
+
+public class MassNotificationPreviewResponse
+{
+    public int TotalRecipients { get; set; }
+    public List<NotificationRecipient> Recipients { get; set; } = new();
+    public bool HasMore { get; set; }
+}
+
+public class NotificationRecipient
+{
+    public int UserId { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public string? Email { get; set; }
+    public string Type { get; set; } = string.Empty; // Player, Staff, Player & Staff, Specific
+}
+
+public class MassNotificationResult
+{
+    public int SentCount { get; set; }
+    public int FailedCount { get; set; }
+    public int TotalRecipients { get; set; }
+}
+
+public class MassNotificationFilters
+{
+    public List<DivisionFilterOption> Divisions { get; set; } = new();
+    public List<StaffRoleFilterOption> StaffRoles { get; set; } = new();
+    public int StaffWithoutRoleCount { get; set; }
+}
+
+public class DivisionFilterOption
+{
+    public int Id { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public int PlayerCount { get; set; }
+}
+
+public class StaffRoleFilterOption
+{
+    public int Id { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public int StaffCount { get; set; }
 }
 
 #endregion

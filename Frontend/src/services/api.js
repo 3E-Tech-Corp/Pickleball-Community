@@ -995,7 +995,12 @@ export const eventsApi = {
     return api.get(`/events/admin/search?${queryParams.toString()}`);
   },
   adminGet: (eventId) => api.get(`/events/admin/${eventId}`),
-  adminUpdate: (eventId, data) => api.put(`/events/admin/${eventId}`, data)
+  adminUpdate: (eventId, data) => api.put(`/events/admin/${eventId}`, data),
+
+  // Mass notifications
+  getNotificationFilters: (eventId) => api.get(`/events/${eventId}/notifications/filters`),
+  previewNotificationRecipients: (eventId, data) => api.post(`/events/${eventId}/notifications/preview`, data),
+  sendMassNotification: (eventId, data) => api.post(`/events/${eventId}/notifications/send`, data)
 }
 
 // Clubs API
