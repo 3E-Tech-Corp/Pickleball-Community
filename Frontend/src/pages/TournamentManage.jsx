@@ -1616,48 +1616,58 @@ export default function TournamentManage() {
               </div>
             )}
 
-            {/* Division Summary - only show divisions with registrations */}
+            {/* Division Summary - show all divisions */}
             <div className="bg-white rounded-xl shadow-sm p-6">
               <h2 className="text-lg font-semibold text-gray-900 mb-4">Division Status</h2>
               <div className="space-y-4">
-                {dashboard?.divisions?.filter(d => d.registeredUnits > 0).map(div => (
-                  <div key={div.id} className="border rounded-lg p-4">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h3 className="font-medium text-gray-900">{div.name}</h3>
-                        <div className="flex gap-4 text-sm text-gray-500 mt-1">
-                          <span>{div.registeredUnits} / {div.maxUnits || '∞'} teams</span>
-                          {div.waitlistedUnits > 0 && (
-                            <span className="text-yellow-600">+{div.waitlistedUnits} waitlisted</span>
+                {(!dashboard?.divisions || dashboard.divisions.length === 0) ? (
+                  <p className="text-sm text-gray-500">No divisions created yet.</p>
+                ) : (
+                  dashboard.divisions.map(div => (
+                    <div key={div.id} className={`border rounded-lg p-4 ${div.registeredUnits === 0 ? 'border-dashed border-gray-300 bg-gray-50' : ''}`}>
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h3 className="font-medium text-gray-900">{div.name}</h3>
+                          <div className="flex gap-4 text-sm text-gray-500 mt-1">
+                            <span>{div.registeredUnits} / {div.maxUnits || '∞'} teams</span>
+                            {div.waitlistedUnits > 0 && (
+                              <span className="text-yellow-600">+{div.waitlistedUnits} waitlisted</span>
+                            )}
+                            {div.registeredUnits > 0 && (
+                              <span>{div.completedMatches} / {div.totalMatches} matches</span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {div.registeredUnits === 0 ? (
+                            <span className="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-500 rounded-full">
+                              No Registrations
+                            </span>
+                          ) : div.scheduleReady ? (
+                            <span className="px-2 py-1 text-xs font-medium bg-green-100 text-green-700 rounded-full">
+                              Schedule Ready
+                            </span>
+                          ) : (
+                            <span className="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-700 rounded-full">
+                              No Schedule
+                            </span>
                           )}
-                          <span>{div.completedMatches} / {div.totalMatches} matches</span>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        {div.scheduleReady ? (
-                          <span className="px-2 py-1 text-xs font-medium bg-green-100 text-green-700 rounded-full">
-                            Schedule Ready
-                          </span>
-                        ) : (
-                          <span className="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-700 rounded-full">
-                            No Schedule
-                          </span>
-                        )}
-                      </div>
+                      {/* Progress bar */}
+                      {div.totalMatches > 0 && (
+                        <div className="mt-3">
+                          <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-orange-500 transition-all"
+                              style={{ width: `${(div.completedMatches / div.totalMatches) * 100}%` }}
+                            />
+                          </div>
+                        </div>
+                      )}
                     </div>
-                    {/* Progress bar */}
-                    {div.totalMatches > 0 && (
-                      <div className="mt-3">
-                        <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                          <div
-                            className="h-full bg-orange-500 transition-all"
-                            style={{ width: `${(div.completedMatches / div.totalMatches) * 100}%` }}
-                          />
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ))}
+                  ))
+                )}
               </div>
             </div>
 
@@ -1696,7 +1706,7 @@ export default function TournamentManage() {
           </div>
         )}
 
-        {/* Divisions Tab - only show divisions with registrations */}
+        {/* Divisions Tab - show all divisions for organizers */}
         {activeTab === 'divisions' && (
           <div className="space-y-6">
             {/* Reset Tournament Button - for testing/dry runs */}
@@ -1720,7 +1730,25 @@ export default function TournamentManage() {
               </div>
             )}
 
-            {dashboard?.divisions?.filter(d => d.registeredUnits > 0).map(div => (
+            {/* Show message if no divisions exist */}
+            {(!dashboard?.divisions || dashboard.divisions.length === 0) && (
+              <div className="bg-gray-50 border border-gray-200 rounded-xl p-8 text-center">
+                <Layers className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 mb-2">No Divisions Created</h3>
+                <p className="text-sm text-gray-500 mb-4">
+                  Create divisions to organize your tournament by skill level, age group, or format.
+                </p>
+                <Link
+                  to={`/event/${eventId}/edit`}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+                >
+                  <Plus className="w-4 h-4" />
+                  Add Divisions
+                </Link>
+              </div>
+            )}
+
+            {dashboard?.divisions?.map(div => (
               <div key={div.id} className="bg-white rounded-xl shadow-sm p-6">
                 <div className="flex items-center justify-between mb-4">
                   <div>
