@@ -43,28 +43,12 @@ END
 GO
 
 -- =====================================================
--- Add SelectedFeeId to EventRegistrations
+-- NOTE: EventRegistrations table is deprecated - registration now uses EventUnits + EventUnitMembers
+-- The SelectedFeeId column is only needed on EventUnitMembers
 -- =====================================================
-IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[dbo].[EventRegistrations]') AND name = 'SelectedFeeId')
-BEGIN
-    ALTER TABLE [dbo].[EventRegistrations]
-    ADD [SelectedFeeId] INT NULL;
-    PRINT 'Added SelectedFeeId column to EventRegistrations'
-END
-GO
-
--- Add foreign key constraint
-IF NOT EXISTS (SELECT * FROM sys.foreign_keys WHERE name = 'FK_EventRegistrations_DivisionFees')
-BEGIN
-    ALTER TABLE [dbo].[EventRegistrations]
-    ADD CONSTRAINT [FK_EventRegistrations_DivisionFees]
-    FOREIGN KEY ([SelectedFeeId]) REFERENCES [dbo].[DivisionFees] ([Id]);
-    PRINT 'Added FK_EventRegistrations_DivisionFees constraint'
-END
-GO
 
 -- =====================================================
--- Add SelectedFeeId to EventUnitMembers (for team registrations)
+-- Add SelectedFeeId to EventUnitMembers
 -- =====================================================
 IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[dbo].[EventUnitMembers]') AND name = 'SelectedFeeId')
 BEGIN

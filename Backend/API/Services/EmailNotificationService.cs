@@ -2,6 +2,7 @@ using System.Data;
 using System.Text.Json;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
+using Pickleball.Community.Database;
 
 namespace Pickleball.Community.Services;
 
