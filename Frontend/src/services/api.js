@@ -1657,7 +1657,16 @@ export const tournamentApi = {
   createDivisionFee: (divisionId, data) => api.post(`/tournament/divisions/${divisionId}/fees`, data),
   updateDivisionFee: (divisionId, feeId, data) => api.put(`/tournament/divisions/${divisionId}/fees/${feeId}`, data),
   deleteDivisionFee: (divisionId, feeId) => api.delete(`/tournament/divisions/${divisionId}/fees/${feeId}`),
-  bulkUpdateDivisionFees: (divisionId, fees) => api.put(`/tournament/divisions/${divisionId}/fees`, fees)
+  bulkUpdateDivisionFees: (divisionId, fees) => api.put(`/tournament/divisions/${divisionId}/fees`, fees),
+
+  // =====================================================
+  // Event Fees (event-level fees, not division-specific)
+  // =====================================================
+  getEventFees: (eventId) => api.get(`/tournament/events/${eventId}/fees`),
+  createEventFee: (eventId, data) => api.post(`/tournament/events/${eventId}/fees`, data),
+  updateEventFee: (eventId, feeId, data) => api.put(`/tournament/events/${eventId}/fees/${feeId}`, data),
+  deleteEventFee: (eventId, feeId) => api.delete(`/tournament/events/${eventId}/fees/${feeId}`),
+  bulkUpdateEventFees: (eventId, fees) => api.put(`/tournament/events/${eventId}/fees`, fees)
 }
 
 // Messaging API

@@ -4,14 +4,24 @@ using System.ComponentModel.DataAnnotations.Schema;
 namespace Pickleball.Community.Models.Entities;
 
 /// <summary>
-/// Represents a fee option for a tournament division.
-/// Divisions can have multiple fee options (e.g., Early Bird, Regular, Late Registration).
+/// Represents a fee option for a tournament division or event.
+/// Both divisions and events can have multiple fee options (e.g., Early Bird, Regular, Late Registration).
+/// For division fees: DivisionId is set, EventId is set (from division's event)
+/// For event fees: DivisionId is null, EventId is set
 /// </summary>
 public class DivisionFee
 {
     public int Id { get; set; }
 
-    public int DivisionId { get; set; }
+    /// <summary>
+    /// The division this fee belongs to (null for event-level fees)
+    /// </summary>
+    public int? DivisionId { get; set; }
+
+    /// <summary>
+    /// The event this fee belongs to (always set for both division and event fees)
+    /// </summary>
+    public int? EventId { get; set; }
 
     [Required]
     [MaxLength(100)]
@@ -52,4 +62,12 @@ public class DivisionFee
     // Navigation
     [ForeignKey("DivisionId")]
     public EventDivision? Division { get; set; }
+
+    [ForeignKey("EventId")]
+    public Event? Event { get; set; }
+
+    /// <summary>
+    /// Helper to check if this is an event-level fee (not division-specific)
+    /// </summary>
+    public bool IsEventFee => DivisionId == null;
 }

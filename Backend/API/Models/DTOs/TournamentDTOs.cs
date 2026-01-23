@@ -1239,12 +1239,13 @@ public class DivisionCourtAssignmentRequest
 // =====================================================
 
 /// <summary>
-/// Fee option for a division, shown during registration
+/// Fee option for a division or event, shown during registration
 /// </summary>
 public class DivisionFeeDto
 {
     public int Id { get; set; }
-    public int DivisionId { get; set; }
+    public int? DivisionId { get; set; }
+    public int? EventId { get; set; }
     public string Name { get; set; } = string.Empty;
     public string? Description { get; set; }
     public decimal Amount { get; set; }
@@ -1257,6 +1258,10 @@ public class DivisionFeeDto
     /// Whether this fee is currently available based on AvailableFrom/AvailableUntil dates
     /// </summary>
     public bool IsCurrentlyAvailable { get; set; }
+    /// <summary>
+    /// True if this is an event-level fee (not division-specific)
+    /// </summary>
+    public bool IsEventFee => DivisionId == null;
 }
 
 /// <summary>
