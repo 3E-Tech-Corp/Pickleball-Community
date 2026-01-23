@@ -51,8 +51,20 @@ BEGIN
     PRINT 'Migration of existing assignments complete.'
 END
 
--- Note: We keep the CourtGroupId column for now for backward compatibility
--- It can be removed in a future migration after all code is updated
+-- Drop the obsolete foreign key constraint and column
+IF EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_TournamentCourts_CourtGroup')
+BEGIN
+    PRINT 'Dropping obsolete FK_TournamentCourts_CourtGroup constraint...'
+    ALTER TABLE TournamentCourts DROP CONSTRAINT FK_TournamentCourts_CourtGroup;
+    PRINT 'Foreign key constraint dropped.'
+END
+
+IF EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'TournamentCourts' AND COLUMN_NAME = 'CourtGroupId')
+BEGIN
+    PRINT 'Dropping obsolete CourtGroupId column from TournamentCourts...'
+    ALTER TABLE TournamentCourts DROP COLUMN CourtGroupId;
+    PRINT 'CourtGroupId column dropped.'
+END
 
 PRINT 'Migration 127 completed successfully.'
 GO

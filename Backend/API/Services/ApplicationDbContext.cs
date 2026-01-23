@@ -866,13 +866,6 @@ public class ApplicationDbContext : DbContext
                   .HasForeignKey(c => c.CurrentGameId)
                   .OnDelete(DeleteBehavior.SetNull);
 
-            // Legacy: Keep one-to-many for backward compatibility
-            entity.HasOne(c => c.CourtGroup)
-                  .WithMany()
-                  .HasForeignKey(c => c.CourtGroupId)
-                  .OnDelete(DeleteBehavior.SetNull);
-
-            entity.HasIndex(c => c.CourtGroupId);
         });
 
         // CourtGroupCourt junction table (many-to-many: courts can belong to multiple groups)
