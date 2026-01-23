@@ -7,12 +7,12 @@ import {
   Award, ArrowRight, Lock, Unlock, Save, Map, ExternalLink, FileText, User,
   CheckCircle, XCircle, MoreVertical, Upload, Send, Info, Radio, ClipboardList,
   Download, Lightbulb, Shield, Trash2, Building2, Layers, UserCheck, Grid3X3,
-  Hammer
+  Hammer, BookOpen, Phone, EyeOff, Edit3, Map as MapIcon
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import { useNotifications } from '../hooks/useNotifications';
-import { tournamentApi, gameDayApi, eventsApi, objectAssetsApi, checkInApi, sharedAssetApi, getSharedAssetUrl, eventTypesApi, eventStaffApi, teamUnitsApi, skillLevelsApi, ageGroupsApi } from '../services/api';
+import { tournamentApi, gameDayApi, eventsApi, objectAssetsApi, checkInApi, sharedAssetApi, getSharedAssetUrl, eventTypesApi, eventStaffApi, teamUnitsApi, skillLevelsApi, ageGroupsApi, objectAssetTypesApi } from '../services/api';
 import ScheduleConfigModal from '../components/ScheduleConfigModal';
 import DivisionFeesEditor from '../components/DivisionFeesEditor';
 import PublicProfileModal from '../components/ui/PublicProfileModal';
@@ -131,6 +131,16 @@ export default function TournamentManage() {
   const [teamUnits, setTeamUnits] = useState([]);
   const [skillLevels, setSkillLevels] = useState([]);
   const [ageGroups, setAgeGroups] = useState([]);
+
+  // Documents management state
+  const [documents, setDocuments] = useState([]);
+  const [assetTypes, setAssetTypes] = useState([]);
+  const [loadingDocuments, setLoadingDocuments] = useState(false);
+  const [showAddDocument, setShowAddDocument] = useState(false);
+  const [uploadingDocument, setUploadingDocument] = useState(false);
+  const [newDocument, setNewDocument] = useState({ title: '', isPublic: true, sortOrder: 0, objectAssetTypeId: null });
+  const [editingDocument, setEditingDocument] = useState(null);
+  const [deletingDocumentId, setDeletingDocumentId] = useState(null);
 
   // Payment methods for dropdown
   const PAYMENT_METHODS = [
@@ -667,6 +677,152 @@ export default function TournamentManage() {
       toast.error('Failed to update division');
     } finally {
       setSavingDivision(false);
+    }
+  };
+
+  // Load event documents using ObjectAssets API
+  const loadDocuments = async () => {
+    setLoadingDocuments(true);
+    try {
+      const response = await objectAssetsApi.getAssets('Event', eventId);
+      if (response.success) {
+        setDocuments(response.data || []);
+      }
+    } catch (err) {
+      console.error('Error loading documents:', err);
+    } finally {
+      setLoadingDocuments(false);
+    }
+  };
+
+  // Load asset types for Event
+  const loadAssetTypes = async () => {
+    try {
+      const response = await objectAssetTypesApi.getAll({ objectTypeName: 'Event' });
+      if (response.success) {
+        setAssetTypes(response.data || []);
+      }
+    } catch (err) {
+      console.error('Error loading asset types:', err);
+    }
+  };
+
+  // Get icon for asset type
+  const getIconForAssetType = (typeName) => {
+    switch (typeName?.toLowerCase()) {
+      case 'waiver': return Shield;
+      case 'map': return MapIcon;
+      case 'rules': return BookOpen;
+      case 'contacts': return Phone;
+      default: return FileText;
+    }
+  };
+
+  // Get color for asset type
+  const getColorForAssetType = (colorClass) => {
+    switch (colorClass) {
+      case 'red': return { bg: 'bg-red-100', text: 'text-red-600' };
+      case 'green': return { bg: 'bg-green-100', text: 'text-green-600' };
+      case 'purple': return { bg: 'bg-purple-100', text: 'text-purple-600' };
+      case 'blue': return { bg: 'bg-blue-100', text: 'text-blue-600' };
+      default: return { bg: 'bg-gray-100', text: 'text-gray-600' };
+    }
+  };
+
+  // Handle document file upload
+  const handleDocumentUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error('File must be less than 10MB');
+      return;
+    }
+
+    if (!newDocument.title.trim()) {
+      toast.error('Please enter a document title first');
+      return;
+    }
+
+    if (!newDocument.objectAssetTypeId) {
+      toast.error('Please select a document type');
+      return;
+    }
+
+    setUploadingDocument(true);
+    try {
+      // Upload file to shared assets
+      const uploadResponse = await sharedAssetApi.upload(file, 'document', 'event', true);
+      const fileUrl = uploadResponse?.data?.url || uploadResponse?.url;
+
+      if (!fileUrl) {
+        toast.error('Failed to upload file');
+        return;
+      }
+
+      // Create document record using ObjectAssets API
+      const response = await objectAssetsApi.addAsset('Event', eventId, {
+        objectAssetTypeId: newDocument.objectAssetTypeId,
+        title: newDocument.title.substring(0, 200),
+        fileUrl: fileUrl,
+        fileName: file.name.substring(0, 200),
+        fileType: file.type?.substring(0, 50),
+        fileSize: file.size,
+        isPublic: newDocument.isPublic,
+        sortOrder: newDocument.sortOrder
+      });
+
+      if (response.success) {
+        toast.success('Document added successfully');
+        setDocuments([...documents, response.data]);
+        setShowAddDocument(false);
+        setNewDocument({ title: '', isPublic: true, sortOrder: 0, objectAssetTypeId: null });
+      } else {
+        toast.error(response.message || 'Failed to add document');
+      }
+    } catch (err) {
+      console.error('Error adding document:', err);
+      toast.error('Failed to add document');
+    } finally {
+      setUploadingDocument(false);
+    }
+  };
+
+  // Update document
+  const handleUpdateDocument = async (docId, updates) => {
+    try {
+      const response = await objectAssetsApi.updateAsset('Event', eventId, docId, updates);
+      if (response.success) {
+        setDocuments(documents.map(d => d.id === docId ? response.data : d));
+        setEditingDocument(null);
+        toast.success('Document updated');
+      } else {
+        toast.error(response.message || 'Failed to update document');
+      }
+    } catch (err) {
+      console.error('Error updating document:', err);
+      toast.error('Failed to update document');
+    }
+  };
+
+  // Delete document
+  const handleDeleteDocument = async (docId) => {
+    if (!confirm('Are you sure you want to delete this document?')) return;
+
+    setDeletingDocumentId(docId);
+    try {
+      const response = await objectAssetsApi.deleteAsset('Event', eventId, docId);
+      if (response.success) {
+        setDocuments(documents.filter(d => d.id !== docId));
+        toast.success('Document deleted');
+      } else {
+        toast.error(response.message || 'Failed to delete document');
+      }
+    } catch (err) {
+      console.error('Error deleting document:', err);
+      toast.error('Failed to delete document');
+    } finally {
+      setDeletingDocumentId(null);
     }
   };
 
@@ -1558,6 +1714,7 @@ export default function TournamentManage() {
                 { key: 'courts', label: 'Courts' },
                 { key: 'registrations', label: 'Registrations' },
                 { key: 'payments', label: 'Payments' },
+                { key: 'documents', label: 'Documents' },
                 { key: 'staff', label: 'Staff' },
                 { key: 'schedule', label: 'Schedule' },
                 { key: 'overview', label: 'Overview' },
@@ -1575,6 +1732,10 @@ export default function TournamentManage() {
                     }
                     if (tab.key === 'courts' && courtGroups.length === 0) {
                       loadCourtGroups();
+                    }
+                    if (tab.key === 'documents' && documents.length === 0) {
+                      loadDocuments();
+                      loadAssetTypes();
                     }
                   }}
                   className={`px-4 py-3 font-medium text-sm border-b-2 transition-colors whitespace-nowrap ${
@@ -4574,6 +4735,301 @@ export default function TournamentManage() {
                 </button>
               </div>
             )}
+          </div>
+        )}
+
+        {/* Documents Tab */}
+        {activeTab === 'documents' && (
+          <div className="space-y-6">
+            <div className="bg-white rounded-xl shadow-sm">
+              <div className="p-4 border-b flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <FileText className="w-5 h-5 text-gray-600" />
+                  <h2 className="font-semibold text-gray-900">Event Documents</h2>
+                  <span className="text-sm text-gray-500">({documents.length})</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={loadDocuments}
+                    disabled={loadingDocuments}
+                    className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 disabled:opacity-50"
+                  >
+                    <RefreshCw className={`w-5 h-5 ${loadingDocuments ? 'animate-spin' : ''}`} />
+                  </button>
+                  <button
+                    onClick={() => setShowAddDocument(true)}
+                    className="flex items-center gap-1 px-3 py-1.5 text-sm bg-orange-600 text-white rounded-lg hover:bg-orange-700"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Add Document
+                  </button>
+                </div>
+              </div>
+
+              {loadingDocuments ? (
+                <div className="p-8 flex items-center justify-center">
+                  <Loader2 className="w-6 h-6 animate-spin text-orange-600" />
+                </div>
+              ) : documents.length === 0 ? (
+                <div className="p-8 text-center text-gray-500">
+                  <FileText className="w-12 h-12 mx-auto mb-2 text-gray-300" />
+                  <p>No documents uploaded yet</p>
+                  <p className="text-sm">Add rules, schedules, waivers, or other event materials</p>
+                </div>
+              ) : (
+                <div className="divide-y divide-gray-100">
+                  {documents.map((doc) => {
+                    const IconComponent = getIconForAssetType(doc.assetTypeName);
+                    const colors = getColorForAssetType(doc.assetTypeColorClass);
+                    return (
+                      <div key={doc.id} className="p-4 flex items-center justify-between hover:bg-gray-50">
+                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                          <div className={`p-2 rounded-lg ${colors.bg} flex-shrink-0`}>
+                            <IconComponent className={`w-5 h-5 ${colors.text}`} />
+                          </div>
+                          <div className="min-w-0">
+                            {editingDocument?.id === doc.id ? (
+                              <div className="space-y-2">
+                                <input
+                                  type="text"
+                                  value={editingDocument.title}
+                                  onChange={(e) => setEditingDocument({ ...editingDocument, title: e.target.value })}
+                                  className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                                  autoFocus
+                                />
+                                <div className="flex flex-wrap gap-1">
+                                  {assetTypes.map(type => {
+                                    const TypeIcon = getIconForAssetType(type.typeName);
+                                    return (
+                                      <button
+                                        key={type.id}
+                                        type="button"
+                                        onClick={() => setEditingDocument({ ...editingDocument, objectAssetTypeId: type.id })}
+                                        className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors ${
+                                          editingDocument.objectAssetTypeId === type.id
+                                            ? 'bg-orange-100 text-orange-700 border border-orange-300'
+                                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                        }`}
+                                      >
+                                        <TypeIcon className="w-3 h-3" />
+                                        {type.displayName}
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <label className="text-xs text-gray-500">Sort:</label>
+                                  <input
+                                    type="number"
+                                    value={editingDocument.sortOrder}
+                                    onChange={(e) => setEditingDocument({ ...editingDocument, sortOrder: parseInt(e.target.value) || 0 })}
+                                    className="w-16 px-2 py-1 border border-gray-300 rounded text-sm"
+                                    min="0"
+                                  />
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-2 flex-wrap">
+                                {doc.assetTypeDisplayName && (
+                                  <span className="px-2 py-0.5 text-xs bg-gray-100 text-gray-600 rounded capitalize">{doc.assetTypeDisplayName}</span>
+                                )}
+                                <p className="font-medium text-gray-900 truncate">{doc.title}</p>
+                              </div>
+                            )}
+                            <p className="text-sm text-gray-500 truncate">{doc.fileName}</p>
+                            <div className="flex items-center gap-2 mt-1">
+                              {doc.isPublic ? (
+                                <span className="inline-flex items-center gap-1 text-xs text-green-600 bg-green-50 px-2 py-0.5 rounded">
+                                  <Eye className="w-3 h-3" /> Public
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 text-xs text-amber-600 bg-amber-50 px-2 py-0.5 rounded">
+                                  <EyeOff className="w-3 h-3" /> Registered Only
+                                </span>
+                              )}
+                              {doc.fileSize && (
+                                <span className="text-xs text-gray-400">
+                                  {(doc.fileSize / 1024).toFixed(0)} KB
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 ml-4">
+                          {editingDocument?.id === doc.id ? (
+                            <>
+                              <button
+                                onClick={() => setEditingDocument({ ...editingDocument, isPublic: !editingDocument.isPublic })}
+                                className={`p-2 rounded ${editingDocument.isPublic ? 'text-green-600 bg-green-50' : 'text-amber-600 bg-amber-50'}`}
+                                title={editingDocument.isPublic ? 'Make Private' : 'Make Public'}
+                              >
+                                {editingDocument.isPublic ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+                              </button>
+                              <button
+                                onClick={() => handleUpdateDocument(doc.id, { title: editingDocument.title, isPublic: editingDocument.isPublic, objectAssetTypeId: editingDocument.objectAssetTypeId, sortOrder: editingDocument.sortOrder })}
+                                className="p-2 text-green-600 hover:bg-green-50 rounded"
+                              >
+                                <Check className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => setEditingDocument(null)}
+                                className="p-2 text-gray-400 hover:bg-gray-100 rounded"
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <a
+                                href={getSharedAssetUrl(doc.fileUrl)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="p-2 text-blue-600 hover:bg-blue-50 rounded"
+                                title="Open Document"
+                              >
+                                <ExternalLink className="w-4 h-4" />
+                              </a>
+                              <button
+                                onClick={() => setEditingDocument({ id: doc.id, title: doc.title, isPublic: doc.isPublic, objectAssetTypeId: doc.objectAssetTypeId, sortOrder: doc.sortOrder || 0 })}
+                                className="p-2 text-gray-400 hover:bg-gray-100 rounded"
+                                title="Edit"
+                              >
+                                <Edit3 className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteDocument(doc.id)}
+                                disabled={deletingDocumentId === doc.id}
+                                className="p-2 text-red-400 hover:bg-red-50 rounded disabled:opacity-50"
+                                title="Delete"
+                              >
+                                {deletingDocumentId === doc.id ? (
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                  <Trash2 className="w-4 h-4" />
+                                )}
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Add Document Form */}
+              {showAddDocument && (
+                <div className="p-4 bg-gray-50 border-t border-gray-200">
+                  <div className="space-y-3">
+                    {/* Document Type Selector */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Document Type *</label>
+                      {assetTypes.length === 0 ? (
+                        <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-700">
+                          No document types available. Please run Migration_098_ObjectAssets.sql.
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
+                          {assetTypes.map(type => {
+                            const IconComponent = getIconForAssetType(type.typeName);
+                            const colors = getColorForAssetType(type.colorClass);
+                            return (
+                              <button
+                                key={type.id}
+                                type="button"
+                                onClick={() => setNewDocument({ ...newDocument, objectAssetTypeId: type.id })}
+                                className={`p-2 rounded-lg border-2 text-center transition-all ${
+                                  newDocument.objectAssetTypeId === type.id
+                                    ? 'border-orange-500 bg-orange-50'
+                                    : 'border-gray-200 hover:border-gray-300'
+                                }`}
+                              >
+                                <div className={`mx-auto w-8 h-8 rounded-lg ${colors.bg} flex items-center justify-center mb-1`}>
+                                  <IconComponent className={`w-4 h-4 ${colors.text}`} />
+                                </div>
+                                <span className={`text-xs font-medium ${
+                                  newDocument.objectAssetTypeId === type.id ? 'text-orange-700' : 'text-gray-600'
+                                }`}>{type.displayName}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Document Title *</label>
+                      <input
+                        type="text"
+                        value={newDocument.title}
+                        onChange={(e) => setNewDocument({ ...newDocument, title: e.target.value })}
+                        placeholder="e.g., Tournament Rules, Schedule, Waiver Form"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                      />
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={newDocument.isPublic}
+                          onChange={(e) => setNewDocument({ ...newDocument, isPublic: e.target.checked })}
+                          className="w-4 h-4 text-orange-600 rounded focus:ring-orange-500"
+                        />
+                        <span className="text-sm text-gray-700">Public (visible to everyone)</span>
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <label className="text-sm text-gray-700">Sort Order:</label>
+                        <input
+                          type="number"
+                          value={newDocument.sortOrder}
+                          onChange={(e) => setNewDocument({ ...newDocument, sortOrder: parseInt(e.target.value) || 0 })}
+                          className="w-16 px-2 py-1 border border-gray-300 rounded text-sm"
+                        />
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <label className="flex-1">
+                        <input
+                          type="file"
+                          onChange={handleDocumentUpload}
+                          disabled={uploadingDocument || !newDocument.title.trim() || !newDocument.objectAssetTypeId}
+                          className="hidden"
+                          accept=".pdf,.doc,.docx,.xls,.xlsx,.txt,.rtf,.png,.jpg,.jpeg,.md,.html,.htm"
+                        />
+                        <span className={`flex items-center justify-center gap-2 px-4 py-2 rounded-lg cursor-pointer transition-colors ${
+                          uploadingDocument || !newDocument.title.trim() || !newDocument.objectAssetTypeId
+                            ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                            : 'bg-orange-600 text-white hover:bg-orange-700'
+                        }`}>
+                          {uploadingDocument ? (
+                            <>
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                              Uploading...
+                            </>
+                          ) : (
+                            <>
+                              <Upload className="w-4 h-4" />
+                              Select & Upload File
+                            </>
+                          )}
+                        </span>
+                      </label>
+                      <button
+                        onClick={() => {
+                          setShowAddDocument(false);
+                          setNewDocument({ title: '', isPublic: true, sortOrder: 0, objectAssetTypeId: null });
+                        }}
+                        className="px-4 py-2 text-gray-600 hover:bg-gray-200 rounded-lg"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                    <p className="text-xs text-gray-500">
+                      Accepted formats: PDF, Word, Excel, text files, images. Max 10MB.
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         )}
 
