@@ -288,22 +288,43 @@ public class CheckInController : EventControllerBase
         if (evt == null)
             return NotFound(new ApiResponse<object> { Success = false, Message = "Event not found" });
 
-        // Find waiver in ObjectAssets
-        var objectAsset = await _context.ObjectAssets
-            .Include(a => a.AssetType)
-            .FirstOrDefaultAsync(a => a.Id == request.WaiverId
-                && a.ObjectId == eventId
-                && a.AssetType != null
-                && a.AssetType.TypeName.ToLower() == "waiver");
+        // First try to find waiver in EventWaivers table (primary source from GET /waivers/{eventId})
+        var eventWaiver = await _context.EventWaivers
+            .FirstOrDefaultAsync(w => w.Id == request.WaiverId && w.EventId == eventId && w.IsActive);
 
-        if (objectAsset == null)
-            return NotFound(new ApiResponse<object> { Success = false, Message = "Waiver not found" });
+        string waiverTitle;
+        string waiverContent;
+        int waiverId;
 
-        // Fetch waiver content from file URL if available
-        string waiverContent = "";
-        if (!string.IsNullOrEmpty(objectAsset.FileUrl) && IsRenderableFile(objectAsset.FileName))
+        if (eventWaiver != null)
         {
-            waiverContent = await FetchFileContentAsync(objectAsset.FileUrl);
+            // Found in EventWaivers table
+            waiverId = eventWaiver.Id;
+            waiverTitle = eventWaiver.Title;
+            waiverContent = eventWaiver.Content;
+        }
+        else
+        {
+            // Fall back to ObjectAssets for backward compatibility
+            var objectAsset = await _context.ObjectAssets
+                .Include(a => a.AssetType)
+                .FirstOrDefaultAsync(a => a.Id == request.WaiverId
+                    && a.ObjectId == eventId
+                    && a.AssetType != null
+                    && a.AssetType.TypeName.ToLower() == "waiver");
+
+            if (objectAsset == null)
+                return NotFound(new ApiResponse<object> { Success = false, Message = "Waiver not found" });
+
+            waiverId = objectAsset.Id;
+            waiverTitle = objectAsset.Title;
+            waiverContent = "";
+
+            // Fetch waiver content from file URL if available
+            if (!string.IsNullOrEmpty(objectAsset.FileUrl) && IsRenderableFile(objectAsset.FileName))
+            {
+                waiverContent = await FetchFileContentAsync(objectAsset.FileUrl);
+            }
         }
 
         // Get user info for legal record
@@ -335,7 +356,7 @@ public class CheckInController : EventControllerBase
         var firstReg = registrations.First();
 
         // Generate reference ID in format E{eventId}-W{waiverId}-M{memberId}-U{userId}
-        var referenceId = $"E{eventId}-W{objectAsset.Id}-M{firstReg.Id}-U{userId}";
+        var referenceId = $"E{eventId}-W{waiverId}-M{firstReg.Id}-U{userId}";
 
         // Get player name
         var playerName = $"{user.FirstName} {user.LastName}".Trim();
@@ -348,10 +369,10 @@ public class CheckInController : EventControllerBase
         {
             var waiverDto = new WaiverDocumentDto
             {
-                Id = objectAsset.Id,
+                Id = waiverId,
                 EventId = eventId,
                 EventName = evt.Name,
-                Title = objectAsset.Title,
+                Title = waiverTitle,
                 Content = waiverContent,
                 PlayerName = playerName,
                 ReferenceId = referenceId
@@ -378,7 +399,7 @@ public class CheckInController : EventControllerBase
         {
             // Check if this waiver was already signed by this member
             var existingSignature = await _context.EventUnitMemberWaivers
-                .FirstOrDefaultAsync(w => w.EventUnitMemberId == reg.Id && w.WaiverId == objectAsset.Id);
+                .FirstOrDefaultAsync(w => w.EventUnitMemberId == reg.Id && w.WaiverId == waiverId);
 
             if (existingSignature == null)
             {
@@ -386,7 +407,7 @@ public class CheckInController : EventControllerBase
                 var waiverSignature = new EventUnitMemberWaiver
                 {
                     EventUnitMemberId = reg.Id,
-                    WaiverId = objectAsset.Id,
+                    WaiverId = waiverId,
                     SignedAt = signedAt,
                     SignatureAssetUrl = signingResult?.SignatureAssetUrl,
                     SignedPdfUrl = signingResult?.SignedWaiverPdfUrl,
@@ -396,7 +417,7 @@ public class CheckInController : EventControllerBase
                     EmergencyPhone = request.EmergencyPhone,
                     SignerEmail = user.Email,
                     SignerIpAddress = ipAddress,
-                    WaiverTitle = objectAsset.Title,
+                    WaiverTitle = waiverTitle,
                     WaiverVersion = 1
                 };
                 _context.EventUnitMemberWaivers.Add(waiverSignature);
@@ -417,7 +438,7 @@ public class CheckInController : EventControllerBase
 
             // Also update the legacy fields on EventUnitMember for backward compatibility
             reg.WaiverSignedAt = signedAt;
-            reg.WaiverDocumentId = objectAsset.Id;
+            reg.WaiverDocumentId = waiverId;
             reg.WaiverSignature = request.Signature.Trim();
         }
 
@@ -445,7 +466,14 @@ public class CheckInController : EventControllerBase
         }
 
         // Check if all waivers for this event have been signed
-        var allEventWaivers = await _context.ObjectAssets
+        // Get waiver IDs from EventWaivers table (primary source)
+        var allEventWaiverIds = await _context.EventWaivers
+            .Where(w => w.EventId == eventId && w.IsActive && (w.DocumentType == "waiver" || w.DocumentType == null))
+            .Select(w => w.Id)
+            .ToListAsync();
+
+        // Also check ObjectAssets for backward compatibility
+        var objectAssetWaiverIds = await _context.ObjectAssets
             .Include(a => a.AssetType)
             .Where(a => a.ObjectId == eventId
                 && a.AssetType != null
@@ -453,11 +481,14 @@ public class CheckInController : EventControllerBase
             .Select(a => a.Id)
             .ToListAsync();
 
+        // Combine both sources (avoiding duplicates)
+        var allWaiverIds = allEventWaiverIds.Union(objectAssetWaiverIds).ToList();
+
         var signedWaiverCount = await _context.EventUnitMemberWaivers
-            .Where(w => w.EventUnitMemberId == firstReg.Id && allEventWaivers.Contains(w.WaiverId))
+            .Where(w => w.EventUnitMemberId == firstReg.Id && allWaiverIds.Contains(w.WaiverId))
             .CountAsync();
 
-        var allWaiversSigned = signedWaiverCount >= allEventWaivers.Count;
+        var allWaiversSigned = signedWaiverCount >= allWaiverIds.Count;
 
         // Send waiver confirmation email with signed PDF attached
         try
@@ -467,7 +498,7 @@ public class CheckInController : EventControllerBase
                 var emailBody = EmailTemplates.WaiverSignedConfirmation(
                     playerName,
                     evt.Name,
-                    objectAsset.Title ?? "Event Waiver",
+                    waiverTitle ?? "Event Waiver",
                     signedAt
                 );
 
@@ -488,7 +519,7 @@ public class CheckInController : EventControllerBase
         }
 
         _logger.LogInformation("User {UserId} signed waiver {WaiverId} for event {EventId} with signature '{Signature}'. All waivers signed: {AllSigned}",
-            userId, objectAsset.Id, eventId, request.Signature, allWaiversSigned);
+            userId, waiverId, eventId, request.Signature, allWaiversSigned);
 
         return Ok(new ApiResponse<object>
         {
@@ -499,7 +530,7 @@ public class CheckInController : EventControllerBase
                 SignedWaiverPdfUrl = signingResult?.SignedWaiverPdfUrl,
                 AllWaiversSigned = allWaiversSigned,
                 SignedCount = signedWaiverCount,
-                TotalCount = allEventWaivers.Count
+                TotalCount = allWaiverIds.Count
             }
         });
     }
