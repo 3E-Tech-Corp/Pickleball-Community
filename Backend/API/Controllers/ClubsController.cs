@@ -1297,6 +1297,7 @@ public class ClubsController : ControllerBase
                     Id = r.Id,
                     ClubId = r.ClubId,
                     ClubName = r.Club != null ? r.Club.Name : "",
+                    ClubLogoUrl = r.Club != null ? r.Club.LogoUrl : null,
                     Status = r.Status,
                     Message = r.Message,
                     CreatedAt = r.CreatedAt
