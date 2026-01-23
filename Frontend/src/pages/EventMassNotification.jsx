@@ -42,7 +42,7 @@ export default function EventMassNotification() {
       try {
         setLoading(true);
         const [eventRes, filtersRes] = await Promise.all([
-          eventsApi.get(eventId),
+          eventsApi.getEvent(eventId),
           eventsApi.getNotificationFilters(eventId)
         ]);
 
