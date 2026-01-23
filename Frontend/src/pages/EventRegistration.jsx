@@ -1262,66 +1262,105 @@ export default function EventRegistration() {
                 </div>
               )}
 
-              {/* Fee summary */}
-              <div className="bg-gray-50 rounded-lg p-4 mb-6">
-                <h3 className="font-medium text-gray-900 mb-3">Payment Summary</h3>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Your Fee ({getSelectedFee()?.name || 'Registration'})</span>
-                    <span className="font-medium">${getEffectiveFeeAmount()}</span>
+              {/* Reference ID */}
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-blue-800">Your Payment Reference ID</p>
+                    <p className="text-xs text-blue-600 mt-1">Include this in your payment memo/note</p>
                   </div>
+                  <div className="flex items-center gap-2">
+                    <code className="bg-white px-3 py-2 rounded border border-blue-300 font-mono text-blue-900">
+                      E{event.id}-U{registrationResult?.unitId}-P{user?.id}
+                    </code>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(`E${event.id}-U${registrationResult?.unitId}-P${user?.id}`);
+                        toast.success('Reference ID copied!');
+                      }}
+                      className="p-2 hover:bg-blue-100 rounded text-blue-600"
+                    >
+                      <Copy className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              </div>
 
-                  {/* Pay for teammates section */}
-                  {getUnpaidTeammates().length > 0 && (
-                    <div className="pt-3 border-t mt-3">
-                      <p className="font-medium text-gray-900 mb-2 flex items-center gap-2">
-                        <Users className="w-4 h-4" />
-                        Pay for Teammates (Optional)
-                      </p>
-                      <div className="space-y-2">
-                        {getUnpaidTeammates().map(member => {
-                          const memberFee = member.selectedFee?.amount || getEffectiveFeeAmount();
-                          return (
-                            <label
-                              key={member.id}
-                              className={`flex items-center justify-between p-2 border rounded-lg cursor-pointer ${
-                                selectedTeammateIds.includes(member.id)
-                                  ? 'border-orange-500 bg-orange-50'
-                                  : 'border-gray-200 hover:border-orange-300'
-                              }`}
-                            >
-                              <div className="flex items-center gap-2">
-                                <input
-                                  type="checkbox"
-                                  checked={selectedTeammateIds.includes(member.id)}
-                                  onChange={(e) => {
-                                    if (e.target.checked) {
-                                      setSelectedTeammateIds([...selectedTeammateIds, member.id]);
-                                    } else {
-                                      setSelectedTeammateIds(selectedTeammateIds.filter(id => id !== member.id));
-                                    }
-                                  }}
-                                  className="rounded text-orange-600"
-                                />
-                                <span className="text-gray-700">
-                                  {member.firstName} {member.lastName}
-                                </span>
-                                {member.selectedFee && (
-                                  <span className="text-xs text-gray-500">({member.selectedFee.name})</span>
-                                )}
-                              </div>
-                              <span className="text-orange-600 font-medium">${memberFee}</span>
-                            </label>
-                          );
-                        })}
+              {/* Payment Summary - Members to pay for */}
+              <div className="bg-gray-50 rounded-lg p-4 mb-6">
+                <h3 className="font-medium text-gray-900 mb-3">Select Members to Pay For</h3>
+                <div className="space-y-2">
+                  {/* Current user - always checked and disabled */}
+                  <div className="flex items-center justify-between p-3 border border-orange-500 bg-orange-50 rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="checkbox"
+                        checked={true}
+                        disabled={true}
+                        className="rounded text-orange-600 cursor-not-allowed"
+                      />
+                      <div>
+                        <span className="font-medium text-gray-900">{user?.firstName} {user?.lastName}</span>
+                        <span className="text-xs text-gray-500 ml-2">(You)</span>
+                        {getSelectedFee() && (
+                          <span className="text-xs text-gray-500 ml-1">- {getSelectedFee().name}</span>
+                        )}
                       </div>
                     </div>
+                    <span className="font-semibold text-orange-600">${getEffectiveFeeAmount()}</span>
+                  </div>
+
+                  {/* Teammates - optional */}
+                  {getUnpaidTeammates().length > 0 && (
+                    <>
+                      <p className="text-xs text-gray-500 mt-3 mb-2 flex items-center gap-1">
+                        <Users className="w-3 h-3" />
+                        Check teammates below if you want to pay for them too
+                      </p>
+                      {getUnpaidTeammates().map(member => {
+                        const memberFee = member.selectedFee?.amount || getEffectiveFeeAmount();
+                        return (
+                          <label
+                            key={member.id}
+                            className={`flex items-center justify-between p-3 border rounded-lg cursor-pointer transition-colors ${
+                              selectedTeammateIds.includes(member.id)
+                                ? 'border-orange-500 bg-orange-50'
+                                : 'border-gray-200 hover:border-orange-300'
+                            }`}
+                          >
+                            <div className="flex items-center gap-3">
+                              <input
+                                type="checkbox"
+                                checked={selectedTeammateIds.includes(member.id)}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setSelectedTeammateIds([...selectedTeammateIds, member.id]);
+                                  } else {
+                                    setSelectedTeammateIds(selectedTeammateIds.filter(id => id !== member.id));
+                                  }
+                                }}
+                                className="rounded text-orange-600"
+                              />
+                              <div>
+                                <span className="text-gray-900">{member.firstName} {member.lastName}</span>
+                                {member.selectedFee && (
+                                  <span className="text-xs text-gray-500 ml-1">- {member.selectedFee.name}</span>
+                                )}
+                              </div>
+                            </div>
+                            <span className={`font-medium ${selectedTeammateIds.includes(member.id) ? 'text-orange-600' : 'text-gray-500'}`}>
+                              ${memberFee}
+                            </span>
+                          </label>
+                        );
+                      })}
+                    </>
                   )}
 
                   {/* Total */}
-                  <div className="flex justify-between pt-3 border-t mt-3">
-                    <span className="font-semibold text-gray-900">Total</span>
-                    <span className="font-bold text-lg text-orange-600">${getPaymentTotal()}</span>
+                  <div className="flex justify-between pt-4 mt-4 border-t-2 border-gray-300">
+                    <span className="font-bold text-gray-900">Total to Pay</span>
+                    <span className="font-bold text-xl text-orange-600">${getPaymentTotal()}</span>
                   </div>
                 </div>
               </div>
