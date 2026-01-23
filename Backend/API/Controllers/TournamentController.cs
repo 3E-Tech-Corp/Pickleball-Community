@@ -4250,7 +4250,7 @@ public class TournamentController : EventControllerBase
         if (evt == null)
             return NotFound(new ApiResponse<CourtPlanningDto> { Success = false, Message = "Event not found" });
 
-        // Get court groups with their courts
+        // Get court groups with their courts (via junction table)
         var courtGroups = await _context.CourtGroups
             .Where(g => g.EventId == eventId && g.IsActive)
             .OrderBy(g => g.SortOrder)
@@ -4263,14 +4263,17 @@ public class TournamentController : EventControllerBase
                 CourtCount = g.CourtCount,
                 Priority = g.Priority,
                 SortOrder = g.SortOrder,
-                Courts = g.Courts.Where(c => c.IsActive).OrderBy(c => c.SortOrder).Select(c => new CourtPlanningItemDto
-                {
-                    Id = c.Id,
-                    CourtLabel = c.CourtLabel,
-                    Status = c.Status,
-                    LocationDescription = c.LocationDescription,
-                    SortOrder = c.SortOrder
-                }).ToList()
+                Courts = g.CourtGroupCourts
+                    .Where(cgc => cgc.Court != null && cgc.Court.IsActive)
+                    .OrderBy(cgc => cgc.SortOrder)
+                    .Select(cgc => new CourtPlanningItemDto
+                    {
+                        Id = cgc.Court!.Id,
+                        CourtLabel = cgc.Court.CourtLabel,
+                        Status = cgc.Court.Status,
+                        LocationDescription = cgc.Court.LocationDescription,
+                        SortOrder = cgc.Court.SortOrder
+                    }).ToList()
             })
             .ToListAsync();
 
