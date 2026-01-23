@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Trash2, Edit3, Loader2, ChevronDown, ChevronUp, Tag, Check, X } from 'lucide-react';
+import { Plus, Trash2, Edit3, Loader2, ChevronDown, ChevronUp, Tag, Check, X, RefreshCw } from 'lucide-react';
 import { tournamentApi } from '../services/api';
 import { useToast } from '../contexts/ToastContext';
 
@@ -154,34 +154,48 @@ export default function EventFeeTypesEditor({ eventId, onFeeTypesChange }) {
 
   return (
     <div className="border border-gray-200 rounded-lg">
-      <button
-        type="button"
-        onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full flex items-center justify-between text-left p-4 hover:bg-gray-50"
-      >
-        <div>
-          <h4 className="font-medium text-gray-900 flex items-center gap-2">
-            <Tag className="w-4 h-4" />
-            Fee Types
-            {hasFeeTypes && (
-              <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">
-                {feeTypes.length} type{feeTypes.length !== 1 ? 's' : ''}
-              </span>
+      <div className="flex items-center justify-between p-4 hover:bg-gray-50">
+        <button
+          type="button"
+          onClick={() => setIsExpanded(!isExpanded)}
+          className="flex-1 flex items-center justify-between text-left"
+        >
+          <div>
+            <h4 className="font-medium text-gray-900 flex items-center gap-2">
+              <Tag className="w-4 h-4" />
+              Fee Types
+              {hasFeeTypes && (
+                <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">
+                  {feeTypes.length} type{feeTypes.length !== 1 ? 's' : ''}
+                </span>
+              )}
+            </h4>
+            {!isExpanded && hasFeeTypes && (
+              <p className="text-sm text-gray-500 mt-1">
+                {feeTypes.map(ft => ft.name).join(', ')}
+              </p>
             )}
-          </h4>
-          {!isExpanded && hasFeeTypes && (
-            <p className="text-sm text-gray-500 mt-1">
-              {feeTypes.map(ft => ft.name).join(', ')}
-            </p>
-          )}
-          {!isExpanded && !hasFeeTypes && (
-            <p className="text-sm text-gray-500 mt-1">
-              Define fee type names (e.g., Early Bird, Regular, Late) first.
-            </p>
-          )}
-        </div>
-        {isExpanded ? <ChevronUp className="w-5 h-5 text-gray-400" /> : <ChevronDown className="w-5 h-5 text-gray-400" />}
-      </button>
+            {!isExpanded && !hasFeeTypes && (
+              <p className="text-sm text-gray-500 mt-1">
+                Define fee type names (e.g., Early Bird, Regular, Late) first.
+              </p>
+            )}
+          </div>
+          {isExpanded ? <ChevronUp className="w-5 h-5 text-gray-400" /> : <ChevronDown className="w-5 h-5 text-gray-400" />}
+        </button>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            loadFeeTypes();
+          }}
+          disabled={loading}
+          className="ml-2 p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg disabled:opacity-50"
+          title="Refresh fee types"
+        >
+          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+        </button>
+      </div>
 
       {isExpanded && (
         <div className="p-4 pt-0 space-y-4">

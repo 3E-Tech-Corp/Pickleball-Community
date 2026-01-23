@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Loader2, ChevronDown, ChevronUp, DollarSign, Calendar, Star, ToggleLeft, ToggleRight } from 'lucide-react';
+import { Loader2, ChevronDown, ChevronUp, DollarSign, Calendar, Star, ToggleLeft, ToggleRight, RefreshCw } from 'lucide-react';
 import { tournamentApi } from '../services/api';
 import { useToast } from '../contexts/ToastContext';
 
@@ -185,39 +185,53 @@ export default function EventFeesEditor({ eventId, onFeesChange }) {
 
   return (
     <div className="border border-gray-200 rounded-lg">
-      <button
-        type="button"
-        onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full flex items-center justify-between text-left p-4 hover:bg-gray-50"
-      >
-        <div>
-          <h4 className="font-medium text-gray-900 flex items-center gap-2">
-            <DollarSign className="w-4 h-4" />
-            Event Fee Amounts
-            {configuredFees.length > 0 && (
-              <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">
-                {configuredFees.length} configured
-              </span>
+      <div className="flex items-center justify-between p-4 hover:bg-gray-50">
+        <button
+          type="button"
+          onClick={() => setIsExpanded(!isExpanded)}
+          className="flex-1 flex items-center justify-between text-left"
+        >
+          <div>
+            <h4 className="font-medium text-gray-900 flex items-center gap-2">
+              <DollarSign className="w-4 h-4" />
+              Event Fee Amounts
+              {configuredFees.length > 0 && (
+                <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">
+                  {configuredFees.length} configured
+                </span>
+              )}
+            </h4>
+            {!isExpanded && configuredFees.length > 0 && (
+              <p className="text-sm text-gray-500 mt-1">
+                {configuredFees.map(f => `${f.name}: $${f.amount}`).join(', ')}
+              </p>
             )}
-          </h4>
-          {!isExpanded && configuredFees.length > 0 && (
-            <p className="text-sm text-gray-500 mt-1">
-              {configuredFees.map(f => `${f.name}: $${f.amount}`).join(', ')}
-            </p>
-          )}
-          {!isExpanded && !hasFeeTypes && (
-            <p className="text-sm text-gray-500 mt-1">
-              Define fee types first, then set amounts here.
-            </p>
-          )}
-          {!isExpanded && hasFeeTypes && configuredFees.length === 0 && (
-            <p className="text-sm text-gray-500 mt-1">
-              No event fees configured yet. Click to set amounts.
-            </p>
-          )}
-        </div>
-        {isExpanded ? <ChevronUp className="w-5 h-5 text-gray-400" /> : <ChevronDown className="w-5 h-5 text-gray-400" />}
-      </button>
+            {!isExpanded && !hasFeeTypes && (
+              <p className="text-sm text-gray-500 mt-1">
+                Define fee types first, then set amounts here.
+              </p>
+            )}
+            {!isExpanded && hasFeeTypes && configuredFees.length === 0 && (
+              <p className="text-sm text-gray-500 mt-1">
+                No event fees configured yet. Click to set amounts.
+              </p>
+            )}
+          </div>
+          {isExpanded ? <ChevronUp className="w-5 h-5 text-gray-400" /> : <ChevronDown className="w-5 h-5 text-gray-400" />}
+        </button>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            loadData();
+          }}
+          disabled={loading}
+          className="ml-2 p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg disabled:opacity-50"
+          title="Refresh fee types"
+        >
+          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+        </button>
+      </div>
 
       {isExpanded && (
         <div className="p-4 pt-0 space-y-4">
