@@ -1735,33 +1735,9 @@ export default function TournamentManage() {
                 <DollarSign className="w-5 h-5 text-gray-500" />
                 Registration Fees
               </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Base Registration Fee ($)</label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={editForm.registrationFee || 0}
-                    onChange={(e) => handleFormChange('registrationFee', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-orange-500 focus:border-orange-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Per Division Fee ($)</label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={editForm.perDivisionFee || 0}
-                    onChange={(e) => handleFormChange('perDivisionFee', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-orange-500 focus:border-orange-500"
-                  />
-                </div>
-              </div>
 
               {/* Fee Types */}
-              <div className="mt-6">
+              <div>
                 <EventFeeTypesEditor
                   eventId={parseInt(eventId)}
                   onFeeTypesChange={() => loadDashboard()}
