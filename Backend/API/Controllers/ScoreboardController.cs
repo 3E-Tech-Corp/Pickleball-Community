@@ -572,8 +572,8 @@ public class ScoreboardController : ControllerBase
                 CourtId = m.TournamentCourtId,
                 CourtName = m.TournamentCourt != null ? m.TournamentCourt.CourtLabel : null,
                 CourtNumber = m.TournamentCourt != null ? m.TournamentCourt.SortOrder : null,
-                CourtGroupName = m.TournamentCourt != null && m.TournamentCourt.CourtGroup != null
-                    ? m.TournamentCourt.CourtGroup.GroupName : null,
+                CourtGroupName = m.TournamentCourt != null && m.TournamentCourt.CourtGroupCourts.Any()
+                    ? m.TournamentCourt.CourtGroupCourts.First().CourtGroup!.GroupName : null,
                 WinnerUnitId = m.WinnerUnitId
             })
             .ToListAsync();
