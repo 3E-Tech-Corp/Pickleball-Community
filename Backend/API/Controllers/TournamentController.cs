@@ -21,6 +21,7 @@ public class TournamentController : EventControllerBase
     private readonly IBracketProgressionService _bracketProgressionService;
     private readonly IScoreBroadcaster _scoreBroadcaster;
     private readonly ICourtAssignmentService _courtAssignmentService;
+    private readonly IEmailNotificationService _emailService;
 
     public TournamentController(
         ApplicationDbContext context,
@@ -29,7 +30,8 @@ public class TournamentController : EventControllerBase
         INotificationService notificationService,
         IBracketProgressionService bracketProgressionService,
         IScoreBroadcaster scoreBroadcaster,
-        ICourtAssignmentService courtAssignmentService)
+        ICourtAssignmentService courtAssignmentService,
+        IEmailNotificationService emailService)
         : base(context)
     {
         _logger = logger;
@@ -38,6 +40,7 @@ public class TournamentController : EventControllerBase
         _bracketProgressionService = bracketProgressionService;
         _scoreBroadcaster = scoreBroadcaster;
         _courtAssignmentService = courtAssignmentService;
+        _emailService = emailService;
     }
 
     // ============================================
@@ -512,6 +515,41 @@ public class TournamentController : EventControllerBase
             .Where(u => u.EventId == eventId)
             .ToListAsync();
         var units = allUnits.Where(u => unitIdsSet.Contains(u.Id)).ToList();
+
+        // Send registration confirmation email
+        try
+        {
+            if (!string.IsNullOrEmpty(user.Email) && units.Any())
+            {
+                var firstUnit = units.First();
+                var division = firstUnit.Division;
+                var feeAmount = division?.DivisionFee ?? evt.PerDivisionFee ?? evt.RegistrationFee ?? 0;
+
+                var emailBody = EmailTemplates.EventRegistrationConfirmation(
+                    $"{user.FirstName} {user.LastName}".Trim(),
+                    evt.Name,
+                    division?.Name ?? "Unknown Division",
+                    evt.StartDate,
+                    evt.VenueName,
+                    firstUnit.Name,
+                    feeAmount,
+                    waiverSigned: false, // Not yet signed at registration time
+                    paymentComplete: false // Not yet paid at registration time
+                );
+
+                await _emailService.SendSimpleAsync(
+                    userId.Value,
+                    user.Email,
+                    $"Registration Confirmed: {evt.Name}",
+                    emailBody
+                );
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to send registration confirmation email to user {UserId}", userId);
+            // Don't fail the registration if email fails
+        }
 
         return Ok(new ApiResponse<List<EventUnitDto>>
         {

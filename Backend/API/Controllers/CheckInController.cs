@@ -17,14 +17,22 @@ public class CheckInController : EventControllerBase
     private readonly IWaiverPdfService _waiverPdfService;
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly IConfiguration _configuration;
+    private readonly IEmailNotificationService _emailService;
 
-    public CheckInController(ApplicationDbContext context, ILogger<CheckInController> logger, IWaiverPdfService waiverPdfService, IHttpClientFactory httpClientFactory, IConfiguration configuration)
+    public CheckInController(
+        ApplicationDbContext context,
+        ILogger<CheckInController> logger,
+        IWaiverPdfService waiverPdfService,
+        IHttpClientFactory httpClientFactory,
+        IConfiguration configuration,
+        IEmailNotificationService emailService)
         : base(context)
     {
         _logger = logger;
         _waiverPdfService = waiverPdfService;
         _httpClientFactory = httpClientFactory;
         _configuration = configuration;
+        _emailService = emailService;
     }
 
     // Helper to check if file is renderable (md/html)
@@ -450,6 +458,34 @@ public class CheckInController : EventControllerBase
             .CountAsync();
 
         var allWaiversSigned = signedWaiverCount >= allEventWaivers.Count;
+
+        // Send waiver confirmation email with signed PDF attached
+        try
+        {
+            if (!string.IsNullOrEmpty(user.Email))
+            {
+                var emailBody = EmailTemplates.WaiverSignedConfirmation(
+                    playerName,
+                    evt.Name,
+                    objectAsset.Title ?? "Event Waiver",
+                    signedAt
+                );
+
+                await _emailService.CreateEmail(
+                    userId.Value,
+                    user.Email,
+                    $"Waiver Signed: {evt.Name}",
+                    emailBody
+                )
+                .AttachIfPresent("Signed_Waiver.pdf", "application/pdf", signingResult?.SignedWaiverPdfUrl)
+                .SendAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to send waiver confirmation email to user {UserId}", userId);
+            // Don't fail the waiver signing if email fails
+        }
 
         _logger.LogInformation("User {UserId} signed waiver {WaiverId} for event {EventId} with signature '{Signature}'. All waivers signed: {AllSigned}",
             userId, objectAsset.Id, eventId, request.Signature, allWaiversSigned);
