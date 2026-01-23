@@ -9052,7 +9052,7 @@ public class TournamentController : EventControllerBase
     }
 
     /// <summary>
-    /// Bulk update fee types for an event (replaces all fee types)
+    /// Bulk update fee types for an event (replaces all fee types not in use)
     /// </summary>
     [HttpPut("events/{eventId}/fee-types")]
     [Authorize]
@@ -9071,8 +9071,8 @@ public class TournamentController : EventControllerBase
         // Check if any are in use before deleting
         var existingIds = existingFeeTypes.Select(ft => ft.Id).ToList();
         var usedFeeTypeIds = await _context.DivisionFees
-            .Where(f => f.FeeTypeId.HasValue && existingIds.Contains(f.FeeTypeId.Value))
-            .Select(f => f.FeeTypeId.Value)
+            .Where(f => existingIds.Contains(f.FeeTypeId))
+            .Select(f => f.FeeTypeId)
             .Distinct()
             .ToListAsync();
 
@@ -9080,15 +9080,12 @@ public class TournamentController : EventControllerBase
         var feeTypesToDelete = existingFeeTypes.Where(ft => !usedFeeTypeIds.Contains(ft.Id)).ToList();
         _context.EventFeeTypes.RemoveRange(feeTypesToDelete);
 
-        // Add new fee types
+        // Add new fee types (name/description only)
         var newFeeTypes = request.FeeTypes.Select((ft, index) => new EventFeeType
         {
             EventId = eventId,
             Name = ft.Name,
             Description = ft.Description,
-            DefaultAmount = ft.DefaultAmount,
-            AvailableFrom = ft.AvailableFrom,
-            AvailableUntil = ft.AvailableUntil,
             IsActive = ft.IsActive,
             SortOrder = ft.SortOrder > 0 ? ft.SortOrder : index,
             CreatedAt = DateTime.UtcNow
@@ -9103,13 +9100,9 @@ public class TournamentController : EventControllerBase
             EventId = ft.EventId,
             Name = ft.Name,
             Description = ft.Description,
-            DefaultAmount = ft.DefaultAmount,
-            AvailableFrom = ft.AvailableFrom,
-            AvailableUntil = ft.AvailableUntil,
             IsActive = ft.IsActive,
             SortOrder = ft.SortOrder,
-            CreatedAt = ft.CreatedAt,
-            IsCurrentlyAvailable = ft.IsCurrentlyAvailable
+            CreatedAt = ft.CreatedAt
         }).ToList();
 
         return Ok(new ApiResponse<List<EventFeeTypeDto>> { Success = true, Data = result });
