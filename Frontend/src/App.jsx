@@ -30,6 +30,7 @@ import EventMassNotification from './pages/EventMassNotification'
 import GameDayManage from './pages/GameDayManage'
 import StaffDashboard from './pages/StaffDashboard'
 import EventManage from './pages/EventManage'
+import AdminEventManage from './pages/AdminEventManage'
 import EventDashboard from './pages/EventDashboard'
 import EventRunningAdmin from './pages/EventRunningAdmin'
 import TDGameDayDashboard from './pages/TDGameDayDashboard'
@@ -110,6 +111,11 @@ function App() {
       <Route path="/event/:eventId/manage" element={
         <ProtectedRoute>
           <EventManage />
+        </ProtectedRoute>
+      } />
+      <Route path="/event/:eventId/admin-manage" element={
+        <ProtectedRoute>
+          <AdminEventManage />
         </ProtectedRoute>
       } />
       <Route path="/event-dashboard/:eventId" element={

@@ -224,6 +224,17 @@ export default function EventView() {
           <ChevronLeft className="w-5 h-5" />
           <span className="text-sm font-medium">Events</span>
         </Link>
+
+        {/* Admin Manage Button - Show for admins and organizers */}
+        {isAuthenticated && (isAdmin || user?.id === event.organizedByUserId) && (
+          <Link
+            to={`/event/${eventId}/admin-manage`}
+            className="absolute top-4 right-4 flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-lg shadow-sm hover:bg-blue-700 transition-colors"
+          >
+            <Settings className="w-5 h-5" />
+            <span className="text-sm font-medium">Admin Manage</span>
+          </Link>
+        )}
       </div>
 
       {/* Main Content */}
