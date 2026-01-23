@@ -446,7 +446,7 @@ public class EventsController : EventControllerBase
                 CreatedAt = evt.CreatedAt,
                 TournamentStatus = evt.TournamentStatus,
                 AllowMultipleDivisions = evt.AllowMultipleDivisions,
-                Divisions = evt.Divisions.OrderBy(d => d.SortOrder).Select(d => new EventDivisionPublicDto
+                Divisions = evt.Divisions.Where(d => d.IsActive).OrderBy(d => d.SortOrder).Select(d => new EventDivisionPublicDto
                 {
                     Id = d.Id,
                     Name = d.Name,
