@@ -262,7 +262,7 @@ export default function TournamentManage() {
       eventTypeId: eventData.eventTypeId || '',
       isPublished: eventData.isPublished || false,
       isPrivate: eventData.isPrivate || false,
-      venueId: eventData.venueId || '',
+      venueId: eventData.courtId || '',
       venueName: eventData.venueName || '',
       address: eventData.address || '',
       city: eventData.city || '',
