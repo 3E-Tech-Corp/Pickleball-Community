@@ -722,6 +722,19 @@ export const notificationTemplateApi = {
 
 // Venues API (formerly Courts - places with pickleball courts)
 export const venuesApi = {
+  // List all venues (simple list for dropdowns)
+  list: async () => {
+    const response = await api.get('/venues/search?pageSize=500&sortBy=name');
+    // Transform to normalize id field (venues use venueId)
+    if (response.success && response.data?.items) {
+      response.data = response.data.items.map(v => ({
+        ...v,
+        id: v.venueId || v.id
+      }));
+    }
+    return response;
+  },
+
   // Search venues with filters
   search: (params = {}) => {
     const queryParams = new URLSearchParams();
@@ -813,6 +826,9 @@ export const eventTypesApi = {
   // Get all event types (public)
   getAll: (includeInactive = false) =>
     api.get(`/eventtypes${includeInactive ? '?includeInactive=true' : ''}`),
+
+  // Alias for getAll (backward compatibility)
+  list: () => api.get('/eventtypes'),
 
   // Get single event type
   getById: (id) => api.get(`/eventtypes/${id}`),
