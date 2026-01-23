@@ -7585,7 +7585,8 @@ public class TournamentController : EventControllerBase
             Role = "Player",
             InviteStatus = "Accepted",
             CreatedAt = DateTime.Now,
-            ReferenceId = $"E{unit.EventId}-U{unit.Id}-P{userId.Value}"
+            ReferenceId = $"E{unit.EventId}-U{unit.Id}-P{userId.Value}",
+            SelectedFeeId = request.SelectedFeeId
         };
         _context.EventUnitMembers.Add(member);
 
@@ -7981,6 +7982,7 @@ public class TournamentController : EventControllerBase
 public class JoinByCodeRequest
 {
     public string JoinCode { get; set; } = string.Empty;
+    public int? SelectedFeeId { get; set; }
 }
 
 public class JoinableUnitDto

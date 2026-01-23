@@ -1465,8 +1465,8 @@ export const tournamentApi = {
   // Join code feature
   getJoinableUnitsV2: (eventId, divisionId) =>
     api.get(`/tournament/events/${eventId}/divisions/${divisionId}/joinable-units-v2`),
-  joinByCode: (joinCode) =>
-    api.post('/tournament/units/join-by-code', { joinCode }),
+  joinByCode: (joinCode, selectedFeeId = null) =>
+    api.post('/tournament/units/join-by-code', { joinCode, selectedFeeId }),
   regenerateJoinCode: (unitId) =>
     api.post(`/tournament/units/${unitId}/regenerate-code`),
 
