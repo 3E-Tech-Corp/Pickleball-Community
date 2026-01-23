@@ -51,17 +51,25 @@ export default function AdminEventManage() {
     try {
       setLoading(true);
       const [eventRes, typesRes, dashboardRes] = await Promise.all([
-        eventsApi.adminGet(eventId),
+        eventsApi.getEvent(eventId),
         eventTypesApi.list(),
         tournamentApi.getDashboard(eventId).catch(() => ({ success: false }))
       ]);
 
       if (eventRes.success && eventRes.data) {
+        // Check if user can manage this event
+        const isAdmin = user?.role === 'Admin';
+        const isOrganizer = eventRes.data.organizedByUserId === user?.id;
+        if (!isAdmin && !isOrganizer) {
+          toast.error('You do not have permission to manage this event');
+          navigate(`/event/${eventId}`);
+          return;
+        }
         setEvent(eventRes.data);
         populateForm(eventRes.data);
       } else {
         toast.error('Event not found');
-        navigate('/admin/events');
+        navigate(`/event/${eventId}`);
         return;
       }
 
@@ -143,16 +151,26 @@ export default function AdminEventManage() {
       const registrationCloseDate = editForm.registrationCloseDate
         ? `${editForm.registrationCloseDate}T${editForm.registrationCloseTime || '23:59'}:00`
         : null;
+      const startDate = editForm.startDate
+        ? `${editForm.startDate}T${editForm.startTime || '08:00'}:00`
+        : event.startDate;
+      const endDate = editForm.endDate
+        ? `${editForm.endDate}T${editForm.endTime || '18:00'}:00`
+        : event.endDate;
 
+      // Use the regular update endpoint (accessible to organizers)
       const updateData = {
         name: editForm.name,
         description: editForm.description,
-        eventTypeId: editForm.eventTypeId ? parseInt(editForm.eventTypeId) : null,
+        eventTypeId: editForm.eventTypeId ? parseInt(editForm.eventTypeId) : event.eventTypeId,
+        startDate,
+        endDate,
+        registrationOpenDate,
+        registrationCloseDate,
         isPublished: editForm.isPublished,
-        isActive: editForm.isActive,
         isPrivate: editForm.isPrivate,
-        tournamentStatus: editForm.tournamentStatus || null,
-        venueId: editForm.venueId ? parseInt(editForm.venueId) : null,
+        allowMultipleDivisions: event.allowMultipleDivisions ?? true,
+        courtId: editForm.venueId ? parseInt(editForm.venueId) : null,
         venueName: editForm.venueName || null,
         address: editForm.address || null,
         city: editForm.city || null,
@@ -160,18 +178,25 @@ export default function AdminEventManage() {
         country: editForm.country || null,
         registrationFee: editForm.registrationFee ? parseFloat(editForm.registrationFee) : 0,
         perDivisionFee: editForm.perDivisionFee ? parseFloat(editForm.perDivisionFee) : 0,
-        registrationOpenDate,
-        registrationCloseDate
       };
 
-      const response = await eventsApi.adminUpdate(eventId, updateData);
-      if (response.success) {
-        toast.success('Event saved successfully');
-        setHasUnsavedChanges(false);
-        loadEventData();
-      } else {
+      const response = await eventsApi.update(eventId, updateData);
+      if (!response.success) {
         toast.error(response.message || 'Failed to save event');
+        return;
       }
+
+      // Update tournament status separately if changed
+      if (editForm.tournamentStatus && editForm.tournamentStatus !== event.tournamentStatus) {
+        const statusRes = await tournamentApi.updateTournamentStatus(eventId, editForm.tournamentStatus);
+        if (!statusRes.success) {
+          toast.warn('Event saved but status update failed');
+        }
+      }
+
+      toast.success('Event saved successfully');
+      setHasUnsavedChanges(false);
+      loadEventData();
     } catch (err) {
       toast.error(err.message || 'Failed to save event');
     } finally {
