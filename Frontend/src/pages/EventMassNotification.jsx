@@ -72,8 +72,8 @@ export default function EventMassNotification() {
       const res = await tournamentApi.searchUsersForRegistration(eventId, query);
       if (res.success) {
         // Filter out already selected users
-        const selectedIds = new Set(specificUsers.map(u => u.id));
-        setUserSearchResults(res.data.filter(u => !selectedIds.has(u.id)));
+        const selectedIds = new Set(specificUsers.map(u => u.userId));
+        setUserSearchResults(res.data.filter(u => !selectedIds.has(u.userId)));
       }
     } catch (err) {
       console.error('User search failed:', err);
@@ -91,7 +91,7 @@ export default function EventMassNotification() {
 
   // Remove specific user
   const removeSpecificUser = (userId) => {
-    setSpecificUsers(prev => prev.filter(u => u.id !== userId));
+    setSpecificUsers(prev => prev.filter(u => u.userId !== userId));
   };
 
   // Toggle division selection
@@ -130,7 +130,7 @@ export default function EventMassNotification() {
     includeStaff,
     divisionIds: includePlayers ? selectedDivisions : [],
     staffRoleIds: includeStaff ? selectedStaffRoles : [],
-    specificUserIds: specificUsers.map(u => u.id),
+    specificUserIds: specificUsers.map(u => u.userId),
     sendInAppNotification
   });
 
@@ -430,7 +430,7 @@ export default function EventMassNotification() {
               <div className="mt-2 border border-gray-200 rounded-lg max-h-48 overflow-y-auto">
                 {userSearchResults.map(user => (
                   <button
-                    key={user.id}
+                    key={user.userId}
                     onClick={() => addSpecificUser(user)}
                     className="w-full px-3 py-2 text-left hover:bg-gray-50 flex items-center gap-2 border-b last:border-b-0"
                   >
@@ -446,12 +446,12 @@ export default function EventMassNotification() {
               <div className="mt-3 flex flex-wrap gap-2">
                 {specificUsers.map(user => (
                   <span
-                    key={user.id}
+                    key={user.userId}
                     className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-800 text-sm rounded-lg"
                   >
                     {user.name}
                     <button
-                      onClick={() => removeSpecificUser(user.id)}
+                      onClick={() => removeSpecificUser(user.userId)}
                       className="hover:text-green-900"
                     >
                       <X className="w-4 h-4" />
