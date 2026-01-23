@@ -42,12 +42,13 @@ public class PlayerHistoryController : ControllerBase
             return NotFound(new ApiResponse<PlayerHistorySummaryDto> { Success = false, Message = "User not found" });
 
         // Game stats - find games via unit membership
-        var userUnitIds = await _context.EventUnitMembers
+        // Use IQueryable subquery to avoid OPENJSON CTE issues with Contains on List
+        var userUnitIdsQuery = _context.EventUnitMembers
             .Where(m => m.UserId == userId && m.InviteStatus == "Accepted")
-            .Select(m => m.UnitId)
-            .Distinct()
-            .ToListAsync();
+            .Select(m => m.UnitId);
 
+        // Materialize for in-memory processing later
+        var userUnitIds = await userUnitIdsQuery.Distinct().ToListAsync();
         var userUnitIdsSet = userUnitIds.ToHashSet();
 
         int totalGames = 0;
@@ -58,17 +59,17 @@ public class PlayerHistoryController : ControllerBase
 
         if (userUnitIds.Any())
         {
-            // Step 1: Get encounter IDs where user's units participated (avoids complex CTE)
-            var encounterIds = await _context.EventEncounters
-                .Where(e => (e.Unit1Id != null && userUnitIds.Contains(e.Unit1Id.Value)) ||
-                            (e.Unit2Id != null && userUnitIds.Contains(e.Unit2Id.Value)))
-                .Select(e => e.Id)
-                .ToListAsync();
+            // Use subquery-based Contains to avoid OPENJSON CTE issues
+            // Get encounter IDs via subquery (generates IN (SELECT ...) instead of OPENJSON)
+            var encounterIdsQuery = _context.EventEncounters
+                .Where(e => (e.Unit1Id != null && userUnitIdsQuery.Contains(e.Unit1Id.Value)) ||
+                            (e.Unit2Id != null && userUnitIdsQuery.Contains(e.Unit2Id.Value)))
+                .Select(e => e.Id);
 
-            // Step 2: Get finished games from those encounters
+            // Get finished games using the subquery
             var rawGameStats = await _context.EventGames
                 .Where(g => g.Status == "Finished" && g.EncounterMatch != null && g.EncounterMatch.EncounterId != null)
-                .Where(g => encounterIds.Contains(g.EncounterMatch!.EncounterId))
+                .Where(g => encounterIdsQuery.Contains(g.EncounterMatch!.EncounterId))
                 .Select(g => new
                 {
                     Unit1Id = g.EncounterMatch!.Encounter!.Unit1Id,
@@ -218,12 +219,13 @@ public class PlayerHistoryController : ControllerBase
         if (user == null)
             return NotFound(new ApiResponse<GameHistoryPagedResponse> { Success = false, Message = "User not found" });
 
-        // Step 1: Find all units where this user is a member
-        var userUnitIds = await _context.EventUnitMembers
+        // Step 1: Create IQueryable subquery for user's units (avoids OPENJSON CTE issues)
+        var userUnitIdsQuery = _context.EventUnitMembers
             .Where(m => m.UserId == userId && m.InviteStatus == "Accepted")
-            .Select(m => m.UnitId)
-            .Distinct()
-            .ToListAsync();
+            .Select(m => m.UnitId);
+
+        // Materialize for in-memory processing later and early exit check
+        var userUnitIds = await userUnitIdsQuery.Distinct().ToListAsync();
 
         if (!userUnitIds.Any())
         {
@@ -244,33 +246,13 @@ public class PlayerHistoryController : ControllerBase
             });
         }
 
-        // Step 2: Get encounter IDs where user's units participated (avoids complex CTE issues)
-        var encounterIds = await _context.EventEncounters
-            .Where(e => (e.Unit1Id != null && userUnitIds.Contains(e.Unit1Id.Value)) ||
-                        (e.Unit2Id != null && userUnitIds.Contains(e.Unit2Id.Value)))
-            .Select(e => e.Id)
-            .ToListAsync();
+        // Step 2: Create IQueryable subquery for encounter IDs (generates IN (SELECT ...) instead of OPENJSON)
+        var encounterIdsQuery = _context.EventEncounters
+            .Where(e => (e.Unit1Id != null && userUnitIdsQuery.Contains(e.Unit1Id.Value)) ||
+                        (e.Unit2Id != null && userUnitIdsQuery.Contains(e.Unit2Id.Value)))
+            .Select(e => e.Id);
 
-        if (!encounterIds.Any())
-        {
-            return Ok(new ApiResponse<GameHistoryPagedResponse>
-            {
-                Success = true,
-                Data = new GameHistoryPagedResponse
-                {
-                    Games = new List<PlayerGameHistoryDto>(),
-                    TotalCount = 0,
-                    Page = request.Page,
-                    PageSize = request.PageSize,
-                    TotalGames = 0,
-                    TotalWins = 0,
-                    TotalLosses = 0,
-                    WinPercentage = 0
-                }
-            });
-        }
-
-        // Step 3: Get all finished games from those encounters with full includes
+        // Step 3: Get all finished games using subquery-based filtering
         var gamesQuery = _context.EventGames
             .Include(g => g.EncounterMatch)
                 .ThenInclude(m => m!.Encounter)
@@ -290,7 +272,7 @@ public class PlayerHistoryController : ControllerBase
                         .ThenInclude(u => u!.Members)
                             .ThenInclude(m => m.User)
             .Where(g => g.Status == "Finished" && g.EncounterMatch != null && g.EncounterMatch.EncounterId != null)
-            .Where(g => encounterIds.Contains(g.EncounterMatch!.EncounterId));
+            .Where(g => encounterIdsQuery.Contains(g.EncounterMatch!.EncounterId));
 
         // Apply filters
         if (request.DateFrom.HasValue)
