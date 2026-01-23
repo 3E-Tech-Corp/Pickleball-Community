@@ -2570,6 +2570,8 @@ public class EventsController : EventControllerBase
                         "EventUpdate",
                         request.Subject,
                         request.Message.Length > 200 ? request.Message.Substring(0, 200) + "..." : request.Message,
+                        $"/event/{eventId}",
+                        "Event",
                         eventId
                     );
                 }
