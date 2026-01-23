@@ -58,13 +58,17 @@ public class PlayerHistoryController : ControllerBase
 
         if (userUnitIds.Any())
         {
-            // Fetch games and process in memory to determine player's unit
+            // Step 1: Get encounter IDs where user's units participated (avoids complex CTE)
+            var encounterIds = await _context.EventEncounters
+                .Where(e => (e.Unit1Id != null && userUnitIds.Contains(e.Unit1Id.Value)) ||
+                            (e.Unit2Id != null && userUnitIds.Contains(e.Unit2Id.Value)))
+                .Select(e => e.Id)
+                .ToListAsync();
+
+            // Step 2: Get finished games from those encounters
             var rawGameStats = await _context.EventGames
-                .Include(g => g.EncounterMatch)
-                    .ThenInclude(m => m!.Encounter)
-                .Where(g => g.Status == "Finished" && g.EncounterMatch != null && g.EncounterMatch.Encounter != null)
-                .Where(g => userUnitIds.Contains(g.EncounterMatch!.Encounter!.Unit1Id ?? 0) ||
-                            userUnitIds.Contains(g.EncounterMatch!.Encounter!.Unit2Id ?? 0))
+                .Where(g => g.Status == "Finished" && g.EncounterMatch != null && g.EncounterMatch.EncounterId != null)
+                .Where(g => encounterIds.Contains(g.EncounterMatch!.EncounterId))
                 .Select(g => new
                 {
                     Unit1Id = g.EncounterMatch!.Encounter!.Unit1Id,
@@ -240,7 +244,33 @@ public class PlayerHistoryController : ControllerBase
             });
         }
 
-        // Step 2: Get all finished games from encounters where user's units participated
+        // Step 2: Get encounter IDs where user's units participated (avoids complex CTE issues)
+        var encounterIds = await _context.EventEncounters
+            .Where(e => (e.Unit1Id != null && userUnitIds.Contains(e.Unit1Id.Value)) ||
+                        (e.Unit2Id != null && userUnitIds.Contains(e.Unit2Id.Value)))
+            .Select(e => e.Id)
+            .ToListAsync();
+
+        if (!encounterIds.Any())
+        {
+            return Ok(new ApiResponse<GameHistoryPagedResponse>
+            {
+                Success = true,
+                Data = new GameHistoryPagedResponse
+                {
+                    Games = new List<PlayerGameHistoryDto>(),
+                    TotalCount = 0,
+                    Page = request.Page,
+                    PageSize = request.PageSize,
+                    TotalGames = 0,
+                    TotalWins = 0,
+                    TotalLosses = 0,
+                    WinPercentage = 0
+                }
+            });
+        }
+
+        // Step 3: Get all finished games from those encounters with full includes
         var gamesQuery = _context.EventGames
             .Include(g => g.EncounterMatch)
                 .ThenInclude(m => m!.Encounter)
@@ -259,9 +289,8 @@ public class PlayerHistoryController : ControllerBase
                     .ThenInclude(e => e!.Unit2)
                         .ThenInclude(u => u!.Members)
                             .ThenInclude(m => m.User)
-            .Where(g => g.Status == "Finished" && g.EncounterMatch != null && g.EncounterMatch.Encounter != null)
-            .Where(g => userUnitIds.Contains(g.EncounterMatch!.Encounter!.Unit1Id ?? 0) ||
-                        userUnitIds.Contains(g.EncounterMatch!.Encounter!.Unit2Id ?? 0));
+            .Where(g => g.Status == "Finished" && g.EncounterMatch != null && g.EncounterMatch.EncounterId != null)
+            .Where(g => encounterIds.Contains(g.EncounterMatch!.EncounterId));
 
         // Apply filters
         if (request.DateFrom.HasValue)
