@@ -3774,6 +3774,7 @@ public class TournamentController : EventControllerBase
             .Include(m => m.Unit1)
             .Include(m => m.Unit2)
             .Include(m => m.Winner)
+            .Include(m => m.TournamentCourt)
             .Include(m => m.Matches).ThenInclude(match => match.Games).ThenInclude(game => game.TournamentCourt)
             .Where(m => m.DivisionId == divisionId)
             .OrderBy(m => m.RoundType)
@@ -3887,13 +3888,19 @@ public class TournamentController : EventControllerBase
             .ToDictionaryAsync(c => c.Id, c => c.CourtLabel);
 
         // Helper to get court label for an encounter
+        // Priority: 1) Encounter-level TournamentCourtId (from planning), 2) Game-level TournamentCourtId
         string? GetCourtLabel(EventEncounter encounter)
         {
+            // Check encounter-level court assignment first (set by court planning)
+            if (encounter.TournamentCourtId.HasValue && courts.TryGetValue(encounter.TournamentCourtId.Value, out var encounterLabel))
+                return encounterLabel;
+
+            // Fallback to game-level court assignment
             var game = encounter.Matches
                 .SelectMany(em => em.Games)
                 .FirstOrDefault(g => g.TournamentCourtId.HasValue);
-            if (game?.TournamentCourtId != null && courts.TryGetValue(game.TournamentCourtId.Value, out var label))
-                return label;
+            if (game?.TournamentCourtId != null && courts.TryGetValue(game.TournamentCourtId.Value, out var gameLabel))
+                return gameLabel;
             return null;
         }
 
@@ -3935,6 +3942,7 @@ public class TournamentController : EventControllerBase
                             ? (m.Unit2Id == null ? m.Unit2SeedLabel : GetSeedInfo(m.Unit2Id))
                             : null,
                         IsBye = (m.Unit1Id == null) != (m.Unit2Id == null), // One but not both is null
+                        CourtId = m.TournamentCourtId,
                         CourtLabel = GetCourtLabel(m),
                         ScheduledTime = m.ScheduledTime,
                         StartedAt = m.StartedAt,

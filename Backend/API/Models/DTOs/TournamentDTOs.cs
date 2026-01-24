@@ -660,6 +660,7 @@ public class ScheduleMatchDto
     public string? Unit1SeedInfo { get; set; } // e.g., "Pool A #1" for playoff matches
     public string? Unit2SeedInfo { get; set; }
     public bool IsBye { get; set; } // True if one team has a bye
+    public int? CourtId { get; set; } // TournamentCourtId for dropdown selection
     public string? CourtLabel { get; set; }
     public DateTime? ScheduledTime { get; set; }
     public DateTime? StartedAt { get; set; }
