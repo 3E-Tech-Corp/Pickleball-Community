@@ -323,7 +323,7 @@ const AdminDashboard = () => {
     setUploadingLogo(true)
     try {
       // Upload to Funtime-Shared asset service
-      const response = await sharedAssetApi.upload(file, 'image', 'theme')
+      const response = await sharedAssetApi.uploadViaProxy(file, 'image', 'theme')
       // Save only relative path to DB
       const logoUrl = getAssetPathFromResponse(response)
       if (logoUrl) {
@@ -349,7 +349,7 @@ const AdminDashboard = () => {
     setUploadingFavicon(true)
     try {
       // Upload to Funtime-Shared asset service
-      const response = await sharedAssetApi.upload(file, 'image', 'theme')
+      const response = await sharedAssetApi.uploadViaProxy(file, 'image', 'theme')
       // Save only relative path to DB
       const faviconUrl = getAssetPathFromResponse(response)
       if (faviconUrl) {
@@ -579,7 +579,7 @@ const AdminDashboard = () => {
     setUploadingHeroImage(true)
     try {
       // Upload to Funtime-Shared asset service
-      const response = await sharedAssetApi.upload(file, 'image', 'theme')
+      const response = await sharedAssetApi.uploadViaProxy(file, 'image', 'theme')
       // Save only relative path to DB
       const heroImageUrl = getAssetPathFromResponse(response)
       if (heroImageUrl) {

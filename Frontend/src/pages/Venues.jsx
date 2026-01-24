@@ -1187,18 +1187,13 @@ function CourtDetailModal({ court, isAuthenticated, onClose, onConfirmationSubmi
     try {
       // Upload file to Funtime-Shared asset service
       const assetType = isVideo ? 'video' : 'image';
-      const uploadResponse = await sharedAssetApi.upload(file, assetType, 'court');
+      const uploadResponse = await sharedAssetApi.uploadViaProxy(file, assetType, 'court');
 
-      // Save only relative path to DB - use response.data.url directly
-      // Response: { data: { success: true, url: "/asset/11", ... } }
-      let assetUrl;
-      if (uploadResponse?.data?.url) {
-        assetUrl = uploadResponse.data.url;
-      } else if (uploadResponse?.url) {
-        assetUrl = uploadResponse.url;
-      } else {
-        throw new Error(uploadResponse.message || 'Upload failed');
+      // Save only relative path to DB
+      if (!uploadResponse?.success || !uploadResponse?.url) {
+        throw new Error(uploadResponse?.message || 'Upload failed');
       }
+      const assetUrl = uploadResponse.url;
 
       // Create court asset record with relative path
       const assetData = {

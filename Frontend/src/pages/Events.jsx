@@ -2264,13 +2264,11 @@ function EventDetailModal({ event, isAuthenticated, isAdmin, currentUserId, user
     setUploadingEditImage(true);
     setEditError(null);
     try {
-      const response = await sharedAssetApi.upload(file, 'image', 'event');
-      if (response?.data?.url) {
-        setEditFormData({ ...editFormData, posterImageUrl: response.data.url });
-      } else if (response?.url) {
+      const response = await sharedAssetApi.uploadViaProxy(file, 'image', 'event');
+      if (response?.success && response?.url) {
         setEditFormData({ ...editFormData, posterImageUrl: response.url });
       } else {
-        setEditError(response.message || 'Upload failed');
+        setEditError(response?.message || 'Upload failed');
       }
     } catch (err) {
       setEditError(err.message || 'Failed to upload image');
@@ -2513,8 +2511,8 @@ function EventDetailModal({ event, isAuthenticated, isAdmin, currentUserId, user
     setUploadingDocument(true);
     try {
       // Upload file to shared assets
-      const uploadResponse = await sharedAssetApi.upload(file, 'document', 'event', true);
-      const fileUrl = uploadResponse?.data?.url || uploadResponse?.url;
+      const uploadResponse = await sharedAssetApi.uploadViaProxy(file, 'document', 'event');
+      const fileUrl = uploadResponse?.url;
 
       if (!fileUrl) {
         toast.error('Failed to upload file');
@@ -7214,13 +7212,11 @@ function CreateEventModal({ eventTypes, teamUnits = [], skillLevels = [], courtI
     setUploadingImage(true);
     setError(null);
     try {
-      const response = await sharedAssetApi.upload(file, 'image', 'event');
-      if (response?.data?.url) {
-        setFormData({ ...formData, posterImageUrl: response.data.url });
-      } else if (response?.url) {
+      const response = await sharedAssetApi.uploadViaProxy(file, 'image', 'event');
+      if (response?.success && response?.url) {
         setFormData({ ...formData, posterImageUrl: response.url });
       } else {
-        setError(response.message || 'Upload failed');
+        setError(response?.message || 'Upload failed');
       }
     } catch (err) {
       setError(err.message || 'Failed to upload image');

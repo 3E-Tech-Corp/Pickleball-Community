@@ -266,9 +266,9 @@ export default function LeagueAdmin({ embedded = false }) {
 
     setUploadingAvatar(true);
     try {
-      const response = await sharedAssetApi.upload(file, 'image', 'league-avatar');
-      if (response.data?.url) {
-        await leaguesApi.updateAvatar(selectedLeague.id, response.data.url);
+      const response = await sharedAssetApi.uploadViaProxy(file, 'image', 'league-avatar');
+      if (response.success && response.url) {
+        await leaguesApi.updateAvatar(selectedLeague.id, response.url);
         loadLeagueDetail(selectedLeague.id);
       }
     } catch (err) {

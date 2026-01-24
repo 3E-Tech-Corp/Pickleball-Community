@@ -939,8 +939,8 @@ export default function TournamentManage() {
     setUploadingDocument(true);
     try {
       // Upload file to shared assets
-      const uploadResponse = await sharedAssetApi.upload(file, 'document', 'event', true);
-      const fileUrl = uploadResponse?.data?.url || uploadResponse?.url;
+      const uploadResponse = await sharedAssetApi.uploadViaProxy(file, 'document', 'event');
+      const fileUrl = uploadResponse?.url;
 
       if (!fileUrl) {
         toast.error('Failed to upload file');
