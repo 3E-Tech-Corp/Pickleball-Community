@@ -3716,6 +3716,23 @@ export default function TournamentManage() {
                             </div>
                             {round.matches?.filter(m => !m.isBye).map((match, matchIdx) => (
                               <div key={matchIdx} className="p-4 border-t border-gray-100">
+                                {/* Scheduled time and court info */}
+                                {(match.scheduledTime || match.courtLabel) && (
+                                  <div className="flex items-center gap-3 mb-2 text-sm">
+                                    {match.scheduledTime && (
+                                      <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-50 text-blue-700 rounded">
+                                        <Clock className="w-3 h-3" />
+                                        {new Date(match.scheduledTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                      </span>
+                                    )}
+                                    {match.courtLabel && (
+                                      <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-green-50 text-green-700 rounded">
+                                        <MapPin className="w-3 h-3" />
+                                        {match.courtLabel}
+                                      </span>
+                                    )}
+                                  </div>
+                                )}
                                 <div className="flex items-center gap-3">
                                   {/* Edit button on far left */}
                                   <button
@@ -3832,6 +3849,23 @@ export default function TournamentManage() {
                             </div>
                             {round.matches?.map((match, matchIdx) => (
                               <div key={matchIdx} className="p-4 border-t border-gray-100">
+                                {/* Scheduled time and court info */}
+                                {!match.isBye && (match.scheduledTime || match.courtLabel) && (
+                                  <div className="flex items-center gap-3 mb-2 text-sm">
+                                    {match.scheduledTime && (
+                                      <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-50 text-blue-700 rounded">
+                                        <Clock className="w-3 h-3" />
+                                        {new Date(match.scheduledTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                      </span>
+                                    )}
+                                    {match.courtLabel && (
+                                      <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-green-50 text-green-700 rounded">
+                                        <MapPin className="w-3 h-3" />
+                                        {match.courtLabel}
+                                      </span>
+                                    )}
+                                  </div>
+                                )}
                                 <div className="flex items-center gap-3">
                                   {/* Edit button on far left */}
                                   {!match.isBye && (
