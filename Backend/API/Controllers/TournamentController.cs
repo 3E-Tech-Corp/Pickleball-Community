@@ -523,9 +523,51 @@ public class TournamentController : EventControllerBase
             .ToListAsync();
         var units = allUnits.Where(u => unitIdsSet.Contains(u.Id)).ToList();
 
-        // Note: Registration confirmation email is NOT sent here
-        // It will be sent after both waiver signing and payment are completed
-        // This is handled in CheckInController after waiver signing and payment submission
+        // Send registration confirmation email immediately
+        // Email will include status of waiver and payment (pending if not yet completed)
+        try
+        {
+            foreach (var unit in units)
+            {
+                var division = evt.Divisions.FirstOrDefault(d => d.Id == unit.DivisionId);
+                var feeAmount = division?.DivisionFee ?? 0;
+
+                // Check if there are waivers for this event
+                var waiverCount = await _context.ObjectAssets
+                    .Include(a => a.AssetType)
+                    .CountAsync(a => a.ObjectId == eventId
+                        && a.AssetType != null
+                        && a.AssetType.TypeName.ToLower() == "waiver");
+
+                var emailBody = EmailTemplates.EventRegistrationConfirmation(
+                    $"{user.FirstName} {user.LastName}".Trim(),
+                    evt.Name ?? "Event",
+                    division?.Name ?? "Division",
+                    evt.StartDate ?? DateTime.Now,
+                    evt.VenueName,
+                    unit.Name,
+                    feeAmount,
+                    waiverSigned: waiverCount == 0, // No waivers = considered signed
+                    paymentComplete: feeAmount == 0 // No fee = considered paid
+                );
+
+                var subject = feeAmount == 0 && waiverCount == 0
+                    ? $"Registration Complete: {evt.Name}"
+                    : $"Registration Received: {evt.Name}";
+
+                await _emailService.SendSimpleAsync(
+                    userId.Value,
+                    user.Email!,
+                    subject,
+                    emailBody
+                );
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to send registration email for user {UserId}", userId);
+            // Don't fail registration if email fails
+        }
 
         return Ok(new ApiResponse<List<EventUnitDto>>
         {
@@ -9239,6 +9281,92 @@ public class TournamentController : EventControllerBase
     }
 
     #endregion
+
+    // ============================================
+    // Registration Validation
+    // ============================================
+
+    /// <summary>
+    /// Validate all registrations for an event and return issues found
+    /// </summary>
+    [Authorize]
+    [HttpGet("events/{eventId}/validate-registrations")]
+    public async Task<ActionResult<ApiResponse<RegistrationValidationResultDto>>> ValidateRegistrations(int eventId)
+    {
+        if (!await CanManageEventAsync(eventId))
+            return Forbid();
+
+        var result = new RegistrationValidationResultDto
+        {
+            Summary = new List<ValidationSummaryItem>(),
+            Issues = new List<ValidationIssue>()
+        };
+
+        try
+        {
+            using var connection = _context.Database.GetDbConnection();
+            await connection.OpenAsync();
+
+            using var command = connection.CreateCommand();
+            command.CommandText = "EXEC sp_ValidateEventRegistrations @EventId";
+            var param = command.CreateParameter();
+            param.ParameterName = "@EventId";
+            param.Value = eventId;
+            command.Parameters.Add(param);
+
+            using var reader = await command.ExecuteReaderAsync();
+
+            // First result set: summary
+            while (await reader.ReadAsync())
+            {
+                result.Summary.Add(new ValidationSummaryItem
+                {
+                    Category = reader.GetString(0),
+                    Severity = reader.GetString(1),
+                    IssueCount = reader.GetInt32(2)
+                });
+            }
+
+            // Second result set: issues
+            if (await reader.NextResultAsync())
+            {
+                while (await reader.ReadAsync())
+                {
+                    result.Issues.Add(new ValidationIssue
+                    {
+                        Category = reader.GetString(0),
+                        Severity = reader.GetString(1),
+                        DivisionId = reader.IsDBNull(2) ? null : reader.GetInt32(2),
+                        DivisionName = reader.IsDBNull(3) ? null : reader.GetString(3),
+                        UnitId = reader.IsDBNull(4) ? null : reader.GetInt32(4),
+                        UnitName = reader.IsDBNull(5) ? null : reader.GetString(5),
+                        UserId = reader.IsDBNull(6) ? null : reader.GetInt32(6),
+                        UserName = reader.IsDBNull(7) ? null : reader.GetString(7),
+                        Message = reader.GetString(8)
+                    });
+                }
+            }
+
+            result.TotalErrors = result.Summary.Where(s => s.Severity == "Error").Sum(s => s.IssueCount);
+            result.TotalWarnings = result.Summary.Where(s => s.Severity == "Warning").Sum(s => s.IssueCount);
+            result.TotalInfo = result.Summary.Where(s => s.Severity == "Info").Sum(s => s.IssueCount);
+
+            return Ok(new ApiResponse<RegistrationValidationResultDto>
+            {
+                Success = true,
+                Data = result
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to validate registrations for event {EventId}", eventId);
+            return StatusCode(500, new ApiResponse<RegistrationValidationResultDto>
+            {
+                Success = false,
+                Message = "Failed to validate registrations: " + ex.Message
+            });
+        }
+    }
 }
 
 // DTOs for join code feature

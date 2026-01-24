@@ -1371,7 +1371,7 @@ export default function EventRegistration() {
                                               setCurrentStep(5);
                                             }
                                           }}
-                                          className="px-2 py-0.5 bg-orange-100 text-orange-600 text-xs font-medium rounded-full hover:bg-orange-200 transition-colors"
+                                          className="px-3 py-1 bg-orange-500 text-white text-sm font-semibold rounded-lg hover:bg-orange-600 transition-colors shadow-sm"
                                         >
                                           Continue
                                         </button>
@@ -1381,7 +1381,7 @@ export default function EventRegistration() {
                                           e.stopPropagation();
                                           setCancelConfirmModal({ isOpen: true, division, unit });
                                         }}
-                                        className="px-2 py-0.5 bg-red-100 text-red-600 text-xs font-medium rounded-full hover:bg-red-200 transition-colors"
+                                        className="px-3 py-1 bg-red-500 text-white text-sm font-semibold rounded-lg hover:bg-red-600 transition-colors shadow-sm"
                                       >
                                         Cancel
                                       </button>

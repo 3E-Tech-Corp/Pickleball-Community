@@ -116,10 +116,16 @@ export default function TournamentManage() {
   // Unit management state
   const [unitsData, setUnitsData] = useState(null); // All units grouped by division
   const [loadingUnits, setLoadingUnits] = useState(false);
+  const [registrationDivisionFilter, setRegistrationDivisionFilter] = useState('all'); // Filter for Registration Management
   const [selectedUnitsForMerge, setSelectedUnitsForMerge] = useState([]);
   const [processingUnitAction, setProcessingUnitAction] = useState(null); // { unitId, action }
   const [expandedUnit, setExpandedUnit] = useState(null); // unitId for expanded view
   const [movingUnitToDivision, setMovingUnitToDivision] = useState(null); // { unit, targetDivisionId }
+
+  // Registration validation state
+  const [validationResults, setValidationResults] = useState(null);
+  const [loadingValidation, setLoadingValidation] = useState(false);
+  const [showValidationModal, setShowValidationModal] = useState(false);
 
   // Payment management state
   const [paymentSummary, setPaymentSummary] = useState(null);
@@ -1433,6 +1439,24 @@ export default function TournamentManage() {
     }
   };
 
+  const validateRegistrations = async () => {
+    setLoadingValidation(true);
+    try {
+      const response = await tournamentApi.validateRegistrations(eventId);
+      if (response.success) {
+        setValidationResults(response.data);
+        setShowValidationModal(true);
+      } else {
+        toast.error(response.message || 'Failed to validate registrations');
+      }
+    } catch (err) {
+      console.error('Error validating registrations:', err);
+      toast.error('Failed to validate registrations');
+    } finally {
+      setLoadingValidation(false);
+    }
+  };
+
   const handleBreakUnit = async (unit) => {
     if (!confirm(`Break "${unit.name}" apart? Each member will become their own registration.`)) return;
     setProcessingUnitAction({ unitId: unit.id, action: 'break' });
@@ -1542,7 +1566,9 @@ export default function TournamentManage() {
 
   const getUnitsByDivision = () => {
     if (!unitsData) return [];
-    return Object.values(unitsData).filter(d => d.units.length > 0);
+    const allDivisions = Object.values(unitsData).filter(d => d.units.length > 0);
+    if (registrationDivisionFilter === 'all') return allDivisions;
+    return allDivisions.filter(d => d.divisionId === parseInt(registrationDivisionFilter));
   };
 
   // Payment Management functions
@@ -1894,6 +1920,7 @@ export default function TournamentManage() {
                 { key: 'divisions', label: 'Divisions' },
                 { key: 'courts', label: 'Courts' },
                 { key: 'registrations', label: 'Registrations' },
+                { key: 'backup', label: 'Backup' },
                 { key: 'payments', label: 'Payments' },
                 { key: 'documents', label: 'Documents' },
                 { key: 'staff', label: 'Staff' },
@@ -4018,8 +4045,18 @@ export default function TournamentManage() {
         {activeTab === 'registrations' && (
           <div className="space-y-6">
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-gray-900">Player Registrations & Check-in</h2>
+              <h2 className="text-lg font-semibold text-gray-900">Registration Management</h2>
               <div className="flex items-center gap-2">
+                {isOrganizer && (
+                  <button
+                    onClick={validateRegistrations}
+                    disabled={loadingValidation}
+                    className="px-4 py-2 text-sm font-medium text-orange-700 bg-orange-100 rounded-lg hover:bg-orange-200 flex items-center gap-2 disabled:opacity-50"
+                  >
+                    {loadingValidation ? <Loader2 className="w-4 h-4 animate-spin" /> : <Shield className="w-4 h-4" />}
+                    Validate
+                  </button>
+                )}
                 {isOrganizer && (
                   <button
                     onClick={() => setShowAddPlayer(true)}
@@ -4030,13 +4067,307 @@ export default function TournamentManage() {
                   </button>
                 )}
                 <button
-                  onClick={() => { loadCheckIns(); loadDashboard(); }}
-                  disabled={loadingCheckIns}
+                  onClick={() => { loadUnits(); loadDashboard(); }}
+                  disabled={loadingUnits}
                   className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 disabled:opacity-50"
                 >
-                  <RefreshCw className={`w-5 h-5 ${loadingCheckIns ? 'animate-spin' : ''}`} />
+                  <RefreshCw className={`w-5 h-5 ${loadingUnits ? 'animate-spin' : ''}`} />
                 </button>
               </div>
+            </div>
+
+            {/* Division Filter */}
+            <div className="bg-white rounded-xl shadow-sm p-4">
+              <div className="flex flex-wrap gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Division</label>
+                  <select
+                    value={registrationDivisionFilter}
+                    onChange={(e) => setRegistrationDivisionFilter(e.target.value)}
+                    className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-orange-500"
+                  >
+                    <option value="all">All Divisions</option>
+                    {dashboard?.divisions?.filter(d => d.registeredUnits > 0).map(div => (
+                      <option key={div.id} value={div.id}>{div.name}</option>
+                    ))}
+                  </select>
+                </div>
+                {!unitsData && (
+                  <div className="flex items-end">
+                    <button
+                      onClick={loadUnits}
+                      disabled={loadingUnits}
+                      className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 flex items-center gap-2"
+                    >
+                      {loadingUnits ? <Loader2 className="w-4 h-4 animate-spin" /> : <Layers className="w-4 h-4" />}
+                      Load Registrations
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Unit Registration List */}
+            {!unitsData ? (
+              <div className="bg-white rounded-xl shadow-sm p-8 text-center">
+                <Layers className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                <p className="text-gray-500 mb-4">Click refresh to load registrations</p>
+                <button
+                  onClick={loadUnits}
+                  disabled={loadingUnits}
+                  className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 flex items-center gap-2 mx-auto"
+                >
+                  {loadingUnits ? <Loader2 className="w-4 h-4 animate-spin" /> : <Layers className="w-4 h-4" />}
+                  Load Registrations
+                </button>
+              </div>
+            ) : getUnitsByDivision().length === 0 ? (
+              <div className="bg-white rounded-xl shadow-sm p-8 text-center">
+                <Layers className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                <p className="text-gray-500">No registered units found</p>
+              </div>
+            ) : (
+                <div className="space-y-4">
+                  {getUnitsByDivision().map(divGroup => {
+                    const teamSize = divGroup.units[0]?.requiredPlayers || 2;
+                    const sortedUnits = [...divGroup.units].sort((a, b) => {
+                      const aComplete = a.isComplete ? 1 : 0;
+                      const bComplete = b.isComplete ? 1 : 0;
+                      return bComplete - aComplete;
+                    });
+
+                    return (
+                      <div key={divGroup.divisionId} className="border rounded-lg overflow-hidden bg-white">
+                        {/* Division Header */}
+                        <div className="p-4 bg-gray-50 border-b">
+                          <div className="flex items-start justify-between gap-4">
+                            <div>
+                              <h4 className="font-semibold text-gray-900 text-lg">{divGroup.divisionName}</h4>
+                            </div>
+                            <span className="px-3 py-1 bg-green-100 text-green-700 rounded-lg text-sm font-medium whitespace-nowrap flex items-center gap-1.5">
+                              <CheckCircle className="w-4 h-4" />
+                              Registered
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Units count and merge toolbar */}
+                        <div className="px-4 py-3 border-b bg-gray-50/50 flex items-center justify-between">
+                          <h5 className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                            <Users className="w-4 h-4" />
+                            {divGroup.units.length} {teamSize > 2 ? 'Teams' : teamSize === 2 ? 'Pairs' : 'Players'} Registered
+                          </h5>
+
+                          {/* Merge toolbar */}
+                          {selectedUnitsForMerge.length > 0 && selectedUnitsForMerge[0]?.divisionId === divGroup.divisionId && (
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-gray-500">{selectedUnitsForMerge.length} selected</span>
+                              <button
+                                onClick={handleMergeUnits}
+                                disabled={selectedUnitsForMerge.length !== 2 || processingUnitAction?.action === 'merge'}
+                                className="px-3 py-1 text-xs font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-1"
+                              >
+                                {processingUnitAction?.action === 'merge' ? <Loader2 className="w-3 h-3 animate-spin" /> : <Users className="w-3 h-3" />}
+                                Merge
+                              </button>
+                              <button
+                                onClick={() => setSelectedUnitsForMerge([])}
+                                className="px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100 rounded-lg"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Unit rows */}
+                        <div className="divide-y divide-gray-100">
+                          {sortedUnits.map((unit, idx) => {
+                            const isComplete = unit.isComplete;
+                            const isSelected = selectedUnitsForMerge.some(u => u.id === unit.id);
+                            const isProcessing = processingUnitAction?.unitId === unit.id;
+                            const acceptedMembers = unit.members?.filter(m => m.inviteStatus === 'Accepted') || [];
+
+                            return (
+                              <div
+                                key={unit.id}
+                                className={`px-2 sm:px-4 py-2 sm:py-3 flex items-center gap-2 sm:gap-3 ${
+                                  isComplete ? 'bg-white' : 'bg-amber-50/50'
+                                } ${idx % 2 === 1 && isComplete ? 'bg-gray-50/50' : ''} ${isSelected ? 'ring-2 ring-blue-500 ring-inset' : ''}`}
+                              >
+                                {/* Checkbox for merge (incomplete units only) */}
+                                {!isComplete && (
+                                  <input
+                                    type="checkbox"
+                                    checked={isSelected}
+                                    onChange={() => toggleUnitForMerge({ ...unit, divisionId: divGroup.divisionId })}
+                                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 shrink-0"
+                                  />
+                                )}
+
+                                {/* Unit number */}
+                                <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-medium shrink-0 ${
+                                  isComplete ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
+                                }`}>
+                                  {idx + 1}
+                                </div>
+
+                                {/* Members inline */}
+                                <div className="flex-1 flex flex-wrap items-center gap-2 min-w-0">
+                                  {acceptedMembers.map((member, mIdx) => (
+                                    <div key={mIdx} className="flex items-center gap-1 shrink-0">
+                                      <button
+                                        onClick={() => member.userId && setProfileModalUserId(member.userId)}
+                                        className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-white border border-gray-200 hover:border-orange-300 hover:bg-orange-50 transition-colors"
+                                      >
+                                        {member.profileImageUrl ? (
+                                          <img src={getSharedAssetUrl(member.profileImageUrl)} alt="" className="w-5 h-5 rounded-full object-cover" />
+                                        ) : (
+                                          <div className="w-5 h-5 rounded-full bg-orange-100 text-orange-700 flex items-center justify-center text-xs font-medium">
+                                            {(member.firstName || 'P')[0].toUpperCase()}
+                                          </div>
+                                        )}
+                                        <span className="text-sm max-w-[80px] sm:max-w-[150px] truncate text-gray-700">
+                                          {member.lastName && member.firstName
+                                            ? `${member.lastName}, ${member.firstName}`
+                                            : member.lastName || member.firstName || 'Player'}
+                                        </span>
+                                      </button>
+                                      {/* Payment status $ icon */}
+                                      <span className={`text-sm ${member.hasPaid ? 'text-green-600' : 'text-gray-400'}`} title={member.hasPaid ? 'Paid' : 'Unpaid'}>
+                                        <DollarSign className="w-4 h-4" />
+                                      </span>
+                                      {/* Remove member button */}
+                                      {acceptedMembers.length > 1 && (
+                                        <button
+                                          onClick={() => handleRemoveMember(unit, member)}
+                                          disabled={isProcessing}
+                                          className="p-0.5 rounded text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
+                                          title="Remove player"
+                                        >
+                                          <Trash2 className="w-4 h-4" />
+                                        </button>
+                                      )}
+                                    </div>
+                                  ))}
+
+                                  {/* Empty slots for incomplete units */}
+                                  {!isComplete && Array.from({ length: Math.max(0, (unit.requiredPlayers || 2) - acceptedMembers.length) }).map((_, i) => (
+                                    <div key={`empty-${i}`} className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-gray-100 border border-dashed border-gray-300 shrink-0">
+                                      <div className="w-5 h-5 bg-gray-200 rounded-full flex items-center justify-center text-gray-400 text-xs">?</div>
+                                      <span className="hidden sm:inline text-sm text-gray-400">Needed</span>
+                                    </div>
+                                  ))}
+                                </div>
+
+                                {/* Status badge and actions */}
+                                <div className="shrink-0 flex items-center gap-2">
+                                  {isComplete ? (
+                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium text-green-700 bg-green-100 rounded-full">
+                                      <Check className="w-3 h-3" />
+                                      <span className="hidden sm:inline">Team Complete</span>
+                                    </span>
+                                  ) : (
+                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium text-amber-700 bg-amber-100 rounded-full">
+                                      <Clock className="w-3 h-3" />
+                                      <span className="hidden sm:inline">Looking</span>
+                                    </span>
+                                  )}
+
+                                  {/* Break unit button (for complete units with >1 member) */}
+                                  {isComplete && acceptedMembers.length > 1 && (
+                                    <button
+                                      onClick={() => handleBreakUnit(unit)}
+                                      disabled={isProcessing}
+                                      className="p-1 text-orange-500 hover:text-orange-700 hover:bg-orange-50 rounded transition-colors disabled:opacity-50"
+                                      title="Break unit apart"
+                                    >
+                                      {isProcessing && processingUnitAction?.action === 'break' ? (
+                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                      ) : (
+                                        <Hammer className="w-4 h-4" />
+                                      )}
+                                    </button>
+                                  )}
+
+                                  {/* Move to different division */}
+                                  {dashboard?.divisions?.filter(d => d.id !== divGroup.divisionId).length > 0 && (
+                                    <button
+                                      onClick={() => setMovingUnitToDivision({ unit: { ...unit, divisionId: divGroup.divisionId }, targetDivisionId: null })}
+                                      className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded"
+                                      title="Move to different division"
+                                    >
+                                      <ArrowRight className="w-4 h-4" />
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {/* Move Division Modal */}
+                  {movingUnitToDivision && (
+                    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                      <div className="bg-white rounded-lg p-6 max-w-md w-full">
+                        <h3 className="font-semibold text-lg mb-4">Move to Different Division</h3>
+                        <p className="text-sm text-gray-600 mb-4">
+                          Move "{movingUnitToDivision.unit?.name}" to a different division. Fees will be adjusted automatically.
+                        </p>
+                        <select
+                          value={movingUnitToDivision.targetDivisionId || ''}
+                          onChange={(e) => setMovingUnitToDivision({
+                            ...movingUnitToDivision,
+                            targetDivisionId: parseInt(e.target.value)
+                          })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 mb-4"
+                        >
+                          <option value="">Select division...</option>
+                          {dashboard?.divisions?.filter(d => d.id !== movingUnitToDivision.unit?.divisionId).map(d => (
+                            <option key={d.id} value={d.id}>{d.name}</option>
+                          ))}
+                        </select>
+                        <div className="flex justify-end gap-2">
+                          <button
+                            onClick={() => setMovingUnitToDivision(null)}
+                            className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            onClick={() => movingUnitToDivision.targetDivisionId && handleMoveUnitToDivision(movingUnitToDivision.unit, movingUnitToDivision.targetDivisionId)}
+                            disabled={!movingUnitToDivision.targetDivisionId || processingUnitAction?.action === 'move'}
+                            className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 flex items-center gap-2"
+                          >
+                            {processingUnitAction?.action === 'move' ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : null}
+                            Move
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+          </div>
+        )}
+
+        {/* Backup Tab - Check-in Management */}
+        {activeTab === 'backup' && (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-gray-900">Player Check-in & Status</h2>
+              <button
+                onClick={() => { loadCheckIns(); loadDashboard(); }}
+                disabled={loadingCheckIns}
+                className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 disabled:opacity-50"
+              >
+                <RefreshCw className={`w-5 h-5 ${loadingCheckIns ? 'animate-spin' : ''}`} />
+              </button>
             </div>
 
             {/* Check-in stats */}
@@ -4253,7 +4584,7 @@ export default function TournamentManage() {
 
                           {/* Expanded details section */}
                           {expandedPlayer === player.userId && (
-                          <div className="px-4 pb-4">
+                            <div className="px-4 pb-4">
                               <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                   {/* Waiver Section with Actions */}
@@ -4544,269 +4875,6 @@ export default function TournamentManage() {
                 Players can check in from their Member Dashboard after signing the waiver and completing payment.
                 Check-in is typically enabled when the tournament status is set to "Running".
               </p>
-            </div>
-
-            {/* Unit Management Section - Events.jsx Style */}
-            <div className="mt-8 pt-6 border-t border-gray-200">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                  <Layers className="w-5 h-5 text-purple-600" />
-                  Registration Management
-                </h2>
-                <button
-                  onClick={loadUnits}
-                  disabled={loadingUnits}
-                  className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 disabled:opacity-50"
-                >
-                  <RefreshCw className={`w-5 h-5 ${loadingUnits ? 'animate-spin' : ''}`} />
-                </button>
-              </div>
-
-              {!unitsData ? (
-                <div className="bg-white rounded-xl shadow-sm p-8 text-center">
-                  <Layers className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                  <p className="text-gray-500 mb-4">Click refresh to load registrations</p>
-                  <button
-                    onClick={loadUnits}
-                    disabled={loadingUnits}
-                    className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 flex items-center gap-2 mx-auto"
-                  >
-                    {loadingUnits ? <Loader2 className="w-4 h-4 animate-spin" /> : <Layers className="w-4 h-4" />}
-                    Load Registrations
-                  </button>
-                </div>
-              ) : getUnitsByDivision().length === 0 ? (
-                <div className="bg-white rounded-xl shadow-sm p-8 text-center">
-                  <Layers className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                  <p className="text-gray-500">No registered units found</p>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {getUnitsByDivision().map(divGroup => {
-                    const teamSize = divGroup.units[0]?.requiredPlayers || 2;
-                    const sortedUnits = [...divGroup.units].sort((a, b) => {
-                      const aComplete = a.isComplete ? 1 : 0;
-                      const bComplete = b.isComplete ? 1 : 0;
-                      return bComplete - aComplete;
-                    });
-
-                    return (
-                      <div key={divGroup.divisionId} className="border rounded-lg overflow-hidden bg-white">
-                        {/* Division Header */}
-                        <div className="p-4 bg-gray-50 border-b">
-                          <div className="flex items-start justify-between gap-4">
-                            <div>
-                              <h4 className="font-semibold text-gray-900 text-lg">{divGroup.divisionName}</h4>
-                            </div>
-                            <span className="px-3 py-1 bg-green-100 text-green-700 rounded-lg text-sm font-medium whitespace-nowrap flex items-center gap-1.5">
-                              <CheckCircle className="w-4 h-4" />
-                              Registered
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* Units count and merge toolbar */}
-                        <div className="px-4 py-3 border-b bg-gray-50/50 flex items-center justify-between">
-                          <h5 className="text-sm font-medium text-gray-700 flex items-center gap-2">
-                            <Users className="w-4 h-4" />
-                            {divGroup.units.length} {teamSize > 2 ? 'Teams' : teamSize === 2 ? 'Pairs' : 'Players'} Registered
-                          </h5>
-
-                          {/* Merge toolbar */}
-                          {selectedUnitsForMerge.length > 0 && selectedUnitsForMerge[0]?.divisionId === divGroup.divisionId && (
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs text-gray-500">{selectedUnitsForMerge.length} selected</span>
-                              <button
-                                onClick={handleMergeUnits}
-                                disabled={selectedUnitsForMerge.length !== 2 || processingUnitAction?.action === 'merge'}
-                                className="px-3 py-1 text-xs font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-1"
-                              >
-                                {processingUnitAction?.action === 'merge' ? <Loader2 className="w-3 h-3 animate-spin" /> : <Users className="w-3 h-3" />}
-                                Merge
-                              </button>
-                              <button
-                                onClick={() => setSelectedUnitsForMerge([])}
-                                className="px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100 rounded-lg"
-                              >
-                                Cancel
-                              </button>
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Unit rows */}
-                        <div className="divide-y divide-gray-100">
-                          {sortedUnits.map((unit, idx) => {
-                            const isComplete = unit.isComplete;
-                            const isSelected = selectedUnitsForMerge.some(u => u.id === unit.id);
-                            const isProcessing = processingUnitAction?.unitId === unit.id;
-                            const acceptedMembers = unit.members?.filter(m => m.inviteStatus === 'Accepted') || [];
-
-                            return (
-                              <div
-                                key={unit.id}
-                                className={`px-2 sm:px-4 py-2 sm:py-3 flex items-center gap-2 sm:gap-3 ${
-                                  isComplete ? 'bg-white' : 'bg-amber-50/50'
-                                } ${idx % 2 === 1 && isComplete ? 'bg-gray-50/50' : ''} ${isSelected ? 'ring-2 ring-blue-500 ring-inset' : ''}`}
-                              >
-                                {/* Checkbox for merge (incomplete units only) */}
-                                {!isComplete && (
-                                  <input
-                                    type="checkbox"
-                                    checked={isSelected}
-                                    onChange={() => toggleUnitForMerge({ ...unit, divisionId: divGroup.divisionId })}
-                                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 shrink-0"
-                                  />
-                                )}
-
-                                {/* Unit number */}
-                                <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-medium shrink-0 ${
-                                  isComplete ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
-                                }`}>
-                                  {idx + 1}
-                                </div>
-
-                                {/* Members inline */}
-                                <div className="flex-1 flex flex-wrap items-center gap-2 min-w-0">
-                                  {acceptedMembers.map((member, mIdx) => (
-                                    <div key={mIdx} className="flex items-center gap-1 shrink-0">
-                                      <button
-                                        onClick={() => member.userId && setProfileModalUserId(member.userId)}
-                                        className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-white border border-gray-200 hover:border-orange-300 hover:bg-orange-50 transition-colors"
-                                      >
-                                        {member.profileImageUrl ? (
-                                          <img src={getSharedAssetUrl(member.profileImageUrl)} alt="" className="w-5 h-5 rounded-full object-cover" />
-                                        ) : (
-                                          <div className="w-5 h-5 rounded-full bg-orange-100 text-orange-700 flex items-center justify-center text-xs font-medium">
-                                            {(member.firstName || 'P')[0].toUpperCase()}
-                                          </div>
-                                        )}
-                                        <span className="text-sm max-w-[80px] sm:max-w-[150px] truncate text-gray-700">
-                                          {member.lastName && member.firstName
-                                            ? `${member.lastName}, ${member.firstName}`
-                                            : member.lastName || member.firstName || 'Player'}
-                                        </span>
-                                      </button>
-                                      {/* Payment status $ icon */}
-                                      <span className={`text-sm ${member.hasPaid ? 'text-green-600' : 'text-gray-400'}`} title={member.hasPaid ? 'Paid' : 'Unpaid'}>
-                                        <DollarSign className="w-4 h-4" />
-                                      </span>
-                                      {/* Remove member button */}
-                                      {acceptedMembers.length > 1 && (
-                                        <button
-                                          onClick={() => handleRemoveMember(unit, member)}
-                                          disabled={isProcessing}
-                                          className="p-0.5 rounded text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
-                                          title="Remove player"
-                                        >
-                                          <Trash2 className="w-4 h-4" />
-                                        </button>
-                                      )}
-                                    </div>
-                                  ))}
-
-                                  {/* Empty slots for incomplete units */}
-                                  {!isComplete && Array.from({ length: Math.max(0, (unit.requiredPlayers || 2) - acceptedMembers.length) }).map((_, i) => (
-                                    <div key={`empty-${i}`} className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-gray-100 border border-dashed border-gray-300 shrink-0">
-                                      <div className="w-5 h-5 bg-gray-200 rounded-full flex items-center justify-center text-gray-400 text-xs">?</div>
-                                      <span className="hidden sm:inline text-sm text-gray-400">Needed</span>
-                                    </div>
-                                  ))}
-                                </div>
-
-                                {/* Status badge and actions */}
-                                <div className="shrink-0 flex items-center gap-2">
-                                  {isComplete ? (
-                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium text-green-700 bg-green-100 rounded-full">
-                                      <Check className="w-3 h-3" />
-                                      <span className="hidden sm:inline">Team Complete</span>
-                                    </span>
-                                  ) : (
-                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium text-amber-700 bg-amber-100 rounded-full">
-                                      <Clock className="w-3 h-3" />
-                                      <span className="hidden sm:inline">Looking</span>
-                                    </span>
-                                  )}
-
-                                  {/* Break unit button (for complete units with >1 member) */}
-                                  {isComplete && acceptedMembers.length > 1 && (
-                                    <button
-                                      onClick={() => handleBreakUnit(unit)}
-                                      disabled={isProcessing}
-                                      className="p-1 text-orange-500 hover:text-orange-700 hover:bg-orange-50 rounded transition-colors disabled:opacity-50"
-                                      title="Break unit apart"
-                                    >
-                                      {isProcessing && processingUnitAction?.action === 'break' ? (
-                                        <Loader2 className="w-4 h-4 animate-spin" />
-                                      ) : (
-                                        <Hammer className="w-4 h-4" />
-                                      )}
-                                    </button>
-                                  )}
-
-                                  {/* Move to different division */}
-                                  {dashboard?.divisions?.filter(d => d.id !== divGroup.divisionId).length > 0 && (
-                                    <button
-                                      onClick={() => setMovingUnitToDivision({ unit: { ...unit, divisionId: divGroup.divisionId }, targetDivisionId: null })}
-                                      className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded"
-                                      title="Move to different division"
-                                    >
-                                      <ArrowRight className="w-4 h-4" />
-                                    </button>
-                                  )}
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    );
-                  })}
-
-                  {/* Move Division Modal */}
-                  {movingUnitToDivision && (
-                    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                      <div className="bg-white rounded-lg p-6 max-w-md w-full">
-                        <h3 className="font-semibold text-lg mb-4">Move to Different Division</h3>
-                        <p className="text-sm text-gray-600 mb-4">
-                          Move "{movingUnitToDivision.unit?.name}" to a different division. Fees will be adjusted automatically.
-                        </p>
-                        <select
-                          value={movingUnitToDivision.targetDivisionId || ''}
-                          onChange={(e) => setMovingUnitToDivision({
-                            ...movingUnitToDivision,
-                            targetDivisionId: parseInt(e.target.value)
-                          })}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 mb-4"
-                        >
-                          <option value="">Select division...</option>
-                          {dashboard?.divisions?.filter(d => d.id !== movingUnitToDivision.unit?.divisionId).map(d => (
-                            <option key={d.id} value={d.id}>{d.name}</option>
-                          ))}
-                        </select>
-                        <div className="flex justify-end gap-2">
-                          <button
-                            onClick={() => setMovingUnitToDivision(null)}
-                            className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg"
-                          >
-                            Cancel
-                          </button>
-                          <button
-                            onClick={() => movingUnitToDivision.targetDivisionId && handleMoveUnitToDivision(movingUnitToDivision.unit, movingUnitToDivision.targetDivisionId)}
-                            disabled={!movingUnitToDivision.targetDivisionId || processingUnitAction?.action === 'move'}
-                            className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 flex items-center gap-2"
-                          >
-                            {processingUnitAction?.action === 'move' ? (
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                            ) : null}
-                            Move
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
             </div>
           </div>
         )}
@@ -5951,6 +6019,108 @@ export default function TournamentManage() {
                   )}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Validation Results Modal */}
+      {showValidationModal && validationResults && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-[1010]">
+          <div className="bg-white rounded-xl shadow-xl max-w-3xl w-full max-h-[90vh] flex flex-col">
+            <div className="p-4 border-b flex items-center justify-between">
+              <div>
+                <h3 className="font-semibold text-gray-900">Registration Validation Results</h3>
+                <div className="flex gap-4 mt-1 text-sm">
+                  {validationResults.totalErrors > 0 && (
+                    <span className="text-red-600 font-medium">{validationResults.totalErrors} Errors</span>
+                  )}
+                  {validationResults.totalWarnings > 0 && (
+                    <span className="text-yellow-600 font-medium">{validationResults.totalWarnings} Warnings</span>
+                  )}
+                  {validationResults.totalInfo > 0 && (
+                    <span className="text-blue-600 font-medium">{validationResults.totalInfo} Info</span>
+                  )}
+                  {validationResults.totalErrors === 0 && validationResults.totalWarnings === 0 && validationResults.totalInfo === 0 && (
+                    <span className="text-green-600 font-medium">No issues found!</span>
+                  )}
+                </div>
+              </div>
+              <button
+                onClick={() => setShowValidationModal(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-4">
+              {validationResults.issues.length === 0 ? (
+                <div className="text-center py-8">
+                  <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
+                  <p className="text-lg font-medium text-gray-900">All registrations are valid!</p>
+                  <p className="text-gray-500">No issues were found with the current registrations.</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {/* Group by category */}
+                  {validationResults.summary.map(item => (
+                    <div key={`${item.category}-${item.severity}`} className="border rounded-lg overflow-hidden">
+                      <div className={`px-4 py-2 font-medium flex items-center justify-between ${
+                        item.severity === 'Error' ? 'bg-red-50 text-red-800' :
+                        item.severity === 'Warning' ? 'bg-yellow-50 text-yellow-800' :
+                        'bg-blue-50 text-blue-800'
+                      }`}>
+                        <span className="flex items-center gap-2">
+                          {item.severity === 'Error' && <XCircle className="w-4 h-4" />}
+                          {item.severity === 'Warning' && <AlertCircle className="w-4 h-4" />}
+                          {item.severity === 'Info' && <Info className="w-4 h-4" />}
+                          {item.category}
+                        </span>
+                        <span className="text-sm">{item.issueCount} issue{item.issueCount !== 1 ? 's' : ''}</span>
+                      </div>
+                      <div className="divide-y">
+                        {validationResults.issues
+                          .filter(i => i.category === item.category && i.severity === item.severity)
+                          .map((issue, idx) => (
+                            <div key={idx} className="px-4 py-2 text-sm">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                {issue.divisionName && (
+                                  <span className="px-2 py-0.5 bg-purple-100 text-purple-700 rounded text-xs font-medium">
+                                    {issue.divisionName}
+                                  </span>
+                                )}
+                                {issue.unitName && (
+                                  <span className="px-2 py-0.5 bg-orange-100 text-orange-700 rounded text-xs font-medium">
+                                    {issue.unitName}
+                                  </span>
+                                )}
+                                {issue.userName && (
+                                  <button
+                                    onClick={() => issue.userId && setProfileModalUserId(issue.userId)}
+                                    className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs font-medium hover:bg-blue-200"
+                                  >
+                                    {issue.userName}
+                                  </button>
+                                )}
+                              </div>
+                              <p className="text-gray-600 mt-1">{issue.message}</p>
+                            </div>
+                          ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="p-4 border-t flex justify-end">
+              <button
+                onClick={() => setShowValidationModal(false)}
+                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
+              >
+                Close
+              </button>
             </div>
           </div>
         </div>

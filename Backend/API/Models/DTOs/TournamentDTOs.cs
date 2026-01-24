@@ -1361,3 +1361,45 @@ public class BulkEventFeeTypesRequest
 {
     public List<EventFeeTypeRequest> FeeTypes { get; set; } = new();
 }
+
+// ============================================
+// Registration Validation DTOs
+// ============================================
+
+/// <summary>
+/// Result of registration validation
+/// </summary>
+public class RegistrationValidationResultDto
+{
+    public int TotalErrors { get; set; }
+    public int TotalWarnings { get; set; }
+    public int TotalInfo { get; set; }
+    public List<ValidationSummaryItem> Summary { get; set; } = new();
+    public List<ValidationIssue> Issues { get; set; } = new();
+}
+
+/// <summary>
+/// Summary count by category
+/// </summary>
+public class ValidationSummaryItem
+{
+    public string Category { get; set; } = string.Empty;
+    public string Severity { get; set; } = string.Empty;
+    public int IssueCount { get; set; }
+}
+
+/// <summary>
+/// Individual validation issue
+/// </summary>
+public class ValidationIssue
+{
+    public string Category { get; set; } = string.Empty;
+    public string Severity { get; set; } = string.Empty;
+    public int? DivisionId { get; set; }
+    public string? DivisionName { get; set; }
+    public int? UnitId { get; set; }
+    public string? UnitName { get; set; }
+    public int? UserId { get; set; }
+    public string? UserName { get; set; }
+    public string Message { get; set; } = string.Empty;
+}
