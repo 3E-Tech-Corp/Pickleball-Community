@@ -359,4 +359,65 @@ public static class EmailTemplates
 </body>
 </html>";
     }
+
+    /// <summary>
+    /// Generate welcome email for new user registration
+    /// </summary>
+    public static string WelcomeNewUser(string firstName)
+    {
+        var name = string.IsNullOrWhiteSpace(firstName) ? "Player" : firstName;
+
+        return $@"
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset='utf-8'>
+    <meta name='viewport' content='width=device-width, initial-scale=1.0'>
+</head>
+<body style='font-family: -apple-system, BlinkMacSystemFont, ""Segoe UI"", Roboto, ""Helvetica Neue"", Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;'>
+    <div style='background: linear-gradient(135deg, #f97316 0%, #ea580c 100%); padding: 30px; border-radius: 12px 12px 0 0; text-align: center;'>
+        <h1 style='color: white; margin: 0; font-size: 28px;'>Welcome to Pickleball Community! 🏓</h1>
+    </div>
+
+    <div style='background: #fff; padding: 30px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 12px 12px;'>
+        <p style='font-size: 18px;'>Hi {name},</p>
+
+        <p style='font-size: 16px;'>Welcome to the fastest-growing pickleball community platform! We're thrilled to have you join us.</p>
+
+        <div style='background: #f9fafb; padding: 20px; border-radius: 8px; margin: 20px 0;'>
+            <h2 style='margin: 0 0 15px 0; color: #f97316; font-size: 18px;'>What You Can Do Here</h2>
+            <ul style='list-style: none; padding: 0; margin: 0;'>
+                <li style='padding: 8px 0; border-bottom: 1px solid #e5e7eb;'>🏆 <strong>Join Tournaments</strong> - Register for local and regional events</li>
+                <li style='padding: 8px 0; border-bottom: 1px solid #e5e7eb;'>📊 <strong>Get Skill Certified</strong> - Peer-reviewed skill ratings from 2.0 to 5.0+</li>
+                <li style='padding: 8px 0; border-bottom: 1px solid #e5e7eb;'>🤝 <strong>Find Partners</strong> - Connect with players at your skill level</li>
+                <li style='padding: 8px 0; border-bottom: 1px solid #e5e7eb;'>🏸 <strong>Discover Clubs</strong> - Find clubs and courts near you</li>
+                <li style='padding: 8px 0;'>📅 <strong>Organize Events</strong> - Create and manage your own tournaments</li>
+            </ul>
+        </div>
+
+        <div style='background: #fef3c7; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #f97316;'>
+            <p style='margin: 0; font-size: 14px;'>
+                <strong>📝 Complete Your Profile!</strong><br>
+                Take a moment to fill in your skill level, playing experience, and equipment preferences. This helps us match you with the right events and players.
+            </p>
+        </div>
+
+        <div style='margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb; text-align: center;'>
+            <a href='https://pickleball.community/profile' style='display: inline-block; background: #f97316; color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px;'>Complete My Profile</a>
+        </div>
+
+        <p style='margin-top: 30px; font-size: 14px; color: #6b7280;'>
+            Ready to hit the courts? Browse upcoming events and find your next game!<br><br>
+            See you on the courts!<br>
+            <strong>The Pickleball Community Team</strong>
+        </p>
+    </div>
+
+    <div style='text-align: center; padding: 20px; font-size: 12px; color: #9ca3af;'>
+        <p>Pickleball Community - Connect, Compete, Have Fun</p>
+        <p><a href='https://pickleball.community' style='color: #f97316;'>pickleball.community</a></p>
+    </div>
+</body>
+</html>";
+    }
 }

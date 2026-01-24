@@ -33,17 +33,20 @@ public class SharedAuthService : ISharedAuthService
     private readonly IConfiguration _configuration;
     private readonly HttpClient _httpClient;
     private readonly ILogger<SharedAuthService> _logger;
+    private readonly IEmailNotificationService _emailService;
 
     public SharedAuthService(
         ApplicationDbContext context,
         IConfiguration configuration,
         IHttpClientFactory httpClientFactory,
-        ILogger<SharedAuthService> logger)
+        ILogger<SharedAuthService> logger,
+        IEmailNotificationService emailService)
     {
         _context = context;
         _configuration = configuration;
         _httpClient = httpClientFactory.CreateClient("SharedAuth");
         _logger = logger;
+        _emailService = emailService;
 
         // Configure base URL from settings
         var baseUrl = _configuration["SharedAuth:BaseUrl"];
@@ -169,6 +172,27 @@ public class SharedAuthService : ISharedAuthService
                 _context.Users.Add(newUser);
                 await _context.SaveChangesAsync();
                 _logger.LogInformation("Created new local user {UserId} from shared auth", sharedUser.Id);
+
+                // Send welcome email to new user
+                if (!string.IsNullOrEmpty(newUser.Email))
+                {
+                    try
+                    {
+                        var welcomeHtml = EmailTemplates.WelcomeNewUser(newUser.FirstName);
+                        await _emailService.SendSimpleAsync(
+                            newUser.Id,
+                            newUser.Email,
+                            "Welcome to Pickleball Community! 🏓",
+                            welcomeHtml);
+                        _logger.LogInformation("Sent welcome email to new user {UserId}", newUser.Id);
+                    }
+                    catch (Exception emailEx)
+                    {
+                        // Don't fail user creation if email fails
+                        _logger.LogWarning(emailEx, "Failed to send welcome email to user {UserId}", newUser.Id);
+                    }
+                }
+
                 return newUser;
             }
             catch (DbUpdateException ex) when (ex.InnerException?.Message?.Contains("duplicate key") == true ||
