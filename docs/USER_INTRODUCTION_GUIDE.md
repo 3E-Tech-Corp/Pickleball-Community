@@ -1,6 +1,6 @@
 # Pickleball Community - User Introduction Guide
 
-Welcome to Pickleball Community! This guide will walk you through the key features of our platform, designed to help players connect, compete, and improve their game.
+Welcome to Pickleball Community! This guide will walk you through the key features of our platform with step-by-step UI navigation.
 
 ---
 
@@ -21,142 +21,310 @@ Welcome to Pickleball Community! This guide will walk you through the key featur
 
 ### Creating Your Account
 
-1. Visit **pickleball.community** and click **Sign Up**
-2. Register using your email address or phone number
-3. Verify your account through the confirmation email/SMS
-4. You're ready to explore!
+**UI Flow:**
+```
+Homepage → Click "Sign Up" (top right)
+    → Enter email/phone
+    → Create password
+    → Click "Create Account"
+    → Check email/SMS for verification code
+    → Enter code → Account created!
+```
 
 ### Installing the App (PWA)
 
-Pickleball Community works as a Progressive Web App (PWA) - it can be installed on your phone for a native app experience:
+**iPhone UI Flow:**
+```
+Open Safari → Navigate to pickleball.community
+    → Tap Share button (bottom center)
+    → Scroll down → Tap "Add to Home Screen"
+    → Tap "Add" (top right)
+    → App icon appears on home screen
+```
 
-- **iPhone**: Open in Safari → Tap Share → "Add to Home Screen"
-- **Android**: Open in Chrome → Tap menu (⋮) → "Add to Home Screen"
+**Android UI Flow:**
+```
+Open Chrome → Navigate to pickleball.community
+    → Tap menu (⋮) (top right)
+    → Tap "Add to Home Screen"
+    → Tap "Add"
+    → App icon appears on home screen
+```
 
-Once installed, the app works offline and provides quick access from your home screen.
+### Main Navigation
+
+**Navigation Bar (Top):**
+```
+[Logo] | Events | Venues | Clubs | Blog | FAQ | Feedback | [Profile Menu]
+```
+
+**Profile Menu (Click profile icon):**
+```
+My Profile
+My Events
+My Clubs
+Settings
+Sign Out
+```
 
 ---
 
 ## 2. Your Player Profile
 
-Your profile is your pickleball identity. Complete it to help others find you and to get matched appropriately in events.
+### Viewing Your Profile
 
-### Profile Information
+**UI Flow:**
+```
+Click Profile Icon (top right) → "My Profile"
+```
 
-- **Basic Info**: Name, location, profile photo
-- **Playing Experience**: How long you've been playing, skill level
-- **Play Style**: Singles, doubles, or mixed preferences
-- **Equipment**: Paddle brand/model (helps with gear discussions)
-- **Availability**: When and where you typically play
+### Editing Profile Information
 
-### Social Links
+**UI Flow:**
+```
+My Profile → Click "Edit Profile" button
+    → Basic Info section:
+        - Profile photo (click to upload)
+        - First/Last name
+        - Location (city, state)
+    → Playing Info section:
+        - Years playing
+        - Skill level dropdown
+        - Preferred play style (Singles/Doubles/Mixed)
+    → Equipment section:
+        - Paddle brand/model
+    → Click "Save Changes"
+```
 
-Connect your social media accounts so other players can find you:
-- Instagram, Facebook, YouTube, TikTok, and more
+### Adding Social Links
+
+**UI Flow:**
+```
+My Profile → Click "Edit Profile"
+    → Scroll to "Social Links" section
+    → Click "Add Link"
+    → Select platform (Instagram, Facebook, YouTube, etc.)
+    → Paste your profile URL
+    → Click "Save"
+```
 
 ### Privacy Settings
 
-Control who can see your profile information and contact you.
+**UI Flow:**
+```
+Profile Icon → "Settings"
+    → "Privacy" tab
+    → Toggle options:
+        - Profile visibility (Public/Friends/Private)
+        - Show email to other users
+        - Show phone to other users
+    → Click "Save"
+```
 
 ---
 
 ## 3. Finding and Joining Events
 
-### Types of Events
-
-| Event Type | Description |
-|------------|-------------|
-| **Tournaments** | Competitive events with brackets, pools, and playoffs |
-| **Game Days** | Casual play sessions, often round-robin format |
-| **Leagues** | Ongoing competitive play over multiple weeks |
-| **Open Play** | Drop-in sessions at local venues |
-
 ### Browsing Events
 
-1. Navigate to **Events** from the main menu
-2. Filter by:
-   - Location (nearby or specific city)
-   - Date range
-   - Event type
-   - Skill level
-3. Click on an event to see full details
+**UI Flow:**
+```
+Top Navigation → Click "Events"
+    → Events List page displays
+    → Filter panel (left side or top on mobile):
+        - Location: Enter city or "Use my location"
+        - Date: Select date range
+        - Event Type: Tournament / Game Day / League
+        - Skill Level: Select range (e.g., 3.0-4.0)
+    → Click "Apply Filters"
+    → Browse filtered results
+```
 
-### Event Details Page
+### Viewing Event Details
 
-Each event page shows:
-- Date, time, and venue location
-- Entry fee and what's included
-- Divisions available (skill levels, age groups)
-- Current registration count
-- Organizer information
-- Required documents (waivers, etc.)
+**UI Flow:**
+```
+Events List → Click on any event card
+    → Event Details page shows:
+        ┌─────────────────────────────────────┐
+        │ Event Name                          │
+        │ [Status Badge: Draft/Open/Closed]   │
+        │ Date: Feb 1, 2026                   │
+        │ Location: Venue Name (linked)       │
+        ├─────────────────────────────────────┤
+        │ [Register for Event] button         │
+        ├─────────────────────────────────────┤
+        │ Tabs: Info | Divisions | Documents  │
+        └─────────────────────────────────────┘
+```
 
 ### Registering for an Event
 
-1. Click **Register for Event**
-2. Select your division (e.g., "3.5 Doubles", "Open Singles")
-3. For doubles/team events:
-   - Register with a partner (search by name or email)
-   - Or register solo and get paired later
-4. Complete payment (if required)
-5. Sign any required waivers
-6. You'll receive a confirmation email
+**UI Flow:**
+```
+Event Details → Click "Register for Event"
+    → Registration Modal opens:
 
-### Managing Your Registration
+    Step 1 - Select Division:
+        → View available divisions (e.g., "Open Doubles", "3.5 Mixed")
+        → Click division to select
+        → Click "Continue"
 
-From your **My Events** page, you can:
-- View upcoming registrations
-- Update partner information
-- Cancel registration (if allowed by organizer)
-- View event documents and schedules
+    Step 2 - Partner Selection (for doubles):
+        → Option A: "I have a partner"
+            → Search by name or email
+            → Select partner from results
+        → Option B: "Find me a partner"
+            → System will match you
+        → Click "Continue"
+
+    Step 3 - Payment (if required):
+        → Review fees
+        → Enter payment info or select saved method
+        → Click "Pay $XX.XX"
+
+    Step 4 - Waiver (if required):
+        → Read waiver document
+        → Check "I agree" box
+        → Sign (type name or draw signature)
+        → Click "Submit"
+
+    → Confirmation screen
+    → "View My Registration" button
+```
+
+### Managing Your Registrations
+
+**UI Flow:**
+```
+Profile Icon → "My Events"
+    → Tabs: Upcoming | Past | Cancelled
+
+    → Click on any registration:
+        ┌─────────────────────────────────────┐
+        │ Event Name                          │
+        │ Division: Open Doubles              │
+        │ Partner: John Smith                 │
+        │ Status: Confirmed ✓                 │
+        │ Payment: Paid ✓                     │
+        │ Waiver: Signed ✓                    │
+        ├─────────────────────────────────────┤
+        │ [View Schedule] [Cancel Registration]│
+        └─────────────────────────────────────┘
+```
 
 ---
 
 ## 4. Tournament Day Experience
 
-### Before You Arrive
+### Pre-Event: Online Check-in
 
-1. **Check-in Online**: Many events allow pre-check-in through the app
-2. **Review Schedule**: See your division's match schedule
-3. **Know Your Court**: Check court assignments for your matches
+**UI Flow:**
+```
+Profile Icon → "My Events"
+    → Click on upcoming event
+    → Click "Check In" button (available 24hrs before)
+    → Confirm your attendance
+    → Status changes to "Checked In ✓"
+```
 
-### At the Event
+### At Event: Viewing Schedule
 
-#### Check-In
+**UI Flow:**
+```
+Event Details → "View Schedule" or "View Tournament"
+    → Tournament page opens with tabs:
 
-1. Find the check-in area or use self-check-in on your phone
-2. Confirm your registration and waiver status
-3. Get your court assignments
+    ┌────────────────────────────────────────────────────┐
+    │  Pre-Planning  |  ★ Game Day Execution             │
+    ├────────────────────────────────────────────────────┤
+    │  Overview | Check-in | Schedule | By Court | ...   │
+    └────────────────────────────────────────────────────┘
+```
 
-#### Viewing the Schedule
+### Schedule Tab - Finding Your Matches
 
-Access the live schedule from your phone:
-- **Schedule Tab**: See all matches in your division
-- **By Court Tab**: See what's happening on each court
-- **Overview Tab**: Tournament progress and standings
+**UI Flow:**
+```
+Game Day Execution → "Schedule" tab
+    → Select your division (if multiple):
+        [Open Doubles ▼] [Singles]
 
-#### During Your Matches
+    → View sections:
+        ┌─────────────────────────────────────┐
+        │ ▼ Drawing Results (19 teams)        │
+        │   Pool 0: Team list with seeds      │
+        └─────────────────────────────────────┘
 
-1. Report to your assigned court when called
-2. After each game, scores are recorded by:
-   - Court monitors/staff
-   - Self-reporting (if enabled)
-   - The winning team confirms the score
-3. Move to your next match as directed
+        ┌─────────────────────────────────────┐
+        │ Pool Play Schedule                  │
+        │ ─────────────────────────────────── │
+        │ Round 1                             │
+        │ 9:00 AM | Court 1                   │
+        │ #1 Team A vs Team B    [Scheduled]  │
+        │ ─────────────────────────────────── │
+        │ 9:00 AM | Court 2                   │
+        │ #2 Team C vs Team D    [Scheduled]  │
+        └─────────────────────────────────────┘
+```
 
-#### Live Standings
+### By Court Tab - Court-Centric View
 
-Watch the standings update in real-time as matches complete:
-- Pool play standings (wins, point differential)
-- Bracket progression for playoffs
-- Final placements
+**UI Flow:**
+```
+Game Day Execution → "By Court" tab
+    → Grid of court cards:
 
-### After the Tournament
+    ┌──────────────┐  ┌──────────────┐  ┌──────────────┐
+    │ 📍 Court 1   │  │ 📍 Court 2   │  │ 📍 Court 3   │
+    │ [Available]  │  │ [In Use]     │  │ [Available]  │
+    │ 3 matches    │  │ 2 matches    │  │ 4 matches    │
+    │──────────────│  │──────────────│  │──────────────│
+    │ 9:00 #1      │  │ 9:00 #2      │  │ 9:00 #3      │
+    │ Team A vs B  │  │ Team C vs D  │  │ Team E vs F  │
+    │ [Scheduled]  │  │ [InProgress] │  │ [Scheduled]  │
+    │──────────────│  │──────────────│  │──────────────│
+    │ 9:30 #7      │  │ 9:30 #8      │  │ 9:30 #9      │
+    │ Team G vs H  │  │ Team I vs J  │  │ Team K vs L  │
+    └──────────────┘  └──────────────┘  └──────────────┘
+```
 
-- View your final placement
-- Check updated skill ratings (if applicable)
-- Rate and review the event
-- Connect with players you met
+### Overview Tab - Tournament Progress
+
+**UI Flow:**
+```
+Game Day Execution → "Overview" tab
+    → Dashboard cards:
+
+    ┌─────────────┐ ┌─────────────┐ ┌─────────────┐
+    │ Matches     │ │ Completed   │ │ In Progress │
+    │    24       │ │    12       │ │     2       │
+    └─────────────┘ └─────────────┘ └─────────────┘
+
+    → Current matches section
+    → Up next section
+    → Live standings (expandable)
+```
+
+### Viewing Live Standings
+
+**UI Flow:**
+```
+Schedule tab → Scroll to "Pool Play Schedule"
+    → Click "View Standings" or scroll to standings section
+
+    → Standings table:
+    ┌────┬────────────┬────┬────┬────┬─────┐
+    │ #  │ Team       │ MW │ ML │ GW │ +/- │
+    ├────┼────────────┼────┼────┼────┼─────┤
+    │ 1  │ Team A     │ 3  │ 0  │ 6  │ +15 │
+    │ 2  │ Team B     │ 2  │ 1  │ 5  │ +8  │
+    │ 3  │ Team C     │ 1  │ 2  │ 3  │ -5  │
+    └────┴────────────┴────┴────┴────┴─────┘
+
+    Toggle: [By Pool] [All Teams]
+    Sort: Click column headers
+```
 
 ---
 
@@ -164,262 +332,600 @@ Watch the standings update in real-time as matches complete:
 
 ### Finding Clubs
 
-1. Navigate to **Clubs** from the main menu
-2. Search by location or club name
-3. View club details:
-   - Home venue
-   - Member count
-   - Upcoming events
-   - Membership requirements
+**UI Flow:**
+```
+Top Navigation → Click "Clubs"
+    → Clubs List page:
+
+    Search: [Enter club name or location    ] [🔍]
+
+    → Club cards display:
+    ┌─────────────────────────────────────┐
+    │ [Club Logo]  Club Name              │
+    │ 📍 City, State                      │
+    │ 👥 45 members                       │
+    │ 🏠 Home Venue: Local Courts         │
+    │                        [View Club]  │
+    └─────────────────────────────────────┘
+```
+
+### Viewing Club Details
+
+**UI Flow:**
+```
+Clubs List → Click "View Club"
+    → Club page:
+
+    ┌─────────────────────────────────────┐
+    │ Club Name                           │
+    │ 📍 Location    👥 Members: 45       │
+    ├─────────────────────────────────────┤
+    │ [Join Club]  [Contact]              │
+    ├─────────────────────────────────────┤
+    │ Tabs: About | Events | Members      │
+    └─────────────────────────────────────┘
+
+    About tab: Club description, rules, home venue
+    Events tab: Club-hosted events
+    Members tab: Member list (if visible)
+```
 
 ### Joining a Club
 
-1. Click **Join Club** on the club page
-2. Some clubs are open; others require approval
-3. Pay membership dues if applicable
-4. Access member-only events and features
+**UI Flow:**
+```
+Club Page → Click "Join Club"
+    → If open membership:
+        → Confirm dialog → Click "Join" → You're a member!
 
-### Club Benefits
+    → If requires approval:
+        → Request form appears
+        → Enter message (optional)
+        → Click "Request to Join"
+        → Status: "Pending Approval"
+        → Wait for admin approval notification
 
-- **Exclusive Events**: Member-only tournaments and game days
-- **Communication**: Club announcements and messaging
-- **Community**: Connect with local players
-- **Discounts**: Some clubs offer partner discounts
+    → If has membership fee:
+        → Review fee details
+        → Click "Pay & Join"
+        → Complete payment
+        → You're a member!
+```
 
-### Club Roles
+### Managing Club Membership
 
-| Role | Description |
-|------|-------------|
-| Member | Standard club membership |
-| Staff | Helps run events and club operations |
-| Admin | Full club management access |
-| Owner | Club creator with all permissions |
+**UI Flow:**
+```
+Profile Icon → "My Clubs"
+    → List of your clubs:
+
+    ┌─────────────────────────────────────┐
+    │ Club Name              [Member]     │
+    │ Joined: Jan 15, 2026               │
+    │ [View Club] [Leave Club]           │
+    └─────────────────────────────────────┘
+```
 
 ---
 
 ## 6. Venues and Courts
 
-### Finding Courts
+### Finding Venues
 
-1. Navigate to **Venues** from the main menu
-2. Search by:
-   - Current location (nearby)
-   - City or zip code
-   - Venue name
-3. View venue details:
-   - Number of courts
-   - Indoor/outdoor
-   - Surface type
-   - Amenities (lights, restrooms, etc.)
-   - Photos
+**UI Flow:**
+```
+Top Navigation → Click "Venues"
+    → Venues page with map and list:
 
-### Venue Information
+    ┌─────────────────────────────────────────────┐
+    │ [Map View]                                  │
+    │    📍 markers showing venue locations       │
+    │                                             │
+    ├─────────────────────────────────────────────┤
+    │ Search: [City or zip code        ] [🔍]    │
+    │ Filter: [Indoor ▼] [# Courts ▼] [Lights ▼] │
+    ├─────────────────────────────────────────────┤
+    │ List View:                                  │
+    │ ┌───────────────────────────────────────┐  │
+    │ │ Venue Name                    ⭐ 4.5   │  │
+    │ │ 📍 123 Main St, City         8 courts │  │
+    │ │ 🏠 Outdoor | Lights | Restrooms       │  │
+    │ └───────────────────────────────────────┘  │
+    └─────────────────────────────────────────────┘
+```
 
-Each venue page shows:
-- Address and map
-- Court count and types
-- Operating hours
-- Contact information
-- Upcoming events at this venue
-- User ratings and reviews
+### Viewing Venue Details
 
-### Contributing
+**UI Flow:**
+```
+Venues List → Click on venue
+    → Venue Details page:
 
-Help the community by:
-- Adding new venues you discover
-- Updating venue information
-- Leaving reviews and photos
-- Reporting closed or changed venues
+    ┌─────────────────────────────────────┐
+    │ [Venue Photos Carousel]             │
+    ├─────────────────────────────────────┤
+    │ Venue Name                  ⭐ 4.5  │
+    │ 📍 Full address                     │
+    │ 🎾 8 courts (6 outdoor, 2 indoor)   │
+    │ 💡 Lights available                 │
+    │ 🕐 Hours: 6am - 10pm               │
+    ├─────────────────────────────────────┤
+    │ [Get Directions] [View Events]      │
+    ├─────────────────────────────────────┤
+    │ Tabs: Info | Events | Reviews       │
+    └─────────────────────────────────────┘
+
+    Info tab: Full details, amenities, contact
+    Events tab: Upcoming events at this venue
+    Reviews tab: User ratings and comments
+```
+
+### Adding a Venue Review
+
+**UI Flow:**
+```
+Venue Details → "Reviews" tab
+    → Click "Write a Review"
+    → Review form:
+        - Star rating (1-5)
+        - Review text
+        - Add photos (optional)
+    → Click "Submit Review"
+```
 
 ---
 
 ## 7. Player Skill Certification
 
-### Understanding Skill Ratings
+### Viewing Your Skill Rating
 
-Pickleball Community uses a peer-reviewed skill certification system:
+**UI Flow:**
+```
+Profile Icon → "My Profile"
+    → Skill Rating section:
 
-| Rating | Level | Description |
-|--------|-------|-------------|
-| 2.0-2.5 | Beginner | Learning basic rules and strokes |
-| 3.0 | Intermediate | Consistent strokes, learning strategy |
-| 3.5 | Intermediate+ | Good court coverage, varied shots |
-| 4.0 | Advanced | Strong all-around game |
-| 4.5 | Advanced+ | Tournament competitive |
-| 5.0+ | Pro/Elite | Professional level play |
+    ┌─────────────────────────────────────┐
+    │ Your Skill Rating                   │
+    │ ┌─────────────────────────────────┐ │
+    │ │         ★ 3.5                   │ │
+    │ │   Based on 12 peer reviews      │ │
+    │ └─────────────────────────────────┘ │
+    │ [View Rating History]               │
+    └─────────────────────────────────────┘
+```
 
-### Getting Certified
+### Rating History
 
-1. Play with other certified players
-2. Request skill reviews from your opponents
-3. Reviews are weighted by the reviewer's own rating
-4. Your rating adjusts based on accumulated reviews
+**UI Flow:**
+```
+My Profile → Click "View Rating History"
+    → Rating History page:
 
-### Skill Groups
+    ┌─────────────────────────────────────┐
+    │ Rating Over Time [Graph]            │
+    │   3.5 ─────────●                    │
+    │   3.0 ────●────                     │
+    │        Jan  Feb  Mar                │
+    ├─────────────────────────────────────┤
+    │ Recent Reviews:                     │
+    │ John S. rated you 3.5 - Jan 20     │
+    │ Mary K. rated you 3.5 - Jan 15     │
+    │ Bob T. rated you 3.0 - Jan 10      │
+    └─────────────────────────────────────┘
+```
 
-Join skill-specific groups to:
-- Find players at your level
-- Access appropriate divisions
-- Track your improvement over time
+### Rating Another Player
+
+**UI Flow:**
+```
+After playing with someone:
+    → View their profile
+    → Click "Rate Player"
+    → Rating form:
+        - Select skill level (2.0 - 5.0)
+        - Add comments (optional)
+    → Click "Submit Rating"
+```
 
 ---
 
 ## 8. For Event Organizers
 
-If you're organizing events, here's an overview of the tournament management features.
-
 ### Creating an Event
 
-1. Navigate to **Events** → **Create Event**
-2. Fill in event details:
-   - Name, date, location
-   - Event type (tournament, game day, etc.)
-   - Registration fees
-   - Required documents (waivers)
+**UI Flow:**
+```
+Top Navigation → "Events" → Click "Create Event" (or + button)
+    → Event Creation wizard:
+
+    Step 1 - Basic Info:
+        - Event name
+        - Event type dropdown (Tournament/Game Day/League)
+        - Date picker
+        - Venue search/select
+        → Click "Continue"
+
+    Step 2 - Details:
+        - Description (rich text editor)
+        - Registration dates (open/close)
+        - Max participants
+        - Entry fee
+        → Click "Continue"
+
+    Step 3 - Documents:
+        - Upload waiver (optional)
+        - Add event rules (optional)
+        → Click "Create Event"
+
+    → Event created! → Redirects to Tournament Management
+```
+
+### Tournament Management Interface
+
+**UI Flow:**
+```
+Event Details → Click "Manage Tournament"
+    → Tournament Management page:
+
+    ┌────────────────────────────────────────────────────┐
+    │ Event Name                           [Draft ▼]     │
+    │ Date | Venue                                       │
+    ├────────────────────────────────────────────────────┤
+    │  📋 Pre-Planning  |  🎮 Game Day Execution         │
+    ├────────────────────────────────────────────────────┤
+    │ Pre-Planning tabs:                                 │
+    │ Event Info | Divisions | Registrations | Courts   │
+    │ Staff | Documents | Payments | Planning           │
+    └────────────────────────────────────────────────────┘
+```
 
 ### Setting Up Divisions
 
-Create divisions based on:
-- Skill level (3.0, 3.5, 4.0, etc.)
-- Age groups (Senior, Junior, Open)
-- Format (Singles, Doubles, Mixed)
-
-Configure each division with:
-- Maximum players/teams
-- Schedule type (Round Robin, Single/Double Elimination)
-- Games per match, points per game
-
-### Pre-Planning Phase
-
-#### Registrations Tab
-- View and manage all registrations
-- Add players manually
-- Handle partner requests
-- Process refunds/cancellations
-
-#### Divisions Tab
-- Configure division settings
-- Generate schedules when ready
-- Manage waitlists
-
-#### Courts Tab
-- Add tournament courts
-- Create court groups for organization
-- Set court availability
-
-#### Planning Tab
-- Pre-assign courts and times to matches
-- Estimate tournament duration
-- Generate timeline view
-- Handle scheduling conflicts
-
-### Game Day Execution
-
-#### Overview Tab
-- Real-time tournament dashboard
-- Match progress tracking
-- Quick access to key functions
-
-#### Check-in Tab
-- Player check-in management
-- Waiver and payment status
-- Contact missing players
-
-#### Schedule Tab
-- View all matches by division
-- Edit match details
-- Assign courts on the fly
-
-#### By Court Tab
-- See schedule from each court's perspective
-- Monitor court utilization
-- Quick match editing
-
-#### Scoring Tab
-- Enter and confirm scores
-- Handle score disputes
-- Track completion progress
-
-#### Game Day Tab
-- Court status management
-- Match queue system
-- Real-time notifications
-
-### Tournament Flow
-
+**UI Flow:**
 ```
-1. Create Event & Divisions
-         ↓
-2. Open Registration
-         ↓
-3. Close Registration
-         ↓
-4. Generate Schedules
-         ↓
-5. Conduct Drawing (assign pool positions)
-         ↓
-6. Pre-Plan Courts & Times (optional)
-         ↓
-7. Game Day: Check-in Players
-         ↓
-8. Run Pool Play
-         ↓
-9. Advance to Playoffs
-         ↓
-10. Complete Finals
-         ↓
-11. Announce Results
+Pre-Planning → "Divisions" tab
+    → Click "Add Division"
+    → Division form:
+        - Name (e.g., "Open Doubles", "3.5 Mixed")
+        - Format: [Singles ▼] [Doubles ▼] [Mixed ▼]
+        - Skill range: Min [3.0 ▼] Max [4.0 ▼]
+        - Schedule type: [Round Robin ▼] [Single Elim ▼]
+        - Games per match: [1 ▼] [Best of 3 ▼]
+        - Points per game: [11 ▼] [15 ▼] [21 ▼]
+    → Click "Save Division"
+
+    → Division card appears:
+    ┌─────────────────────────────────────┐
+    │ Open Doubles            [Edit] [⋮] │
+    │ Round Robin | Best of 3            │
+    │ 0/16 registered                    │
+    │ Status: Accepting Registrations    │
+    │ [Generate Schedule] (when ready)   │
+    └─────────────────────────────────────┘
 ```
 
-### Staff Roles
+### Managing Registrations
 
-Assign staff members with specific permissions:
+**UI Flow:**
+```
+Pre-Planning → "Registrations" tab
+    → Filter bar:
+        Division: [All ▼]  Status: [All ▼]  Fee Type: [All ▼]
 
-| Permission | Description |
-|------------|-------------|
-| Can Record Scores | Enter and edit game scores |
-| Can Check-In Players | Manage player check-in |
-| Can Manage Courts | Assign courts and manage status |
-| Can Manage Schedule | Edit match times and order |
-| Can View All Data | Access to all event information |
+    → Registration list:
+    ┌─────────────────────────────────────────────────┐
+    │ ☑ Team Name              Division    Status    │
+    │   Player 1 + Player 2    Open Dbl    ✓ Paid   │
+    │   [Edit] [Cancel] [Move Division]              │
+    ├─────────────────────────────────────────────────┤
+    │ ☑ Team Name              Division    Status    │
+    │   Player 3 + Player 4    Open Dbl    ⚠ Unpaid │
+    │   [Edit] [Cancel] [Move Division]              │
+    └─────────────────────────────────────────────────┘
+
+    → Click "Add Player" to manually add registration
+```
+
+### Setting Up Courts
+
+**UI Flow:**
+```
+Pre-Planning → "Courts" tab
+    → Court Groups section:
+        → Click "Add Court Group"
+        → Enter group name (e.g., "North Courts")
+        → Click "Save"
+
+    → Courts section:
+        → Click "Add Courts"
+        → Enter number of courts to add
+        → Select court group (optional)
+        → Click "Add"
+
+    → Court list:
+    ┌─────────────────────────────────────┐
+    │ Court 1  [North Courts]  [Available]│
+    │ Court 2  [North Courts]  [Available]│
+    │ Court 3  [South Courts]  [Available]│
+    │ Court 4  [South Courts]  [Available]│
+    └─────────────────────────────────────┘
+```
+
+### Pre-Planning Courts & Times
+
+**UI Flow:**
+```
+Pre-Planning → "Planning" tab
+    → Select division/pool:
+        Division: [Open Doubles ▼]  Pool: [All ▼]
+
+    → Unscheduled matches:
+        ☑ #1 Team A vs Team B
+        ☑ #2 Team C vs Team D
+        [Select All] [Clear]
+
+    → Time Configuration:
+        Start time: [9:00 AM]
+        Game duration: [15] minutes
+        Wait between: [5] minutes
+
+    → Court Selection:
+        ○ Court Group: [North Courts ▼]
+        ● Individual Courts: ☑Court 1 ☑Court 2 ☐Court 3
+
+    → Click "Generate Schedule"
+
+    → Timeline Preview:
+    ┌─────────────────────────────────────────────┐
+    │ Court 1  │▓▓▓▓│    │▓▓▓▓│    │▓▓▓▓│       │
+    │ Court 2  │▓▓▓▓│    │▓▓▓▓│    │▓▓▓▓│       │
+    │          9:00  9:30  10:00 10:30 11:00     │
+    └─────────────────────────────────────────────┘
+
+    → Click "Save Schedule"
+```
+
+### Generating Division Schedule
+
+**UI Flow:**
+```
+Pre-Planning → "Divisions" tab
+    → Find division with enough registrations
+    → Click "Generate Schedule"
+    → Confirmation dialog:
+        "Generate Round Robin schedule for 16 teams?"
+        "This will create 120 matches across 15 rounds."
+    → Click "Generate"
+    → Schedule Status changes to "Schedule Ready"
+```
+
+### Conducting the Drawing
+
+**UI Flow:**
+```
+Pre-Planning → "Divisions" tab
+    → Click "Drawing" button on division
+    → Drawing Modal opens:
+
+    ┌─────────────────────────────────────────────┐
+    │ Drawing for Open Doubles                    │
+    │ 16 teams will be assigned to 2 pools        │
+    ├─────────────────────────────────────────────┤
+    │ Pool A                 │ Pool B             │
+    │ ─────────────────────  │ ─────────────────  │
+    │ 1. [Empty]             │ 1. [Empty]         │
+    │ 2. [Empty]             │ 2. [Empty]         │
+    │ ...                    │ ...                │
+    ├─────────────────────────────────────────────┤
+    │ Unassigned Teams:                           │
+    │ [Team A] [Team B] [Team C] ...             │
+    │                                             │
+    │ [Auto-Draw] [Draw One] [Reset] [Save]      │
+    └─────────────────────────────────────────────┘
+
+    → Click "Auto-Draw" for random assignment
+    → Or drag teams manually into positions
+    → Click "Save" to confirm drawing
+```
+
+### Game Day: Player Check-in
+
+**UI Flow:**
+```
+Game Day Execution → "Check-in" tab
+    → Division filter: [All ▼]
+    → Search: [Player name...]
+
+    → Player list:
+    ┌────────────────────────────────────────────────┐
+    │ ☐ John Smith        Open Doubles               │
+    │   Partner: Jane Doe                            │
+    │   Payment: ✓ Paid   Waiver: ✓ Signed          │
+    │   [Check In]                                   │
+    ├────────────────────────────────────────────────┤
+    │ ✓ Bob Johnson       Open Doubles   [Checked In]│
+    │   Partner: Mary Williams                       │
+    │   Payment: ✓ Paid   Waiver: ✓ Signed          │
+    └────────────────────────────────────────────────┘
+
+    → Click "Check In" for each player as they arrive
+    → Status updates to "Checked In" ✓
+```
+
+### Game Day: Scoring Matches
+
+**UI Flow:**
+```
+Game Day Execution → "Schedule" tab
+    → Find match to score
+    → Click [Edit ✏️] button on match row
+
+    → Score Modal opens:
+    ┌─────────────────────────────────────────────┐
+    │ Match #1: Team A vs Team B                  │
+    │ Court: Court 1                              │
+    ├─────────────────────────────────────────────┤
+    │ Game 1:  Team A [11] - [7] Team B          │
+    │ Game 2:  Team A [9] - [11] Team B          │
+    │ Game 3:  Team A [__] - [__] Team B         │
+    ├─────────────────────────────────────────────┤
+    │ Status: [In Progress ▼]                     │
+    │ Court: [Court 1 ▼]                         │
+    ├─────────────────────────────────────────────┤
+    │ [Cancel]              [Save] [Save & Finish]│
+    └─────────────────────────────────────────────┘
+
+    → Enter scores for each game
+    → Click "Save & Finish" when match complete
+```
+
+### Game Day: By Court Management
+
+**UI Flow:**
+```
+Game Day Execution → "By Court" tab
+    → Court cards with matches:
+
+    ┌──────────────────────────────────────┐
+    │ 📍 Court 1            [In Use]       │
+    │ 3 matches scheduled                  │
+    ├──────────────────────────────────────┤
+    │ [✏️] 9:00 #1                         │
+    │     Team A vs Team B                 │
+    │     11-7, 11-9           [Completed] │
+    ├──────────────────────────────────────┤
+    │ [✏️] 9:30 #5                         │
+    │     Team C vs Team D                 │
+    │                          [InProgress]│
+    ├──────────────────────────────────────┤
+    │ [✏️] 10:00 #9                        │
+    │     Team E vs Team F                 │
+    │                          [Scheduled] │
+    └──────────────────────────────────────┘
+
+    → Click [✏️] to edit any match
+    → For organizers/staff: Can edit scores, status, court
+```
+
+### Adding Event Staff
+
+**UI Flow:**
+```
+Pre-Planning → "Staff" tab
+    → Click "Add Staff"
+    → Search for user by name/email
+    → Select staff role:
+        ☑ Can Record Scores
+        ☑ Can Check-In Players
+        ☐ Can Manage Courts
+        ☐ Can Manage Schedule
+        ☐ Can View All Data
+    → Click "Add Staff Member"
+
+    → Staff list:
+    ┌─────────────────────────────────────────┐
+    │ John Smith          Scorer              │
+    │ Permissions: Scores, Check-in           │
+    │ [Edit Permissions] [Remove]             │
+    └─────────────────────────────────────────┘
+```
+
+### Tournament Reset (Testing/Dry Runs)
+
+**UI Flow:**
+```
+Tournament Management → Click "⋮" menu (top right)
+    → Click "Reset Tournament"
+    → Warning dialog:
+        "This will clear all:
+         - Drawing results
+         - Game scores
+         - Court assignments
+         - Match statuses
+
+         Schedule structure will be preserved."
+    → Type "RESET" to confirm
+    → Click "Reset Tournament"
+    → Tournament returns to pre-drawing state
+```
 
 ---
 
 ## Quick Reference
 
-### Key URLs
+### Tournament Flow Diagram
 
-- **Main Site**: https://pickleball.community
-- **Events**: https://pickleball.community/events
-- **Venues**: https://pickleball.community/venues
-- **Clubs**: https://pickleball.community/clubs
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    TOURNAMENT LIFECYCLE                      │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  1. CREATE EVENT          2. SETUP                          │
+│  ┌──────────────┐         ┌──────────────┐                 │
+│  │ Event Info   │    →    │ Divisions    │                 │
+│  │ Date/Venue   │         │ Courts       │                 │
+│  └──────────────┘         │ Documents    │                 │
+│                           └──────────────┘                 │
+│                                 ↓                          │
+│  3. REGISTRATION          4. PREPARATION                    │
+│  ┌──────────────┐         ┌──────────────┐                 │
+│  │ Open Reg     │    →    │ Close Reg    │                 │
+│  │ Collect Fees │         │ Gen Schedule │                 │
+│  │ Sign Waivers │         │ Conduct Draw │                 │
+│  └──────────────┘         │ Plan Courts  │                 │
+│                           └──────────────┘                 │
+│                                 ↓                          │
+│  5. GAME DAY              6. COMPLETION                     │
+│  ┌──────────────┐         ┌──────────────┐                 │
+│  │ Check-in     │    →    │ Finals       │                 │
+│  │ Pool Play    │         │ Awards       │                 │
+│  │ Record Scores│         │ Results      │                 │
+│  │ Playoffs     │         └──────────────┘                 │
+│  └──────────────┘                                          │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
 
-### Getting Help
+### Key Keyboard Shortcuts
 
-- **FAQ**: Available in the app menu
-- **Help Topics**: Context-sensitive help throughout the app
-- **Contact Support**: Through the Feedback option in the menu
+| Action | Shortcut |
+|--------|----------|
+| Search | `/` or `Ctrl+K` |
+| Refresh | `F5` or `Ctrl+R` |
+| Back | `Backspace` or `Alt+←` |
 
-### Tips for Success
+### Status Badges
 
-1. **Complete your profile** - It helps organizers and other players
-2. **Check in early** - Avoid delays on tournament day
-3. **Enable notifications** - Stay updated on match calls
-4. **Review your opponents** - Help build the community rating system
-5. **Leave event feedback** - Help organizers improve
+| Badge | Meaning |
+|-------|---------|
+| 🟢 Available | Court is free |
+| 🟠 In Use | Match in progress |
+| 🔵 Scheduled | Upcoming match |
+| 🟢 Completed | Match finished |
+| ✓ Checked In | Player has arrived |
+| ⚠ Unpaid | Payment pending |
 
 ---
 
-## Summary
+## Getting Help
 
-Pickleball Community is your all-in-one platform for:
+**In-App Help:**
+```
+Any page → Click [?] help icon
+    → Context-sensitive help topics
+```
 
-- **Playing**: Find events, register, and compete
-- **Connecting**: Join clubs and meet players
-- **Improving**: Track your skill progression
-- **Organizing**: Run professional tournaments with ease
+**FAQ:**
+```
+Top Navigation → "FAQ"
+    → Searchable FAQ database
+```
 
-Welcome to the community - see you on the courts!
+**Feedback/Support:**
+```
+Top Navigation → "Feedback"
+    → Submit bug reports or suggestions
+```
 
 ---
 
