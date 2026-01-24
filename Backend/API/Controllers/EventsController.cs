@@ -930,8 +930,11 @@ public class EventsController : EventControllerBase
             evt.Country = dto.Country;
             evt.Latitude = dto.Latitude;
             evt.Longitude = dto.Longitude;
-            evt.PosterImageUrl = dto.PosterImageUrl;
-            evt.BannerImageUrl = dto.BannerImageUrl;
+            // Only update image URLs if explicitly provided (preserve existing if null)
+            if (dto.PosterImageUrl != null)
+                evt.PosterImageUrl = dto.PosterImageUrl;
+            if (dto.BannerImageUrl != null)
+                evt.BannerImageUrl = dto.BannerImageUrl;
             evt.RegistrationFee = dto.RegistrationFee;
             evt.PerDivisionFee = dto.PerDivisionFee;
             evt.PriceUnit = dto.PriceUnit;
@@ -2300,6 +2303,8 @@ public class EventsController : EventControllerBase
                 DivisionCount = e.Divisions?.Count ?? 0,
                 RegistrationFee = e.RegistrationFee,
                 PerDivisionFee = e.PerDivisionFee,
+                PosterImageUrl = e.PosterImageUrl,
+                BannerImageUrl = e.BannerImageUrl,
                 CreatedAt = e.CreatedAt,
                 UpdatedAt = e.UpdatedAt
             }).ToList();
@@ -2371,6 +2376,8 @@ public class EventsController : EventControllerBase
             DivisionCount = evt.Divisions?.Count ?? 0,
             RegistrationFee = evt.RegistrationFee,
             PerDivisionFee = evt.PerDivisionFee,
+            PosterImageUrl = evt.PosterImageUrl,
+            BannerImageUrl = evt.BannerImageUrl,
             CreatedAt = evt.CreatedAt,
             UpdatedAt = evt.UpdatedAt
         };
@@ -2442,6 +2449,10 @@ public class EventsController : EventControllerBase
         if (request.RegistrationFee.HasValue) evt.RegistrationFee = request.RegistrationFee.Value;
         if (request.PerDivisionFee.HasValue) evt.PerDivisionFee = request.PerDivisionFee.Value;
 
+        // Image URLs (preserve existing if not provided)
+        if (request.PosterImageUrl != null) evt.PosterImageUrl = request.PosterImageUrl;
+        if (request.BannerImageUrl != null) evt.BannerImageUrl = request.BannerImageUrl;
+
         evt.UpdatedAt = DateTime.Now;
 
         await _context.SaveChangesAsync();
@@ -2483,6 +2494,8 @@ public class EventsController : EventControllerBase
             ClubName = evt.OrganizedByClub?.Name,
             RegistrationFee = evt.RegistrationFee,
             PerDivisionFee = evt.PerDivisionFee,
+            PosterImageUrl = evt.PosterImageUrl,
+            BannerImageUrl = evt.BannerImageUrl,
             CreatedAt = evt.CreatedAt,
             UpdatedAt = evt.UpdatedAt
         };
@@ -2874,6 +2887,8 @@ public class AdminEventDto
     public int DivisionCount { get; set; }
     public decimal RegistrationFee { get; set; }
     public decimal PerDivisionFee { get; set; }
+    public string? PosterImageUrl { get; set; }
+    public string? BannerImageUrl { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }
 }
@@ -2900,6 +2915,8 @@ public class AdminEventUpdateRequest
     public string? Country { get; set; }
     public decimal? RegistrationFee { get; set; }
     public decimal? PerDivisionFee { get; set; }
+    public string? PosterImageUrl { get; set; }
+    public string? BannerImageUrl { get; set; }
 }
 
 #endregion
