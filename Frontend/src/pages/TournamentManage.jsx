@@ -659,10 +659,14 @@ export default function TournamentManage() {
     }
     if (planningCourtSelection === 'individual') {
       return selectedCourtsForPlanning.map(courtId => {
+        // Check court groups first
         for (const group of (planningData?.courtGroups || [])) {
           const court = group.courts?.find(c => c.id === courtId);
           if (court) return court;
         }
+        // Check unassigned courts
+        const unassigned = planningData?.unassignedCourts?.find(c => c.id === courtId);
+        if (unassigned) return unassigned;
         return null;
       }).filter(Boolean);
     }
@@ -6381,6 +6385,7 @@ export default function TournamentManage() {
                         <div className="flex-1">
                           <label className="block text-sm font-medium text-gray-700 mb-1">Select Courts</label>
                           <div className="flex flex-wrap gap-2">
+                            {/* Courts from court groups */}
                             {planningData.courtGroups?.flatMap(group =>
                               group.courts?.map(court => (
                                 <button
@@ -6402,7 +6407,30 @@ export default function TournamentManage() {
                                 </button>
                               ))
                             )}
+                            {/* Unassigned courts */}
+                            {planningData.unassignedCourts?.map(court => (
+                              <button
+                                key={court.id}
+                                onClick={() => {
+                                  setSelectedCourtsForPlanning(prev =>
+                                    prev.includes(court.id)
+                                      ? prev.filter(id => id !== court.id)
+                                      : [...prev, court.id]
+                                  );
+                                }}
+                                className={`px-3 py-1.5 text-sm rounded-lg border ${
+                                  selectedCourtsForPlanning.includes(court.id)
+                                    ? 'bg-green-100 border-green-300 text-green-700'
+                                    : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+                                }`}
+                              >
+                                {court.courtLabel}
+                              </button>
+                            ))}
                           </div>
+                          {(planningData.courtGroups?.flatMap(g => g.courts || []).length || 0) + (planningData.unassignedCourts?.length || 0) === 0 && (
+                            <p className="text-sm text-gray-500 mt-2">No courts configured. Add courts in the Courts tab first.</p>
+                          )}
                         </div>
                       )}
 
