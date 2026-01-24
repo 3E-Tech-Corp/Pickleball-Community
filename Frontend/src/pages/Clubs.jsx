@@ -799,25 +799,24 @@ export default function Clubs() {
             </div>
 
             {/* Clubs Results */}
-            {loading ? (
-              <div className="flex items-center justify-center py-12">
-                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-purple-600"></div>
-              </div>
-            ) : clubs.length > 0 ? (
-              <>
-                {viewMode === 'map' ? (
-                  /* Map View - Mobile responsive */
-                  <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-                    {/* Desktop: Side-by-side layout */}
-                    <div className="hidden md:flex h-[600px]">
-                      {/* Compact Club List - Desktop */}
-                      <div className="w-80 border-r border-gray-200 flex flex-col">
-                        <div className="p-3 border-b bg-gray-50">
-                          <p className="text-sm font-medium text-gray-700">
-                            {clubs.filter(c => c.latitude || c.gpsLat).length} clubs on map
-                          </p>
+            {viewMode === 'map' ? (
+              /* Map View - Keep mounted during loading to preserve map state */
+              <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+                {/* Desktop: Side-by-side layout */}
+                <div className="hidden md:flex h-[600px]">
+                  {/* Compact Club List - Desktop */}
+                  <div className="w-80 border-r border-gray-200 flex flex-col">
+                    <div className="p-3 border-b bg-gray-50">
+                      <p className="text-sm font-medium text-gray-700">
+                        {loading ? 'Loading...' : `${clubs.filter(c => c.latitude || c.gpsLat).length} clubs on map`}
+                      </p>
+                    </div>
+                    <div className="flex-1 overflow-y-auto relative">
+                      {loading && (
+                        <div className="absolute inset-0 bg-white/80 flex items-center justify-center z-10">
+                          <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-purple-600"></div>
                         </div>
-                        <div className="flex-1 overflow-y-auto">
+                      )}
                           {clubs.filter(c => c.latitude || c.gpsLat).map((club, index) => {
                             const clubId = club.id;
                             const isSelected = hoveredClubId === clubId;
@@ -866,129 +865,143 @@ export default function Clubs() {
                           )}
                         </div>
                       </div>
-                      {/* Map - Desktop */}
-                      <div className="flex-1 relative">
-                        <VenueMap
-                          venues={mapVenues}
-                          userLocation={userLocation}
-                          onVenueClick={(club) => handleViewDetails(club)}
-                          onMarkerSelect={(club) => setHoveredClubId(club.id)}
-                          selectedVenueId={hoveredClubId}
-                          showNumbers={true}
-                          onBoundsChange={handleMapBoundsChange}
-                          fitBounds={!mapBounds}
-                        />
-                        {showSearchAreaButton && (
-                          <button
-                            onClick={handleSearchInArea}
-                            className="absolute top-4 left-1/2 -translate-x-1/2 z-[1000] px-4 py-2 bg-white rounded-full shadow-lg border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-2"
+                  {/* Map - Desktop */}
+                  <div className="flex-1 relative">
+                    <VenueMap
+                      venues={mapVenues}
+                      userLocation={userLocation}
+                      onVenueClick={(club) => handleViewDetails(club)}
+                      onMarkerSelect={(club) => setHoveredClubId(club.id)}
+                      selectedVenueId={hoveredClubId}
+                      showNumbers={true}
+                      onBoundsChange={handleMapBoundsChange}
+                      fitBounds={!mapBounds}
+                      skipInitialFitBounds={userInteractedWithMapRef.current}
+                    />
+                    {loading && (
+                      <div className="absolute inset-0 bg-white/50 flex items-center justify-center z-[999]">
+                        <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-purple-600"></div>
+                      </div>
+                    )}
+                    {showSearchAreaButton && (
+                      <button
+                        onClick={handleSearchInArea}
+                        className="absolute top-4 left-1/2 -translate-x-1/2 z-[1000] px-4 py-2 bg-white rounded-full shadow-lg border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-2"
+                      >
+                        <Search className="w-4 h-4" />
+                        Search this area
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Mobile: Stacked layout with horizontal scrollable list */}
+                <div className="md:hidden flex flex-col">
+                  {/* Map - Mobile (takes most of the viewport) */}
+                  <div className="h-[50vh] min-h-[300px] relative">
+                    <VenueMap
+                      venues={mapVenues}
+                      userLocation={userLocation}
+                      onVenueClick={(club) => handleViewDetails(club)}
+                      onMarkerSelect={(club) => setHoveredClubId(club.id)}
+                      selectedVenueId={hoveredClubId}
+                      showNumbers={true}
+                      onBoundsChange={handleMapBoundsChange}
+                      fitBounds={!mapBounds}
+                      skipInitialFitBounds={userInteractedWithMapRef.current}
+                    />
+                    {loading && (
+                      <div className="absolute inset-0 bg-white/50 flex items-center justify-center z-[999]">
+                        <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-purple-600"></div>
+                      </div>
+                    )}
+                    {showSearchAreaButton && (
+                      <button
+                        onClick={handleSearchInArea}
+                        className="absolute top-4 left-1/2 -translate-x-1/2 z-[1000] px-4 py-2 bg-white rounded-full shadow-lg border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-2"
+                      >
+                        <Search className="w-4 h-4" />
+                        Search this area
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Club count indicator */}
+                  <div className="px-3 py-2 bg-gray-50 border-t border-b border-gray-200">
+                    <p className="text-sm font-medium text-gray-700">
+                      {loading ? 'Loading...' : `${clubs.filter(c => c.latitude || c.gpsLat).length} clubs on map - scroll to browse`}
+                    </p>
+                  </div>
+
+                  {/* Horizontal scrollable club cards - Mobile */}
+                  <div className="overflow-x-auto">
+                    <div className="flex gap-3 p-3" style={{ minWidth: 'min-content' }}>
+                      {clubs.filter(c => c.latitude || c.gpsLat).map((club, index) => {
+                        const clubId = club.id;
+                        const isSelected = hoveredClubId === clubId;
+                        return (
+                          <div
+                            key={clubId}
+                            className={`flex-shrink-0 w-[200px] p-3 rounded-lg border cursor-pointer transition-colors ${
+                              isSelected
+                                ? 'bg-purple-50 border-purple-300 shadow-md'
+                                : 'bg-white border-gray-200 hover:border-purple-200'
+                            }`}
+                            onClick={() => handleViewDetails(club)}
                           >
-                            <Search className="w-4 h-4" />
-                            Search this area
-                          </button>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Mobile: Stacked layout with horizontal scrollable list */}
-                    <div className="md:hidden flex flex-col">
-                      {/* Map - Mobile (takes most of the viewport) */}
-                      <div className="h-[50vh] min-h-[300px] relative">
-                        <VenueMap
-                          venues={mapVenues}
-                          userLocation={userLocation}
-                          onVenueClick={(club) => handleViewDetails(club)}
-                          onMarkerSelect={(club) => setHoveredClubId(club.id)}
-                          selectedVenueId={hoveredClubId}
-                          showNumbers={true}
-                          onBoundsChange={handleMapBoundsChange}
-                          fitBounds={!mapBounds}
-                        />
-                        {showSearchAreaButton && (
-                          <button
-                            onClick={handleSearchInArea}
-                            className="absolute top-4 left-1/2 -translate-x-1/2 z-[1000] px-4 py-2 bg-white rounded-full shadow-lg border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-2"
-                          >
-                            <Search className="w-4 h-4" />
-                            Search this area
-                          </button>
-                        )}
-                      </div>
-
-                      {/* Club count indicator */}
-                      <div className="px-3 py-2 bg-gray-50 border-t border-b border-gray-200">
-                        <p className="text-sm font-medium text-gray-700">
-                          {clubs.filter(c => c.latitude || c.gpsLat).length} clubs on map - scroll to browse
-                        </p>
-                      </div>
-
-                      {/* Horizontal scrollable club cards - Mobile */}
-                      <div className="overflow-x-auto">
-                        <div className="flex gap-3 p-3" style={{ minWidth: 'min-content' }}>
-                          {clubs.filter(c => c.latitude || c.gpsLat).map((club, index) => {
-                            const clubId = club.id;
-                            const isSelected = hoveredClubId === clubId;
-                            return (
-                              <div
-                                key={clubId}
-                                className={`flex-shrink-0 w-[200px] p-3 rounded-lg border cursor-pointer transition-colors ${
-                                  isSelected
-                                    ? 'bg-purple-50 border-purple-300 shadow-md'
-                                    : 'bg-white border-gray-200 hover:border-purple-200'
-                                }`}
-                                onClick={() => handleViewDetails(club)}
-                              >
-                                <div className="flex items-start gap-2">
-                                  <span className={`flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-semibold text-white ${
-                                    isSelected ? 'bg-purple-600' : 'bg-blue-600'
-                                  }`}>
-                                    {index + 1}
+                            <div className="flex items-start gap-2">
+                              <span className={`flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-semibold text-white ${
+                                isSelected ? 'bg-purple-600' : 'bg-blue-600'
+                              }`}>
+                                {index + 1}
+                              </span>
+                              <div className="flex-1 min-w-0">
+                                <h4 className="font-medium text-gray-900 text-sm line-clamp-2">
+                                  {club.name}
+                                </h4>
+                                <p className="text-xs text-gray-500 truncate mt-0.5">
+                                  {[club.city, club.state].filter(Boolean).join(', ')}
+                                </p>
+                                <div className="flex items-center gap-2 mt-1.5">
+                                  {club.distance && (
+                                    <span className="text-xs text-purple-600 font-medium">
+                                      {club.distance.toFixed(1)} mi
+                                    </span>
+                                  )}
+                                  <span className="text-xs text-gray-400">
+                                    {club.memberCount} members
                                   </span>
-                                  <div className="flex-1 min-w-0">
-                                    <h4 className="font-medium text-gray-900 text-sm line-clamp-2">
-                                      {club.name}
-                                    </h4>
-                                    <p className="text-xs text-gray-500 truncate mt-0.5">
-                                      {[club.city, club.state].filter(Boolean).join(', ')}
-                                    </p>
-                                    <div className="flex items-center gap-2 mt-1.5">
-                                      {club.distance && (
-                                        <span className="text-xs text-purple-600 font-medium">
-                                          {club.distance.toFixed(1)} mi
-                                        </span>
-                                      )}
-                                      <span className="text-xs text-gray-400">
-                                        {club.memberCount} members
-                                      </span>
-                                    </div>
-                                  </div>
                                 </div>
                               </div>
-                            );
-                          })}
-                          {clubs.filter(c => !(c.latitude || c.gpsLat)).length > 0 && (
-                            <div className="flex-shrink-0 w-[150px] p-3 flex items-center justify-center text-xs text-gray-400 text-center">
-                              +{clubs.filter(c => !(c.latitude || c.gpsLat)).length} clubs without location
                             </div>
-                          )}
+                          </div>
+                        );
+                      })}
+                      {clubs.filter(c => !(c.latitude || c.gpsLat)).length > 0 && (
+                        <div className="flex-shrink-0 w-[150px] p-3 flex items-center justify-center text-xs text-gray-400 text-center">
+                          +{clubs.filter(c => !(c.latitude || c.gpsLat)).length} clubs without location
                         </div>
-                      </div>
+                      )}
                     </div>
                   </div>
-                ) : (
-                  /* List View - Row-based cards */
-                  <div className="space-y-4">
-                    {clubs.map(club => (
-                      <ClubCard
-                        key={club.id}
-                        club={club}
-                        onViewDetails={() => handleViewDetails(club)}
-                      />
-                    ))}
-                  </div>
-                )}
+                </div>
+              </div>
+            ) : loading ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-purple-600"></div>
+              </div>
+            ) : clubs.length > 0 ? (
+              /* List View - Row-based cards */
+              <div className="space-y-4">
+                {clubs.map(club => (
+                  <ClubCard
+                    key={club.id}
+                    club={club}
+                    onViewDetails={() => handleViewDetails(club)}
+                  />
+                ))}
 
-                {/* Pagination */}
+                {/* Pagination for List View */}
                 {totalPages > 1 && (
                   <div className="mt-8 flex items-center justify-center gap-4">
                     <button
@@ -1012,7 +1025,7 @@ export default function Clubs() {
                     </button>
                   </div>
                 )}
-              </>
+              </div>
             ) : (
               <div className="bg-white rounded-xl shadow-sm p-12 text-center">
                 <Users className="w-16 h-16 text-gray-300 mx-auto mb-4" />

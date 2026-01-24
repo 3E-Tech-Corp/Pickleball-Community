@@ -55,7 +55,8 @@ export default function VenueMap({
   fitBounds = true,
   showNumbers = false,
   onBoundsChange = null, // Callback when map viewport changes: ({ minLat, maxLat, minLng, maxLng }, isUserInteraction) => void
-  forceRefitBounds = false // Set to a new value to force a re-fit
+  forceRefitBounds = false, // Set to a new value to force a re-fit
+  skipInitialFitBounds = false // If true, skip fitBounds even on initial mount (used when parent knows user has interacted)
 }) {
   // Support both venues and courts props for backward compatibility
   const items = venues || courts || [];
@@ -301,7 +302,8 @@ export default function VenueMap({
     const shouldFitBounds = fitBoundsRef.current &&
                             venuesWithCoords.length > 0 &&
                             !initialFitDoneRef.current &&
-                            !userHasInteractedRef.current;
+                            !userHasInteractedRef.current &&
+                            !skipInitialFitBounds;
 
     if (shouldFitBounds) {
       const bounds = L.latLngBounds(venuesWithCoords.map(c => [c.lat, c.lng]));
