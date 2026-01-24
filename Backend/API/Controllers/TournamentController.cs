@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Data.SqlClient;
 using Pickleball.Community.Database;
 using Pickleball.Community.Models.Constants;
 using Pickleball.Community.Models.Entities;
@@ -4483,50 +4484,35 @@ public class TournamentController : EventControllerBase
         if (request.Assignments == null || request.Assignments.Count == 0)
             return BadRequest(new ApiResponse<object> { Success = false, Message = "No assignments provided" });
 
-        var encounterIds = request.Assignments.Select(a => a.EncounterId).ToList();
-        var encounters = await _context.EventEncounters
-            .Where(e => encounterIds.Contains(e.Id) && e.EventId == request.EventId)
-            .ToListAsync();
-
-        if (encounters.Count != encounterIds.Count)
-            return BadRequest(new ApiResponse<object> { Success = false, Message = "Some encounters not found" });
-
-        // Validate courts
-        var courtIds = request.Assignments
-            .Where(a => a.CourtId.HasValue)
-            .Select(a => a.CourtId!.Value)
-            .Distinct()
-            .ToList();
-
-        if (courtIds.Count > 0)
-        {
-            var validCourts = await _context.TournamentCourts
-                .Where(c => courtIds.Contains(c.Id) && c.EventId == request.EventId)
-                .Select(c => c.Id)
-                .ToListAsync();
-
-            if (validCourts.Count != courtIds.Count)
-                return BadRequest(new ApiResponse<object> { Success = false, Message = "Invalid court IDs" });
-        }
-
+        // Use raw SQL to avoid EF Core Contains() CTE syntax issues
         var now = DateTime.Now;
+        var updatedCount = 0;
+
         foreach (var assignment in request.Assignments)
         {
-            var encounter = encounters.First(e => e.Id == assignment.EncounterId);
-            encounter.TournamentCourtId = assignment.CourtId;
-            if (assignment.ScheduledTime.HasValue)
-                encounter.ScheduledTime = assignment.ScheduledTime;
-            if (assignment.EstimatedStartTime.HasValue)
-                encounter.EstimatedStartTime = assignment.EstimatedStartTime;
-            encounter.UpdatedAt = now;
-        }
+            // Update each encounter individually using raw SQL to avoid EF Core query generation issues
+            var sql = @"UPDATE EventEncounters
+                        SET TournamentCourtId = @CourtId,
+                            ScheduledTime = COALESCE(@ScheduledTime, ScheduledTime),
+                            EstimatedStartTime = COALESCE(@EstimatedStartTime, EstimatedStartTime),
+                            UpdatedAt = @UpdatedAt
+                        WHERE Id = @EncounterId AND EventId = @EventId";
 
-        await _context.SaveChangesAsync();
+            var result = await _context.Database.ExecuteSqlRawAsync(sql,
+                new SqlParameter("@CourtId", (object?)assignment.CourtId ?? DBNull.Value),
+                new SqlParameter("@ScheduledTime", (object?)assignment.ScheduledTime ?? DBNull.Value),
+                new SqlParameter("@EstimatedStartTime", (object?)assignment.EstimatedStartTime ?? DBNull.Value),
+                new SqlParameter("@UpdatedAt", now),
+                new SqlParameter("@EncounterId", assignment.EncounterId),
+                new SqlParameter("@EventId", request.EventId));
+
+            updatedCount += result;
+        }
 
         return Ok(new ApiResponse<object>
         {
             Success = true,
-            Message = $"{request.Assignments.Count} encounters updated"
+            Message = $"{updatedCount} encounters updated"
         });
     }
 
