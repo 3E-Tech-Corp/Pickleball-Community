@@ -7880,6 +7880,13 @@ public class TournamentController : EventControllerBase
             foreach (var encounter in encounters)
             {
                 encounter.WinnerUnitId = null;
+                encounter.Status = "Scheduled";
+                encounter.StartedAt = null;
+                encounter.CompletedAt = null;
+                // Reset court planning assignments
+                encounter.TournamentCourtId = null;
+                encounter.ScheduledTime = null;
+                encounter.EstimatedStartTime = null;
                 encounter.UpdatedAt = DateTime.Now;
 
                 // For playoff rounds (bracket), reset unit assignments since they depend on pool rankings
