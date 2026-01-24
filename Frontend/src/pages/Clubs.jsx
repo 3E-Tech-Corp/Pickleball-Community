@@ -108,7 +108,7 @@ export default function Clubs() {
     return null;
   };
 
-  // Geocode clubs that don't have coordinates
+  // Geocode clubs that don't have coordinates and save to DB for faster future loads
   const geocodeClubsWithoutCoords = async (clubsList) => {
     const clubsToGeocode = clubsList.filter(c => !c.latitude && !c.gpsLat && (c.city || c.state));
 
@@ -127,6 +127,14 @@ export default function Clubs() {
           const idx = updatedClubs.findIndex(c => c.id === club.id);
           if (idx !== -1) {
             updatedClubs[idx] = { ...updatedClubs[idx], latitude: coords.lat, longitude: coords.lng };
+          }
+
+          // Save coordinates to database for faster future loads
+          try {
+            await clubsApi.updateCoordinates(club.id, coords.lat, coords.lng);
+          } catch (err) {
+            // Silently fail - geocoding still works, just won't persist
+            console.debug('Could not save coordinates for club', club.id, err);
           }
         }
       })();

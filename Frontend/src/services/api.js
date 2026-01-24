@@ -1055,6 +1055,9 @@ export const clubsApi = {
   // Update a club
   update: (id, data) => api.put(`/clubs/${id}`, data),
 
+  // Update club coordinates (for geocoding cache)
+  updateCoordinates: (id, latitude, longitude) => api.patch(`/clubs/${id}/coordinates`, { latitude, longitude }),
+
   // Delete a club (soft delete)
   delete: (id) => api.delete(`/clubs/${id}`),
 

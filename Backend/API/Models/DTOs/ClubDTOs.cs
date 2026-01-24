@@ -141,6 +141,13 @@ public class UpdateClubDto : CreateClubDto
 {
 }
 
+// Update club coordinates (for geocoding cache)
+public class UpdateClubCoordinatesDto
+{
+    public double Latitude { get; set; }
+    public double Longitude { get; set; }
+}
+
 // Club search request
 public class ClubSearchRequest
 {

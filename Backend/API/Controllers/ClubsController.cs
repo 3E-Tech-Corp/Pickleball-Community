@@ -569,6 +569,38 @@ public class ClubsController : ControllerBase
         }
     }
 
+    // PATCH: /clubs/{id}/coordinates - Update club coordinates (for geocoding cache)
+    // Only updates if coordinates are currently null to avoid overwriting user-set values
+    [HttpPatch("{id}/coordinates")]
+    public async Task<ActionResult<ApiResponse<bool>>> UpdateClubCoordinates(int id, [FromBody] UpdateClubCoordinatesDto dto)
+    {
+        try
+        {
+            var club = await _context.Clubs.FindAsync(id);
+            if (club == null || !club.IsActive)
+                return NotFound(new ApiResponse<bool> { Success = false, Message = "Club not found" });
+
+            // Only update if coordinates are currently null (don't overwrite existing values)
+            if (club.Latitude.HasValue && club.Longitude.HasValue)
+                return Ok(new ApiResponse<bool> { Success = true, Data = false, Message = "Coordinates already set" });
+
+            club.Latitude = dto.Latitude;
+            club.Longitude = dto.Longitude;
+            club.UpdatedAt = DateTime.Now;
+
+            await _context.SaveChangesAsync();
+
+            _logger.LogInformation("Updated coordinates for club {ClubId}: {Lat}, {Lng}", id, dto.Latitude, dto.Longitude);
+
+            return Ok(new ApiResponse<bool> { Success = true, Data = true, Message = "Coordinates updated" });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating coordinates for club {ClubId}", id);
+            return StatusCode(500, new ApiResponse<bool> { Success = false, Message = "An error occurred" });
+        }
+    }
+
     // DELETE: /clubs/{id} - Deactivate club (soft delete)
     [HttpDelete("{id}")]
     [Authorize]
