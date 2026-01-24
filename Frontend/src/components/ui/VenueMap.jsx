@@ -67,11 +67,12 @@ export default function VenueMap({
   const [mapReady, setMapReady] = useState(false);
   const [inChina] = useState(() => isLikelyInChina());
 
-  // Store callbacks in refs to avoid map re-initialization when they change
+  // Store callbacks and props in refs to avoid unnecessary effect re-runs
   const onBoundsChangeRef = useRef(onBoundsChange);
   const onMarkerSelectRef = useRef(onMarkerSelect);
   const handleItemClickRef = useRef(handleItemClick);
   const itemsRef = useRef(items);
+  const fitBoundsRef = useRef(fitBounds);
 
   // Keep refs updated when values change
   useEffect(() => {
@@ -79,7 +80,8 @@ export default function VenueMap({
     onMarkerSelectRef.current = onMarkerSelect;
     handleItemClickRef.current = handleItemClick;
     itemsRef.current = items;
-  }, [onBoundsChange, onMarkerSelect, handleItemClick, items]);
+    fitBoundsRef.current = fitBounds;
+  }, [onBoundsChange, onMarkerSelect, handleItemClick, items, fitBounds]);
 
   // Filter venues with valid coordinates
   const venuesWithCoords = useMemo(() => {
@@ -277,15 +279,15 @@ export default function VenueMap({
       markersRef.current.push(userMarker);
     }
 
-    // Fit bounds if requested
-    if (fitBounds && venuesWithCoords.length > 0) {
+    // Fit bounds if requested (use ref to avoid triggering effect on prop change)
+    if (fitBoundsRef.current && venuesWithCoords.length > 0) {
       const bounds = L.latLngBounds(venuesWithCoords.map(c => [c.lat, c.lng]));
       if (userLocation) {
         bounds.extend([userLocation.lat, userLocation.lng]);
       }
       map.fitBounds(bounds, { padding: [50, 50], maxZoom: 13 });
     }
-  }, [mapReady, venuesWithCoords, userLocation, fitBounds, onCourtClick, onMarkerSelect, selectedCourtId, showNumbers]);
+  }, [mapReady, venuesWithCoords, userLocation, onCourtClick, onMarkerSelect, selectedCourtId, showNumbers]);
 
   // Update marker styles when selection changes
   useEffect(() => {
