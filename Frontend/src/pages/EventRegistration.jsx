@@ -1338,23 +1338,56 @@ export default function EventRegistration() {
                             <div className="flex-1">
                               <div className="flex items-center gap-2 mb-1">
                                 <h3 className="font-semibold text-gray-900">{division.name}</h3>
-                                {isRegistered && (
-                                  <>
-                                    <span className="px-2 py-0.5 bg-green-100 text-green-700 text-xs font-medium rounded-full flex items-center gap-1">
-                                      <Check className="w-3 h-3" /> Registered
-                                    </span>
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        const unit = userRegistrations.find(u => u.divisionId === division.id);
-                                        setCancelConfirmModal({ isOpen: true, division, unit });
-                                      }}
-                                      className="px-2 py-0.5 bg-red-100 text-red-600 text-xs font-medium rounded-full hover:bg-red-200 transition-colors"
-                                    >
-                                      Cancel
-                                    </button>
-                                  </>
-                                )}
+                                {isRegistered && (() => {
+                                  const unit = userRegistrations.find(u => u.divisionId === division.id);
+                                  const myMember = unit?.members?.find(m => m.userId === user?.id);
+                                  const waiverSigned = myMember?.waiverSigned || myMember?.waiverSignedAt;
+                                  const hasPaid = myMember?.hasPaid;
+                                  const feeAmount = division.divisionFee || event.perDivisionFee || event.registrationFee || 0;
+                                  const needsWaiver = !waiverSigned;
+                                  const needsPayment = feeAmount > 0 && !hasPaid;
+                                  const isIncomplete = needsWaiver || needsPayment;
+
+                                  return (
+                                    <>
+                                      <span className={`px-2 py-0.5 ${isIncomplete ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700'} text-xs font-medium rounded-full flex items-center gap-1`}>
+                                        <Check className="w-3 h-3" /> {isIncomplete ? 'Incomplete' : 'Registered'}
+                                      </span>
+                                      {isIncomplete && (
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            // Set up state to continue registration
+                                            setSelectedDivision(division);
+                                            setRegistrationResult({ unitId: unit.id, joinCode: unit.joinCode });
+                                            // Load unit members for payment step
+                                            const acceptedMembers = unit.members?.filter(m => m.inviteStatus === 'Accepted') || [];
+                                            setUnitMembers(acceptedMembers);
+                                            // Jump to appropriate step
+                                            if (needsWaiver) {
+                                              loadWaivers();
+                                              setCurrentStep(4);
+                                            } else if (needsPayment) {
+                                              setCurrentStep(5);
+                                            }
+                                          }}
+                                          className="px-2 py-0.5 bg-orange-100 text-orange-600 text-xs font-medium rounded-full hover:bg-orange-200 transition-colors"
+                                        >
+                                          Continue
+                                        </button>
+                                      )}
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setCancelConfirmModal({ isOpen: true, division, unit });
+                                        }}
+                                        className="px-2 py-0.5 bg-red-100 text-red-600 text-xs font-medium rounded-full hover:bg-red-200 transition-colors"
+                                      >
+                                        Cancel
+                                      </button>
+                                    </>
+                                  );
+                                })()}
                                 {isFull && !isRegistered && (
                                   <span className="px-2 py-0.5 bg-red-100 text-red-700 text-xs font-medium rounded-full">
                                     Full
@@ -1378,6 +1411,33 @@ export default function EventRegistration() {
                                   </span>
                                 )}
                               </div>
+                              {/* Show pending items for incomplete registrations */}
+                              {isRegistered && (() => {
+                                const unit = userRegistrations.find(u => u.divisionId === division.id);
+                                const myMember = unit?.members?.find(m => m.userId === user?.id);
+                                const waiverSigned = myMember?.waiverSigned || myMember?.waiverSignedAt;
+                                const hasPaid = myMember?.hasPaid;
+                                const feeAmount = division.divisionFee || event.perDivisionFee || event.registrationFee || 0;
+                                const needsWaiver = !waiverSigned;
+                                const needsPayment = feeAmount > 0 && !hasPaid;
+
+                                if (!needsWaiver && !needsPayment) return null;
+
+                                return (
+                                  <div className="flex flex-wrap gap-2 text-xs mt-1">
+                                    {needsWaiver && (
+                                      <span className="px-2 py-0.5 bg-amber-50 text-amber-600 rounded border border-amber-200">
+                                        Waiver pending
+                                      </span>
+                                    )}
+                                    {needsPayment && (
+                                      <span className="px-2 py-0.5 bg-amber-50 text-amber-600 rounded border border-amber-200">
+                                        Payment pending
+                                      </span>
+                                    )}
+                                  </div>
+                                );
+                              })()}
                             </div>
                           </div>
                           <div className="text-right text-sm">

@@ -202,6 +202,10 @@ public class EventUnitMemberDto
     // For join requests - the request ID (null for regular members)
     public int? JoinRequestId { get; set; }
 
+    // Waiver status
+    public bool WaiverSigned { get; set; }
+    public DateTime? WaiverSignedAt { get; set; }
+
     // Member-level payment info
     public bool HasPaid { get; set; }
     public DateTime? PaidAt { get; set; }

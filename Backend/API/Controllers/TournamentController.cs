@@ -3169,7 +3169,16 @@ public class TournamentController : EventControllerBase
                 Role = m.Role,
                 InviteStatus = m.InviteStatus,
                 IsCheckedIn = m.IsCheckedIn,
-                CheckedInAt = m.CheckedInAt
+                CheckedInAt = m.CheckedInAt,
+                WaiverSigned = m.WaiverSignedAt.HasValue,
+                WaiverSignedAt = m.WaiverSignedAt,
+                HasPaid = m.HasPaid,
+                PaidAt = m.PaidAt,
+                AmountPaid = m.AmountPaid,
+                PaymentProofUrl = m.PaymentProofUrl,
+                PaymentReference = m.PaymentReference,
+                ReferenceId = m.ReferenceId,
+                PaymentMethod = m.PaymentMethod
             }).ToList() ?? new List<EventUnitMemberDto>()
         };
     }
@@ -5931,6 +5940,9 @@ public class TournamentController : EventControllerBase
                     IsCheckedIn = m.IsCheckedIn,
                     CheckedInAt = m.CheckedInAt,
                     JoinRequestId = null,
+                    // Waiver status
+                    WaiverSigned = m.WaiverSignedAt.HasValue,
+                    WaiverSignedAt = m.WaiverSignedAt,
                     // Member-level payment info
                     HasPaid = m.HasPaid,
                     PaidAt = m.PaidAt,
