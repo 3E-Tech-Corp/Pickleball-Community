@@ -1531,12 +1531,18 @@ export default function TournamentManage() {
   };
 
   const handleRemoveMember = async (unit, member) => {
-    if (!confirm(`Remove ${member.firstName} ${member.lastName} from "${unit.name}"?`)) return;
+    const acceptedCount = unit.members?.filter(m => m.inviteStatus === 'Accepted').length || 0;
+    const isLastMember = acceptedCount <= 1;
+    const confirmMessage = isLastMember
+      ? `Cancel registration for ${member.firstName} ${member.lastName}? This will remove the entire registration.`
+      : `Remove ${member.firstName} ${member.lastName} from "${unit.name}"?`;
+
+    if (!confirm(confirmMessage)) return;
     setProcessingUnitAction({ unitId: unit.id, action: 'remove-member' });
     try {
       const response = await tournamentApi.removeRegistration(eventId, unit.id, member.userId);
       if (response.success) {
-        toast.success('Member removed from unit');
+        toast.success(isLastMember ? 'Registration cancelled' : 'Member removed from unit');
         loadUnits();
         loadDashboard();
         loadCheckIns();
@@ -4237,17 +4243,15 @@ export default function TournamentManage() {
                                       <span className={`text-sm ${member.hasPaid ? 'text-green-600' : 'text-gray-400'}`} title={member.hasPaid ? 'Paid' : 'Unpaid'}>
                                         <DollarSign className="w-4 h-4" />
                                       </span>
-                                      {/* Remove member button */}
-                                      {acceptedMembers.length > 1 && (
-                                        <button
-                                          onClick={() => handleRemoveMember(unit, member)}
-                                          disabled={isProcessing}
-                                          className="p-0.5 rounded text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
-                                          title="Remove player"
-                                        >
-                                          <Trash2 className="w-4 h-4" />
-                                        </button>
-                                      )}
+                                      {/* Remove member button - show for singles or when team has multiple members */}
+                                      <button
+                                        onClick={() => handleRemoveMember(unit, member)}
+                                        disabled={isProcessing}
+                                        className="p-0.5 rounded text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
+                                        title={acceptedMembers.length === 1 ? "Cancel registration" : "Remove player"}
+                                      >
+                                        <Trash2 className="w-4 h-4" />
+                                      </button>
                                     </div>
                                   ))}
 
