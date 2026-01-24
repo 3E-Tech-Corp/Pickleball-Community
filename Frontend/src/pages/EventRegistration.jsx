@@ -316,16 +316,56 @@ export default function EventRegistration() {
     if (selectedDivisions.length > 0) {
       return getTotalFeeForSelectedDivisions();
     }
-    // Single division mode
+    // Single division mode - return sum of event fee + division fee
+    const eventFee = event?.registrationFee || 0;
     const selectedFee = getSelectedFee();
-    if (selectedFee) return selectedFee.amount;
-    return selectedDivision?.divisionFee || event?.perDivisionFee || event?.registrationFee || 0;
+    const divFee = selectedFee?.amount || selectedDivision?.divisionFee || event?.perDivisionFee || 0;
+
+    // If both exist, return sum; otherwise return whichever is set
+    if (eventFee > 0 && divFee > 0) {
+      return eventFee + divFee;
+    }
+    return eventFee || divFee;
   };
 
   // Check if division has multiple fee options
   const hasFeeOptions = (division) => {
     const availableFees = (division?.fees || []).filter(f => f.isActive && f.isCurrentlyAvailable);
     return availableFees.length > 0;
+  };
+
+  // Check if event has event-level fee options
+  const hasEventFeeOptions = () => {
+    const availableFees = (event?.eventFees || []).filter(f => f.isActive && f.isCurrentlyAvailable);
+    return availableFees.length > 0;
+  };
+
+  // Get the event fee (one-time registration fee)
+  const getEventFee = () => {
+    // If event has event fee options, use those
+    if (hasEventFeeOptions()) {
+      const defaultFee = (event?.eventFees || []).find(f => f.isDefault && f.isActive && f.isCurrentlyAvailable);
+      if (defaultFee) return defaultFee.amount;
+      // Fall back to first available fee
+      const firstFee = (event?.eventFees || []).find(f => f.isActive && f.isCurrentlyAvailable);
+      if (firstFee) return firstFee.amount;
+    }
+    // Use legacy registrationFee field
+    return event?.registrationFee || 0;
+  };
+
+  // Get the division fee (per-division fee)
+  const getDivisionFee = () => {
+    const selectedFee = getSelectedFee();
+    if (selectedFee) return selectedFee.amount;
+    return selectedDivision?.divisionFee || event?.perDivisionFee || 0;
+  };
+
+  // Check if there are separate event and division fees
+  const hasSeparateFees = () => {
+    const eventFee = getEventFee();
+    const divisionFee = getDivisionFee();
+    return eventFee > 0 && divisionFee > 0;
   };
 
   // Toggle division selection (for multi-division mode)
@@ -371,14 +411,20 @@ export default function EventRegistration() {
 
   // Get total fee for all selected divisions
   const getTotalFeeForSelectedDivisions = () => {
-    return selectedDivisions.reduce((total, div) => {
+    // Start with event fee (one-time) if it exists
+    const eventFee = event?.registrationFee || 0;
+
+    // Add up division fees
+    const divisionTotal = selectedDivisions.reduce((total, div) => {
       const selectedFeeForDiv = divisionFeeSelections[div.id];
       if (selectedFeeForDiv) {
         const fee = (div.fees || []).find(f => f.id === selectedFeeForDiv);
         return total + (fee?.amount || 0);
       }
-      return total + (div.divisionFee || event?.perDivisionFee || event?.registrationFee || 0);
+      return total + (div.divisionFee || event?.perDivisionFee || 0);
     }, 0);
+
+    return eventFee + divisionTotal;
   };
 
   // Proceed with selected divisions
@@ -1951,14 +1997,38 @@ export default function EventRegistration() {
                         <span className="text-gray-600">Player</span>
                         <span className="font-medium">{user?.firstName} {user?.lastName}</span>
                       </div>
-                      {getEffectiveFeeAmount() > 0 && (
-                        <div className="flex justify-between pt-2 border-t">
-                          <span className="text-gray-600">
-                            {selectedDivisions.length > 1 ? 'Total Fee' : (getSelectedFee() ? getSelectedFee().name : 'Fee')}
-                          </span>
-                          <span className="font-medium text-orange-600">
-                            ${getEffectiveFeeAmount()}
-                          </span>
+                      {/* Fee Breakdown */}
+                      {(getEventFee() > 0 || getDivisionFee() > 0) && (
+                        <div className="pt-2 border-t space-y-1">
+                          {hasSeparateFees() ? (
+                            <>
+                              {/* Event Fee (one-time) */}
+                              <div className="flex justify-between">
+                                <span className="text-gray-600">Event Fee</span>
+                                <span className="font-medium">${getEventFee()}</span>
+                              </div>
+                              {/* Division Fee */}
+                              <div className="flex justify-between">
+                                <span className="text-gray-600">
+                                  {getSelectedFee() ? getSelectedFee().name : 'Division Fee'}
+                                </span>
+                                <span className="font-medium">${getDivisionFee()}</span>
+                              </div>
+                              {/* Total */}
+                              <div className="flex justify-between pt-1 border-t font-semibold">
+                                <span className="text-gray-900">Total</span>
+                                <span className="text-orange-600">${getEventFee() + getDivisionFee()}</span>
+                              </div>
+                            </>
+                          ) : (
+                            /* Single fee display */
+                            <div className="flex justify-between font-semibold">
+                              <span className="text-gray-600">
+                                {getSelectedFee() ? getSelectedFee().name : 'Fee'}
+                              </span>
+                              <span className="text-orange-600">${getEffectiveFeeAmount()}</span>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
@@ -2313,6 +2383,32 @@ export default function EventRegistration() {
                   </div>
                 </div>
               </div>
+
+              {/* Fee Breakdown */}
+              {hasSeparateFees() && (
+                <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 mb-6">
+                  <h3 className="font-medium text-gray-900 mb-3 flex items-center gap-2">
+                    <DollarSign className="w-4 h-4" />
+                    Fee Breakdown (per person)
+                  </h3>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Event Fee</span>
+                      <span className="font-medium">${getEventFee()}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">
+                        {getSelectedFee() ? getSelectedFee().name : 'Division Fee'}
+                      </span>
+                      <span className="font-medium">${getDivisionFee()}</span>
+                    </div>
+                    <div className="flex justify-between pt-2 border-t border-orange-300 font-semibold">
+                      <span className="text-gray-900">Per Person Total</span>
+                      <span className="text-orange-600">${getEventFee() + getDivisionFee()}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Payment Summary - Members to pay for */}
               <div className="bg-gray-50 rounded-lg p-4 mb-6">

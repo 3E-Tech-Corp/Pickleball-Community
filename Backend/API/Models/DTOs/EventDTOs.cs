@@ -50,6 +50,16 @@ public class EventPublicViewDto
 
     // Registered players (public info only)
     public List<RegisteredPlayerPublicDto> RegisteredPlayers { get; set; } = new();
+
+    /// <summary>
+    /// Event-level fee options (DivisionId = 0). When set, these override RegistrationFee.
+    /// </summary>
+    public List<DivisionFeePublicDto> EventFees { get; set; } = new();
+
+    /// <summary>
+    /// Payment instructions from the organizer
+    /// </summary>
+    public string? PaymentInstructions { get; set; }
 }
 
 // Public division info
@@ -68,6 +78,28 @@ public class EventDivisionPublicDto
     public int RegisteredCount { get; set; }
     public int RegisteredPlayerCount { get; set; }
     public int LookingForPartnerCount { get; set; }
+    /// <summary>
+    /// Team size from TeamUnit. 1 = singles, 2 = doubles/pairs
+    /// </summary>
+    public int TeamSize { get; set; } = 2;
+    /// <summary>
+    /// Available fee options for this division
+    /// </summary>
+    public List<DivisionFeePublicDto> Fees { get; set; } = new();
+}
+
+/// <summary>
+/// Public fee option info for registration
+/// </summary>
+public class DivisionFeePublicDto
+{
+    public int Id { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public string? Description { get; set; }
+    public decimal Amount { get; set; }
+    public bool IsDefault { get; set; }
+    public bool IsActive { get; set; }
+    public bool IsCurrentlyAvailable { get; set; }
 }
 
 // Public registered player info

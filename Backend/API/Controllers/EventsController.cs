@@ -369,6 +369,18 @@ public class EventsController : EventControllerBase
                     .ThenInclude(d => d.SkillLevel)
                 .FirstOrDefaultAsync(e => e.Id == id && e.IsActive && e.IsPublished && !e.IsPrivate);
 
+            // Load division fees separately (query with FeeType)
+            var allFees = await _context.DivisionFees
+                .Where(f => f.EventId == id && f.IsActive)
+                .Include(f => f.FeeType)
+                .ToListAsync();
+
+            var eventFees = allFees.Where(f => f.DivisionId == 0).ToList();
+            var divisionFeesLookup = allFees
+                .Where(f => f.DivisionId > 0)
+                .GroupBy(f => f.DivisionId)
+                .ToDictionary(g => g.Key, g => g.ToList());
+
             if (evt == null)
                 return NotFound(new ApiResponse<EventPublicViewDto> { Success = false, Message = "Event not found or not public" });
 
@@ -446,6 +458,7 @@ public class EventsController : EventControllerBase
                 CreatedAt = evt.CreatedAt,
                 TournamentStatus = evt.TournamentStatus,
                 AllowMultipleDivisions = evt.AllowMultipleDivisions,
+                PaymentInstructions = evt.PaymentInstructions,
                 Divisions = evt.Divisions.Where(d => d.IsActive).OrderBy(d => d.SortOrder).Select(d => new EventDivisionPublicDto
                 {
                     Id = d.Id,
@@ -458,11 +471,16 @@ public class EventsController : EventControllerBase
                     MaxUnits = d.MaxUnits,
                     MaxPlayers = d.MaxPlayers,
                     DivisionFee = d.DivisionFee,
+                    TeamSize = d.TeamUnit?.TotalPlayers ?? 1,
                     RegisteredCount = d.Units.Count(u => u.Status != "Cancelled" && !u.IsTemporary),
                     RegisteredPlayerCount = d.Units.Where(u => u.Status != "Cancelled" && !u.IsTemporary).Sum(u => u.Members.Count),
-                    LookingForPartnerCount = d.Units.Count(u => u.Status != "Cancelled" && !u.IsTemporary && u.Members.Count < (d.TeamUnit?.TotalPlayers ?? 1))
+                    LookingForPartnerCount = d.Units.Count(u => u.Status != "Cancelled" && !u.IsTemporary && u.Members.Count < (d.TeamUnit?.TotalPlayers ?? 1)),
+                    Fees = divisionFeesLookup.TryGetValue(d.Id, out var divFees)
+                        ? divFees.OrderBy(f => f.SortOrder).Select(f => MapFeeToPublicDto(f)).ToList()
+                        : new List<DivisionFeePublicDto>()
                 }).ToList(),
-                RegisteredPlayers = registeredPlayers
+                RegisteredPlayers = registeredPlayers,
+                EventFees = eventFees.OrderBy(f => f.SortOrder).Select(f => MapFeeToPublicDto(f)).ToList()
             };
 
             return Ok(new ApiResponse<EventPublicViewDto> { Success = true, Data = dto });
@@ -2787,6 +2805,24 @@ public class EventsController : EventControllerBase
         }
 
         return recipients.Values.OrderBy(r => r.Name).ToList();
+    }
+
+    private static DivisionFeePublicDto MapFeeToPublicDto(DivisionFee fee)
+    {
+        var now = DateTime.UtcNow;
+        var isCurrentlyAvailable = (fee.AvailableFrom == null || fee.AvailableFrom <= now)
+            && (fee.AvailableUntil == null || fee.AvailableUntil >= now);
+
+        return new DivisionFeePublicDto
+        {
+            Id = fee.Id,
+            Name = fee.FeeType?.Name ?? "",
+            Description = fee.FeeType?.Description,
+            Amount = fee.Amount,
+            IsDefault = fee.IsDefault,
+            IsActive = fee.IsActive,
+            IsCurrentlyAvailable = isCurrentlyAvailable
+        };
     }
 
     #endregion
