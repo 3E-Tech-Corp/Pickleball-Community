@@ -67,6 +67,20 @@ export default function VenueMap({
   const [mapReady, setMapReady] = useState(false);
   const [inChina] = useState(() => isLikelyInChina());
 
+  // Store callbacks in refs to avoid map re-initialization when they change
+  const onBoundsChangeRef = useRef(onBoundsChange);
+  const onMarkerSelectRef = useRef(onMarkerSelect);
+  const handleItemClickRef = useRef(handleItemClick);
+  const itemsRef = useRef(items);
+
+  // Keep refs updated when values change
+  useEffect(() => {
+    onBoundsChangeRef.current = onBoundsChange;
+    onMarkerSelectRef.current = onMarkerSelect;
+    handleItemClickRef.current = handleItemClick;
+    itemsRef.current = items;
+  }, [onBoundsChange, onMarkerSelect, handleItemClick, items]);
+
   // Filter venues with valid coordinates
   const venuesWithCoords = useMemo(() => {
     if (!items) return [];
@@ -130,10 +144,10 @@ export default function VenueMap({
       const btn = e.target.closest('.venue-detail-btn');
       if (btn) {
         const venueId = parseInt(btn.dataset.venueId, 10);
-        const venue = items.find(v => (v.id || v.courtId) === venueId);
+        const venue = itemsRef.current.find(v => (v.id || v.courtId) === venueId);
         if (venue) {
-          if (onMarkerSelect) onMarkerSelect(venue);
-          if (handleItemClick) handleItemClick(venue);
+          if (onMarkerSelectRef.current) onMarkerSelectRef.current(venue);
+          if (handleItemClickRef.current) handleItemClickRef.current(venue);
         }
       }
     };
@@ -141,9 +155,9 @@ export default function VenueMap({
 
     // Handle map bounds changes (pan/zoom)
     const handleMoveEnd = () => {
-      if (onBoundsChange) {
+      if (onBoundsChangeRef.current) {
         const bounds = map.getBounds();
-        onBoundsChange({
+        onBoundsChangeRef.current({
           minLat: bounds.getSouth(),
           maxLat: bounds.getNorth(),
           minLng: bounds.getWest(),
@@ -167,7 +181,7 @@ export default function VenueMap({
         setMapReady(false);
       }
     };
-  }, [isClient, inChina, items, onMarkerSelect, handleItemClick, onBoundsChange]);
+  }, [isClient, inChina]); // Removed items, callbacks from deps - map should only init once
 
   // Create numbered marker icon
   const createNumberedIcon = (number, isSelected) => {
