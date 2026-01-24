@@ -52,10 +52,10 @@ export default function Clubs() {
   const pageSize = 20;
 
   // View mode: 'list' or 'map'
-  const [viewMode, setViewMode] = useState('list');
+  const [viewMode, setViewMode] = useState('map');
 
   // Sorting
-  const [sortBy, setSortBy] = useState('distance'); // distance, name
+  const [sortBy, setSortBy] = useState('name'); // name, distance (if location available)
   const [sortOrder, setSortOrder] = useState('asc');
 
   // Location state
@@ -65,6 +65,81 @@ export default function Clubs() {
 
   // For map view hover
   const [hoveredClubId, setHoveredClubId] = useState(null);
+
+  // Geocoding cache for clubs without coordinates
+  const [geocodeCache, setGeocodeCache] = useState({});
+
+  // Geocode a single address using OpenStreetMap Nominatim
+  const geocodeAddress = async (city, state, country) => {
+    if (!city && !state) return null;
+
+    const addressParts = [city, state, country].filter(Boolean);
+    const addressKey = addressParts.join(',');
+
+    // Check cache first
+    if (geocodeCache[addressKey]) {
+      return geocodeCache[addressKey];
+    }
+
+    try {
+      const encodedAddress = encodeURIComponent(addressParts.join(', '));
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodedAddress}&limit=1`,
+        {
+          headers: {
+            'User-Agent': 'PickleballCommunity/1.0'
+          }
+        }
+      );
+      const data = await response.json();
+
+      if (data && data.length > 0) {
+        const result = {
+          lat: parseFloat(data[0].lat),
+          lng: parseFloat(data[0].lon)
+        };
+        // Update cache
+        setGeocodeCache(prev => ({ ...prev, [addressKey]: result }));
+        return result;
+      }
+    } catch (err) {
+      console.error('Geocoding error for', addressKey, err);
+    }
+    return null;
+  };
+
+  // Geocode clubs that don't have coordinates
+  const geocodeClubsWithoutCoords = async (clubsList) => {
+    const clubsToGeocode = clubsList.filter(c => !c.latitude && !c.gpsLat && (c.city || c.state));
+
+    if (clubsToGeocode.length === 0) return clubsList;
+
+    // Process in batches to avoid rate limiting (Nominatim allows 1 req/sec)
+    const updatedClubs = [...clubsList];
+    const geocodePromises = [];
+
+    for (const club of clubsToGeocode) {
+      // Add delay between requests to respect Nominatim rate limit
+      const promise = (async () => {
+        await new Promise(resolve => setTimeout(resolve, geocodePromises.length * 1100)); // 1.1s delay
+        const coords = await geocodeAddress(club.city, club.state, club.country);
+        if (coords) {
+          const idx = updatedClubs.findIndex(c => c.id === club.id);
+          if (idx !== -1) {
+            updatedClubs[idx] = { ...updatedClubs[idx], latitude: coords.lat, longitude: coords.lng };
+          }
+        }
+      })();
+      geocodePromises.push(promise);
+    }
+
+    // Wait for all geocoding to complete (but don't block UI - set state progressively)
+    Promise.all(geocodePromises).then(() => {
+      setClubs([...updatedClubs]);
+    });
+
+    return clubsList; // Return original list immediately, will update via state
+  };
 
   // Load available member roles on mount
   useEffect(() => {
@@ -285,9 +360,15 @@ export default function Clubs() {
 
       const response = await clubsApi.search(params);
       if (response.success && response.data) {
-        setClubs(response.data.items || []);
+        const loadedClubs = response.data.items || [];
+        setClubs(loadedClubs);
         setTotalPages(response.data.totalPages || 1);
         setTotalCount(response.data.totalCount || 0);
+
+        // Geocode clubs without coordinates (runs asynchronously)
+        if (viewMode === 'map') {
+          geocodeClubsWithoutCoords(loadedClubs);
+        }
       }
     } catch (err) {
       console.error('Error loading clubs:', err);
@@ -302,6 +383,16 @@ export default function Clubs() {
       loadClubs();
     }
   }, [loadClubs, activeTab]);
+
+  // Trigger geocoding when switching to map view with existing clubs
+  useEffect(() => {
+    if (viewMode === 'map' && clubs.length > 0) {
+      const clubsWithoutCoords = clubs.filter(c => !c.latitude && !c.gpsLat && (c.city || c.state));
+      if (clubsWithoutCoords.length > 0) {
+        geocodeClubsWithoutCoords(clubs);
+      }
+    }
+  }, [viewMode]);
 
   // Debounced search
   const [searchTimeout, setSearchTimeout] = useState(null);
