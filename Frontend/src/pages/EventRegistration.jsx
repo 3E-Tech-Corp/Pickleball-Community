@@ -809,6 +809,16 @@ export default function EventRegistration() {
         // Remove from local state
         setUserRegistrations(prev => prev.filter(u => u.divisionId !== division.id));
         setCancelConfirmModal({ isOpen: false, division: null, unit: null });
+
+        // Refresh event data to update registeredCount for divisions
+        try {
+          const eventResponse = await eventsApi.getEventPublic(eventId);
+          if (eventResponse.success && eventResponse.data) {
+            setEvent(eventResponse.data);
+          }
+        } catch (e) {
+          console.log('Could not refresh event data:', e);
+        }
       } else {
         toast.error(response.message || 'Failed to cancel registration');
       }
