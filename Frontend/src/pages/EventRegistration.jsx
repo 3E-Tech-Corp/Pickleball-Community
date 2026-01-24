@@ -340,8 +340,14 @@ export default function EventRegistration() {
     return availableFees.length > 0;
   };
 
-  // Get the event fee (one-time registration fee)
+  // Get the event fee (one-time registration fee - only charged for first division)
   const getEventFee = () => {
+    // Event fee is only charged once per user per event
+    // If user already has registrations for this event, don't charge again
+    if (userRegistrations.length > 0) {
+      return 0;
+    }
+
     // If event has event fee options, use those
     if (hasEventFeeOptions()) {
       const defaultFee = (event?.eventFees || []).find(f => f.isDefault && f.isActive && f.isCurrentlyAvailable);
@@ -411,8 +417,8 @@ export default function EventRegistration() {
 
   // Get total fee for all selected divisions
   const getTotalFeeForSelectedDivisions = () => {
-    // Start with event fee (one-time) if it exists
-    const eventFee = event?.registrationFee || 0;
+    // Start with event fee (one-time) - uses getEventFee which checks if user already registered
+    const eventFee = getEventFee();
 
     // Add up division fees
     const divisionTotal = selectedDivisions.reduce((total, div) => {
