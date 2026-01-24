@@ -42,6 +42,7 @@ export default function TournamentManage() {
   const [standingsSortBy, setStandingsSortBy] = useState('pool'); // 'pool', 'rank', 'matchesWon', 'gameDiff', 'pointDiff'
   const [event, setEvent] = useState(null);
   const [activeTab, setActiveTab] = useState('eventinfo');
+  const [mainTab, setMainTab] = useState('preplanning'); // 'preplanning' or 'gameday'
   const [selectedDivision, setSelectedDivision] = useState(null);
   const selectedDivisionRef = useRef(null); // Ref to track selectedDivision for SignalR listener
   const [error, setError] = useState(null);
@@ -117,6 +118,8 @@ export default function TournamentManage() {
   const [unitsData, setUnitsData] = useState(null); // All units grouped by division
   const [loadingUnits, setLoadingUnits] = useState(false);
   const [registrationDivisionFilter, setRegistrationDivisionFilter] = useState('all'); // Filter for Registration Management
+  const [registrationFeeTypeFilter, setRegistrationFeeTypeFilter] = useState('all'); // Fee type filter
+  const [eventFeeTypes, setEventFeeTypes] = useState([]); // Fee types for the event
   const [selectedUnitsForMerge, setSelectedUnitsForMerge] = useState([]);
   const [processingUnitAction, setProcessingUnitAction] = useState(null); // { unitId, action }
   const [expandedUnit, setExpandedUnit] = useState(null); // unitId for expanded view
@@ -173,10 +176,31 @@ export default function TournamentManage() {
     { value: 'Other', label: 'Other' },
   ];
 
+  // Court/Time Planning state
+  const [planningData, setPlanningData] = useState(null); // Full planning data from API
+  const [loadingPlanningData, setLoadingPlanningData] = useState(false);
+  const [planningDivisionId, setPlanningDivisionId] = useState(''); // Selected division for planning
+  const [planningPoolId, setPlanningPoolId] = useState('all'); // Selected pool/phase
+  const [planningConfig, setPlanningConfig] = useState({
+    gameDurationMinutes: 15,
+    waitTimeMinutes: 5,
+    courtCount: 4,
+  });
+  const [selectedEncountersForPlanning, setSelectedEncountersForPlanning] = useState([]); // Encounter IDs to plan
+  const [planningCourtSelection, setPlanningCourtSelection] = useState('group'); // 'group' or 'individual'
+  const [selectedCourtGroupForPlanning, setSelectedCourtGroupForPlanning] = useState('');
+  const [selectedCourtsForPlanning, setSelectedCourtsForPlanning] = useState([]); // Individual court IDs
+  const [planningStartTime, setPlanningStartTime] = useState('');
+  const [generatedSchedule, setGeneratedSchedule] = useState([]); // Generated time slots
+  const [courtTimeAllocations, setCourtTimeAllocations] = useState([]); // All saved allocations for timeline
+  const [savingPlan, setSavingPlan] = useState(false);
+  const [planningErrors, setPlanningErrors] = useState([]);
+
   useEffect(() => {
     if (eventId) {
       loadDashboard();
       loadEvent();
+      loadEventFeeTypes();
     }
   }, [eventId]);
 
@@ -549,6 +573,281 @@ export default function TournamentManage() {
     }
   };
 
+  // Court/Time Planning Functions
+  const loadPlanningData = async () => {
+    setLoadingPlanningData(true);
+    try {
+      const response = await tournamentApi.getCourtPlanningData(eventId);
+      if (response.success) {
+        setPlanningData(response.data);
+        // Build court time allocations from encounters that have scheduled times
+        const allocations = (response.data?.encounters || [])
+          .filter(e => e.scheduledTime && e.courtId)
+          .map(e => ({
+            encounterId: e.id,
+            courtId: e.courtId,
+            courtLabel: e.courtLabel,
+            scheduledTime: new Date(e.scheduledTime),
+            endTime: e.estimatedEndTime ? new Date(e.estimatedEndTime) :
+              new Date(new Date(e.scheduledTime).getTime() + (e.estimatedDurationMinutes || 20) * 60000),
+            divisionId: e.divisionId,
+            divisionName: e.divisionName,
+            unit1Name: e.unit1Name,
+            unit2Name: e.unit2Name,
+            encounterLabel: e.encounterLabel,
+            encounterNumber: e.encounterNumber,
+            status: e.status,
+          }));
+        setCourtTimeAllocations(allocations);
+      } else {
+        toast.error(response.message || 'Failed to load planning data');
+      }
+    } catch (err) {
+      console.error('Error loading planning data:', err);
+      toast.error('Failed to load planning data');
+    } finally {
+      setLoadingPlanningData(false);
+    }
+  };
+
+  const getFilteredEncounters = () => {
+    if (!planningData?.encounters) return [];
+    let filtered = planningData.encounters.filter(e => !e.isBye);
+
+    if (planningDivisionId) {
+      filtered = filtered.filter(e => e.divisionId === parseInt(planningDivisionId));
+    }
+    if (planningPoolId && planningPoolId !== 'all') {
+      // Filter by phase/pool
+      if (planningPoolId.startsWith('phase_')) {
+        const phaseId = parseInt(planningPoolId.replace('phase_', ''));
+        filtered = filtered.filter(e => e.phaseId === phaseId);
+      } else if (planningPoolId.startsWith('round_')) {
+        const roundNum = parseInt(planningPoolId.replace('round_', ''));
+        filtered = filtered.filter(e => e.roundNumber === roundNum);
+      }
+    }
+    return filtered;
+  };
+
+  const getUnscheduledEncounters = () => {
+    return getFilteredEncounters().filter(e => !e.scheduledTime || !e.courtId);
+  };
+
+  const getScheduledEncounters = () => {
+    return getFilteredEncounters().filter(e => e.scheduledTime && e.courtId);
+  };
+
+  const calculateTimeEstimate = () => {
+    const encounters = selectedEncountersForPlanning.length > 0
+      ? selectedEncountersForPlanning
+      : getUnscheduledEncounters().map(e => e.id);
+    const matchCount = encounters.length;
+    const { gameDurationMinutes, waitTimeMinutes, courtCount } = planningConfig;
+    const totalMinutesPerMatch = gameDurationMinutes + waitTimeMinutes;
+    const matchesPerCourt = Math.ceil(matchCount / courtCount);
+    const totalMinutes = matchesPerCourt * totalMinutesPerMatch;
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    return { matchCount, totalMinutes, hours, minutes };
+  };
+
+  const getAvailableCourtsForPlanning = () => {
+    if (planningCourtSelection === 'group' && selectedCourtGroupForPlanning) {
+      const group = planningData?.courtGroups?.find(g => g.id === parseInt(selectedCourtGroupForPlanning));
+      return group?.courts || [];
+    }
+    if (planningCourtSelection === 'individual') {
+      return selectedCourtsForPlanning.map(courtId => {
+        // Check court groups first
+        for (const group of (planningData?.courtGroups || [])) {
+          const court = group.courts?.find(c => c.id === courtId);
+          if (court) return court;
+        }
+        // Check unassigned courts
+        const unassigned = planningData?.unassignedCourts?.find(c => c.id === courtId);
+        if (unassigned) return unassigned;
+        return null;
+      }).filter(Boolean);
+    }
+    return [];
+  };
+
+  const generateScheduleForSelection = () => {
+    const encounters = selectedEncountersForPlanning.length > 0
+      ? planningData.encounters.filter(e => selectedEncountersForPlanning.includes(e.id))
+      : getUnscheduledEncounters();
+
+    if (encounters.length === 0) {
+      toast.error('No matches selected for scheduling');
+      return;
+    }
+
+    if (!planningStartTime) {
+      toast.error('Please enter a start time');
+      return;
+    }
+
+    const courts = getAvailableCourtsForPlanning();
+    if (courts.length === 0) {
+      toast.error('Please select courts or a court group');
+      return;
+    }
+
+    const { gameDurationMinutes, waitTimeMinutes } = planningConfig;
+    const totalMinutesPerMatch = gameDurationMinutes + waitTimeMinutes;
+
+    // Parse start time and combine with event date
+    const eventDate = new Date(planningData.eventStartDate);
+    const [hours, minutes] = planningStartTime.split(':').map(Number);
+    const startDateTime = new Date(eventDate);
+    startDateTime.setHours(hours, minutes, 0, 0);
+
+    // Check for conflicts with existing allocations
+    const existingAllocations = [...courtTimeAllocations];
+    const newSchedule = [];
+    const errors = [];
+
+    // Track next available time for each court
+    const courtNextAvailable = {};
+    courts.forEach(court => {
+      // Find last scheduled time for this court
+      const courtAllocations = existingAllocations.filter(a => a.courtId === court.id);
+      if (courtAllocations.length > 0) {
+        const lastEnd = Math.max(...courtAllocations.map(a => a.endTime.getTime()));
+        courtNextAvailable[court.id] = new Date(Math.max(startDateTime.getTime(), lastEnd));
+      } else {
+        courtNextAvailable[court.id] = new Date(startDateTime);
+      }
+    });
+
+    // Assign encounters to courts using round-robin
+    encounters.forEach((encounter, index) => {
+      // Find court with earliest availability
+      let earliestCourt = courts[0];
+      let earliestTime = courtNextAvailable[courts[0].id];
+
+      courts.forEach(court => {
+        if (courtNextAvailable[court.id] < earliestTime) {
+          earliestCourt = court;
+          earliestTime = courtNextAvailable[court.id];
+        }
+      });
+
+      const slotStart = new Date(courtNextAvailable[earliestCourt.id]);
+      const slotEnd = new Date(slotStart.getTime() + totalMinutesPerMatch * 60000);
+
+      // Check for conflicts
+      const conflict = existingAllocations.find(a =>
+        a.courtId === earliestCourt.id &&
+        slotStart < a.endTime && slotEnd > a.scheduledTime
+      );
+
+      if (conflict) {
+        errors.push(`Conflict on ${earliestCourt.courtLabel} at ${slotStart.toLocaleTimeString()}`);
+      }
+
+      newSchedule.push({
+        encounterId: encounter.id,
+        courtId: earliestCourt.id,
+        courtLabel: earliestCourt.courtLabel,
+        scheduledTime: slotStart,
+        endTime: slotEnd,
+        divisionId: encounter.divisionId,
+        divisionName: encounter.divisionName,
+        unit1Name: encounter.unit1Name,
+        unit2Name: encounter.unit2Name,
+        roundNumber: encounter.roundNumber,
+        roundName: encounter.roundName,
+        encounterLabel: encounter.encounterLabel,
+        encounterNumber: encounter.encounterNumber,
+        isNew: true,
+      });
+
+      // Update next available time for this court
+      courtNextAvailable[earliestCourt.id] = slotEnd;
+    });
+
+    setGeneratedSchedule(newSchedule);
+    setPlanningErrors(errors);
+
+    if (newSchedule.length > 0) {
+      toast.success(`Generated schedule for ${newSchedule.length} matches`);
+    }
+  };
+
+  const applyGeneratedSchedule = () => {
+    // Merge new schedule into allocations
+    const newAllocations = [...courtTimeAllocations];
+    generatedSchedule.forEach(slot => {
+      // Remove any existing allocation for this encounter
+      const existingIndex = newAllocations.findIndex(a => a.encounterId === slot.encounterId);
+      if (existingIndex >= 0) {
+        newAllocations.splice(existingIndex, 1);
+      }
+      newAllocations.push({ ...slot, isNew: true });
+    });
+    setCourtTimeAllocations(newAllocations);
+    setGeneratedSchedule([]);
+    setSelectedEncountersForPlanning([]);
+    toast.success('Schedule applied. Click "Save Plan" to persist changes.');
+  };
+
+  const removeAllocation = (encounterId) => {
+    setCourtTimeAllocations(prev => prev.filter(a => a.encounterId !== encounterId));
+    setGeneratedSchedule(prev => prev.filter(s => s.encounterId !== encounterId));
+  };
+
+  const savePlanningData = async () => {
+    const newAllocations = courtTimeAllocations.filter(a => a.isNew);
+    if (newAllocations.length === 0) {
+      toast.info('No new changes to save');
+      return;
+    }
+
+    setSavingPlan(true);
+    try {
+      const assignments = newAllocations.map(a => ({
+        encounterId: a.encounterId,
+        courtId: a.courtId,
+        scheduledTime: a.scheduledTime.toISOString(),
+        estimatedStartTime: a.scheduledTime.toISOString(),
+      }));
+
+      const response = await tournamentApi.bulkAssignCourtsAndTimes(eventId, assignments);
+      if (response.success) {
+        toast.success(`Saved ${assignments.length} court/time assignments`);
+        // Mark all as saved (not new)
+        setCourtTimeAllocations(prev => prev.map(a => ({ ...a, isNew: false })));
+        // Reload to get updated data
+        loadPlanningData();
+      } else {
+        toast.error(response.message || 'Failed to save plan');
+      }
+    } catch (err) {
+      console.error('Error saving plan:', err);
+      toast.error('Failed to save planning data');
+    } finally {
+      setSavingPlan(false);
+    }
+  };
+
+  const toggleEncounterSelection = (encounterId) => {
+    setSelectedEncountersForPlanning(prev =>
+      prev.includes(encounterId)
+        ? prev.filter(id => id !== encounterId)
+        : [...prev, encounterId]
+    );
+  };
+
+  const selectAllUnscheduled = () => {
+    setSelectedEncountersForPlanning(getUnscheduledEncounters().map(e => e.id));
+  };
+
+  const clearSelection = () => {
+    setSelectedEncountersForPlanning([]);
+  };
+
   const handleCreateCourtGroup = async () => {
     if (!newGroupName.trim()) {
       toast.error('Please enter a group name');
@@ -844,11 +1143,11 @@ export default function TournamentManage() {
     setRegisteringPlayer(true);
     try {
       const response = await tournamentApi.adminRegisterUser(eventId, {
-        userId: selectedPlayerForReg.id,
+        userId: selectedPlayerForReg.userId,
         divisionId: parseInt(selectedDivisionForReg)
       });
       if (response.success) {
-        toast.success(`${selectedPlayerForReg.displayName || selectedPlayerForReg.email} registered successfully`);
+        toast.success(`${selectedPlayerForReg.name || selectedPlayerForReg.email} registered successfully`);
         setShowAddPlayer(false);
         setPlayerSearchQuery('');
         setPlayerSearchResults([]);
@@ -939,8 +1238,8 @@ export default function TournamentManage() {
     setUploadingDocument(true);
     try {
       // Upload file to shared assets
-      const uploadResponse = await sharedAssetApi.upload(file, 'document', 'event', true);
-      const fileUrl = uploadResponse?.data?.url || uploadResponse?.url;
+      const uploadResponse = await sharedAssetApi.uploadViaProxy(file, 'document', 'event');
+      const fileUrl = uploadResponse?.url;
 
       if (!fileUrl) {
         toast.error('Failed to upload file');
@@ -1335,7 +1634,7 @@ export default function TournamentManage() {
     setUploadingPaymentProof(true);
     try {
       const assetType = file.type === 'application/pdf' ? 'document' : 'image';
-      const response = await sharedAssetApi.upload(file, assetType, 'payment-proof', true);
+      const response = await sharedAssetApi.uploadViaProxy(file, assetType, 'payment-proof');
       if (response.success && response.url) {
         const fullUrl = getSharedAssetUrl(response.url);
         updateEditForm('paymentProofUrl', fullUrl);
@@ -1418,10 +1717,14 @@ export default function TournamentManage() {
         (response.data || []).forEach(unit => {
           if (unit.status === 'Cancelled') return;
           const divId = unit.divisionId;
+          // Skip units without a valid divisionId
+          if (!divId) return;
           if (!grouped[divId]) {
+            // Try to get division name from event data if not in unit
+            const divisionFromEvent = event?.divisions?.find(d => d.id === divId);
             grouped[divId] = {
               divisionId: divId,
-              divisionName: unit.divisionName || 'Unknown Division',
+              divisionName: unit.divisionName || divisionFromEvent?.name || '',
               units: []
             };
           }
@@ -1436,6 +1739,17 @@ export default function TournamentManage() {
       toast.error('Failed to load units');
     } finally {
       setLoadingUnits(false);
+    }
+  };
+
+  const loadEventFeeTypes = async () => {
+    try {
+      const response = await tournamentApi.getEventFeeTypes(eventId);
+      if (response.success) {
+        setEventFeeTypes(response.data || []);
+      }
+    } catch (err) {
+      console.error('Error loading fee types:', err);
     }
   };
 
@@ -1531,12 +1845,18 @@ export default function TournamentManage() {
   };
 
   const handleRemoveMember = async (unit, member) => {
-    if (!confirm(`Remove ${member.firstName} ${member.lastName} from "${unit.name}"?`)) return;
+    const acceptedCount = unit.members?.filter(m => m.inviteStatus === 'Accepted').length || 0;
+    const isLastMember = acceptedCount <= 1;
+    const confirmMessage = isLastMember
+      ? `Cancel registration for ${member.firstName} ${member.lastName}? This will remove the entire registration.`
+      : `Remove ${member.firstName} ${member.lastName} from "${unit.name}"?`;
+
+    if (!confirm(confirmMessage)) return;
     setProcessingUnitAction({ unitId: unit.id, action: 'remove-member' });
     try {
       const response = await tournamentApi.removeRegistration(eventId, unit.id, member.userId);
       if (response.success) {
-        toast.success('Member removed from unit');
+        toast.success(isLastMember ? 'Registration cancelled' : 'Member removed from unit');
         loadUnits();
         loadDashboard();
         loadCheckIns();
@@ -1566,7 +1886,8 @@ export default function TournamentManage() {
 
   const getUnitsByDivision = () => {
     if (!unitsData) return [];
-    const allDivisions = Object.values(unitsData).filter(d => d.units.length > 0);
+    // Filter out divisions without a valid divisionId or name, and with no units
+    const allDivisions = Object.values(unitsData).filter(d => d.units.length > 0 && d.divisionId && d.divisionName);
     if (registrationDivisionFilter === 'all') return allDivisions;
     return allDivisions.filter(d => d.divisionId === parseInt(registrationDivisionFilter));
   };
@@ -1912,49 +2233,127 @@ export default function TournamentManage() {
       {/* Tabs - organized by workflow */}
       <div className="bg-white border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          {/* Main Tab Groups */}
+          <div className="flex border-b border-gray-200 mb-2">
+            {[
+              { key: 'preplanning', label: 'Pre-Planning', icon: '📋' },
+              { key: 'gameday', label: 'Game Day Execution', icon: '🎮' }
+            ].map(tabGroup => (
+              <button
+                key={tabGroup.key}
+                onClick={() => {
+                  setMainTab(tabGroup.key);
+                  // Set default sub-tab when switching main tabs
+                  if (tabGroup.key === 'preplanning') {
+                    setActiveTab('eventinfo');
+                  } else if (tabGroup.key === 'gameday') {
+                    setActiveTab('overview');
+                  }
+                }}
+                className={`px-6 py-3 font-semibold text-sm transition-colors ${
+                  mainTab === tabGroup.key
+                    ? 'border-b-2 border-orange-600 text-orange-600'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                <span className="mr-2">{tabGroup.icon}</span>
+                {tabGroup.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Sub-tabs based on main tab selection */}
           <div className="flex overflow-x-auto">
-            {/* Tab navigation */}
             <div className="flex">
-              {[
-                { key: 'eventinfo', label: 'Event Info' },
-                { key: 'divisions', label: 'Divisions' },
-                { key: 'courts', label: 'Courts' },
-                { key: 'registrations', label: 'Registrations' },
-                { key: 'backup', label: 'Backup' },
-                { key: 'payments', label: 'Payments' },
-                { key: 'documents', label: 'Documents' },
-                { key: 'staff', label: 'Staff' },
-                { key: 'schedule', label: 'Schedule' },
-                { key: 'overview', label: 'Overview' },
-                { key: 'gameday', label: 'Game Day' }
-              ].map(tab => (
-                <button
-                  key={tab.key}
-                  onClick={() => {
-                    setActiveTab(tab.key);
-                    if (tab.key === 'staff' && staffList.length === 0) {
-                      loadStaff();
-                    }
-                    if (tab.key === 'payments' && !paymentSummary) {
-                      loadPaymentSummary();
-                    }
-                    if (tab.key === 'courts' && courtGroups.length === 0) {
-                      loadCourtGroups();
-                    }
-                    if (tab.key === 'documents' && documents.length === 0) {
-                      loadDocuments();
-                      loadAssetTypes();
-                    }
-                  }}
-                  className={`px-4 py-3 font-medium text-sm border-b-2 transition-colors whitespace-nowrap ${
-                    activeTab === tab.key
-                      ? 'border-orange-600 text-orange-600'
-                      : 'border-transparent text-gray-500 hover:text-gray-700'
-                  }`}
-                >
-                  {tab.label}
-                </button>
-              ))}
+              {/* Pre-Planning sub-tabs */}
+              {mainTab === 'preplanning' ? (
+                [
+                  { key: 'eventinfo', label: 'Event Info' },
+                  { key: 'divisions', label: 'Divisions' },
+                  { key: 'courts', label: 'Courts' },
+                  { key: 'registrations', label: 'Registrations' },
+                  { key: 'payments', label: 'Payments' },
+                  { key: 'documents', label: 'Documents' },
+                  { key: 'staff', label: 'Staff' },
+                  { key: 'planning', label: 'Planning' }
+                ].map(tab => (
+                  <button
+                    key={tab.key}
+                    onClick={() => {
+                      setActiveTab(tab.key);
+                      if (tab.key === 'staff' && staffList.length === 0) {
+                        loadStaff();
+                      }
+                      if (tab.key === 'payments' && !paymentSummary) {
+                        loadPaymentSummary();
+                      }
+                      if (tab.key === 'courts' && courtGroups.length === 0) {
+                        loadCourtGroups();
+                      }
+                      if (tab.key === 'documents' && documents.length === 0) {
+                        loadDocuments();
+                        loadAssetTypes();
+                      }
+                      if (tab.key === 'planning' && courtGroups.length === 0) {
+                        loadCourtGroups();
+                      }
+                    }}
+                    className={`px-4 py-3 font-medium text-sm border-b-2 transition-colors whitespace-nowrap ${
+                      activeTab === tab.key
+                        ? 'border-orange-600 text-orange-600'
+                        : 'border-transparent text-gray-500 hover:text-gray-700'
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))
+              ) : (
+                <>
+                  {/* Left tabs */}
+                  {[
+                    { key: 'overview', label: 'Overview' },
+                    { key: 'checkin', label: 'Check-in' },
+                    { key: 'schedule', label: 'Schedule' },
+                    { key: 'bycourt', label: 'By Court' }
+                  ].map(tab => (
+                    <button
+                      key={tab.key}
+                      onClick={() => {
+                        setActiveTab(tab.key);
+                        if (tab.key === 'checkin' && !checkInData) {
+                          loadCheckIns();
+                        }
+                      }}
+                      className={`px-4 py-3 font-medium text-sm border-b-2 transition-colors whitespace-nowrap ${
+                        activeTab === tab.key
+                          ? 'border-orange-600 text-orange-600'
+                          : 'border-transparent text-gray-500 hover:text-gray-700'
+                      }`}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
+                  {/* Spacer */}
+                  <div className="flex-1" />
+                  {/* Right tabs */}
+                  {[
+                    { key: 'scoring', label: 'Scoring' },
+                    { key: 'gamedayexec', label: 'Game Day' }
+                  ].map(tab => (
+                    <button
+                      key={tab.key}
+                      onClick={() => setActiveTab(tab.key)}
+                      className={`px-4 py-3 font-medium text-sm border-b-2 transition-colors whitespace-nowrap ${
+                        activeTab === tab.key
+                          ? 'border-orange-600 text-orange-600'
+                          : 'border-transparent text-gray-500 hover:text-gray-700'
+                      }`}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -3338,6 +3737,23 @@ export default function TournamentManage() {
                             </div>
                             {round.matches?.filter(m => !m.isBye).map((match, matchIdx) => (
                               <div key={matchIdx} className="p-4 border-t border-gray-100">
+                                {/* Scheduled time and court info */}
+                                {(match.scheduledTime || match.courtLabel) && (
+                                  <div className="flex items-center gap-3 mb-2 text-sm">
+                                    {match.scheduledTime && (
+                                      <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-50 text-blue-700 rounded">
+                                        <Clock className="w-3 h-3" />
+                                        {new Date(match.scheduledTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                      </span>
+                                    )}
+                                    {match.courtLabel && (
+                                      <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-green-50 text-green-700 rounded">
+                                        <MapPin className="w-3 h-3" />
+                                        {match.courtLabel}
+                                      </span>
+                                    )}
+                                  </div>
+                                )}
                                 <div className="flex items-center gap-3">
                                   {/* Edit button on far left */}
                                   <button
@@ -3454,6 +3870,23 @@ export default function TournamentManage() {
                             </div>
                             {round.matches?.map((match, matchIdx) => (
                               <div key={matchIdx} className="p-4 border-t border-gray-100">
+                                {/* Scheduled time and court info */}
+                                {!match.isBye && (match.scheduledTime || match.courtLabel) && (
+                                  <div className="flex items-center gap-3 mb-2 text-sm">
+                                    {match.scheduledTime && (
+                                      <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-50 text-blue-700 rounded">
+                                        <Clock className="w-3 h-3" />
+                                        {new Date(match.scheduledTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                      </span>
+                                    )}
+                                    {match.courtLabel && (
+                                      <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-green-50 text-green-700 rounded">
+                                        <MapPin className="w-3 h-3" />
+                                        {match.courtLabel}
+                                      </span>
+                                    )}
+                                  </div>
+                                )}
                                 <div className="flex items-center gap-3">
                                   {/* Edit button on far left */}
                                   {!match.isBye && (
@@ -4041,6 +4474,165 @@ export default function TournamentManage() {
           </div>
         )}
 
+        {/* By Court Tab - Shows schedule grouped by court */}
+        {activeTab === 'bycourt' && (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-gray-900">Schedule By Court</h2>
+              <button
+                onClick={() => {
+                  loadDashboard();
+                  dashboard?.divisions?.forEach(div => {
+                    if (div.scheduleReady) loadSchedule(div.id);
+                  });
+                }}
+                className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100"
+              >
+                <RefreshCw className="w-5 h-5" />
+              </button>
+            </div>
+
+            {dashboard?.courts?.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {dashboard.courts.map(court => {
+                  // Get all matches assigned to this court from the schedule
+                  const courtMatches = [];
+
+                  // Collect matches from all divisions' schedules
+                  if (schedule?.rounds) {
+                    schedule.rounds.forEach(round => {
+                      round.matches?.forEach(match => {
+                        if (match.courtId === court.id) {
+                          courtMatches.push({
+                            ...match,
+                            roundName: round.roundName,
+                            roundType: round.roundType
+                          });
+                        }
+                      });
+                    });
+                  }
+
+                  // Sort by scheduled time
+                  courtMatches.sort((a, b) => {
+                    if (!a.scheduledTime) return 1;
+                    if (!b.scheduledTime) return -1;
+                    return new Date(a.scheduledTime) - new Date(b.scheduledTime);
+                  });
+
+                  return (
+                    <div key={court.id} className="bg-white rounded-xl shadow-sm overflow-hidden">
+                      <div className={`px-4 py-3 border-b ${
+                        court.status === 'InUse' ? 'bg-orange-50' :
+                        court.status === 'Available' ? 'bg-green-50' : 'bg-gray-50'
+                      }`}>
+                        <div className="flex items-center justify-between">
+                          <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+                            <MapPin className="w-4 h-4" />
+                            {court.courtLabel}
+                          </h3>
+                          <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${
+                            court.status === 'InUse' ? 'bg-orange-100 text-orange-700' :
+                            court.status === 'Available' ? 'bg-green-100 text-green-700' :
+                            'bg-gray-100 text-gray-700'
+                          }`}>
+                            {court.status || 'Available'}
+                          </span>
+                        </div>
+                        {courtMatches.length > 0 && (
+                          <p className="text-sm text-gray-500 mt-1">
+                            {courtMatches.length} match{courtMatches.length !== 1 ? 'es' : ''} scheduled
+                          </p>
+                        )}
+                      </div>
+                      <div className="divide-y max-h-80 overflow-y-auto">
+                        {courtMatches.length > 0 ? (
+                          courtMatches.map((match, idx) => (
+                            <div key={idx} className="p-3 hover:bg-gray-50">
+                              <div className="flex items-start gap-2">
+                                {/* Edit button - only for organizers/admins */}
+                                {isOrganizer && (
+                                  <button
+                                    onClick={() => setSelectedGameForEdit({
+                                      id: match.games?.[0]?.gameId || match.games?.[0]?.id || match.encounterId,
+                                      encounterId: match.encounterId,
+                                      ...(match.games?.[0] || {}),
+                                      unit1: { id: match.unit1Id, name: match.unit1Name || match.unit1SeedInfo, members: match.unit1Members || [] },
+                                      unit2: { id: match.unit2Id, name: match.unit2Name || match.unit2SeedInfo, members: match.unit2Members || [] },
+                                      unit1Score: match.games?.[0]?.unit1Score ?? match.unit1Score ?? 0,
+                                      unit2Score: match.games?.[0]?.unit2Score ?? match.unit2Score ?? 0,
+                                      bestOf: match.bestOf || 1,
+                                      matchNumber: match.matchNumber,
+                                      status: match.games?.[0]?.status || match.status || 'New',
+                                      games: match.games || [],
+                                      courtLabel: match.courtLabel,
+                                      winnerUnitId: match.winnerUnitId,
+                                      hasGames: match.games?.length > 0
+                                    })}
+                                    className="p-1.5 bg-blue-100 text-blue-700 hover:bg-blue-200 rounded transition-colors flex-shrink-0"
+                                    title="Edit match"
+                                  >
+                                    <Edit2 className="w-4 h-4" />
+                                  </button>
+                                )}
+                                <div className="flex-1 min-w-0">
+                                  {match.scheduledTime && (
+                                    <div className="flex items-center gap-1 text-xs text-blue-600 mb-1">
+                                      <Clock className="w-3 h-3" />
+                                      {new Date(match.scheduledTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                    </div>
+                                  )}
+                                  <div className="text-sm">
+                                    <span className="text-gray-400 mr-2">#{match.matchNumber}</span>
+                                    <span className={match.status === 'Completed' ? 'text-green-600' : 'text-gray-900'}>
+                                      {match.unit1Name || match.unit1SeedInfo || `Unit #${match.unit1Number || '?'}`}
+                                    </span>
+                                    <span className="text-gray-400 mx-2">vs</span>
+                                    <span className={match.status === 'Completed' ? 'text-green-600' : 'text-gray-900'}>
+                                      {match.unit2Name || match.unit2SeedInfo || `Unit #${match.unit2Number || '?'}`}
+                                    </span>
+                                  </div>
+                                  {match.score && (
+                                    <div className="text-xs text-gray-500 mt-1">{match.score}</div>
+                                  )}
+                                  <div className="flex items-center gap-2 mt-1">
+                                    <span className={`text-xs px-1.5 py-0.5 rounded ${
+                                      match.status === 'Completed' ? 'bg-green-100 text-green-700' :
+                                      match.status === 'InProgress' ? 'bg-orange-100 text-orange-700' :
+                                      'bg-gray-100 text-gray-600'
+                                    }`}>
+                                      {match.status || 'Scheduled'}
+                                    </span>
+                                    {match.roundName && (
+                                      <span className="text-xs text-gray-400">{match.roundName}</span>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          ))
+                        ) : (
+                          <div className="p-4 text-center text-gray-400 text-sm">
+                            No matches scheduled
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="bg-white rounded-xl shadow-sm p-12 text-center">
+                <MapPin className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 mb-2">No Courts Configured</h3>
+                <p className="text-gray-500">
+                  Add courts in the Courts section under Pre-Planning to see the schedule by court.
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Registrations Tab */}
         {activeTab === 'registrations' && (
           <div className="space-y-6">
@@ -4092,6 +4684,21 @@ export default function TournamentManage() {
                     ))}
                   </select>
                 </div>
+                {eventFeeTypes.length > 0 && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Fee Type</label>
+                    <select
+                      value={registrationFeeTypeFilter}
+                      onChange={(e) => setRegistrationFeeTypeFilter(e.target.value)}
+                      className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-orange-500"
+                    >
+                      <option value="all">All Fee Types</option>
+                      {eventFeeTypes.map(ft => (
+                        <option key={ft.id} value={ft.id}>{ft.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
                 {!unitsData && (
                   <div className="flex items-end">
                     <button
@@ -4237,17 +4844,15 @@ export default function TournamentManage() {
                                       <span className={`text-sm ${member.hasPaid ? 'text-green-600' : 'text-gray-400'}`} title={member.hasPaid ? 'Paid' : 'Unpaid'}>
                                         <DollarSign className="w-4 h-4" />
                                       </span>
-                                      {/* Remove member button */}
-                                      {acceptedMembers.length > 1 && (
-                                        <button
-                                          onClick={() => handleRemoveMember(unit, member)}
-                                          disabled={isProcessing}
-                                          className="p-0.5 rounded text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
-                                          title="Remove player"
-                                        >
-                                          <Trash2 className="w-4 h-4" />
-                                        </button>
-                                      )}
+                                      {/* Remove member button - show for singles or when team has multiple members */}
+                                      <button
+                                        onClick={() => handleRemoveMember(unit, member)}
+                                        disabled={isProcessing}
+                                        className="p-0.5 rounded text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
+                                        title={acceptedMembers.length === 1 ? "Cancel registration" : "Remove player"}
+                                      >
+                                        <Trash2 className="w-4 h-4" />
+                                      </button>
                                     </div>
                                   ))}
 
@@ -4356,8 +4961,8 @@ export default function TournamentManage() {
           </div>
         )}
 
-        {/* Backup Tab - Check-in Management */}
-        {activeTab === 'backup' && (
+        {/* Check-in Tab - Player Check-in Management */}
+        {activeTab === 'checkin' && (
           <div className="space-y-6">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold text-gray-900">Player Check-in & Status</h2>
@@ -5669,6 +6274,696 @@ export default function TournamentManage() {
           </div>
         )}
 
+        {/* Planning Tab - Court/Pool assignments for divisions */}
+        {activeTab === 'planning' && (
+          <div className="space-y-6">
+            {/* Header with actions */}
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-gray-900">Court & Time Planning</h2>
+              <div className="flex items-center gap-2">
+                {courtTimeAllocations.some(a => a.isNew) && (
+                  <button
+                    onClick={savePlanningData}
+                    disabled={savingPlan}
+                    className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 flex items-center gap-2"
+                  >
+                    {savingPlan ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                    Save Plan
+                  </button>
+                )}
+                <button
+                  onClick={() => {
+                    loadPlanningData();
+                    loadCourtGroups();
+                  }}
+                  disabled={loadingPlanningData}
+                  className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100"
+                >
+                  <RefreshCw className={`w-5 h-5 ${loadingPlanningData ? 'animate-spin' : ''}`} />
+                </button>
+              </div>
+            </div>
+
+            {/* Load Planning Data prompt */}
+            {!planningData && !loadingPlanningData && (
+              <div className="bg-white rounded-xl shadow-sm p-8 text-center">
+                <Calendar className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                <p className="text-gray-500 mb-4">Load planning data to start scheduling matches</p>
+                <button
+                  onClick={loadPlanningData}
+                  className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700"
+                >
+                  Load Planning Data
+                </button>
+              </div>
+            )}
+
+            {loadingPlanningData && (
+              <div className="bg-white rounded-xl shadow-sm p-8 text-center">
+                <Loader2 className="w-8 h-8 animate-spin text-orange-500 mx-auto mb-3" />
+                <p className="text-gray-500">Loading planning data...</p>
+              </div>
+            )}
+
+            {planningData && (
+              <>
+                {/* Step 1: Select Matches */}
+                <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+                  <div className="px-4 py-3 bg-gray-50 border-b">
+                    <h3 className="font-medium text-gray-900 flex items-center gap-2">
+                      <Target className="w-5 h-5 text-blue-500" />
+                      Step 1: Select Matches to Schedule
+                    </h3>
+                  </div>
+                  <div className="p-4 space-y-4">
+                    {/* Filters */}
+                    <div className="flex flex-wrap gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Division</label>
+                        <select
+                          value={planningDivisionId}
+                          onChange={(e) => {
+                            setPlanningDivisionId(e.target.value);
+                            setPlanningPoolId('all');
+                            setSelectedEncountersForPlanning([]);
+                          }}
+                          className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-orange-500"
+                        >
+                          <option value="">All Divisions</option>
+                          {planningData.divisions?.map(div => (
+                            <option key={div.id} value={div.id}>
+                              {div.name} ({div.encounterCount} matches)
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      {planningDivisionId && (
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Pool/Round</label>
+                          <select
+                            value={planningPoolId}
+                            onChange={(e) => {
+                              setPlanningPoolId(e.target.value);
+                              setSelectedEncountersForPlanning([]);
+                            }}
+                            className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-orange-500"
+                          >
+                            <option value="all">All Rounds</option>
+                            {/* Group by phases if available */}
+                            {planningData.divisions?.find(d => d.id === parseInt(planningDivisionId))?.phases?.map(phase => (
+                              <option key={`phase_${phase.id}`} value={`phase_${phase.id}`}>
+                                {phase.name} ({phase.encounterCount} matches)
+                              </option>
+                            ))}
+                            {/* Also show by round number */}
+                            {[...new Set(getFilteredEncounters().map(e => e.roundNumber))].sort((a,b) => a-b).map(round => (
+                              <option key={`round_${round}`} value={`round_${round}`}>
+                                Round {round}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Summary stats */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <div className="p-3 bg-gray-50 rounded-lg">
+                        <div className="text-2xl font-bold text-gray-900">{getFilteredEncounters().length}</div>
+                        <div className="text-xs text-gray-500">Total Matches</div>
+                      </div>
+                      <div className="p-3 bg-yellow-50 rounded-lg">
+                        <div className="text-2xl font-bold text-yellow-700">{getUnscheduledEncounters().length}</div>
+                        <div className="text-xs text-yellow-600">Unscheduled</div>
+                      </div>
+                      <div className="p-3 bg-green-50 rounded-lg">
+                        <div className="text-2xl font-bold text-green-700">{getScheduledEncounters().length}</div>
+                        <div className="text-xs text-green-600">Scheduled</div>
+                      </div>
+                      <div className="p-3 bg-blue-50 rounded-lg">
+                        <div className="text-2xl font-bold text-blue-700">{selectedEncountersForPlanning.length}</div>
+                        <div className="text-xs text-blue-600">Selected</div>
+                      </div>
+                    </div>
+
+                    {/* Match selection actions */}
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        onClick={selectAllUnscheduled}
+                        className="px-3 py-1.5 text-sm bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200"
+                      >
+                        Select All Unscheduled
+                      </button>
+                      {selectedEncountersForPlanning.length > 0 && (
+                        <button
+                          onClick={clearSelection}
+                          className="px-3 py-1.5 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
+                        >
+                          Clear Selection ({selectedEncountersForPlanning.length})
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Match list */}
+                    {getUnscheduledEncounters().length > 0 && (
+                      <div className="border rounded-lg overflow-hidden max-h-64 overflow-y-auto">
+                        <table className="min-w-full divide-y divide-gray-200">
+                          <thead className="bg-gray-50 sticky top-0">
+                            <tr>
+                              <th className="w-10 px-3 py-2"></th>
+                              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Match</th>
+                              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Round</th>
+                              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Teams</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-200 bg-white">
+                            {getUnscheduledEncounters().map(encounter => (
+                              <tr
+                                key={encounter.id}
+                                onClick={() => toggleEncounterSelection(encounter.id)}
+                                className={`cursor-pointer hover:bg-gray-50 ${
+                                  selectedEncountersForPlanning.includes(encounter.id) ? 'bg-blue-50' : ''
+                                }`}
+                              >
+                                <td className="px-3 py-2">
+                                  <input
+                                    type="checkbox"
+                                    checked={selectedEncountersForPlanning.includes(encounter.id)}
+                                    onChange={() => {}}
+                                    className="rounded border-gray-300 text-orange-600 focus:ring-orange-500"
+                                  />
+                                </td>
+                                <td className="px-3 py-2 text-sm">
+                                  <span className="font-medium">{encounter.encounterLabel || `#${encounter.encounterNumber}`}</span>
+                                  {!planningDivisionId && (
+                                    <span className="ml-2 text-xs text-gray-500">{encounter.divisionName}</span>
+                                  )}
+                                </td>
+                                <td className="px-3 py-2 text-sm text-gray-600">
+                                  {encounter.roundName || `Round ${encounter.roundNumber}`}
+                                </td>
+                                <td className="px-3 py-2 text-sm">
+                                  {encounter.unit1Name && encounter.unit2Name ? (
+                                    <>{encounter.unit1Name} vs {encounter.unit2Name}</>
+                                  ) : (
+                                    <span className="text-gray-500 italic">
+                                      Match {encounter.encounterLabel || `#${encounter.encounterNumber}`}
+                                    </span>
+                                  )}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Step 2: Time Configuration */}
+                <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+                  <div className="px-4 py-3 bg-gray-50 border-b">
+                    <h3 className="font-medium text-gray-900 flex items-center gap-2">
+                      <Clock className="w-5 h-5 text-purple-500" />
+                      Step 2: Time Configuration
+                    </h3>
+                  </div>
+                  <div className="p-4">
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Game Duration (min)</label>
+                        <input
+                          type="number"
+                          min="5"
+                          max="60"
+                          value={planningConfig.gameDurationMinutes}
+                          onChange={(e) => setPlanningConfig(prev => ({ ...prev, gameDurationMinutes: parseInt(e.target.value) || 15 }))}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-orange-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Wait Time (min)</label>
+                        <input
+                          type="number"
+                          min="0"
+                          max="30"
+                          value={planningConfig.waitTimeMinutes}
+                          onChange={(e) => setPlanningConfig(prev => ({ ...prev, waitTimeMinutes: parseInt(e.target.value) || 5 }))}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-orange-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Courts to Use</label>
+                        <input
+                          type="number"
+                          min="1"
+                          max="20"
+                          value={planningConfig.courtCount}
+                          onChange={(e) => setPlanningConfig(prev => ({ ...prev, courtCount: parseInt(e.target.value) || 4 }))}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-orange-500"
+                        />
+                      </div>
+                      <div className="flex items-end">
+                        <div className="p-3 bg-purple-50 rounded-lg w-full">
+                          <div className="text-sm font-medium text-purple-700">
+                            {(() => {
+                              const est = calculateTimeEstimate();
+                              return `${est.matchCount} matches = ~${est.hours}h ${est.minutes}m`;
+                            })()}
+                          </div>
+                          <div className="text-xs text-purple-600">Estimated total time</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Step 3: Court Selection */}
+                <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+                  <div className="px-4 py-3 bg-gray-50 border-b">
+                    <h3 className="font-medium text-gray-900 flex items-center gap-2">
+                      <Grid3X3 className="w-5 h-5 text-green-500" />
+                      Step 3: Court Selection & Start Time
+                    </h3>
+                  </div>
+                  <div className="p-4 space-y-4">
+                    <div className="flex flex-wrap gap-4">
+                      {/* Court selection mode */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Selection Mode</label>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => setPlanningCourtSelection('group')}
+                            className={`px-3 py-2 text-sm rounded-lg border ${
+                              planningCourtSelection === 'group'
+                                ? 'bg-orange-100 border-orange-300 text-orange-700'
+                                : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+                            }`}
+                          >
+                            Court Group
+                          </button>
+                          <button
+                            onClick={() => setPlanningCourtSelection('individual')}
+                            className={`px-3 py-2 text-sm rounded-lg border ${
+                              planningCourtSelection === 'individual'
+                                ? 'bg-orange-100 border-orange-300 text-orange-700'
+                                : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+                            }`}
+                          >
+                            Individual Courts
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Court group selection */}
+                      {planningCourtSelection === 'group' && (
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Court Group</label>
+                          <select
+                            value={selectedCourtGroupForPlanning}
+                            onChange={(e) => setSelectedCourtGroupForPlanning(e.target.value)}
+                            className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-orange-500"
+                          >
+                            <option value="">Select a group...</option>
+                            {planningData.courtGroups?.map(group => (
+                              <option key={group.id} value={group.id}>
+                                {group.groupName} ({group.courtCount} courts)
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+
+                      {/* Individual court selection */}
+                      {planningCourtSelection === 'individual' && (
+                        <div className="flex-1">
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Select Courts</label>
+                          <div className="flex flex-wrap gap-2">
+                            {/* Courts from court groups */}
+                            {planningData.courtGroups?.flatMap(group =>
+                              group.courts?.map(court => (
+                                <button
+                                  key={court.id}
+                                  onClick={() => {
+                                    setSelectedCourtsForPlanning(prev =>
+                                      prev.includes(court.id)
+                                        ? prev.filter(id => id !== court.id)
+                                        : [...prev, court.id]
+                                    );
+                                  }}
+                                  className={`px-3 py-1.5 text-sm rounded-lg border ${
+                                    selectedCourtsForPlanning.includes(court.id)
+                                      ? 'bg-green-100 border-green-300 text-green-700'
+                                      : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+                                  }`}
+                                >
+                                  {court.courtLabel}
+                                </button>
+                              ))
+                            )}
+                            {/* Unassigned courts */}
+                            {planningData.unassignedCourts?.map(court => (
+                              <button
+                                key={court.id}
+                                onClick={() => {
+                                  setSelectedCourtsForPlanning(prev =>
+                                    prev.includes(court.id)
+                                      ? prev.filter(id => id !== court.id)
+                                      : [...prev, court.id]
+                                  );
+                                }}
+                                className={`px-3 py-1.5 text-sm rounded-lg border ${
+                                  selectedCourtsForPlanning.includes(court.id)
+                                    ? 'bg-green-100 border-green-300 text-green-700'
+                                    : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+                                }`}
+                              >
+                                {court.courtLabel}
+                              </button>
+                            ))}
+                          </div>
+                          {(planningData.courtGroups?.flatMap(g => g.courts || []).length || 0) + (planningData.unassignedCourts?.length || 0) === 0 && (
+                            <p className="text-sm text-gray-500 mt-2">No courts configured. Add courts in the Courts tab first.</p>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Start time */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Start Time</label>
+                        <input
+                          type="time"
+                          value={planningStartTime}
+                          onChange={(e) => setPlanningStartTime(e.target.value)}
+                          className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-orange-500"
+                        />
+                      </div>
+
+                      {/* Generate button */}
+                      <div className="flex items-end">
+                        <button
+                          onClick={generateScheduleForSelection}
+                          disabled={!planningStartTime || (planningCourtSelection === 'group' && !selectedCourtGroupForPlanning) ||
+                            (planningCourtSelection === 'individual' && selectedCourtsForPlanning.length === 0)}
+                          className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                        >
+                          <Calendar className="w-4 h-4" />
+                          Generate Schedule
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Selected courts summary */}
+                    {getAvailableCourtsForPlanning().length > 0 && (
+                      <div className="p-3 bg-green-50 rounded-lg">
+                        <div className="text-sm text-green-700">
+                          <span className="font-medium">Selected courts:</span>{' '}
+                          {getAvailableCourtsForPlanning().map(c => c.courtLabel).join(', ')}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Generated Schedule Preview */}
+                {generatedSchedule.length > 0 && (
+                  <div className="bg-white rounded-xl shadow-sm overflow-hidden border-2 border-orange-200">
+                    <div className="px-4 py-3 bg-orange-50 border-b flex items-center justify-between">
+                      <h3 className="font-medium text-orange-800 flex items-center gap-2">
+                        <Calendar className="w-5 h-5" />
+                        Generated Schedule Preview ({generatedSchedule.length} matches)
+                      </h3>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setGeneratedSchedule([])}
+                          className="px-3 py-1.5 text-sm bg-white text-gray-700 rounded-lg hover:bg-gray-100 border"
+                        >
+                          Discard
+                        </button>
+                        <button
+                          onClick={applyGeneratedSchedule}
+                          className="px-3 py-1.5 text-sm bg-orange-600 text-white rounded-lg hover:bg-orange-700"
+                        >
+                          Apply Schedule
+                        </button>
+                      </div>
+                    </div>
+                    <div className="p-4">
+                      {planningErrors.length > 0 && (
+                        <div className="mb-4 p-3 bg-red-50 rounded-lg">
+                          <div className="text-sm font-medium text-red-700 mb-1">Conflicts detected:</div>
+                          {planningErrors.map((err, i) => (
+                            <div key={i} className="text-sm text-red-600">{err}</div>
+                          ))}
+                        </div>
+                      )}
+                      <div className="overflow-x-auto">
+                        <table className="min-w-full divide-y divide-gray-200">
+                          <thead className="bg-gray-50">
+                            <tr>
+                              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Time</th>
+                              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Court</th>
+                              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Match</th>
+                              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Teams</th>
+                              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Actions</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-200">
+                            {generatedSchedule.sort((a, b) => a.scheduledTime - b.scheduledTime).map(slot => (
+                              <tr key={slot.encounterId} className="hover:bg-gray-50">
+                                <td className="px-3 py-2 text-sm font-medium">
+                                  {slot.scheduledTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                </td>
+                                <td className="px-3 py-2 text-sm">
+                                  <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded text-xs font-medium">
+                                    {slot.courtLabel}
+                                  </span>
+                                </td>
+                                <td className="px-3 py-2 text-sm">
+                                  {slot.encounterLabel || `R${slot.roundNumber}`}
+                                  <span className="ml-2 text-xs text-gray-500">{slot.divisionName}</span>
+                                </td>
+                                <td className="px-3 py-2 text-sm">
+                                  {slot.unit1Name && slot.unit2Name ? (
+                                    <>{slot.unit1Name} vs {slot.unit2Name}</>
+                                  ) : (
+                                    <span className="text-gray-500 italic">
+                                      Match {slot.encounterLabel || `#${slot.encounterId}`}
+                                    </span>
+                                  )}
+                                </td>
+                                <td className="px-3 py-2">
+                                  <button
+                                    onClick={() => removeAllocation(slot.encounterId)}
+                                    className="text-red-600 hover:text-red-800"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Visual Timeline */}
+                {courtTimeAllocations.length > 0 && (
+                  <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+                    <div className="px-4 py-3 bg-gray-50 border-b flex items-center justify-between">
+                      <h3 className="font-medium text-gray-900 flex items-center gap-2">
+                        <LayoutGrid className="w-5 h-5 text-indigo-500" />
+                        Court Timeline ({courtTimeAllocations.length} scheduled)
+                      </h3>
+                      {courtTimeAllocations.some(a => a.isNew) && (
+                        <span className="text-sm text-orange-600">
+                          {courtTimeAllocations.filter(a => a.isNew).length} unsaved changes
+                        </span>
+                      )}
+                    </div>
+                    <div className="p-4 overflow-x-auto">
+                      {(() => {
+                        // Get unique courts and time range
+                        const courts = [...new Set(courtTimeAllocations.map(a => a.courtId))]
+                          .map(courtId => {
+                            const alloc = courtTimeAllocations.find(a => a.courtId === courtId);
+                            return { id: courtId, label: alloc?.courtLabel || `Court ${courtId}` };
+                          });
+
+                        const allTimes = courtTimeAllocations.flatMap(a => [a.scheduledTime.getTime(), a.endTime.getTime()]);
+                        const minTime = Math.min(...allTimes);
+                        const maxTime = Math.max(...allTimes);
+                        const totalMinutes = (maxTime - minTime) / 60000;
+                        const pixelsPerMinute = 4;
+
+                        // Generate time markers (every 30 minutes)
+                        const timeMarkers = [];
+                        for (let t = minTime; t <= maxTime; t += 30 * 60000) {
+                          timeMarkers.push(new Date(t));
+                        }
+
+                        return (
+                          <div className="relative" style={{ minWidth: `${totalMinutes * pixelsPerMinute + 120}px` }}>
+                            {/* Time header */}
+                            <div className="flex mb-2 ml-20">
+                              {timeMarkers.map((time, i) => (
+                                <div
+                                  key={i}
+                                  className="text-xs text-gray-500"
+                                  style={{ width: `${30 * pixelsPerMinute}px` }}
+                                >
+                                  {time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                </div>
+                              ))}
+                            </div>
+
+                            {/* Court rows */}
+                            {courts.map(court => (
+                              <div key={court.id} className="flex items-center mb-2">
+                                <div className="w-20 text-sm font-medium text-gray-700 pr-2 flex-shrink-0">
+                                  {court.label}
+                                </div>
+                                <div
+                                  className="relative h-10 bg-gray-100 rounded"
+                                  style={{ width: `${totalMinutes * pixelsPerMinute}px` }}
+                                >
+                                  {/* Time grid lines */}
+                                  {timeMarkers.map((time, i) => (
+                                    <div
+                                      key={i}
+                                      className="absolute top-0 bottom-0 border-l border-gray-200"
+                                      style={{ left: `${((time.getTime() - minTime) / 60000) * pixelsPerMinute}px` }}
+                                    />
+                                  ))}
+
+                                  {/* Allocations for this court */}
+                                  {courtTimeAllocations
+                                    .filter(a => a.courtId === court.id)
+                                    .map(alloc => {
+                                      const left = ((alloc.scheduledTime.getTime() - minTime) / 60000) * pixelsPerMinute;
+                                      const width = ((alloc.endTime.getTime() - alloc.scheduledTime.getTime()) / 60000) * pixelsPerMinute;
+                                      const colors = {
+                                        new: 'bg-orange-200 border-orange-400',
+                                        saved: 'bg-blue-200 border-blue-400',
+                                      };
+                                      const colorClass = alloc.isNew ? colors.new : colors.saved;
+
+                                      const displayText = alloc.unit1Name && alloc.unit2Name
+                                        ? `${alloc.unit1Name?.split(' ')[0]} vs ${alloc.unit2Name?.split(' ')[0]}`
+                                        : `Match ${alloc.encounterLabel || alloc.encounterId}`;
+                                      const tooltipText = alloc.unit1Name && alloc.unit2Name
+                                        ? `${alloc.unit1Name} vs ${alloc.unit2Name}\n${alloc.scheduledTime.toLocaleTimeString()}`
+                                        : `Match ${alloc.encounterLabel || alloc.encounterId}\n${alloc.scheduledTime.toLocaleTimeString()}`;
+
+                                      return (
+                                        <div
+                                          key={alloc.encounterId}
+                                          className={`absolute top-1 bottom-1 rounded border text-xs overflow-hidden ${colorClass}`}
+                                          style={{ left: `${left}px`, width: `${width}px` }}
+                                          title={tooltipText}
+                                        >
+                                          <div className="px-1 truncate font-medium">
+                                            {displayText}
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                </div>
+                              </div>
+                            ))}
+
+                            {/* Legend */}
+                            <div className="flex gap-4 mt-4 text-xs">
+                              <div className="flex items-center gap-1">
+                                <div className="w-4 h-4 bg-orange-200 border border-orange-400 rounded"></div>
+                                <span>New (unsaved)</span>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <div className="w-4 h-4 bg-blue-200 border border-blue-400 rounded"></div>
+                                <span>Saved</span>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  </div>
+                )}
+
+                {/* Scheduled Matches Table */}
+                {courtTimeAllocations.length > 0 && (
+                  <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+                    <div className="px-4 py-3 bg-gray-50 border-b">
+                      <h3 className="font-medium text-gray-900 flex items-center gap-2">
+                        <ClipboardList className="w-5 h-5 text-teal-500" />
+                        Scheduled Matches
+                      </h3>
+                    </div>
+                    <div className="p-4 overflow-x-auto">
+                      <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Time</th>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Court</th>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Division</th>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Teams</th>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Status</th>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-200">
+                          {courtTimeAllocations
+                            .sort((a, b) => a.scheduledTime - b.scheduledTime)
+                            .map(alloc => (
+                              <tr key={alloc.encounterId} className={`hover:bg-gray-50 ${alloc.isNew ? 'bg-orange-50' : ''}`}>
+                                <td className="px-3 py-2 text-sm font-medium">
+                                  {alloc.scheduledTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                </td>
+                                <td className="px-3 py-2 text-sm">
+                                  <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded text-xs font-medium">
+                                    {alloc.courtLabel}
+                                  </span>
+                                </td>
+                                <td className="px-3 py-2 text-sm text-gray-600">{alloc.divisionName}</td>
+                                <td className="px-3 py-2 text-sm">
+                                  {alloc.unit1Name && alloc.unit2Name ? (
+                                    <>{alloc.unit1Name} vs {alloc.unit2Name}</>
+                                  ) : (
+                                    <span className="text-gray-500 italic">
+                                      Match {alloc.encounterLabel || `#${alloc.encounterId}`}
+                                    </span>
+                                  )}
+                                </td>
+                                <td className="px-3 py-2 text-sm">
+                                  {alloc.isNew ? (
+                                    <span className="px-2 py-0.5 bg-orange-100 text-orange-700 rounded text-xs">Unsaved</span>
+                                  ) : (
+                                    <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded text-xs">Saved</span>
+                                  )}
+                                </td>
+                                <td className="px-3 py-2">
+                                  <button
+                                    onClick={() => removeAllocation(alloc.encounterId)}
+                                    className="text-red-600 hover:text-red-800"
+                                    title="Remove from schedule"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                </td>
+                              </tr>
+                            ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        )}
+
         {/* Scoring Tab - merged into Overview, keeping for backwards compatibility */}
         {activeTab === 'scoring' && (
           <div className="space-y-6">
@@ -5759,7 +7054,7 @@ export default function TournamentManage() {
         )}
 
         {/* Game Day Tab */}
-        {activeTab === 'gameday' && (
+        {activeTab === 'gamedayexec' && (
           <div className="space-y-6">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold text-gray-900">Game Day Manager</h2>
@@ -6187,17 +7482,17 @@ export default function TournamentManage() {
                 <div className="border border-gray-200 rounded-lg max-h-48 overflow-y-auto">
                   {playerSearchResults.map(player => (
                     <button
-                      key={player.id}
+                      key={player.userId}
                       onClick={() => {
                         setSelectedPlayerForReg(player);
-                        setPlayerSearchQuery(player.displayName || player.email);
+                        setPlayerSearchQuery(player.name || player.email);
                         setPlayerSearchResults([]);
                       }}
                       className="w-full px-4 py-3 text-left hover:bg-gray-50 flex items-center gap-3 border-b last:border-b-0"
                     >
-                      {player.avatarUrl ? (
+                      {player.profileImageUrl ? (
                         <img
-                          src={getSharedAssetUrl(player.avatarUrl)}
+                          src={getSharedAssetUrl(player.profileImageUrl)}
                           alt=""
                           className="w-8 h-8 rounded-full object-cover"
                         />
@@ -6207,7 +7502,7 @@ export default function TournamentManage() {
                         </div>
                       )}
                       <div>
-                        <div className="font-medium text-gray-900">{player.displayName || 'Unknown'}</div>
+                        <div className="font-medium text-gray-900">{player.name || 'Unknown'}</div>
                         <div className="text-sm text-gray-500">{player.email}</div>
                       </div>
                     </button>
@@ -6220,9 +7515,9 @@ export default function TournamentManage() {
                 <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      {selectedPlayerForReg.avatarUrl ? (
+                      {selectedPlayerForReg.profileImageUrl ? (
                         <img
-                          src={getSharedAssetUrl(selectedPlayerForReg.avatarUrl)}
+                          src={getSharedAssetUrl(selectedPlayerForReg.profileImageUrl)}
                           alt=""
                           className="w-10 h-10 rounded-full object-cover"
                         />
@@ -6232,7 +7527,7 @@ export default function TournamentManage() {
                         </div>
                       )}
                       <div>
-                        <div className="font-medium text-gray-900">{selectedPlayerForReg.displayName || 'Unknown'}</div>
+                        <div className="font-medium text-gray-900">{selectedPlayerForReg.name || 'Unknown'}</div>
                         <div className="text-sm text-gray-500">{selectedPlayerForReg.email}</div>
                       </div>
                     </div>

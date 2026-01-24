@@ -409,7 +409,10 @@ export default function DivisionSchedule() {
         {schedule?.rounds && schedule.rounds.length > 0 && (
           <div className="mb-8 print:mb-4">
             {/* Pool Play Section */}
-            {schedule.rounds.filter(r => r.roundType === 'Pool').length > 0 && (
+            {schedule.rounds.filter(r => r.roundType === 'Pool').length > 0 && (() => {
+              // Calculate encounter sequence number across all pool rounds
+              let encounterSeq = 0;
+              return (
               <div className="mb-8">
                 <h3 className="text-xl font-semibold text-gray-900 mb-4 flex items-center gap-2 print:text-lg">
                   <Calendar className="w-5 h-5 text-orange-500" />
@@ -438,13 +441,14 @@ export default function DivisionSchedule() {
                             {round.matches
                               .filter(m => !m.isBye)
                               .map((match, matchIdx) => {
+                                encounterSeq++;
                                 const unit1Wins = match.winnerUnitId === match.unit1Id;
                                 const unit2Wins = match.winnerUnitId === match.unit2Id;
                                 return (
                                   <tr key={matchIdx} className="hover:bg-gray-50 print:text-xs">
                                     <td className="border border-gray-300 px-3 py-2 text-gray-600 print:px-1 print:py-1">
                                       <div className="flex items-center gap-2">
-                                        <span>{match.matchNumber}</span>
+                                        <span>#{encounterSeq}</span>
                                         <button
                                           onClick={() => handleOpenMatchDetails(match)}
                                           className="p-1 text-gray-400 hover:text-orange-600 hover:bg-orange-50 rounded transition-colors print:hidden"
@@ -462,7 +466,7 @@ export default function DivisionSchedule() {
                                           </span>
                                         )}
                                         <span className={`${unit1Wins ? 'text-green-700 font-semibold' : 'text-gray-900'}`}>
-                                          {match.unit1Name || `Position ${match.unit1Number}`}
+                                          {match.unit1Name || `Unit #${match.unit1Number}`}
                                         </span>
                                       </div>
                                     </td>
@@ -480,7 +484,7 @@ export default function DivisionSchedule() {
                                           </span>
                                         )}
                                         <span className={`${unit2Wins ? 'text-green-700 font-semibold' : 'text-gray-900'}`}>
-                                          {match.unit2Name || `Position ${match.unit2Number}`}
+                                          {match.unit2Name || `Unit #${match.unit2Number}`}
                                         </span>
                                       </div>
                                     </td>
@@ -496,10 +500,17 @@ export default function DivisionSchedule() {
                     </div>
                   ))}
               </div>
-            )}
+              );
+            })()}
 
             {/* Playoff/Bracket Section (includes Bronze Medal/3rd Place matches) */}
-            {schedule.rounds.filter(r => r.roundType === 'Bracket' || r.roundType === 'ThirdPlace').length > 0 && (
+            {schedule.rounds.filter(r => r.roundType === 'Bracket' || r.roundType === 'ThirdPlace').length > 0 && (() => {
+              // Calculate encounter sequence number - continue from pool play count
+              const poolMatchCount = schedule.rounds
+                .filter(r => r.roundType === 'Pool')
+                .reduce((sum, r) => sum + r.matches.filter(m => !m.isBye).length, 0);
+              let playoffSeq = poolMatchCount;
+              return (
               <div className="mb-8">
                 <h3 className="text-xl font-semibold text-gray-900 mb-4 flex items-center gap-2 print:text-lg">
                   <Trophy className="w-5 h-5 text-yellow-500" />
@@ -536,13 +547,15 @@ export default function DivisionSchedule() {
                             </tr>
                           </thead>
                           <tbody>
-                            {round.matches.map((match, matchIdx) => (
+                            {round.matches.map((match, matchIdx) => {
+                              if (!match.isBye) playoffSeq++;
+                              return (
                               <tr
                                 key={matchIdx}
                                 className={`print:text-xs ${match.isBye ? 'bg-gray-100 text-gray-400' : 'hover:bg-yellow-50'}`}
                               >
                                 <td className="border border-gray-300 px-3 py-2 text-gray-600 print:px-1 print:py-1">
-                                  {match.matchNumber}
+                                  {match.isBye ? '—' : `#${playoffSeq}`}
                                 </td>
                                 <td className="border border-gray-300 px-3 py-2 print:px-1 print:py-1">
                                   {match.isBye && !match.unit1Name ? (
@@ -611,14 +624,16 @@ export default function DivisionSchedule() {
                                   )}
                                 </td>
                               </tr>
-                            ))}
+                              );
+                            })}
                           </tbody>
                         </table>
                       </div>
                     </div>
                   ))}
               </div>
-            )}
+              );
+            })()}
 
             {/* Other round types (not Pool, Bracket, or ThirdPlace) */}
             {schedule.rounds.filter(r => r.roundType !== 'Pool' && r.roundType !== 'Bracket' && r.roundType !== 'ThirdPlace').length > 0 && (
@@ -662,7 +677,7 @@ export default function DivisionSchedule() {
                                           {match.unit1Number}
                                         </span>
                                       )}
-                                      <span className="text-gray-900">{match.unit1Name || `Position ${match.unit1Number}`}</span>
+                                      <span className="text-gray-900">{match.unit1Name || `Unit #${match.unit1Number}`}</span>
                                     </div>
                                   </td>
                                   <td className="border border-gray-300 px-3 py-2 text-center text-gray-400 print:px-1 print:py-1">vs</td>
@@ -673,7 +688,7 @@ export default function DivisionSchedule() {
                                           {match.unit2Number}
                                         </span>
                                       )}
-                                      <span className="text-gray-900">{match.unit2Name || `Position ${match.unit2Number}`}</span>
+                                      <span className="text-gray-900">{match.unit2Name || `Unit #${match.unit2Number}`}</span>
                                     </div>
                                   </td>
                                   <td className="border border-gray-300 px-3 py-2 text-center text-gray-600 print:px-1 print:py-1">
@@ -744,7 +759,7 @@ export default function DivisionSchedule() {
                       </span>
                     )}
                     <span className="font-medium text-gray-900">
-                      {selectedMatch.unit1Name || `Position ${selectedMatch.unit1Number}`}
+                      {selectedMatch.unit1Name || `Unit #${selectedMatch.unit1Number}`}
                     </span>
                   </div>
                 </div>
@@ -757,7 +772,7 @@ export default function DivisionSchedule() {
                       </span>
                     )}
                     <span className="font-medium text-gray-900">
-                      {selectedMatch.unit2Name || `Position ${selectedMatch.unit2Number}`}
+                      {selectedMatch.unit2Name || `Unit #${selectedMatch.unit2Number}`}
                     </span>
                   </div>
                 </div>

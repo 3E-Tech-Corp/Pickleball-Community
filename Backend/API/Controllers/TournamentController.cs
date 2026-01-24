@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Data.SqlClient;
 using Pickleball.Community.Database;
 using Pickleball.Community.Models.Constants;
 using Pickleball.Community.Models.Entities;
@@ -3773,6 +3774,7 @@ public class TournamentController : EventControllerBase
             .Include(m => m.Unit1)
             .Include(m => m.Unit2)
             .Include(m => m.Winner)
+            .Include(m => m.TournamentCourt)
             .Include(m => m.Matches).ThenInclude(match => match.Games).ThenInclude(game => game.TournamentCourt)
             .Where(m => m.DivisionId == divisionId)
             .OrderBy(m => m.RoundType)
@@ -3886,13 +3888,19 @@ public class TournamentController : EventControllerBase
             .ToDictionaryAsync(c => c.Id, c => c.CourtLabel);
 
         // Helper to get court label for an encounter
+        // Priority: 1) Encounter-level TournamentCourtId (from planning), 2) Game-level TournamentCourtId
         string? GetCourtLabel(EventEncounter encounter)
         {
+            // Check encounter-level court assignment first (set by court planning)
+            if (encounter.TournamentCourtId.HasValue && courts.TryGetValue(encounter.TournamentCourtId.Value, out var encounterLabel))
+                return encounterLabel;
+
+            // Fallback to game-level court assignment
             var game = encounter.Matches
                 .SelectMany(em => em.Games)
                 .FirstOrDefault(g => g.TournamentCourtId.HasValue);
-            if (game?.TournamentCourtId != null && courts.TryGetValue(game.TournamentCourtId.Value, out var label))
-                return label;
+            if (game?.TournamentCourtId != null && courts.TryGetValue(game.TournamentCourtId.Value, out var gameLabel))
+                return gameLabel;
             return null;
         }
 
@@ -3934,6 +3942,7 @@ public class TournamentController : EventControllerBase
                             ? (m.Unit2Id == null ? m.Unit2SeedLabel : GetSeedInfo(m.Unit2Id))
                             : null,
                         IsBye = (m.Unit1Id == null) != (m.Unit2Id == null), // One but not both is null
+                        CourtId = m.TournamentCourtId,
                         CourtLabel = GetCourtLabel(m),
                         ScheduledTime = m.ScheduledTime,
                         StartedAt = m.StartedAt,
@@ -4483,50 +4492,35 @@ public class TournamentController : EventControllerBase
         if (request.Assignments == null || request.Assignments.Count == 0)
             return BadRequest(new ApiResponse<object> { Success = false, Message = "No assignments provided" });
 
-        var encounterIds = request.Assignments.Select(a => a.EncounterId).ToList();
-        var encounters = await _context.EventEncounters
-            .Where(e => encounterIds.Contains(e.Id) && e.EventId == request.EventId)
-            .ToListAsync();
-
-        if (encounters.Count != encounterIds.Count)
-            return BadRequest(new ApiResponse<object> { Success = false, Message = "Some encounters not found" });
-
-        // Validate courts
-        var courtIds = request.Assignments
-            .Where(a => a.CourtId.HasValue)
-            .Select(a => a.CourtId!.Value)
-            .Distinct()
-            .ToList();
-
-        if (courtIds.Count > 0)
-        {
-            var validCourts = await _context.TournamentCourts
-                .Where(c => courtIds.Contains(c.Id) && c.EventId == request.EventId)
-                .Select(c => c.Id)
-                .ToListAsync();
-
-            if (validCourts.Count != courtIds.Count)
-                return BadRequest(new ApiResponse<object> { Success = false, Message = "Invalid court IDs" });
-        }
-
+        // Use raw SQL to avoid EF Core Contains() CTE syntax issues
         var now = DateTime.Now;
+        var updatedCount = 0;
+
         foreach (var assignment in request.Assignments)
         {
-            var encounter = encounters.First(e => e.Id == assignment.EncounterId);
-            encounter.TournamentCourtId = assignment.CourtId;
-            if (assignment.ScheduledTime.HasValue)
-                encounter.ScheduledTime = assignment.ScheduledTime;
-            if (assignment.EstimatedStartTime.HasValue)
-                encounter.EstimatedStartTime = assignment.EstimatedStartTime;
-            encounter.UpdatedAt = now;
-        }
+            // Update each encounter individually using raw SQL to avoid EF Core query generation issues
+            var sql = @"UPDATE EventEncounters
+                        SET TournamentCourtId = @CourtId,
+                            ScheduledTime = COALESCE(@ScheduledTime, ScheduledTime),
+                            EstimatedStartTime = COALESCE(@EstimatedStartTime, EstimatedStartTime),
+                            UpdatedAt = @UpdatedAt
+                        WHERE Id = @EncounterId AND EventId = @EventId";
 
-        await _context.SaveChangesAsync();
+            var result = await _context.Database.ExecuteSqlRawAsync(sql,
+                new SqlParameter("@CourtId", (object?)assignment.CourtId ?? DBNull.Value),
+                new SqlParameter("@ScheduledTime", (object?)assignment.ScheduledTime ?? DBNull.Value),
+                new SqlParameter("@EstimatedStartTime", (object?)assignment.EstimatedStartTime ?? DBNull.Value),
+                new SqlParameter("@UpdatedAt", now),
+                new SqlParameter("@EncounterId", assignment.EncounterId),
+                new SqlParameter("@EventId", request.EventId));
+
+            updatedCount += result;
+        }
 
         return Ok(new ApiResponse<object>
         {
             Success = true,
-            Message = $"{request.Assignments.Count} encounters updated"
+            Message = $"{updatedCount} encounters updated"
         });
     }
 
@@ -7886,6 +7880,13 @@ public class TournamentController : EventControllerBase
             foreach (var encounter in encounters)
             {
                 encounter.WinnerUnitId = null;
+                encounter.Status = "Scheduled";
+                encounter.StartedAt = null;
+                encounter.CompletedAt = null;
+                // Reset court planning assignments
+                encounter.TournamentCourtId = null;
+                encounter.ScheduledTime = null;
+                encounter.EstimatedStartTime = null;
                 encounter.UpdatedAt = DateTime.Now;
 
                 // For playoff rounds (bracket), reset unit assignments since they depend on pool rankings

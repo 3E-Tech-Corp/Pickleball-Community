@@ -272,11 +272,11 @@ export default function LeagueDetail() {
 
     setUploadingDocument(true);
     try {
-      const response = await sharedAssetApi.upload(file, 'document', 'league-document');
-      if (response.data?.url) {
+      const response = await sharedAssetApi.uploadViaProxy(file, 'document', 'league-document');
+      if (response.success && response.url) {
         setDocumentData(prev => ({
           ...prev,
-          fileUrl: response.data.url,
+          fileUrl: response.url,
           fileName: file.name,
           fileType: file.type,
           fileSize: file.size
@@ -442,13 +442,13 @@ export default function LeagueDetail() {
     try {
       // Upload file to shared asset service
       const assetType = sharedAssetApi.getAssetType(file);
-      const uploadRes = await sharedAssetApi.upload(file, assetType, 'grant-attachment');
+      const uploadRes = await sharedAssetApi.uploadViaProxy(file, assetType, 'grant-attachment');
 
-      if (uploadRes.data?.url) {
+      if (uploadRes.success && uploadRes.url) {
         // Add attachment to transaction
         const attachmentData = {
           fileName: file.name,
-          fileUrl: uploadRes.data.url,
+          fileUrl: uploadRes.url,
           fileType: file.type,
           fileSize: file.size,
           description: attachmentDescription || null
