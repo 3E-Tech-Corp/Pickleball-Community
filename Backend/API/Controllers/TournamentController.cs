@@ -1450,8 +1450,11 @@ public class TournamentController : EventControllerBase
 
     /// <summary>
     /// Unregister from a division - allows player to withdraw their registration
-    /// For singles/solo: deletes the unit entirely
-    /// For captain of team: deletes entire unit (team withdraws)
+    /// Uses stored procedure to handle complex cleanup logic:
+    /// - Removes join requests
+    /// - Removes unit members
+    /// - Removes unit if user was alone or captain
+    /// - Cleans up waiver records
     /// </summary>
     [Authorize]
     [HttpDelete("events/{eventId}/divisions/{divisionId}/unregister")]
@@ -1461,43 +1464,44 @@ public class TournamentController : EventControllerBase
         if (!userId.HasValue)
             return Unauthorized(new ApiResponse<bool> { Success = false, Message = "Unauthorized" });
 
-        // Find user's unit in this division
-        var membership = await _context.EventUnitMembers
-            .Include(m => m.Unit)
-            .ThenInclude(u => u!.Members)
-            .FirstOrDefaultAsync(m => m.UserId == userId.Value
-                && m.Unit!.EventId == eventId
-                && m.Unit.DivisionId == divisionId
-                && m.Unit.Status != "Cancelled");
-
-        if (membership?.Unit == null)
-            return NotFound(new ApiResponse<bool> { Success = false, Message = "You are not registered for this division" });
-
-        var unit = membership.Unit;
-
-        // Check if tournament has started (matches scheduled)
-        var hasScheduledMatches = await _context.EventEncounters
-            .AnyAsync(m => m.DivisionId == divisionId && (m.Unit1Id == unit.Id || m.Unit2Id == unit.Id) && m.Status != "Cancelled");
-
-        if (hasScheduledMatches)
-            return BadRequest(new ApiResponse<bool> { Success = false, Message = "Cannot unregister after tournament schedule has been created. Contact the organizer." });
-
-        // If user is captain or solo player, delete the entire unit
-        if (unit.CaptainUserId == userId.Value || unit.Members.Count == 1)
+        try
         {
-            // Remove all members first
-            _context.EventUnitMembers.RemoveRange(unit.Members);
-            _context.EventUnits.Remove(unit);
+            // Use stored procedure for complex unregister logic
+            var successParam = new Microsoft.Data.SqlClient.SqlParameter("@Success", System.Data.SqlDbType.Bit) { Direction = System.Data.ParameterDirection.Output };
+            var messageParam = new Microsoft.Data.SqlClient.SqlParameter("@Message", System.Data.SqlDbType.NVarChar, 500) { Direction = System.Data.ParameterDirection.Output };
+
+            await _context.Database.ExecuteSqlRawAsync(
+                "EXEC sp_UnregisterFromDivision @EventId, @DivisionId, @UserId, @Success OUTPUT, @Message OUTPUT",
+                new Microsoft.Data.SqlClient.SqlParameter("@EventId", eventId),
+                new Microsoft.Data.SqlClient.SqlParameter("@DivisionId", divisionId),
+                new Microsoft.Data.SqlClient.SqlParameter("@UserId", userId.Value),
+                successParam,
+                messageParam
+            );
+
+            var success = (bool)successParam.Value;
+            var message = (string)messageParam.Value;
+
+            if (success)
+            {
+                return Ok(new ApiResponse<bool> { Success = true, Data = true, Message = message });
+            }
+            else
+            {
+                // Determine appropriate status code based on message
+                if (message.Contains("not registered"))
+                    return NotFound(new ApiResponse<bool> { Success = false, Message = message });
+                else if (message.Contains("Cannot unregister"))
+                    return BadRequest(new ApiResponse<bool> { Success = false, Message = message });
+                else
+                    return BadRequest(new ApiResponse<bool> { Success = false, Message = message });
+            }
         }
-        else
+        catch (Exception ex)
         {
-            // Just remove this member
-            _context.EventUnitMembers.Remove(membership);
+            _logger.LogError(ex, "Error unregistering user {UserId} from division {DivisionId} in event {EventId}", userId, divisionId, eventId);
+            return StatusCode(500, new ApiResponse<bool> { Success = false, Message = "An error occurred while unregistering" });
         }
-
-        await _context.SaveChangesAsync();
-
-        return Ok(new ApiResponse<bool> { Success = true, Data = true, Message = "Successfully unregistered from division" });
     }
 
     /// <summary>
