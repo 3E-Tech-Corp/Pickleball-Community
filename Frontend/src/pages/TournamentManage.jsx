@@ -2304,7 +2304,7 @@ export default function TournamentManage() {
                 [
                   { key: 'schedule', label: 'Schedule' },
                   { key: 'overview', label: 'Overview' },
-                  { key: 'backup', label: 'Backup' },
+                  { key: 'checkin', label: 'Check-in' },
                   { key: 'scoring', label: 'Scoring' },
                   { key: 'gamedayexec', label: 'Game Day' }
                 ].map(tab => (
@@ -2312,6 +2312,9 @@ export default function TournamentManage() {
                     key={tab.key}
                     onClick={() => {
                       setActiveTab(tab.key);
+                      if (tab.key === 'checkin' && !checkInData) {
+                        loadCheckIns();
+                      }
                     }}
                     className={`px-4 py-3 font-medium text-sm border-b-2 transition-colors whitespace-nowrap ${
                       activeTab === tab.key
@@ -4737,8 +4740,8 @@ export default function TournamentManage() {
           </div>
         )}
 
-        {/* Backup Tab - Check-in Management */}
-        {activeTab === 'backup' && (
+        {/* Check-in Tab - Player Check-in Management */}
+        {activeTab === 'checkin' && (
           <div className="space-y-6">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold text-gray-900">Player Check-in & Status</h2>
