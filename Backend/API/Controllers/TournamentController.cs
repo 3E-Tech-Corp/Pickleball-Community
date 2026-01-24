@@ -543,7 +543,7 @@ public class TournamentController : EventControllerBase
                     $"{user.FirstName} {user.LastName}".Trim(),
                     evt.Name ?? "Event",
                     division?.Name ?? "Division",
-                    evt.StartDate ?? DateTime.Now,
+                    evt.StartDate,
                     evt.VenueName,
                     unit.Name,
                     feeAmount,
