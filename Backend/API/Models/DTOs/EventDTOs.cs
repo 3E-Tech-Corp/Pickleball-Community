@@ -802,6 +802,7 @@ public class DeclineStaffRequest
 public class CreateEventStaffDto
 {
     public int UserId { get; set; }
+    public string? Email { get; set; } // Alternative to UserId - look up user by email
     public int? RoleId { get; set; }
     public string Status { get; set; } = "Active";
     public int Priority { get; set; } = 0;
