@@ -18,19 +18,22 @@ public class ClubsController : ControllerBase
     private readonly INotificationService _notificationService;
     private readonly IActivityAwardService _activityAwardService;
     private readonly IEmailNotificationService _emailService;
+    private readonly IGeocodingService _geocodingService;
 
     public ClubsController(
         ApplicationDbContext context,
         ILogger<ClubsController> logger,
         INotificationService notificationService,
         IActivityAwardService activityAwardService,
-        IEmailNotificationService emailService)
+        IEmailNotificationService emailService,
+        IGeocodingService geocodingService)
     {
         _context = context;
         _logger = logger;
         _notificationService = notificationService;
         _activityAwardService = activityAwardService;
         _emailService = emailService;
+        _geocodingService = geocodingService;
     }
 
     private int? GetCurrentUserId()
@@ -244,6 +247,10 @@ public class ClubsController : ControllerBase
                 };
             }).ToList();
 
+            // Geocode clubs without coordinates (no home venue and no stored coords)
+            // Do this asynchronously and save to DB for future loads
+            _ = GeocodeClubsWithoutCoordsAsync(pagedClubs, clubDtos);
+
             return Ok(new ApiResponse<PagedResult<ClubDto>>
             {
                 Success = true,
@@ -260,6 +267,59 @@ public class ClubsController : ControllerBase
         {
             _logger.LogError(ex, "Error searching clubs");
             return StatusCode(500, new ApiResponse<PagedResult<ClubDto>> { Success = false, Message = "An error occurred" });
+        }
+    }
+
+    // Helper: Geocode clubs without coordinates and save to DB (fire-and-forget)
+    private async Task GeocodeClubsWithoutCoordsAsync(
+        List<(Club club, Venue? homeVenue, int memberCount, double? distance)> pagedClubs,
+        List<ClubDto> clubDtos)
+    {
+        try
+        {
+            foreach (var (club, homeVenue, _, _) in pagedClubs)
+            {
+                // Skip if already has coordinates
+                if (club.Latitude.HasValue && club.Longitude.HasValue)
+                    continue;
+
+                // Skip if home venue provides coordinates
+                if (homeVenue != null && !string.IsNullOrEmpty(homeVenue.GpsLat) && !string.IsNullOrEmpty(homeVenue.GpsLng))
+                    continue;
+
+                // Skip if no address info
+                if (string.IsNullOrWhiteSpace(club.City) && string.IsNullOrWhiteSpace(club.State))
+                    continue;
+
+                // Geocode the address
+                var coords = await _geocodingService.GeocodeAddressAsync(club.City, club.State, club.Country);
+                if (coords.HasValue)
+                {
+                    // Update the DTO for immediate response
+                    var dto = clubDtos.FirstOrDefault(d => d.Id == club.Id);
+                    if (dto != null)
+                    {
+                        dto.Latitude = coords.Value.Latitude;
+                        dto.Longitude = coords.Value.Longitude;
+                    }
+
+                    // Save to database for future loads
+                    var dbClub = await _context.Clubs.FindAsync(club.Id);
+                    if (dbClub != null && !dbClub.Latitude.HasValue && !dbClub.Longitude.HasValue)
+                    {
+                        dbClub.Latitude = coords.Value.Latitude;
+                        dbClub.Longitude = coords.Value.Longitude;
+                        dbClub.UpdatedAt = DateTime.Now;
+                        await _context.SaveChangesAsync();
+                        _logger.LogInformation("Geocoded and saved coordinates for club {ClubId}: {Lat}, {Lng}",
+                            club.Id, coords.Value.Latitude, coords.Value.Longitude);
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Error geocoding clubs in background");
         }
     }
 
