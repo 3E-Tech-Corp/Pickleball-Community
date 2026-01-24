@@ -169,6 +169,8 @@ export default function VenueMap({
         const isUserInteraction = !isProgrammaticMove;
         if (isUserInteraction) {
           userHasInteractedRef.current = true;
+          // Also mark initial fit as done to prevent any future fitBounds
+          initialFitDoneRef.current = true;
         }
         onBoundsChangeRef.current({
           minLat: bounds.getSouth(),
