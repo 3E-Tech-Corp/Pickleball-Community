@@ -523,40 +523,50 @@ public class TournamentController : EventControllerBase
             .ToListAsync();
         var units = allUnits.Where(u => unitIdsSet.Contains(u.Id)).ToList();
 
-        // Send registration confirmation email
+        // Send registration confirmation email immediately
+        // Email will include status of waiver and payment (pending if not yet completed)
         try
         {
-            if (!string.IsNullOrEmpty(user.Email) && units.Any())
+            foreach (var unit in units)
             {
-                var firstUnit = units.First();
-                var division = firstUnit.Division;
-                var feeAmount = division?.DivisionFee
-                    ?? (evt.PerDivisionFee != 0 ? evt.PerDivisionFee : evt.RegistrationFee);
+                var division = evt.Divisions.FirstOrDefault(d => d.Id == unit.DivisionId);
+                var feeAmount = division?.DivisionFee ?? 0;
+
+                // Check if there are waivers for this event
+                var waiverCount = await _context.ObjectAssets
+                    .Include(a => a.AssetType)
+                    .CountAsync(a => a.ObjectId == eventId
+                        && a.AssetType != null
+                        && a.AssetType.TypeName.ToLower() == "waiver");
 
                 var emailBody = EmailTemplates.EventRegistrationConfirmation(
                     $"{user.FirstName} {user.LastName}".Trim(),
-                    evt.Name,
-                    division?.Name ?? "Unknown Division",
+                    evt.Name ?? "Event",
+                    division?.Name ?? "Division",
                     evt.StartDate,
                     evt.VenueName,
-                    firstUnit.Name,
+                    unit.Name,
                     feeAmount,
-                    waiverSigned: false, // Not yet signed at registration time
-                    paymentComplete: false // Not yet paid at registration time
+                    waiverSigned: waiverCount == 0, // No waivers = considered signed
+                    paymentComplete: feeAmount == 0 // No fee = considered paid
                 );
+
+                var subject = feeAmount == 0 && waiverCount == 0
+                    ? $"Registration Complete: {evt.Name}"
+                    : $"Registration Received: {evt.Name}";
 
                 await _emailService.SendSimpleAsync(
                     userId.Value,
-                    user.Email,
-                    $"Registration Confirmed: {evt.Name}",
+                    user.Email!,
+                    subject,
                     emailBody
                 );
             }
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Failed to send registration confirmation email to user {UserId}", userId);
-            // Don't fail the registration if email fails
+            _logger.LogWarning(ex, "Failed to send registration email for user {UserId}", userId);
+            // Don't fail registration if email fails
         }
 
         return Ok(new ApiResponse<List<EventUnitDto>>
@@ -1450,8 +1460,11 @@ public class TournamentController : EventControllerBase
 
     /// <summary>
     /// Unregister from a division - allows player to withdraw their registration
-    /// For singles/solo: deletes the unit entirely
-    /// For captain of team: deletes entire unit (team withdraws)
+    /// Uses stored procedure to handle complex cleanup logic:
+    /// - Removes join requests
+    /// - Removes unit members
+    /// - Removes unit if user was alone or captain
+    /// - Cleans up waiver records
     /// </summary>
     [Authorize]
     [HttpDelete("events/{eventId}/divisions/{divisionId}/unregister")]
@@ -1461,43 +1474,44 @@ public class TournamentController : EventControllerBase
         if (!userId.HasValue)
             return Unauthorized(new ApiResponse<bool> { Success = false, Message = "Unauthorized" });
 
-        // Find user's unit in this division
-        var membership = await _context.EventUnitMembers
-            .Include(m => m.Unit)
-            .ThenInclude(u => u!.Members)
-            .FirstOrDefaultAsync(m => m.UserId == userId.Value
-                && m.Unit!.EventId == eventId
-                && m.Unit.DivisionId == divisionId
-                && m.Unit.Status != "Cancelled");
-
-        if (membership?.Unit == null)
-            return NotFound(new ApiResponse<bool> { Success = false, Message = "You are not registered for this division" });
-
-        var unit = membership.Unit;
-
-        // Check if tournament has started (matches scheduled)
-        var hasScheduledMatches = await _context.EventEncounters
-            .AnyAsync(m => m.DivisionId == divisionId && (m.Unit1Id == unit.Id || m.Unit2Id == unit.Id) && m.Status != "Cancelled");
-
-        if (hasScheduledMatches)
-            return BadRequest(new ApiResponse<bool> { Success = false, Message = "Cannot unregister after tournament schedule has been created. Contact the organizer." });
-
-        // If user is captain or solo player, delete the entire unit
-        if (unit.CaptainUserId == userId.Value || unit.Members.Count == 1)
+        try
         {
-            // Remove all members first
-            _context.EventUnitMembers.RemoveRange(unit.Members);
-            _context.EventUnits.Remove(unit);
+            // Use stored procedure for complex unregister logic
+            var successParam = new Microsoft.Data.SqlClient.SqlParameter("@Success", System.Data.SqlDbType.Bit) { Direction = System.Data.ParameterDirection.Output };
+            var messageParam = new Microsoft.Data.SqlClient.SqlParameter("@Message", System.Data.SqlDbType.NVarChar, 500) { Direction = System.Data.ParameterDirection.Output };
+
+            await _context.Database.ExecuteSqlRawAsync(
+                "EXEC sp_UnregisterFromDivision @EventId, @DivisionId, @UserId, @Success OUTPUT, @Message OUTPUT",
+                new Microsoft.Data.SqlClient.SqlParameter("@EventId", eventId),
+                new Microsoft.Data.SqlClient.SqlParameter("@DivisionId", divisionId),
+                new Microsoft.Data.SqlClient.SqlParameter("@UserId", userId.Value),
+                successParam,
+                messageParam
+            );
+
+            var success = (bool)successParam.Value;
+            var message = (string)messageParam.Value;
+
+            if (success)
+            {
+                return Ok(new ApiResponse<bool> { Success = true, Data = true, Message = message });
+            }
+            else
+            {
+                // Determine appropriate status code based on message
+                if (message.Contains("not registered"))
+                    return NotFound(new ApiResponse<bool> { Success = false, Message = message });
+                else if (message.Contains("Cannot unregister"))
+                    return BadRequest(new ApiResponse<bool> { Success = false, Message = message });
+                else
+                    return BadRequest(new ApiResponse<bool> { Success = false, Message = message });
+            }
         }
-        else
+        catch (Exception ex)
         {
-            // Just remove this member
-            _context.EventUnitMembers.Remove(membership);
+            _logger.LogError(ex, "Error unregistering user {UserId} from division {DivisionId} in event {EventId}", userId, divisionId, eventId);
+            return StatusCode(500, new ApiResponse<bool> { Success = false, Message = "An error occurred while unregistering" });
         }
-
-        await _context.SaveChangesAsync();
-
-        return Ok(new ApiResponse<bool> { Success = true, Data = true, Message = "Successfully unregistered from division" });
     }
 
     /// <summary>
@@ -1809,6 +1823,57 @@ public class TournamentController : EventControllerBase
 
         unit.UpdatedAt = DateTime.Now;
         await _context.SaveChangesAsync();
+
+        // Check if registration is now complete (waiver signed AND payment submitted)
+        // Send registration complete email if so
+        try
+        {
+            var payingMember = membersToPayFor.FirstOrDefault(m => m.UserId == userId.Value) ?? membersToPayFor.First();
+            var payingUser = await _context.Users.FindAsync(payingMember.UserId);
+
+            if (payingUser?.Email != null)
+            {
+                // Check if waiver is signed (check ObjectAssets for waivers)
+                var waiverCount = await _context.ObjectAssets
+                    .Include(a => a.AssetType)
+                    .CountAsync(a => a.ObjectId == eventId
+                        && a.AssetType != null
+                        && a.AssetType.TypeName.ToLower() == "waiver");
+
+                var signedWaiverCount = await _context.EventUnitMemberWaivers
+                    .CountAsync(w => w.EventUnitMemberId == payingMember.Id);
+
+                var allWaiversSigned = waiverCount == 0 || signedWaiverCount >= waiverCount;
+
+                if (allWaiversSigned)
+                {
+                    // Both waiver and payment complete - send registration complete email
+                    var playerName = $"{payingUser.FirstName} {payingUser.LastName}".Trim();
+                    var emailBody = EmailTemplates.EventRegistrationConfirmation(
+                        playerName,
+                        unit.Event?.Name ?? "Event",
+                        unit.Division?.Name ?? "Division",
+                        unit.Event?.StartDate ?? DateTime.Now,
+                        unit.Event?.VenueName,
+                        unit.Name,
+                        amountDue,
+                        waiverSigned: true,
+                        paymentComplete: true
+                    );
+
+                    await _emailService.SendSimpleAsync(
+                        payingMember.UserId,
+                        payingUser.Email,
+                        $"Registration Complete: {unit.Event?.Name}",
+                        emailBody
+                    );
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to send registration complete email after payment for user {UserId}", userId);
+        }
 
         return Ok(new ApiResponse<PaymentInfoDto>
         {
@@ -3146,7 +3211,16 @@ public class TournamentController : EventControllerBase
                 Role = m.Role,
                 InviteStatus = m.InviteStatus,
                 IsCheckedIn = m.IsCheckedIn,
-                CheckedInAt = m.CheckedInAt
+                CheckedInAt = m.CheckedInAt,
+                WaiverSigned = m.WaiverSignedAt.HasValue,
+                WaiverSignedAt = m.WaiverSignedAt,
+                HasPaid = m.HasPaid,
+                PaidAt = m.PaidAt,
+                AmountPaid = m.AmountPaid,
+                PaymentProofUrl = m.PaymentProofUrl,
+                PaymentReference = m.PaymentReference,
+                ReferenceId = m.ReferenceId,
+                PaymentMethod = m.PaymentMethod
             }).ToList() ?? new List<EventUnitMemberDto>()
         };
     }
@@ -5649,7 +5723,9 @@ public class TournamentController : EventControllerBase
     public async Task<ActionResult<ApiResponse<TournamentDashboardDto>>> GetTournamentDashboard(int eventId)
     {
         var evt = await _context.Events
-            .Include(e => e.Divisions)
+            .Include(e => e.Divisions).ThenInclude(d => d.TeamUnit)
+            .Include(e => e.Divisions).ThenInclude(d => d.SkillLevel)
+            .Include(e => e.Divisions).ThenInclude(d => d.AgeGroupEntity)
             .FirstOrDefaultAsync(e => e.Id == eventId);
 
         if (evt == null)
@@ -5738,8 +5814,16 @@ public class TournamentController : EventControllerBase
             {
                 Id = d.Id,
                 Name = d.Name,
+                Description = d.Description,
                 TeamUnitId = d.TeamUnitId,
+                TeamUnitName = d.TeamUnit?.Name,
+                SkillLevelId = d.SkillLevelId,
+                SkillLevelName = d.SkillLevel?.Name,
+                AgeGroupId = d.AgeGroupId,
+                AgeGroupName = d.AgeGroupEntity?.Name,
                 MaxUnits = d.MaxUnits ?? 0,
+                MaxPlayers = d.MaxPlayers,
+                DivisionFee = d.DivisionFee,
                 IsActive = d.IsActive,
                 RegisteredUnits = units.Count(u => u.DivisionId == d.Id && u.Status != "Cancelled"),
                 WaitlistedUnits = units.Count(u => u.DivisionId == d.Id && u.Status == "Waitlisted"),
@@ -5898,6 +5982,9 @@ public class TournamentController : EventControllerBase
                     IsCheckedIn = m.IsCheckedIn,
                     CheckedInAt = m.CheckedInAt,
                     JoinRequestId = null,
+                    // Waiver status
+                    WaiverSigned = m.WaiverSignedAt.HasValue,
+                    WaiverSignedAt = m.WaiverSignedAt,
                     // Member-level payment info
                     HasPaid = m.HasPaid,
                     PaidAt = m.PaidAt,
@@ -9194,6 +9281,92 @@ public class TournamentController : EventControllerBase
     }
 
     #endregion
+
+    // ============================================
+    // Registration Validation
+    // ============================================
+
+    /// <summary>
+    /// Validate all registrations for an event and return issues found
+    /// </summary>
+    [Authorize]
+    [HttpGet("events/{eventId}/validate-registrations")]
+    public async Task<ActionResult<ApiResponse<RegistrationValidationResultDto>>> ValidateRegistrations(int eventId)
+    {
+        if (!await CanManageEventAsync(eventId))
+            return Forbid();
+
+        var result = new RegistrationValidationResultDto
+        {
+            Summary = new List<ValidationSummaryItem>(),
+            Issues = new List<ValidationIssue>()
+        };
+
+        try
+        {
+            using var connection = _context.Database.GetDbConnection();
+            await connection.OpenAsync();
+
+            using var command = connection.CreateCommand();
+            command.CommandText = "EXEC sp_ValidateEventRegistrations @EventId";
+            var param = command.CreateParameter();
+            param.ParameterName = "@EventId";
+            param.Value = eventId;
+            command.Parameters.Add(param);
+
+            using var reader = await command.ExecuteReaderAsync();
+
+            // First result set: summary
+            while (await reader.ReadAsync())
+            {
+                result.Summary.Add(new ValidationSummaryItem
+                {
+                    Category = reader.GetString(0),
+                    Severity = reader.GetString(1),
+                    IssueCount = reader.GetInt32(2)
+                });
+            }
+
+            // Second result set: issues
+            if (await reader.NextResultAsync())
+            {
+                while (await reader.ReadAsync())
+                {
+                    result.Issues.Add(new ValidationIssue
+                    {
+                        Category = reader.GetString(0),
+                        Severity = reader.GetString(1),
+                        DivisionId = reader.IsDBNull(2) ? null : reader.GetInt32(2),
+                        DivisionName = reader.IsDBNull(3) ? null : reader.GetString(3),
+                        UnitId = reader.IsDBNull(4) ? null : reader.GetInt32(4),
+                        UnitName = reader.IsDBNull(5) ? null : reader.GetString(5),
+                        UserId = reader.IsDBNull(6) ? null : reader.GetInt32(6),
+                        UserName = reader.IsDBNull(7) ? null : reader.GetString(7),
+                        Message = reader.GetString(8)
+                    });
+                }
+            }
+
+            result.TotalErrors = result.Summary.Where(s => s.Severity == "Error").Sum(s => s.IssueCount);
+            result.TotalWarnings = result.Summary.Where(s => s.Severity == "Warning").Sum(s => s.IssueCount);
+            result.TotalInfo = result.Summary.Where(s => s.Severity == "Info").Sum(s => s.IssueCount);
+
+            return Ok(new ApiResponse<RegistrationValidationResultDto>
+            {
+                Success = true,
+                Data = result
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to validate registrations for event {EventId}", eventId);
+            return StatusCode(500, new ApiResponse<RegistrationValidationResultDto>
+            {
+                Success = false,
+                Message = "Failed to validate registrations: " + ex.Message
+            });
+        }
+    }
 }
 
 // DTOs for join code feature

@@ -1498,6 +1498,10 @@ export const tournamentApi = {
   adminBreakUnit: (unitId) =>
     api.post(`/tournament/units/${unitId}/admin-break`),
 
+  // Registration Validation
+  validateRegistrations: (eventId) =>
+    api.get(`/tournament/events/${eventId}/validate-registrations`),
+
   // Admin User Search and Registration
   searchUsersForRegistration: (eventId, query) =>
     api.get(`/tournament/events/${eventId}/search-users?query=${encodeURIComponent(query)}`),

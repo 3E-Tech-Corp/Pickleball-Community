@@ -11,7 +11,7 @@ export default defineConfig({
     'import.meta.env.VITE_BUILD_TIME': JSON.stringify(Date.now().toString())
   },
   plugins: [
-    VitePWA({
+    process.env.SKIP_PWA !== 'true' && VitePWA({
       registerType: "autoUpdate",
       // Enable service worker in development for push notification testing
       devOptions: {
@@ -49,7 +49,7 @@ export default defineConfig({
       }
     }),
     react(),
-  ],
+  ].filter(Boolean),
   resolve: {
     alias: {
       "@": fileURLToPath(new URL("./src", import.meta.url)),

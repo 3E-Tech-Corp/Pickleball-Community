@@ -99,6 +99,10 @@ export default function EventRegistration() {
   const [loadingWaivers, setLoadingWaivers] = useState(false);
   const waiverContentRef = useRef(null);
 
+  // Cancel registration state
+  const [cancellingRegistration, setCancellingRegistration] = useState(false);
+  const [cancelConfirmModal, setCancelConfirmModal] = useState({ isOpen: false, division: null, unit: null });
+
   // Load event data
   useEffect(() => {
     const loadData = async () => {
@@ -792,6 +796,30 @@ export default function EventRegistration() {
     }
   };
 
+  // Handle cancel registration
+  const handleCancelRegistration = async () => {
+    const { division, unit } = cancelConfirmModal;
+    if (!division) return;
+
+    setCancellingRegistration(true);
+    try {
+      const response = await tournamentApi.unregisterFromDivision(eventId, division.id);
+      if (response.success) {
+        toast.success(`Successfully cancelled registration for ${division.name}`);
+        // Remove from local state
+        setUserRegistrations(prev => prev.filter(u => u.divisionId !== division.id));
+        setCancelConfirmModal({ isOpen: false, division: null, unit: null });
+      } else {
+        toast.error(response.message || 'Failed to cancel registration');
+      }
+    } catch (err) {
+      console.error('Error cancelling registration:', err);
+      toast.error(err?.response?.data?.message || 'Failed to cancel registration');
+    } finally {
+      setCancellingRegistration(false);
+    }
+  };
+
   // Handle join by code
   const handleJoinByCode = async () => {
     if (!joinCodeInput.trim()) {
@@ -1310,11 +1338,56 @@ export default function EventRegistration() {
                             <div className="flex-1">
                               <div className="flex items-center gap-2 mb-1">
                                 <h3 className="font-semibold text-gray-900">{division.name}</h3>
-                                {isRegistered && (
-                                  <span className="px-2 py-0.5 bg-green-100 text-green-700 text-xs font-medium rounded-full flex items-center gap-1">
-                                    <Check className="w-3 h-3" /> Registered
-                                  </span>
-                                )}
+                                {isRegistered && (() => {
+                                  const unit = userRegistrations.find(u => u.divisionId === division.id);
+                                  const myMember = unit?.members?.find(m => m.userId === user?.id);
+                                  const waiverSigned = myMember?.waiverSigned || myMember?.waiverSignedAt;
+                                  const hasPaid = myMember?.hasPaid;
+                                  const feeAmount = division.divisionFee || event.perDivisionFee || event.registrationFee || 0;
+                                  const needsWaiver = !waiverSigned;
+                                  const needsPayment = feeAmount > 0 && !hasPaid;
+                                  const isIncomplete = needsWaiver || needsPayment;
+
+                                  return (
+                                    <>
+                                      <span className={`px-2 py-0.5 ${isIncomplete ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700'} text-xs font-medium rounded-full flex items-center gap-1`}>
+                                        <Check className="w-3 h-3" /> {isIncomplete ? 'Incomplete' : 'Registered'}
+                                      </span>
+                                      {isIncomplete && (
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            // Set up state to continue registration
+                                            setSelectedDivision(division);
+                                            setRegistrationResult({ unitId: unit.id, joinCode: unit.joinCode });
+                                            // Load unit members for payment step
+                                            const acceptedMembers = unit.members?.filter(m => m.inviteStatus === 'Accepted') || [];
+                                            setUnitMembers(acceptedMembers);
+                                            // Jump to appropriate step
+                                            if (needsWaiver) {
+                                              loadWaivers();
+                                              setCurrentStep(4);
+                                            } else if (needsPayment) {
+                                              setCurrentStep(5);
+                                            }
+                                          }}
+                                          className="px-3 py-1 bg-orange-500 text-white text-sm font-semibold rounded-lg hover:bg-orange-600 transition-colors shadow-sm"
+                                        >
+                                          Continue
+                                        </button>
+                                      )}
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setCancelConfirmModal({ isOpen: true, division, unit });
+                                        }}
+                                        className="px-3 py-1 bg-red-500 text-white text-sm font-semibold rounded-lg hover:bg-red-600 transition-colors shadow-sm"
+                                      >
+                                        Cancel
+                                      </button>
+                                    </>
+                                  );
+                                })()}
                                 {isFull && !isRegistered && (
                                   <span className="px-2 py-0.5 bg-red-100 text-red-700 text-xs font-medium rounded-full">
                                     Full
@@ -1338,6 +1411,33 @@ export default function EventRegistration() {
                                   </span>
                                 )}
                               </div>
+                              {/* Show pending items for incomplete registrations */}
+                              {isRegistered && (() => {
+                                const unit = userRegistrations.find(u => u.divisionId === division.id);
+                                const myMember = unit?.members?.find(m => m.userId === user?.id);
+                                const waiverSigned = myMember?.waiverSigned || myMember?.waiverSignedAt;
+                                const hasPaid = myMember?.hasPaid;
+                                const feeAmount = division.divisionFee || event.perDivisionFee || event.registrationFee || 0;
+                                const needsWaiver = !waiverSigned;
+                                const needsPayment = feeAmount > 0 && !hasPaid;
+
+                                if (!needsWaiver && !needsPayment) return null;
+
+                                return (
+                                  <div className="flex flex-wrap gap-2 text-xs mt-1">
+                                    {needsWaiver && (
+                                      <span className="px-2 py-0.5 bg-amber-50 text-amber-600 rounded border border-amber-200">
+                                        Waiver pending
+                                      </span>
+                                    )}
+                                    {needsPayment && (
+                                      <span className="px-2 py-0.5 bg-amber-50 text-amber-600 rounded border border-amber-200">
+                                        Payment pending
+                                      </span>
+                                    )}
+                                  </div>
+                                );
+                              })()}
                             </div>
                           </div>
                           <div className="text-right text-sm">
@@ -2390,6 +2490,74 @@ export default function EventRegistration() {
           </div>
         )}
       </div>
+
+      {/* Cancel Registration Confirmation Modal */}
+      {cancelConfirmModal.isOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl max-w-md w-full p-6 shadow-xl">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 bg-red-100 rounded-full">
+                <AlertCircle className="w-6 h-6 text-red-600" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900">Cancel Registration?</h3>
+            </div>
+
+            <div className="space-y-4 mb-6">
+              <p className="text-gray-600">
+                Are you sure you want to cancel your registration for <span className="font-semibold text-gray-900">{cancelConfirmModal.division?.name}</span>?
+              </p>
+
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                <div className="flex gap-2">
+                  <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                  <div className="text-sm text-amber-800">
+                    <p className="font-medium mb-1">Please note:</p>
+                    <ul className="list-disc list-inside space-y-1 text-amber-700">
+                      <li>Your spot will be given up and may be taken by another player</li>
+                      <li>If you have a partner, they will need to find a new partner or withdraw</li>
+                      <li>Any fees paid may be subject to the event's refund policy</li>
+                      <li>You can re-register later if spots are still available</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+
+              {cancelConfirmModal.unit?.members?.length > 1 && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <p className="text-sm text-blue-800">
+                    <span className="font-medium">Team members:</span>{' '}
+                    {cancelConfirmModal.unit.members.map(m => m.displayName || m.email).join(', ')}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setCancelConfirmModal({ isOpen: false, division: null, unit: null })}
+                disabled={cancellingRegistration}
+                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 disabled:opacity-50"
+              >
+                Keep Registration
+              </button>
+              <button
+                onClick={handleCancelRegistration}
+                disabled={cancellingRegistration}
+                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {cancellingRegistration ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Cancelling...
+                  </>
+                ) : (
+                  'Cancel Registration'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
