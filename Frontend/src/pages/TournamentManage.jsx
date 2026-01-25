@@ -108,6 +108,9 @@ export default function TournamentManage() {
   const [staffModalTab, setStaffModalTab] = useState('friends'); // 'friends' or 'email'
   const [friendsList, setFriendsList] = useState([]);
   const [loadingFriends, setLoadingFriends] = useState(false);
+  const [editingStaff, setEditingStaff] = useState(null); // Staff member being edited
+  const [editStaffForm, setEditStaffForm] = useState({ roleId: '' });
+  const [savingStaffEdit, setSavingStaffEdit] = useState(false);
 
   // Court groups state
   const [courtGroups, setCourtGroups] = useState([]);
@@ -590,6 +593,34 @@ export default function TournamentManage() {
       }
     } catch (err) {
       toast.error('Failed to decline staff');
+    }
+  };
+
+  const openEditStaffModal = (staff) => {
+    setEditingStaff(staff);
+    setEditStaffForm({ roleId: staff.roleId?.toString() || '' });
+  };
+
+  const handleUpdateStaff = async () => {
+    if (!editingStaff || !editStaffForm.roleId) return;
+
+    setSavingStaffEdit(true);
+    try {
+      const response = await eventStaffApi.updateStaff(eventId, editingStaff.id, {
+        roleId: parseInt(editStaffForm.roleId)
+      });
+      if (response.success) {
+        toast.success('Staff role updated');
+        setEditingStaff(null);
+        loadStaff();
+      } else {
+        toast.error(response.message || 'Failed to update staff');
+      }
+    } catch (err) {
+      console.error('Error updating staff:', err);
+      toast.error('Failed to update staff');
+    } finally {
+      setSavingStaffEdit(false);
     }
   };
 
@@ -6229,18 +6260,72 @@ export default function TournamentManage() {
                           </div>
                         </div>
                       </div>
-                      <button
-                        onClick={() => handleRemoveStaff(staff.id)}
-                        className="p-2 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50"
-                        title="Remove staff"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => openEditStaffModal(staff)}
+                          className="p-2 text-gray-400 hover:text-blue-600 rounded-lg hover:bg-blue-50"
+                          title="Edit role"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleRemoveStaff(staff.id)}
+                          className="p-2 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50"
+                          title="Remove staff"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
               )}
             </div>
+
+            {/* Edit Staff Modal */}
+            {editingStaff && (
+              <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                <div className="bg-white rounded-xl shadow-xl max-w-md w-full">
+                  <div className="p-6 border-b">
+                    <h3 className="text-lg font-semibold text-gray-900">Edit Staff Role</h3>
+                    <p className="text-sm text-gray-500 mt-1">
+                      Change role for {editingStaff.userName || editingStaff.userEmail}
+                    </p>
+                  </div>
+                  <div className="p-6 space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Role</label>
+                      <select
+                        value={editStaffForm.roleId}
+                        onChange={(e) => setEditStaffForm({ ...editStaffForm, roleId: e.target.value })}
+                        className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-orange-500"
+                      >
+                        <option value="">Select a role</option>
+                        {staffRoles.map(role => (
+                          <option key={role.id} value={role.id}>{role.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  <div className="p-4 border-t bg-gray-50 flex justify-end gap-3 rounded-b-xl">
+                    <button
+                      onClick={() => setEditingStaff(null)}
+                      className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleUpdateStaff}
+                      disabled={savingStaffEdit || !editStaffForm.roleId}
+                      className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50 flex items-center gap-2"
+                    >
+                      {savingStaffEdit && <Loader2 className="w-4 h-4 animate-spin" />}
+                      Save Changes
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Staff Roles Info */}
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-blue-700">

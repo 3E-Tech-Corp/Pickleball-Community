@@ -732,6 +732,7 @@ public class EventStaffRoleDto
     public bool CanCheckInPlayers { get; set; }
     public bool CanManageLineups { get; set; }
     public bool CanViewAllData { get; set; }
+    public bool CanManagePayments { get; set; }
     public bool CanFullyManageEvent { get; set; }
     public bool AllowSelfRegistration { get; set; }
     public int SortOrder { get; set; }
@@ -774,6 +775,7 @@ public class EventStaffDto
     public bool CanCheckInPlayers { get; set; }
     public bool CanManageLineups { get; set; }
     public bool CanViewAllData { get; set; }
+    public bool CanManagePayments { get; set; }
     public bool CanFullyManageEvent { get; set; }
 }
 
@@ -852,6 +854,7 @@ public class CreateEventStaffRoleDto
     public bool CanCheckInPlayers { get; set; }
     public bool CanManageLineups { get; set; }
     public bool CanViewAllData { get; set; }
+    public bool CanManagePayments { get; set; }
     public bool CanFullyManageEvent { get; set; }
     public bool AllowSelfRegistration { get; set; } = true;
     public int SortOrder { get; set; }
@@ -953,6 +956,7 @@ public class StaffPermissionsDto
     public bool CanCheckInPlayers { get; set; }
     public bool CanManageLineups { get; set; }
     public bool CanViewAllData { get; set; }
+    public bool CanManagePayments { get; set; }
     public bool CanFullyManageEvent { get; set; }
     public bool IsOrganizer { get; set; }
     public bool IsAdmin { get; set; }
