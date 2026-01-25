@@ -523,7 +523,10 @@ export const userApi = {
   adminSendTestSms: (userId, message = null) => api.post(`/users/${userId}/admin-test-sms`, { message }),
 
   // Admin: Update a user's phone number
-  adminUpdatePhone: (userId, newPhone) => api.put(`/users/${userId}/admin-phone`, { newPhone })
+  adminUpdatePhone: (userId, newPhone) => api.put(`/users/${userId}/admin-phone`, { newPhone }),
+
+  // Admin: Re-sync a user from Funtime-Shared service
+  adminResyncUser: (userId) => api.post(`/users/${userId}/admin-resync`)
 }
 
 // Content Types API
