@@ -115,7 +115,7 @@ public class PhaseTemplatesController : ControllerBase
                 Tags = t.Tags,
                 CreatedAt = t.CreatedAt,
                 CreatedByUserId = t.CreatedByUserId,
-                CreatedByName = t.CreatedBy != null ? t.CreatedBy.DisplayName : null
+                CreatedByName = t.CreatedBy != null ? t.CreatedBy.FirstName + " " + t.CreatedBy.LastName : null
             })
             .FirstOrDefaultAsync();
 
@@ -437,7 +437,7 @@ public class PhaseTemplatesController : ControllerBase
                 SlotId = slot.Id,
                 SlotNumber = slot.SlotNumber,
                 UnitId = request.UnitId,
-                UnitName = slot.Unit?.CustomName,
+                UnitName = slot.Unit?.Name,
                 Message = "Exit slot assigned successfully"
             });
         }
@@ -523,7 +523,7 @@ public class PhaseTemplatesController : ControllerBase
                 s.Id,
                 s.SlotNumber,
                 s.UnitId,
-                UnitName = s.Unit != null ? s.Unit.CustomName : null,
+                UnitName = s.Unit != null ? s.Unit.Name : null,
                 s.IsResolved,
                 s.WasManuallyResolved,
                 s.ResolvedAt,
@@ -739,10 +739,10 @@ public class PhaseTemplatesController : ControllerBase
             var phaseIds = division.Phases.Select(p => p.Id).ToList();
 
             // Delete advancement rules
-            var rules = await _context.PhaseAdvancementRules
+            var existingRules = await _context.PhaseAdvancementRules
                 .Where(r => phaseIds.Contains(r.SourcePhaseId) || phaseIds.Contains(r.TargetPhaseId))
                 .ToListAsync();
-            _context.PhaseAdvancementRules.RemoveRange(rules);
+            _context.PhaseAdvancementRules.RemoveRange(existingRules);
 
             // Delete encounters (they reference phases)
             var encounters = await _context.EventEncounters
@@ -954,8 +954,9 @@ public class PhaseTemplatesController : ControllerBase
             SourcePhaseId = fromPhase.Id,
             TargetPhaseId = toPhase.Id,
             TargetSlotNumber = ruleJson.GetProperty("toSlot").GetInt32(),
-            SourceRank = ruleJson.TryGetProperty("fromRank", out var rank) ? rank.GetInt32() : 1,
-            SourcePoolName = ruleJson.TryGetProperty("fromPool", out var pool) ? pool.GetString() : null
+            SourceRank = ruleJson.TryGetProperty("fromRank", out var rank) ? rank.GetInt32() : 1
+            // Note: Pool-specific rules (fromPool in JSON) require pools to be created first
+            // SourcePoolId can be set after pools are created
         };
 
         _context.PhaseAdvancementRules.Add(rule);
