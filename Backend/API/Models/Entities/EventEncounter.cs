@@ -192,6 +192,41 @@ public class EventEncounter
     /// </summary>
     public DateTime? EstimatedEndTime { get; set; }
 
+    // =====================================================
+    // Lineup Locking (for team scrimmage formats)
+    // =====================================================
+
+    /// <summary>
+    /// Whether Unit1's captain has locked their lineup for this encounter.
+    /// When both units lock their lineups, lineup becomes visible to regular users.
+    /// </summary>
+    public bool Unit1LineupLocked { get; set; } = false;
+
+    /// <summary>
+    /// Whether Unit2's captain has locked their lineup for this encounter.
+    /// </summary>
+    public bool Unit2LineupLocked { get; set; } = false;
+
+    /// <summary>
+    /// When Unit1's lineup was locked
+    /// </summary>
+    public DateTime? Unit1LineupLockedAt { get; set; }
+
+    /// <summary>
+    /// When Unit2's lineup was locked
+    /// </summary>
+    public DateTime? Unit2LineupLockedAt { get; set; }
+
+    /// <summary>
+    /// User who locked Unit1's lineup (captain or admin)
+    /// </summary>
+    public int? Unit1LineupLockedByUserId { get; set; }
+
+    /// <summary>
+    /// User who locked Unit2's lineup (captain or admin)
+    /// </summary>
+    public int? Unit2LineupLockedByUserId { get; set; }
+
     public DateTime CreatedAt { get; set; } = DateTime.Now;
     public DateTime UpdatedAt { get; set; } = DateTime.Now;
 

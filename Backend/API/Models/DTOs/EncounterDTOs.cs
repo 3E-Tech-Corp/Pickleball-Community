@@ -67,6 +67,11 @@ public class EventEncounterSummaryDto
     public string? CourtLabel { get; set; }
     public int MatchCount { get; set; }
     public int CompletedMatchCount { get; set; }
+
+    // Lineup locking status
+    public bool Unit1LineupLocked { get; set; }
+    public bool Unit2LineupLocked { get; set; }
+    public bool BothLineupsLocked { get; set; }
 }
 
 /// <summary>
@@ -100,6 +105,17 @@ public class EventEncounterDetailDto
     public string? Notes { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
+
+    // Lineup locking status
+    public bool Unit1LineupLocked { get; set; }
+    public bool Unit2LineupLocked { get; set; }
+    public DateTime? Unit1LineupLockedAt { get; set; }
+    public DateTime? Unit2LineupLockedAt { get; set; }
+
+    /// <summary>
+    /// True when both units have locked their lineups - lineup is visible to all users
+    /// </summary>
+    public bool BothLineupsLocked { get; set; }
 
     // Matches within this encounter
     public List<EncounterMatchDto> Matches { get; set; } = new();
@@ -322,4 +338,38 @@ public class DivisionEncounterConfigUpdateDto
     public bool AllowPlayerReuseInEncounter { get; set; }
     public bool AllowLineupChangePerEncounter { get; set; }
     public List<EncounterMatchFormatCreateDto> MatchFormats { get; set; } = new();
+}
+
+// =====================================================
+// Lineup Locking DTOs
+// =====================================================
+
+/// <summary>
+/// DTO for toggling lineup lock status
+/// </summary>
+public class LineupLockToggleDto
+{
+    /// <summary>
+    /// Which unit side (1 or 2) is locking/unlocking
+    /// </summary>
+    public int UnitSide { get; set; }
+
+    /// <summary>
+    /// True to lock, false to unlock
+    /// </summary>
+    public bool Locked { get; set; }
+}
+
+/// <summary>
+/// Response for lineup lock operations
+/// </summary>
+public class LineupLockResultDto
+{
+    public bool Success { get; set; }
+    public string? Message { get; set; }
+    public bool Unit1LineupLocked { get; set; }
+    public bool Unit2LineupLocked { get; set; }
+    public bool BothLineupsLocked { get; set; }
+    public DateTime? Unit1LineupLockedAt { get; set; }
+    public DateTime? Unit2LineupLockedAt { get; set; }
 }

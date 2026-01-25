@@ -411,7 +411,7 @@ public class EventsController : EventControllerBase
                         City = m.User?.City,
                         State = m.User?.State,
                         DivisionName = d.Name,
-                        TeamName = u.Name
+                        TeamName = Utility.GetUnitDisplayName(u, d.TeamUnit?.TotalPlayers ?? 1)
                     })))
                 .DistinctBy(p => (p.UserId, p.DivisionName))
                 .ToList();

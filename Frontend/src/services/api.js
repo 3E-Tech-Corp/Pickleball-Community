@@ -2494,4 +2494,23 @@ export const eventStaffApi = {
   getDashboard: (eventId) => api.get(`/eventstaff/event/${eventId}/dashboard`)
 }
 
+// Encounter API (Team Scrimmage / Lineup Management)
+export const encounterApi = {
+  // Division encounter config
+  getDivisionConfig: (divisionId) => api.get(`/encounters/divisions/${divisionId}/config`),
+  updateDivisionConfig: (divisionId, data) => api.put(`/encounters/divisions/${divisionId}/config`, data),
+
+  // Encounter management
+  getEncounter: (encounterId) => api.get(`/encounters/${encounterId}`),
+  createEncounter: (eventId, data) => api.post(`/encounters/events/${eventId}`, data),
+
+  // Match player assignment
+  getMatchPlayers: (matchId) => api.get(`/encounters/matches/${matchId}/players`),
+  updateMatchPlayers: (matchId, data) => api.put(`/encounters/matches/${matchId}/players`, data),
+
+  // Lineup locking
+  toggleLineupLock: (encounterId, data) => api.post(`/encounters/${encounterId}/lineup-lock`, data),
+  getLineupLockStatus: (encounterId) => api.get(`/encounters/${encounterId}/lineup-lock`)
+}
+
 export default api
