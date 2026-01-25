@@ -1372,7 +1372,7 @@ public class UsersController : ControllerBase
                     {
                         Success = true,
                         Message = "User re-synced successfully from shared auth",
-                        Data = MapToUserProfileDto(user)
+                        Data = MapToProfileDto(user)
                     });
                 }
             }
@@ -1383,7 +1383,7 @@ public class UsersController : ControllerBase
                 {
                     Success = false,
                     Message = "User not found in shared auth service. This user may have been created locally or the shared auth record was deleted.",
-                    Data = MapToUserProfileDto(user)
+                    Data = MapToProfileDto(user)
                 });
             }
 
