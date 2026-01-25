@@ -94,7 +94,7 @@ BEGIN
 
     -- Return the updated slot
     SELECT s.*,
-           u.CustomName AS UnitName
+           u.Name AS UnitName
     FROM PhaseSlots s
     LEFT JOIN EventUnits u ON s.UnitId = u.Id
     WHERE s.PhaseId = @PhaseId
