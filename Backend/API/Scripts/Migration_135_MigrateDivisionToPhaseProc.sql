@@ -233,7 +233,7 @@ BEGIN
               AND RoundName IS NOT NULL
               AND RoundName LIKE 'Pool%'
         )
-        INSERT INTO PhasePools (PhaseId, Name, SortOrder, CreatedAt, UpdatedAt)
+        INSERT INTO PhasePools (PhaseId, PoolName, PoolOrder, CreatedAt, UpdatedAt)
         SELECT
             @NewPhaseId,
             PoolName,
@@ -246,7 +246,7 @@ BEGIN
         UPDATE e
         SET e.PoolId = pp.Id, e.UpdatedAt = GETUTCDATE()
         FROM EventEncounters e
-        INNER JOIN PhasePools pp ON pp.PhaseId = @NewPhaseId AND pp.Name = e.RoundName
+        INNER JOIN PhasePools pp ON pp.PhaseId = @NewPhaseId AND pp.PoolName = e.RoundName
         WHERE e.PhaseId = @NewPhaseId
           AND e.PoolId IS NULL
           AND e.RoundType = 'Pool'

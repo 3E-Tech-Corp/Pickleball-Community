@@ -241,21 +241,21 @@ PRINT 'Step 5: Creating PhasePools for multi-pool divisions...'
 )
 INSERT INTO PhasePools (
     PhaseId,
-    Name,
-    SortOrder,
+    PoolName,
+    PoolOrder,
     CreatedAt,
     UpdatedAt
 )
 SELECT
     dp.PhaseId,
     dp.PoolName,
-    ROW_NUMBER() OVER (PARTITION BY dp.PhaseId ORDER BY dp.PoolName) AS SortOrder,
+    ROW_NUMBER() OVER (PARTITION BY dp.PhaseId ORDER BY dp.PoolName) AS PoolOrder,
     GETUTCDATE() AS CreatedAt,
     GETUTCDATE() AS UpdatedAt
 FROM DistinctPools dp
 WHERE NOT EXISTS (
     SELECT 1 FROM PhasePools pp
-    WHERE pp.PhaseId = dp.PhaseId AND pp.Name = dp.PoolName
+    WHERE pp.PhaseId = dp.PhaseId AND pp.PoolName = dp.PoolName
 )
 
 DECLARE @PoolsCreated INT = @@ROWCOUNT
@@ -272,7 +272,7 @@ SET
     e.PoolId = pp.Id,
     e.UpdatedAt = GETUTCDATE()
 FROM EventEncounters e
-INNER JOIN PhasePools pp ON pp.PhaseId = e.PhaseId AND pp.Name = e.RoundName
+INNER JOIN PhasePools pp ON pp.PhaseId = e.PhaseId AND pp.PoolName = e.RoundName
 WHERE e.PoolId IS NULL
   AND e.RoundType = 'Pool'
   AND e.RoundName IS NOT NULL
