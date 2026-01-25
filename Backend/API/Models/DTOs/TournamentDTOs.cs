@@ -130,6 +130,20 @@ public class EventUnitDto
     public int DivisionId { get; set; }
     public string? DivisionName { get; set; }
     public string Name { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Computed display name based on naming rules:
+    /// - Pairs (size=2) with 2 members: "FirstName1 & FirstName2"
+    /// - Singles or incomplete pairs: stored Name
+    /// - Teams (size>2): stored Name (captain can customize)
+    /// </summary>
+    public string DisplayName { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Whether captain has set a custom name.
+    /// For pairs, if false, DisplayName is computed from member names.
+    /// </summary>
+    public bool HasCustomName { get; set; }
     public int? UnitNumber { get; set; }
     public int? PoolNumber { get; set; }
     public string? PoolName { get; set; }
