@@ -55,6 +55,7 @@ public class EventEncounterSummaryDto
     public int RoundNumber { get; set; }
     public string? RoundName { get; set; }
     public int EncounterNumber { get; set; }
+    public int? DivisionMatchNumber { get; set; }
     public int? Unit1Id { get; set; }
     public string? Unit1Name { get; set; }
     public int? Unit2Id { get; set; }
@@ -87,6 +88,7 @@ public class EventEncounterDetailDto
     public int RoundNumber { get; set; }
     public string? RoundName { get; set; }
     public int EncounterNumber { get; set; }
+    public int? DivisionMatchNumber { get; set; }
     public int? Unit1Number { get; set; }
     public int? Unit2Number { get; set; }
     public int? Unit1Id { get; set; }

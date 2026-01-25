@@ -341,6 +341,11 @@ public class DivisionPhasesController : ControllerBase
 
         _logger.LogInformation("Generated {Count} encounters for phase {PhaseId}", encountersCreated, id);
 
+        // Assign sequential DivisionMatchNumber to all encounters in the division
+        await _context.Database.ExecuteSqlRawAsync(
+            "EXEC sp_AssignDivisionMatchNumbers @DivisionId = {0}",
+            phase.DivisionId);
+
         return Ok(new { success = true, data = new { encountersCreated } });
     }
 
@@ -365,6 +370,7 @@ public class DivisionPhasesController : ControllerBase
             {
                 e.Id,
                 e.EncounterNumber,
+                e.DivisionMatchNumber,
                 e.EncounterLabel,
                 e.RoundType,
                 e.RoundNumber,

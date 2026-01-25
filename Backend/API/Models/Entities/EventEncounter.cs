@@ -54,6 +54,12 @@ public class EventEncounter
     public int EncounterNumber { get; set; } = 1;
 
     /// <summary>
+    /// Sequential match number within the division (1, 2, 3, ... N)
+    /// Used for referencing matches: "Match #5", "Match #12", etc.
+    /// </summary>
+    public int? DivisionMatchNumber { get; set; }
+
+    /// <summary>
     /// Backward-compatible alias for EncounterNumber
     /// </summary>
     [System.ComponentModel.DataAnnotations.Schema.NotMapped]

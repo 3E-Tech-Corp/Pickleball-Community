@@ -394,6 +394,7 @@ public class EventMatchDto
     public int RoundNumber { get; set; }
     public string? RoundName { get; set; }
     public int MatchNumber { get; set; }
+    public int? DivisionMatchNumber { get; set; }
     public int? BracketPosition { get; set; }
 
     // Units
@@ -637,6 +638,23 @@ public class TournamentStatsDto
     public decimal TotalAmountPaid { get; set; }
 }
 
+/// <summary>
+/// Detailed match and game statistics for a division
+/// </summary>
+public class DivisionMatchStatsDto
+{
+    public int DivisionId { get; set; }
+    public string DivisionName { get; set; } = string.Empty;
+    public int TotalEncounters { get; set; }
+    public int TotalMatches { get; set; }
+    public int TotalGames { get; set; }
+    public int CompletedEncounters { get; set; }
+    public int CompletedMatches { get; set; }
+    public int CompletedGames { get; set; }
+    public int InProgressEncounters { get; set; }
+    public int ScheduledEncounters { get; set; }
+}
+
 // ============================================
 // Schedule Export DTOs
 // ============================================
@@ -667,6 +685,7 @@ public class ScheduleMatchDto
 {
     public int EncounterId { get; set; } // For linking to encounter details/editing
     public int MatchNumber { get; set; }
+    public int? DivisionMatchNumber { get; set; }
     public int? Unit1Number { get; set; }
     public int? Unit2Number { get; set; }
     public string? Unit1Name { get; set; }
@@ -1106,6 +1125,7 @@ public class EncounterPlanningDto
     public int RoundNumber { get; set; }
     public string? RoundName { get; set; }
     public int EncounterNumber { get; set; }
+    public int? DivisionMatchNumber { get; set; }
     public string? EncounterLabel { get; set; }
     public int? Unit1Id { get; set; }
     public string? Unit1Name { get; set; }

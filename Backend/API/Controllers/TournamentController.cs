@@ -3714,6 +3714,11 @@ public class TournamentController : EventControllerBase
         }
         await _context.SaveChangesAsync();
 
+        // Assign sequential DivisionMatchNumber to all encounters in the division
+        await _context.Database.ExecuteSqlRawAsync(
+            "EXEC sp_AssignDivisionMatchNumbers @DivisionId = {0}",
+            divisionId);
+
         // Reload with games
         var result = await _context.EventEncounters
             .Include(m => m.Matches).ThenInclude(match => match.Games)
@@ -3880,6 +3885,52 @@ public class TournamentController : EventControllerBase
         {
             Success = true,
             Data = result.Select(MapToUnitDto).ToList()
+        });
+    }
+
+    /// <summary>
+    /// Get match statistics for a division including total encounters, matches, and games
+    /// </summary>
+    [HttpGet("divisions/{divisionId}/match-stats")]
+    public async Task<ActionResult<ApiResponse<DivisionMatchStatsDto>>> GetDivisionMatchStats(int divisionId)
+    {
+        var division = await _context.EventDivisions
+            .FirstOrDefaultAsync(d => d.Id == divisionId);
+
+        if (division == null)
+            return NotFound(new ApiResponse<DivisionMatchStatsDto> { Success = false, Message = "Division not found" });
+
+        var encounters = await _context.EventEncounters
+            .Where(e => e.DivisionId == divisionId)
+            .Select(e => new
+            {
+                e.Id,
+                e.Status,
+                MatchCount = e.Matches.Count,
+                CompletedMatchCount = e.Matches.Count(m => m.Status == "Completed"),
+                GameCount = e.Matches.SelectMany(m => m.Games).Count(),
+                CompletedGameCount = e.Matches.SelectMany(m => m.Games).Count(g => g.Status == "Completed")
+            })
+            .ToListAsync();
+
+        var stats = new DivisionMatchStatsDto
+        {
+            DivisionId = divisionId,
+            DivisionName = division.Name,
+            TotalEncounters = encounters.Count,
+            TotalMatches = encounters.Sum(e => e.MatchCount),
+            TotalGames = encounters.Sum(e => e.GameCount),
+            CompletedEncounters = encounters.Count(e => e.Status == "Completed"),
+            CompletedMatches = encounters.Sum(e => e.CompletedMatchCount),
+            CompletedGames = encounters.Sum(e => e.CompletedGameCount),
+            InProgressEncounters = encounters.Count(e => e.Status == "InProgress"),
+            ScheduledEncounters = encounters.Count(e => e.Status == "Scheduled")
+        };
+
+        return Ok(new ApiResponse<DivisionMatchStatsDto>
+        {
+            Success = true,
+            Data = stats
         });
     }
 
@@ -4052,6 +4103,7 @@ public class TournamentController : EventControllerBase
                     {
                         EncounterId = m.Id,
                         MatchNumber = m.MatchNumber,
+                        DivisionMatchNumber = m.DivisionMatchNumber,
                         Unit1Number = m.Unit1Number,
                         Unit2Number = m.Unit2Number,
                         Unit1Name = GetUnitDisplayName(m.Unit1Id) ?? m.Unit1?.Name,
@@ -6224,6 +6276,7 @@ public class TournamentController : EventControllerBase
             RoundNumber = m.RoundNumber,
             RoundName = m.RoundName,
             MatchNumber = m.MatchNumber,
+            DivisionMatchNumber = m.DivisionMatchNumber,
             BracketPosition = m.BracketPosition,
             Unit1Number = m.Unit1Number,
             Unit2Number = m.Unit2Number,
