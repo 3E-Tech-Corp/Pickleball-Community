@@ -593,94 +593,113 @@ export default function EventView() {
 
                         {/* Players grouped by unit/team */}
                         {divisionPlayers.length > 0 && (
-                          <div className="mt-2 space-y-2">
+                          <div className="mt-2">
                             {hasTeams ? (
-                              // Show players grouped by team
-                              teamNames.map((teamName) => {
-                                // Get team info from first player (all players in team share same joinMethod/isComplete)
-                                const firstPlayer = playersByTeam[teamName][0];
-                                const isComplete = firstPlayer?.isComplete;
-                                const joinMethod = firstPlayer?.joinMethod || 'Approval';
-                                const isFriendsOnly = joinMethod === 'FriendsOnly';
+                              // Show players grouped by team in card grid
+                              <div className="flex flex-wrap gap-2">
+                                {teamNames.map((teamName) => {
+                                  // Get team info from first player (all players in team share same joinMethod/isComplete)
+                                  const firstPlayer = playersByTeam[teamName][0];
+                                  const isComplete = firstPlayer?.isComplete;
+                                  const joinMethod = firstPlayer?.joinMethod || 'Approval';
+                                  const isFriendsOnly = joinMethod === 'FriendsOnly';
+                                  const players = playersByTeam[teamName];
 
-                                return (
-                                <div key={teamName} className="bg-white rounded p-2">
-                                  <div className="text-xs font-medium text-gray-600 mb-1.5 flex items-center gap-1 justify-between">
-                                    <div className="flex items-center gap-1">
-                                      <Users className="w-3 h-3" />
-                                      {teamName}
-                                    </div>
-                                    {/* Show join method indicator for incomplete teams */}
-                                    {!isComplete && (
-                                      <span
-                                        className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-medium rounded ${
-                                          isFriendsOnly
-                                            ? 'bg-purple-100 text-purple-700'
-                                            : 'bg-amber-100 text-amber-700'
-                                        }`}
-                                        title={isFriendsOnly ? 'Friends only - auto-accept' : 'Open to anyone'}
-                                      >
-                                        {isFriendsOnly ? (
-                                          <>
-                                            <Users className="w-2.5 h-2.5" />
-                                            Friends
-                                          </>
-                                        ) : (
-                                          <>
-                                            <UserPlus className="w-2.5 h-2.5" />
-                                            Open
-                                          </>
+                                  return (
+                                    <div
+                                      key={teamName}
+                                      className={`bg-white rounded-lg border p-2 ${
+                                        isComplete
+                                          ? 'border-green-200'
+                                          : isFriendsOnly
+                                            ? 'border-purple-200'
+                                            : 'border-amber-200'
+                                      }`}
+                                    >
+                                      {/* Team header with join method badge */}
+                                      <div className="flex items-center gap-1.5 mb-1.5">
+                                        {!isComplete && (
+                                          <span
+                                            className={`inline-flex items-center justify-center w-4 h-4 rounded-full ${
+                                              isFriendsOnly
+                                                ? 'bg-purple-100 text-purple-600'
+                                                : 'bg-amber-100 text-amber-600'
+                                            }`}
+                                            title={isFriendsOnly ? 'Friends only' : 'Open to anyone'}
+                                          >
+                                            {isFriendsOnly ? (
+                                              <Users className="w-2.5 h-2.5" />
+                                            ) : (
+                                              <UserPlus className="w-2.5 h-2.5" />
+                                            )}
+                                          </span>
                                         )}
-                                      </span>
-                                    )}
-                                  </div>
-                                  <div className="flex flex-wrap gap-1">
-                                    {playersByTeam[teamName].map((player) => (
-                                      <button
-                                        key={player.userId}
-                                        onClick={() => setSelectedProfileUserId(player.userId)}
-                                        className="flex items-center gap-1.5 px-2 py-1 bg-gray-50 rounded hover:bg-gray-100 transition-colors text-left"
-                                      >
-                                        {player.profileImageUrl ? (
-                                          <img
-                                            src={getSharedAssetUrl(player.profileImageUrl)}
-                                            alt={player.name}
-                                            className="w-6 h-6 rounded-full object-cover flex-shrink-0"
-                                          />
-                                        ) : (
-                                          <div className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0">
-                                            <User className="w-3 h-3 text-gray-400" />
+                                        {isComplete && (
+                                          <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-green-100 text-green-600">
+                                            <Check className="w-2.5 h-2.5" />
+                                          </span>
+                                        )}
+                                        <span className="text-xs font-medium text-gray-700 truncate max-w-[120px]">
+                                          {teamName}
+                                        </span>
+                                      </div>
+                                      {/* Player avatars */}
+                                      <div className="flex items-center gap-1">
+                                        {players.map((player, idx) => (
+                                          <button
+                                            key={player.userId}
+                                            onClick={() => setSelectedProfileUserId(player.userId)}
+                                            className="group relative"
+                                            title={player.name}
+                                          >
+                                            {player.profileImageUrl ? (
+                                              <img
+                                                src={getSharedAssetUrl(player.profileImageUrl)}
+                                                alt={player.name}
+                                                className="w-7 h-7 rounded-full object-cover border-2 border-white shadow-sm hover:scale-110 transition-transform"
+                                              />
+                                            ) : (
+                                              <div className="w-7 h-7 rounded-full bg-gray-200 flex items-center justify-center border-2 border-white shadow-sm hover:scale-110 transition-transform">
+                                                <span className="text-[10px] font-medium text-gray-500">
+                                                  {player.name?.charAt(0) || '?'}
+                                                </span>
+                                              </div>
+                                            )}
+                                          </button>
+                                        ))}
+                                        {/* Show empty slot for incomplete teams */}
+                                        {!isComplete && (
+                                          <div className="w-7 h-7 rounded-full border-2 border-dashed border-gray-300 flex items-center justify-center">
+                                            <span className="text-[10px] text-gray-400">?</span>
                                           </div>
                                         )}
-                                        <span className="text-xs text-gray-700">
-                                          {player.name}
-                                        </span>
-                                      </button>
-                                    ))}
-                                  </div>
-                                </div>
-                              );})
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
                             ) : (
                               // Show players as flat grid (no teams)
-                              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-1.5">
+                              <div className="flex flex-wrap gap-1.5">
                                 {divisionPlayers.map((player) => (
                                   <button
                                     key={player.userId}
                                     onClick={() => setSelectedProfileUserId(player.userId)}
-                                    className="flex items-center gap-2 p-1.5 bg-white rounded hover:bg-gray-100 transition-colors text-left"
+                                    className="flex items-center gap-1.5 px-2 py-1 bg-white rounded-lg border border-gray-200 hover:border-gray-300 transition-colors"
+                                    title={player.name}
                                   >
                                     {player.profileImageUrl ? (
                                       <img
                                         src={getSharedAssetUrl(player.profileImageUrl)}
                                         alt={player.name}
-                                        className="w-7 h-7 rounded-full object-cover flex-shrink-0"
+                                        className="w-6 h-6 rounded-full object-cover"
                                       />
                                     ) : (
-                                      <div className="w-7 h-7 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0">
-                                        <User className="w-3.5 h-3.5 text-gray-400" />
+                                      <div className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center">
+                                        <User className="w-3 h-3 text-gray-400" />
                                       </div>
                                     )}
-                                    <span className="text-xs text-gray-700 truncate">
+                                    <span className="text-xs text-gray-700">
                                       {player.name}
                                     </span>
                                   </button>
