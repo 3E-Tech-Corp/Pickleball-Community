@@ -6237,7 +6237,9 @@ public class TournamentController : EventControllerBase
         {
             Id = u.Id,
             EventId = u.EventId,
+            EventName = u.Event?.Name,
             DivisionId = u.DivisionId,
+            DivisionName = u.Division?.Name,
             Name = u.Name,
             DisplayName = Utility.GetUnitDisplayName(u, teamSize),
             HasCustomName = u.HasCustomName,

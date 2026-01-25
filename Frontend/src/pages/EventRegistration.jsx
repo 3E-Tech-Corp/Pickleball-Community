@@ -1338,22 +1338,17 @@ export default function EventRegistration() {
                       <div
                         onClick={() => {
                           if (isRegistered || isFull) return;
-                          if (event.allowMultipleDivisions) {
-                            toggleDivisionSelection(division);
-                          } else {
-                            handleSelectDivision(division);
-                          }
+                          // Single selection - select this division
+                          setSelectedDivision(division);
+                          setSelectedDivisions([division]);
                         }}
                         role={isRegistered || isFull ? undefined : 'button'}
                         tabIndex={isRegistered || isFull ? undefined : 0}
                         onKeyDown={(e) => {
                           if ((e.key === 'Enter' || e.key === ' ') && !isRegistered && !isFull) {
                             e.preventDefault();
-                            if (event.allowMultipleDivisions) {
-                              toggleDivisionSelection(division);
-                            } else {
-                              handleSelectDivision(division);
-                            }
+                            setSelectedDivision(division);
+                            setSelectedDivisions([division]);
                           }
                         }}
                         className={`
@@ -1367,14 +1362,6 @@ export default function EventRegistration() {
                       >
                         <div className="flex items-start justify-between">
                           <div className="flex items-start gap-3 flex-1">
-                            {/* Checkbox for multi-select mode */}
-                            {event.allowMultipleDivisions && !isRegistered && !isFull && (
-                              <div className={`mt-1 w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 ${
-                                isSelected ? 'border-orange-500 bg-orange-500' : 'border-gray-300'
-                              }`}>
-                                {isSelected && <Check className="w-3 h-3 text-white" />}
-                              </div>
-                            )}
                             <div className="flex-1">
                               <div className="flex items-center gap-2 mb-1">
                                 <h3 className="font-semibold text-gray-900">{division.name}</h3>
@@ -1543,27 +1530,26 @@ export default function EventRegistration() {
                 })}
               </div>
 
-              {/* Continue button for multi-division selection */}
-              {event.allowMultipleDivisions && selectedDivisions.length > 0 && (
+              {/* Continue button for division selection */}
+              {selectedDivisions.length > 0 && (
                 <div className="mt-6 pt-4 border-t">
                   <div className="flex items-center justify-between mb-4">
                     <div>
                       <p className="font-medium text-gray-900">
-                        {selectedDivisions.length} division{selectedDivisions.length > 1 ? 's' : ''} selected
-                      </p>
-                      <p className="text-sm text-gray-500">
-                        {selectedDivisions.map(d => d.name).join(', ')}
+                        Selected: {selectedDivision?.name}
                       </p>
                     </div>
-                    <p className="text-lg font-semibold text-orange-600">
-                      Total: ${getTotalFeeForSelectedDivisions()}
-                    </p>
+                    {getTotalFeeForSelectedDivisions() > 0 && (
+                      <p className="text-lg font-semibold text-orange-600">
+                        Fee: ${getTotalFeeForSelectedDivisions()}
+                      </p>
+                    )}
                   </div>
                   <button
                     onClick={handleProceedWithDivisions}
                     className="w-full py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-700 flex items-center justify-center gap-2 font-medium"
                   >
-                    Continue with {selectedDivisions.length} Division{selectedDivisions.length > 1 ? 's' : ''}
+                    Continue
                     <ChevronRight className="w-5 h-5" />
                   </button>
                 </div>
