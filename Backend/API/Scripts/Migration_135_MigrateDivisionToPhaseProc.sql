@@ -311,4 +311,128 @@ GO
 
 PRINT 'Created sp_EnsureDivisionHasPhase stored procedure'
 
+-- =====================================================
+-- sp_MigrateEventToPhases
+-- Migrates all divisions in an event to phase-based format
+-- =====================================================
+
+IF EXISTS (SELECT 1 FROM sys.procedures WHERE name = 'sp_MigrateEventToPhases')
+BEGIN
+    DROP PROCEDURE sp_MigrateEventToPhases
+    PRINT 'Dropped existing sp_MigrateEventToPhases'
+END
+GO
+
+CREATE PROCEDURE sp_MigrateEventToPhases
+    @EventId INT,
+    @DivisionsMigrated INT OUTPUT,
+    @TotalSlotsCreated INT OUTPUT,
+    @TotalEncountersUpdated INT OUTPUT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    SET @DivisionsMigrated = 0
+    SET @TotalSlotsCreated = 0
+    SET @TotalEncountersUpdated = 0
+
+    -- Check if event exists
+    IF NOT EXISTS (SELECT 1 FROM Events WHERE Id = @EventId)
+    BEGIN
+        RAISERROR('Event %d does not exist', 16, 1, @EventId)
+        RETURN
+    END
+
+    -- Get all active divisions for this event that have encounters
+    DECLARE @DivisionIds TABLE (DivisionId INT)
+
+    INSERT INTO @DivisionIds (DivisionId)
+    SELECT DISTINCT d.Id
+    FROM EventDivisions d
+    WHERE d.EventId = @EventId
+      AND d.IsActive = 1
+      AND EXISTS (SELECT 1 FROM EventEncounters e WHERE e.DivisionId = d.Id)
+
+    -- Process each division
+    DECLARE @CurrentDivisionId INT
+    DECLARE @PhaseId INT
+    DECLARE @SlotsCreated INT
+    DECLARE @EncountersUpdated INT
+
+    DECLARE division_cursor CURSOR LOCAL FAST_FORWARD FOR
+        SELECT DivisionId FROM @DivisionIds
+
+    OPEN division_cursor
+    FETCH NEXT FROM division_cursor INTO @CurrentDivisionId
+
+    WHILE @@FETCH_STATUS = 0
+    BEGIN
+        BEGIN TRY
+            EXEC sp_MigrateDivisionToPhase
+                @DivisionId = @CurrentDivisionId,
+                @PhaseId = @PhaseId OUTPUT,
+                @SlotsCreated = @SlotsCreated OUTPUT,
+                @EncountersUpdated = @EncountersUpdated OUTPUT
+
+            IF @PhaseId IS NOT NULL
+            BEGIN
+                SET @DivisionsMigrated = @DivisionsMigrated + 1
+                SET @TotalSlotsCreated = @TotalSlotsCreated + ISNULL(@SlotsCreated, 0)
+                SET @TotalEncountersUpdated = @TotalEncountersUpdated + ISNULL(@EncountersUpdated, 0)
+            END
+        END TRY
+        BEGIN CATCH
+            -- Log error but continue with other divisions
+            PRINT 'Error migrating division ' + CAST(@CurrentDivisionId AS VARCHAR(10)) + ': ' + ERROR_MESSAGE()
+        END CATCH
+
+        FETCH NEXT FROM division_cursor INTO @CurrentDivisionId
+    END
+
+    CLOSE division_cursor
+    DEALLOCATE division_cursor
+END
+GO
+
+PRINT 'Created sp_MigrateEventToPhases stored procedure'
+
+-- =====================================================
+-- sp_EnsureEventHasPhases
+-- Simpler version that ensures all divisions have phases
+-- =====================================================
+
+IF EXISTS (SELECT 1 FROM sys.procedures WHERE name = 'sp_EnsureEventHasPhases')
+BEGIN
+    DROP PROCEDURE sp_EnsureEventHasPhases
+    PRINT 'Dropped existing sp_EnsureEventHasPhases'
+END
+GO
+
+CREATE PROCEDURE sp_EnsureEventHasPhases
+    @EventId INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    DECLARE @DivisionsMigrated INT
+    DECLARE @TotalSlotsCreated INT
+    DECLARE @TotalEncountersUpdated INT
+
+    EXEC sp_MigrateEventToPhases
+        @EventId = @EventId,
+        @DivisionsMigrated = @DivisionsMigrated OUTPUT,
+        @TotalSlotsCreated = @TotalSlotsCreated OUTPUT,
+        @TotalEncountersUpdated = @TotalEncountersUpdated OUTPUT
+
+    -- Return summary as result set
+    SELECT
+        @EventId AS EventId,
+        @DivisionsMigrated AS DivisionsMigrated,
+        @TotalSlotsCreated AS SlotsCreated,
+        @TotalEncountersUpdated AS EncountersUpdated
+END
+GO
+
+PRINT 'Created sp_EnsureEventHasPhases stored procedure'
+
 PRINT 'Migration 135 completed successfully'
