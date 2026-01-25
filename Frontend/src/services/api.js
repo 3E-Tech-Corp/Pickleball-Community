@@ -1524,6 +1524,8 @@ export const tournamentApi = {
     api.post('/tournament/units/join-by-code', { joinCode, selectedFeeId }),
   regenerateJoinCode: (unitId) =>
     api.post(`/tournament/units/${unitId}/regenerate-code`),
+  updateJoinMethod: (unitId, joinMethod) =>
+    api.put(`/tournament/units/${unitId}/join-method`, { joinMethod }),
 
   // Payment
   getPaymentSummary: (eventId) =>

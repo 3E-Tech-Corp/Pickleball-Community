@@ -693,6 +693,7 @@ public class EventsController : EventControllerBase
                                         }).ToList(),
                                     // Captain info for managing join requests
                                     IsCaptain = u.CaptainUserId == userId.Value,
+                                    JoinMethod = u.JoinMethod ?? "Approval",
                                     PendingJoinRequests = u.CaptainUserId == userId.Value
                                         ? (u.JoinRequests ?? new List<EventUnitJoinRequest>())
                                             .Where(jr => jr.Status == "Pending")

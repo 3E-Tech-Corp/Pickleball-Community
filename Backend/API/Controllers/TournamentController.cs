@@ -1698,6 +1698,83 @@ public class TournamentController : EventControllerBase
     }
 
     /// <summary>
+    /// Update the join method for a unit (captain only)
+    /// Allows changing between "Approval" (open to anyone) and "FriendsOnly" (friends auto-accept)
+    /// </summary>
+    [Authorize]
+    [HttpPut("units/{unitId}/join-method")]
+    public async Task<ActionResult<ApiResponse<EventUnitDto>>> UpdateUnitJoinMethod(int unitId, [FromBody] UpdateJoinMethodRequest request)
+    {
+        var userId = GetUserId();
+        if (!userId.HasValue)
+            return Unauthorized(new ApiResponse<EventUnitDto> { Success = false, Message = "Unauthorized" });
+
+        var unit = await _context.EventUnits
+            .Include(u => u.Members.Where(m => m.InviteStatus == "Accepted"))
+                .ThenInclude(m => m.User)
+            .Include(u => u.Division)
+                .ThenInclude(d => d!.TeamUnit)
+            .Include(u => u.Captain)
+            .FirstOrDefaultAsync(u => u.Id == unitId);
+
+        if (unit == null)
+            return NotFound(new ApiResponse<EventUnitDto> { Success = false, Message = "Unit not found" });
+
+        // Only captain can change join method
+        if (unit.CaptainUserId != userId.Value)
+        {
+            var isAdmin = await IsAdminAsync();
+            var isOrganizer = await IsEventOrganizerAsync(unit.EventId, userId.Value);
+            if (!isAdmin && !isOrganizer)
+                return Forbid();
+        }
+
+        var teamSize = unit.Division?.TeamUnit?.TotalPlayers ?? 1;
+
+        // Only applicable for team registrations (size > 1)
+        if (teamSize <= 1)
+        {
+            return BadRequest(new ApiResponse<EventUnitDto>
+            {
+                Success = false,
+                Message = "Join method is not applicable for singles registration"
+            });
+        }
+
+        // Validate join method value
+        var validMethods = new[] { "Approval", "FriendsOnly" };
+        if (!validMethods.Contains(request.JoinMethod))
+        {
+            return BadRequest(new ApiResponse<EventUnitDto>
+            {
+                Success = false,
+                Message = "Invalid join method. Must be 'Approval' or 'FriendsOnly'"
+            });
+        }
+
+        unit.JoinMethod = request.JoinMethod;
+        unit.UpdatedAt = DateTime.Now;
+        await _context.SaveChangesAsync();
+
+        // Reload with all data
+        var loadedUnit = await _context.EventUnits
+            .Include(u => u.Members)
+                .ThenInclude(m => m.User)
+            .Include(u => u.Division)
+                .ThenInclude(d => d!.TeamUnit)
+            .Include(u => u.Captain)
+            .FirstOrDefaultAsync(u => u.Id == unitId);
+
+        var methodDescription = request.JoinMethod == "FriendsOnly" ? "Friends only (auto-accept)" : "Open to anyone";
+        return Ok(new ApiResponse<EventUnitDto>
+        {
+            Success = true,
+            Data = MapToUnitDto(loadedUnit!),
+            Message = $"Join method updated to: {methodDescription}"
+        });
+    }
+
+    /// <summary>
     /// Admin/Organizer: Break a unit apart - creates individual registrations for each member
     /// Captain stays in original unit, other members get their own units
     /// </summary>
@@ -9738,4 +9815,15 @@ public class SetUnitNameRequest
     /// Custom team name. If null or empty, resets to default (auto-computed for pairs).
     /// </summary>
     public string? Name { get; set; }
+}
+
+/// <summary>
+/// Request to update the join method for a unit
+/// </summary>
+public class UpdateJoinMethodRequest
+{
+    /// <summary>
+    /// How partners can join: "Approval" (open to anyone, captain approves) or "FriendsOnly" (friends auto-accept)
+    /// </summary>
+    public string JoinMethod { get; set; } = "Approval";
 }

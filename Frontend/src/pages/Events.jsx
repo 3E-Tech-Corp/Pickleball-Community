@@ -4157,7 +4157,7 @@ function EventDetailModal({ event, isAuthenticated, isAdmin, currentUserId, user
                             )}
                             {/* Partner status and find/change partner option */}
                             {reg.needsPartner && (
-                              <div className="mt-2">
+                              <div className="mt-2 space-y-2">
                                 <div className="flex items-center gap-2 text-orange-600">
                                   <UserPlus className="w-4 h-4" />
                                   <span className="text-sm">
@@ -4174,6 +4174,52 @@ function EventDetailModal({ event, isAuthenticated, isAdmin, currentUserId, user
                                     {reg.partners?.length > 0 ? 'Change Partner' : 'Find a partner'}
                                   </button>
                                 </div>
+                                {/* Join method toggle - only for captain */}
+                                {reg.isCaptain && (
+                                  <div className="flex items-center gap-2 text-sm">
+                                    <span className="text-gray-500">Who can join:</span>
+                                    <button
+                                      onClick={async () => {
+                                        const newMethod = reg.joinMethod === 'FriendsOnly' ? 'Approval' : 'FriendsOnly';
+                                        try {
+                                          const response = await tournamentApi.updateJoinMethod(reg.unitId, newMethod);
+                                          if (response.success) {
+                                            toast.success(response.message || 'Join method updated');
+                                            // Update local state
+                                            setEvent(prev => ({
+                                              ...prev,
+                                              myRegistrations: prev.myRegistrations.map(r =>
+                                                r.unitId === reg.unitId ? { ...r, joinMethod: newMethod } : r
+                                              )
+                                            }));
+                                          } else {
+                                            toast.error(response.message || 'Failed to update');
+                                          }
+                                        } catch (err) {
+                                          toast.error(err?.message || 'Failed to update join method');
+                                        }
+                                      }}
+                                      className={`px-2 py-1 rounded-lg text-xs font-medium transition-colors ${
+                                        reg.joinMethod === 'FriendsOnly'
+                                          ? 'bg-purple-100 text-purple-700 hover:bg-purple-200'
+                                          : 'bg-amber-100 text-amber-700 hover:bg-amber-200'
+                                      }`}
+                                    >
+                                      {reg.joinMethod === 'FriendsOnly' ? (
+                                        <span className="flex items-center gap-1">
+                                          <Users className="w-3 h-3" />
+                                          Friends only
+                                        </span>
+                                      ) : (
+                                        <span className="flex items-center gap-1">
+                                          <UserPlus className="w-3 h-3" />
+                                          Anyone
+                                        </span>
+                                      )}
+                                    </button>
+                                    <span className="text-xs text-gray-400">(tap to change)</span>
+                                  </div>
+                                )}
                               </div>
                             )}
                           </div>

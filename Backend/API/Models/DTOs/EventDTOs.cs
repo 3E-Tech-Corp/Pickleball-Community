@@ -239,6 +239,11 @@ public class UserRegistrationInfoDto
     // Captain info - for managing join requests
     public bool IsCaptain { get; set; } = false;
     public List<UnitJoinRequestInfoDto> PendingJoinRequests { get; set; } = new();
+
+    /// <summary>
+    /// How partners can join: "Approval" (open to anyone) or "FriendsOnly" (friends auto-accept)
+    /// </summary>
+    public string JoinMethod { get; set; } = "Approval";
 }
 
 /// <summary>
