@@ -59,7 +59,7 @@ SELECT DISTINCT
     'Migrated from legacy schedule format' AS Description,
     (SELECT COUNT(DISTINCT u.Id)
      FROM EventUnits u
-     WHERE u.DivisionId = d.Id AND u.IsActive = 1) AS IncomingSlotCount,
+     WHERE u.DivisionId = d.Id AND u.Status NOT IN ('Cancelled', 'Waitlisted')) AS IncomingSlotCount,
     0 AS AdvancingSlotCount,  -- Legacy phases don't advance to another phase
     CASE
         WHEN d.ScheduleStatus = 'Finalized' THEN 'Completed'
@@ -112,7 +112,7 @@ PRINT 'Step 2: Creating PhaseSlots for units in migrated divisions...'
     FROM EventEncounters e
     INNER JOIN EventUnits u ON u.Id = e.Unit1Id OR u.Id = e.Unit2Id
     WHERE e.PhaseId IS NULL
-      AND u.IsActive = 1
+      AND u.Status NOT IN ('Cancelled', 'Waitlisted')
     GROUP BY e.DivisionId, u.Id
 ),
 UnitsWithSeeds AS (

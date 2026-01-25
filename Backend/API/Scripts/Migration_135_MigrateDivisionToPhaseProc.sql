@@ -154,7 +154,7 @@ BEGIN
             FROM EventEncounters e
             INNER JOIN EventUnits u ON u.Id = e.Unit1Id OR u.Id = e.Unit2Id
             WHERE e.DivisionId = @DivisionId
-              AND u.IsActive = 1
+              AND u.Status NOT IN ('Cancelled', 'Waitlisted')
             GROUP BY u.Id
         ),
         UnitsWithSeeds AS (
