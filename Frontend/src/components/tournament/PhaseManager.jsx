@@ -7,9 +7,16 @@ import { tournamentApi } from '../../services/api';
 
 const PHASE_TYPES = [
   { value: 'RoundRobin', label: 'Round Robin', icon: Grid3X3, description: 'All teams play each other' },
-  { value: 'SingleElimination', label: 'Single Elimination', icon: GitBranch, description: 'Lose once and you\'re out' },
-  { value: 'DoubleElimination', label: 'Double Elimination', icon: GitBranch, description: 'Lose twice and you\'re out' },
   { value: 'Pools', label: 'Pool Play', icon: Grid3X3, description: 'Multiple round-robin pools' },
+  { value: 'BracketRound', label: 'Bracket Round', icon: GitBranch, description: 'Single bracket round (e.g., Semifinal, Final)' },
+  { value: 'SingleElimination', label: 'Single Elimination (Full)', icon: GitBranch, description: 'Complete bracket in one phase' },
+  { value: 'DoubleElimination', label: 'Double Elimination', icon: GitBranch, description: 'Lose twice and you\'re out' },
+];
+
+const SEEDING_STRATEGIES = [
+  { value: 'Snake', label: 'Snake Draft', description: '1A, 1B, 2B, 2A, 3A, 3B... (standard)' },
+  { value: 'Sequential', label: 'Sequential', description: '1A, 2A, 3A, 1B, 2B, 3B...' },
+  { value: 'CrossPool', label: 'Cross Pool', description: '1A vs 2B, 1B vs 2A (2 pools only)' },
 ];
 
 const PHASE_STATUS_COLORS = {
@@ -61,6 +68,8 @@ export default function PhaseManager({ divisionId, eventId, readOnly = false }) 
       advancingSlotCount: 4,
       poolCount: 1,
       bestOf: 1,
+      includeConsolation: false,
+      seedingStrategy: 'Snake',
     });
     setIsModalOpen(true);
   };
@@ -284,10 +293,15 @@ function PhaseCard({
                     {phase.poolCount} pools
                   </span>
                 )}
-                <span className="flex items-center gap-1">
-                  <Award className="w-4 h-4" />
-                  {phase.advancingSlotCount} advance
-                </span>
+                {phase.advancingSlotCount > 0 && (
+                  <span className="flex items-center gap-1">
+                    <Award className="w-4 h-4" />
+                    {phase.advancingSlotCount} advance
+                  </span>
+                )}
+                {phase.includeConsolation && (
+                  <span className="text-amber-600 text-xs font-medium">+3rd Place</span>
+                )}
               </div>
               {phase.startTime && (
                 <div className="flex items-center gap-1 mt-1 text-sm text-gray-500">
@@ -427,6 +441,49 @@ function PhaseModal({ phase, onChange, onSave, onClose }) {
                   ? `${Math.ceil((phase.incomingSlotCount || 8) / phase.poolCount)} teams per pool`
                   : 'Single pool - all teams play each other'
                 }
+              </p>
+            </div>
+          )}
+
+          {/* BracketRound specific options */}
+          {phase.phaseType === 'BracketRound' && (
+            <>
+              <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                <input
+                  type="checkbox"
+                  id="includeConsolation"
+                  checked={phase.includeConsolation || false}
+                  onChange={(e) => handleChange('includeConsolation', e.target.checked)}
+                  className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                />
+                <label htmlFor="includeConsolation" className="text-sm text-gray-700">
+                  <span className="font-medium">Include 3rd Place Match</span>
+                  <span className="block text-gray-500">Semifinal losers play for 3rd place</span>
+                </label>
+              </div>
+              <p className="text-xs text-gray-500">
+                Creates {Math.floor((phase.incomingSlotCount || 4) / 2)} bracket match{Math.floor((phase.incomingSlotCount || 4) / 2) !== 1 ? 'es' : ''}
+                {phase.includeConsolation ? ' + consolation match' : ''}
+                {(phase.incomingSlotCount || 4) % 2 === 1 ? ' (top seed gets bye)' : ''}
+              </p>
+            </>
+          )}
+
+          {/* Seeding Strategy (for bracket phases receiving from pools) */}
+          {(phase.phaseType === 'BracketRound' || phase.phaseType === 'SingleElimination') && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Seeding Strategy (from Pools)</label>
+              <select
+                value={phase.seedingStrategy || 'Snake'}
+                onChange={(e) => handleChange('seedingStrategy', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              >
+                {SEEDING_STRATEGIES.map(s => (
+                  <option key={s.value} value={s.value}>{s.label}</option>
+                ))}
+              </select>
+              <p className="text-xs text-gray-500 mt-1">
+                {SEEDING_STRATEGIES.find(s => s.value === (phase.seedingStrategy || 'Snake'))?.description}
               </p>
             </div>
           )}

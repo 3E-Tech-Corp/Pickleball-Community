@@ -1630,6 +1630,9 @@ export const tournamentApi = {
 
   // Advancement Rules
   setAdvancementRules: (phaseId, rules) => api.post(`/divisionphases/${phaseId}/advancement-rules`, rules),
+  /** Auto-generate advancement rules from source phase using seeding strategy (Snake, Sequential, CrossPool) */
+  generateAdvancementRules: (phaseId, sourcePhaseId, advancingPerPool = null) =>
+    api.post(`/divisionphases/${phaseId}/auto-advancement-rules`, { sourcePhaseId, advancingPerPool }),
 
   // Court Assignments
   setPhaseCourtAssignments: (phaseId, assignments) => api.post(`/divisionphases/${phaseId}/court-assignments`, assignments),
