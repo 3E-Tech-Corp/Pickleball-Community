@@ -42,7 +42,7 @@ export default function Events() {
   const [statesWithCounts, setStatesWithCounts] = useState([]);
   const [citiesWithCounts, setCitiesWithCounts] = useState([]);
   const [userLocation, setUserLocation] = useState(null);
-  const [radiusMiles, setRadiusMiles] = useState(100);
+  const [radiusMiles, setRadiusMiles] = useState(0); // 0 = Anywhere
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
