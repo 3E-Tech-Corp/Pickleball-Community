@@ -33,6 +33,7 @@ import HelpTopicsAdmin from './HelpTopicsAdmin'
 import ObjectAssetTypesAdmin from './ObjectAssetTypesAdmin'
 import EventsAdmin from './EventsAdmin'
 import StaffRolesAdmin from './StaffRolesAdmin'
+import PhaseTemplatesAdmin from './PhaseTemplatesAdmin'
 
 const AdminDashboard = () => {
   const { user } = useAuth()
@@ -992,7 +993,8 @@ const AdminDashboard = () => {
         { id: 'teamUnits', label: 'Team Units', icon: Users },
         { id: 'skillLevels', label: 'Skill Levels', icon: Award },
         { id: 'scoreMethods', label: 'Score Methods', icon: Play },
-        { id: 'gameFormats', label: 'Game Formats', icon: Settings }
+        { id: 'gameFormats', label: 'Game Formats', icon: Settings },
+        { id: 'phaseTemplates', label: 'Phase Templates', icon: Layers }
       ]
     },
     {
@@ -2590,6 +2592,9 @@ const AdminDashboard = () => {
 
           {/* Game Formats Admin */}
           {activeTab === 'gameFormats' && <GameFormatsAdmin embedded />}
+
+          {/* Phase Templates Admin */}
+          {activeTab === 'phaseTemplates' && <PhaseTemplatesAdmin embedded />}
 
           {/* League Admin */}
           {activeTab === 'leagues' && <LeagueAdmin embedded />}
