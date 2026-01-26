@@ -7,7 +7,7 @@ import {
   Award, ArrowRight, Lock, Unlock, Save, Map, ExternalLink, FileText, User,
   CheckCircle, XCircle, MoreVertical, Upload, Send, Info, Radio, ClipboardList,
   Download, Lightbulb, Shield, Trash2, Building2, Layers, UserCheck, Grid3X3,
-  Hammer, BookOpen, Phone, EyeOff, Edit3, Map as MapIcon
+  Hammer, BookOpen, Phone, EyeOff, Edit3, Map as MapIcon, Mail, Image
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
@@ -96,6 +96,8 @@ export default function TournamentManage() {
   const [editForm, setEditForm] = useState({});
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [savingEvent, setSavingEvent] = useState(false);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [uploadingBanner, setUploadingBanner] = useState(false);
 
   // Staff management state
   const [staffList, setStaffList] = useState([]);
@@ -401,6 +403,14 @@ export default function TournamentManage() {
       startTime: startDate.time || '08:00',
       endDate: endDate.date,
       endTime: endDate.time || '18:00',
+      // Logo & Banner
+      posterImageUrl: eventData.posterImageUrl || '',
+      bannerImageUrl: eventData.bannerImageUrl || '',
+      // Contact Info
+      contactName: eventData.contactName || '',
+      contactEmail: eventData.contactEmail || '',
+      contactPhone: eventData.contactPhone || '',
+      paymentInstructions: eventData.paymentInstructions || '',
     });
     setHasUnsavedChanges(false);
   };
@@ -445,6 +455,14 @@ export default function TournamentManage() {
         country: editForm.country || null,
         registrationFee: editForm.registrationFee ? parseFloat(editForm.registrationFee) : 0,
         perDivisionFee: editForm.perDivisionFee ? parseFloat(editForm.perDivisionFee) : 0,
+        // Logo & Banner
+        posterImageUrl: editForm.posterImageUrl || null,
+        bannerImageUrl: editForm.bannerImageUrl || null,
+        // Contact Info
+        contactName: editForm.contactName || null,
+        contactEmail: editForm.contactEmail || null,
+        contactPhone: editForm.contactPhone || null,
+        paymentInstructions: editForm.paymentInstructions || null,
       };
 
       const response = await eventsApi.update(eventId, updateData);
@@ -1716,6 +1734,72 @@ export default function TournamentManage() {
     }
   };
 
+  // Handle logo upload
+  const handleLogoUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+    if (!validTypes.includes(file.type)) {
+      toast.error('Please upload an image file (JPG, PNG, GIF, WebP)');
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('File size must be less than 5MB');
+      return;
+    }
+
+    setUploadingLogo(true);
+    try {
+      const response = await sharedAssetApi.uploadViaProxy(file, 'image', 'event-logo');
+      if (response.success && response.data?.url) {
+        handleFormChange('posterImageUrl', response.data.url);
+        toast.success('Logo uploaded successfully');
+      } else {
+        toast.error(response.message || 'Failed to upload logo');
+      }
+    } catch (err) {
+      console.error('Error uploading logo:', err);
+      toast.error('Failed to upload logo');
+    } finally {
+      setUploadingLogo(false);
+    }
+  };
+
+  // Handle banner upload
+  const handleBannerUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+    if (!validTypes.includes(file.type)) {
+      toast.error('Please upload an image file (JPG, PNG, GIF, WebP)');
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error('File size must be less than 10MB');
+      return;
+    }
+
+    setUploadingBanner(true);
+    try {
+      const response = await sharedAssetApi.uploadViaProxy(file, 'image', 'event-banner');
+      if (response.success && response.data?.url) {
+        handleFormChange('bannerImageUrl', response.data.url);
+        toast.success('Banner uploaded successfully');
+      } else {
+        toast.error(response.message || 'Failed to upload banner');
+      }
+    } catch (err) {
+      console.error('Error uploading banner:', err);
+      toast.error('Failed to upload banner');
+    } finally {
+      setUploadingBanner(false);
+    }
+  };
+
   // Send waiver request to player
   const handleSendWaiverRequest = async (player) => {
     setSendingWaiverRequest(player.userId);
@@ -2683,6 +2767,164 @@ export default function TournamentManage() {
                   eventId={parseInt(eventId)}
                   onFeesChange={() => loadDashboard()}
                 />
+              </div>
+            </div>
+
+            {/* Logo & Banner */}
+            <div className="bg-white rounded-xl shadow-sm p-6">
+              <h3 className="font-medium text-gray-900 mb-4 flex items-center gap-2">
+                <Image className="w-5 h-5 text-gray-500" />
+                Logo & Banner Images
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Event Logo */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Event Logo</label>
+                  {editForm.posterImageUrl ? (
+                    <div className="relative">
+                      <img
+                        src={editForm.posterImageUrl}
+                        alt="Event Logo"
+                        className="w-full h-40 object-contain bg-gray-50 rounded-lg border border-gray-200"
+                      />
+                      <button
+                        onClick={() => handleFormChange('posterImageUrl', '')}
+                        className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <label className="flex flex-col items-center justify-center w-full h-40 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100 transition-colors">
+                      <div className="flex flex-col items-center justify-center py-4">
+                        {uploadingLogo ? (
+                          <Loader2 className="w-8 h-8 text-gray-400 animate-spin" />
+                        ) : (
+                          <>
+                            <Upload className="w-8 h-8 text-gray-400 mb-2" />
+                            <p className="text-sm text-gray-500">Click to upload logo</p>
+                            <p className="text-xs text-gray-400 mt-1">JPG, PNG, GIF, WebP (max 5MB)</p>
+                          </>
+                        )}
+                      </div>
+                      <input
+                        type="file"
+                        className="hidden"
+                        accept="image/*"
+                        onChange={handleLogoUpload}
+                        disabled={uploadingLogo}
+                      />
+                    </label>
+                  )}
+                </div>
+
+                {/* Event Banner */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Event Banner</label>
+                  {editForm.bannerImageUrl ? (
+                    <div className="relative">
+                      <img
+                        src={editForm.bannerImageUrl}
+                        alt="Event Banner"
+                        className="w-full h-40 object-cover bg-gray-50 rounded-lg border border-gray-200"
+                      />
+                      <button
+                        onClick={() => handleFormChange('bannerImageUrl', '')}
+                        className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <label className="flex flex-col items-center justify-center w-full h-40 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100 transition-colors">
+                      <div className="flex flex-col items-center justify-center py-4">
+                        {uploadingBanner ? (
+                          <Loader2 className="w-8 h-8 text-gray-400 animate-spin" />
+                        ) : (
+                          <>
+                            <Upload className="w-8 h-8 text-gray-400 mb-2" />
+                            <p className="text-sm text-gray-500">Click to upload banner</p>
+                            <p className="text-xs text-gray-400 mt-1">JPG, PNG, GIF, WebP (max 10MB)</p>
+                          </>
+                        )}
+                      </div>
+                      <input
+                        type="file"
+                        className="hidden"
+                        accept="image/*"
+                        onChange={handleBannerUpload}
+                        disabled={uploadingBanner}
+                      />
+                    </label>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Contact Information */}
+            <div className="bg-white rounded-xl shadow-sm p-6">
+              <h3 className="font-medium text-gray-900 mb-4 flex items-center gap-2">
+                <User className="w-5 h-5 text-gray-500" />
+                Contact Information
+              </h3>
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      <User className="w-4 h-4 inline mr-1" />
+                      Contact Name
+                    </label>
+                    <input
+                      type="text"
+                      value={editForm.contactName || ''}
+                      onChange={(e) => handleFormChange('contactName', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-orange-500 focus:border-orange-500"
+                      placeholder="Tournament Director"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      <Mail className="w-4 h-4 inline mr-1" />
+                      Contact Email
+                    </label>
+                    <input
+                      type="email"
+                      value={editForm.contactEmail || ''}
+                      onChange={(e) => handleFormChange('contactEmail', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-orange-500 focus:border-orange-500"
+                      placeholder="contact@example.com"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      <Phone className="w-4 h-4 inline mr-1" />
+                      Contact Phone
+                    </label>
+                    <input
+                      type="tel"
+                      value={editForm.contactPhone || ''}
+                      onChange={(e) => handleFormChange('contactPhone', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-orange-500 focus:border-orange-500"
+                      placeholder="(555) 123-4567"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <DollarSign className="w-4 h-4 inline mr-1" />
+                    Payment Instructions
+                  </label>
+                  <textarea
+                    value={editForm.paymentInstructions || ''}
+                    onChange={(e) => handleFormChange('paymentInstructions', e.target.value)}
+                    rows={3}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-orange-500 focus:border-orange-500"
+                    placeholder="Enter payment instructions (e.g., Venmo: @username, Zelle: email@example.com)"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    This will be shown to players on the registration/payment page.
+                  </p>
+                </div>
               </div>
             </div>
           </div>
