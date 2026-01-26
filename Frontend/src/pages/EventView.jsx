@@ -4,7 +4,7 @@ import {
   Calendar, MapPin, Clock, Users, DollarSign, ChevronLeft,
   UserPlus, Building2, Phone, Mail, User, Image, ExternalLink,
   Loader2, AlertCircle, FileText, Radio, Settings, Trophy, Medal,
-  Edit3, Check
+  Edit3, Check, X
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { eventsApi, objectAssetsApi, scoreboardApi, tournamentApi, eventStaffApi, getSharedAssetUrl } from '../services/api';
@@ -26,6 +26,7 @@ export default function EventView() {
   const [selectedProfileUserId, setSelectedProfileUserId] = useState(null);
   const [userRegistrations, setUserRegistrations] = useState([]);
   const [staffStatus, setStaffStatus] = useState(null); // { isStaff: boolean, status: string, roleName: string }
+  const [selectedAd, setSelectedAd] = useState(null); // For fullsize ad modal
 
   // Load event data
   useEffect(() => {
@@ -487,45 +488,33 @@ export default function EventView() {
               </div>
             )}
 
-            {/* Ad Assets */}
+            {/* Sponsors & Ads */}
             {adAssets.length > 0 && (
               <div className="mb-6 pb-6 border-b border-gray-100">
                 <h2 className="text-lg font-semibold text-gray-900 mb-3 flex items-center gap-2">
                   <Image className="w-5 h-5 text-orange-600" />
-                  Sponsors & Ads
+                  Sponsors
                 </h2>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 gap-3">
                   {adAssets.map((asset) => (
-                    <div key={asset.id} className="relative group">
+                    <div
+                      key={asset.id}
+                      className="bg-white border border-gray-200 rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow cursor-pointer"
+                      onClick={() => setSelectedAd(asset)}
+                    >
                       {asset.fileUrl && (
-                        asset.linkUrl ? (
-                          <a
-                            href={asset.linkUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="block"
-                          >
-                            <img
-                              src={getSharedAssetUrl(asset.fileUrl)}
-                              alt={asset.title || 'Ad'}
-                              className="w-full h-auto rounded-lg shadow-sm hover:shadow-md transition-shadow"
-                            />
-                            {asset.title && (
-                              <p className="mt-2 text-sm text-gray-600">{asset.title}</p>
-                            )}
-                          </a>
-                        ) : (
-                          <>
-                            <img
-                              src={getSharedAssetUrl(asset.fileUrl)}
-                              alt={asset.title || 'Ad'}
-                              className="w-full h-auto rounded-lg shadow-sm"
-                            />
-                            {asset.title && (
-                              <p className="mt-2 text-sm text-gray-600">{asset.title}</p>
-                            )}
-                          </>
-                        )
+                        <div className="aspect-[4/3] bg-gray-50 flex items-center justify-center overflow-hidden">
+                          <img
+                            src={getSharedAssetUrl(asset.fileUrl)}
+                            alt={asset.title || 'Sponsor'}
+                            className="w-full h-full object-contain"
+                          />
+                        </div>
+                      )}
+                      {asset.title && (
+                        <div className="p-2 border-t border-gray-100">
+                          <p className="text-xs text-gray-600 truncate text-center">{asset.title}</p>
+                        </div>
                       )}
                     </div>
                   ))}
@@ -828,6 +817,58 @@ export default function EventView() {
           userId={selectedProfileUserId}
           onClose={() => setSelectedProfileUserId(null)}
         />
+      )}
+
+      {/* Ad/Sponsor Fullsize Modal */}
+      {selectedAd && (
+        <div
+          className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4"
+          onClick={() => setSelectedAd(null)}
+        >
+          <div
+            className="bg-white rounded-xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-4 border-b">
+              <h3 className="font-semibold text-gray-900">
+                {selectedAd.title || 'Sponsor'}
+              </h3>
+              <button
+                onClick={() => setSelectedAd(null)}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="p-4 flex items-center justify-center bg-gray-50">
+              {selectedAd.fileUrl && (
+                <img
+                  src={getSharedAssetUrl(selectedAd.fileUrl)}
+                  alt={selectedAd.title || 'Sponsor'}
+                  className="max-w-full max-h-[60vh] object-contain"
+                />
+              )}
+            </div>
+
+            {/* Modal Footer with Link */}
+            {selectedAd.linkUrl && (
+              <div className="p-4 border-t bg-gray-50 flex justify-center">
+                <a
+                  href={selectedAd.linkUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors"
+                >
+                  <ExternalLink className="w-4 h-4" />
+                  Visit Sponsor
+                </a>
+              </div>
+            )}
+          </div>
+        </div>
       )}
     </div>
   );
