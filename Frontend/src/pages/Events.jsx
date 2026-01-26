@@ -6316,7 +6316,7 @@ function EventDetailModal({ event, isAuthenticated, isAdmin, currentUserId, user
                           <div className="flex items-center gap-3">
                             <span className="text-gray-400 font-medium w-6">{index + 1}.</span>
                             <img
-                              src={acceptedMembers[0].profileImageUrl || '/default-avatar.png'}
+                              src={getSharedAssetUrl(acceptedMembers[0].profileImageUrl) || '/default-avatar.png'}
                               alt=""
                               className="w-10 h-10 rounded-full object-cover"
                             />
@@ -6338,7 +6338,7 @@ function EventDetailModal({ event, isAuthenticated, isAdmin, currentUserId, user
                                   <div key={member.id} className="flex items-center gap-2">
                                     {mIndex > 0 && <span className="text-gray-400">&</span>}
                                     <img
-                                      src={member.profileImageUrl || '/default-avatar.png'}
+                                      src={getSharedAssetUrl(member.profileImageUrl) || '/default-avatar.png'}
                                       alt=""
                                       className="w-8 h-8 rounded-full object-cover"
                                     />
@@ -6358,7 +6358,7 @@ function EventDetailModal({ event, isAuthenticated, isAdmin, currentUserId, user
                                 {pendingJoinRequests.map((member) => (
                                   <div key={member.joinRequestId} className="flex items-center gap-2 bg-orange-50 border border-orange-200 rounded-full px-2 py-1">
                                     <img
-                                      src={member.profileImageUrl || '/default-avatar.png'}
+                                      src={getSharedAssetUrl(member.profileImageUrl) || '/default-avatar.png'}
                                       alt=""
                                       className="w-6 h-6 rounded-full object-cover"
                                     />
@@ -6403,7 +6403,7 @@ function EventDetailModal({ event, isAuthenticated, isAdmin, currentUserId, user
                               {acceptedMembers.map((member) => (
                                 <div key={member.id} className="flex items-center gap-1 bg-gray-100 rounded-full px-2 py-1">
                                   <img
-                                    src={member.profileImageUrl || '/default-avatar.png'}
+                                    src={getSharedAssetUrl(member.profileImageUrl) || '/default-avatar.png'}
                                     alt=""
                                     className="w-5 h-5 rounded-full object-cover"
                                   />
@@ -6416,7 +6416,7 @@ function EventDetailModal({ event, isAuthenticated, isAdmin, currentUserId, user
                               {pendingJoinRequests.map((member) => (
                                 <div key={member.joinRequestId} className="flex items-center gap-1 bg-orange-50 border border-orange-200 rounded-full px-2 py-1">
                                   <img
-                                    src={member.profileImageUrl || '/default-avatar.png'}
+                                    src={getSharedAssetUrl(member.profileImageUrl) || '/default-avatar.png'}
                                     alt=""
                                     className="w-5 h-5 rounded-full object-cover"
                                   />
