@@ -799,7 +799,7 @@ export default function EventRegistration() {
   // Handle pay later
   const handlePayLater = () => {
     toast.info('You can complete payment later from your dashboard');
-    setCurrentStep(3); // Go to success step
+    navigate(`/event/${eventId}`); // Go back to event view
   };
 
   // Handle waiver signing
