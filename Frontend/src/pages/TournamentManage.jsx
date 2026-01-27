@@ -5211,8 +5211,11 @@ export default function TournamentManage() {
                                         </span>
                                       </button>
                                       {/* Payment status $ icon */}
-                                      <span className={`text-sm ${member.hasPaid ? 'text-green-600' : 'text-gray-400'}`} title={member.hasPaid ? 'Paid' : 'Unpaid'}>
-                                        <DollarSign className="w-4 h-4" />
+                                      <span
+                                        className={`flex items-center justify-center w-5 h-5 rounded-full ${member.hasPaid ? 'bg-green-500' : 'bg-gray-300'}`}
+                                        title={member.hasPaid ? 'Paid' : 'Unpaid'}
+                                      >
+                                        <DollarSign className={`w-3 h-3 ${member.hasPaid ? 'text-white' : 'text-gray-500'}`} />
                                       </span>
                                       {/* Remove member button - show for singles or when team has multiple members */}
                                       <button
