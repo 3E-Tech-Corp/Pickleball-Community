@@ -1761,8 +1761,8 @@ export default function TournamentManage() {
     setUploadingLogo(true);
     try {
       const response = await sharedAssetApi.uploadViaProxy(file, 'image', 'event-logo');
-      if (response.success && response.data?.url) {
-        handleFormChange('posterImageUrl', response.data.url);
+      if (response.success && response.url) {
+        handleFormChange('posterImageUrl', response.url);
         toast.success('Logo uploaded successfully');
       } else {
         toast.error(response.message || 'Failed to upload logo');
@@ -1794,8 +1794,8 @@ export default function TournamentManage() {
     setUploadingBanner(true);
     try {
       const response = await sharedAssetApi.uploadViaProxy(file, 'image', 'event-banner');
-      if (response.success && response.data?.url) {
-        handleFormChange('bannerImageUrl', response.data.url);
+      if (response.success && response.url) {
+        handleFormChange('bannerImageUrl', response.url);
         toast.success('Banner uploaded successfully');
       } else {
         toast.error(response.message || 'Failed to upload banner');
