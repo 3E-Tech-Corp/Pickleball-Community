@@ -15,6 +15,7 @@ import { useNotifications } from '../hooks/useNotifications';
 import { tournamentApi, gameDayApi, eventsApi, objectAssetsApi, checkInApi, sharedAssetApi, getSharedAssetUrl, eventTypesApi, eventStaffApi, teamUnitsApi, skillLevelsApi, ageGroupsApi, objectAssetTypesApi, friendsApi } from '../services/api';
 import ScheduleConfigModal from '../components/ScheduleConfigModal';
 import DivisionFeesEditor from '../components/DivisionFeesEditor';
+import MatchFormatEditor from '../components/MatchFormatEditor';
 import PublicProfileModal from '../components/ui/PublicProfileModal';
 import GameScoreModal from '../components/ui/GameScoreModal';
 import VenuePicker from '../components/ui/VenuePicker';
@@ -8332,6 +8333,14 @@ export default function TournamentManage() {
                   eventId={parseInt(eventId)}
                   divisionFee={editingDivision.divisionFee || 0}
                   onFeesChange={() => loadEvent()}
+                />
+              )}
+
+              {/* Match Format Configuration - only show when editing existing division */}
+              {editingDivision.id && (
+                <MatchFormatEditor
+                  divisionId={editingDivision.id}
+                  onConfigChange={() => loadEvent()}
                 />
               )}
 
