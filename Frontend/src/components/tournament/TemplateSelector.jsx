@@ -42,9 +42,8 @@ export default function TemplateSelector({ divisionId, unitCount = 8, onApply, o
       setLoading(true);
       // Get all templates, then filter by unit count on frontend for better UX
       const response = await tournamentApi.getPhaseTemplates();
-      if (response.success) {
-        setTemplates(response.data || []);
-      }
+      // Response is the array directly (axios interceptor returns response.data)
+      setTemplates(Array.isArray(response) ? response : (response?.data || response || []));
     } catch (err) {
       setError('Failed to load templates');
       console.error('Error fetching templates:', err);
@@ -65,9 +64,8 @@ export default function TemplateSelector({ divisionId, unitCount = 8, onApply, o
         divisionId,
         unitCount || template.defaultUnits
       );
-      if (response.success) {
-        setPreview(response.data);
-      }
+      // Response is the preview object directly (axios interceptor returns response.data)
+      setPreview(response?.data || response);
     } catch (err) {
       console.error('Error loading preview:', err);
     } finally {
@@ -87,10 +85,12 @@ export default function TemplateSelector({ divisionId, unitCount = 8, onApply, o
         true // clear existing phases
       );
 
-      if (response.success) {
-        onApply?.(response.data);
+      // Response is the result object directly (axios interceptor returns response.data)
+      const result = response?.data || response;
+      if (result?.success !== false) {
+        onApply?.(result);
       } else {
-        alert('Failed to apply template: ' + (response.message || 'Unknown error'));
+        alert('Failed to apply template: ' + (result?.message || 'Unknown error'));
       }
     } catch (err) {
       console.error('Error applying template:', err);
