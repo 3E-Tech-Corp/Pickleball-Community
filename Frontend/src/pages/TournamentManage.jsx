@@ -3219,13 +3219,22 @@ export default function TournamentManage() {
             {isOrganizer && (
               <div className="flex items-center justify-between">
                 <h2 className="text-lg font-semibold text-gray-900">Tournament Divisions</h2>
-                <button
-                  onClick={handleOpenAddDivision}
-                  className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 flex items-center gap-2"
-                >
-                  <Plus className="w-4 h-4" />
-                  Add Division
-                </button>
+                <div className="flex items-center gap-2">
+                  <Link
+                    to={`/tournament/${eventId}/schedules`}
+                    className="px-4 py-2 text-sm font-medium text-blue-600 border border-blue-300 rounded-lg hover:bg-blue-50 flex items-center gap-2"
+                  >
+                    <Calendar className="w-4 h-4" />
+                    View All Schedules
+                  </Link>
+                  <button
+                    onClick={handleOpenAddDivision}
+                    className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 flex items-center gap-2"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Add Division
+                  </button>
+                </div>
               </div>
             )}
 
