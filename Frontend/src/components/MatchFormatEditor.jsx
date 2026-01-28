@@ -248,7 +248,7 @@ export default function MatchFormatEditor({ divisionId, onConfigChange }) {
               <div className="space-y-2">
                 {config.matchFormats.map((format, index) => (
                   <div key={index} className="p-3 border border-gray-200 rounded-lg bg-white">
-                    {/* Row 1: Match number, name, code, best of */}
+                    {/* Row 1: Match number, name, code */}
                     <div className="flex items-center gap-3">
                       <span className="w-8 h-8 flex items-center justify-center bg-gray-100 rounded-full text-sm font-medium text-gray-600 flex-shrink-0">
                         {index + 1}
@@ -272,19 +272,6 @@ export default function MatchFormatEditor({ divisionId, onConfigChange }) {
                           maxLength={10}
                           className="w-16 border border-gray-300 rounded p-1.5 text-sm text-center uppercase"
                         />
-                      </div>
-
-                      <div className="flex items-center gap-1 flex-shrink-0">
-                        <label className="text-xs text-gray-500">Best of:</label>
-                        <select
-                          value={format.bestOf}
-                          onChange={(e) => handleFormatChange(index, 'bestOf', parseInt(e.target.value))}
-                          className="border border-gray-300 rounded p-1.5 text-sm"
-                        >
-                          <option value={1}>1</option>
-                          <option value={3}>3</option>
-                          <option value={5}>5</option>
-                        </select>
                       </div>
                     </div>
 
