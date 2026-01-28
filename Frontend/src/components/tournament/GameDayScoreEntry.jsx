@@ -3,7 +3,7 @@ import {
   ClipboardList, Search, Filter, Loader2, Play, CheckCircle2,
   Clock, ChevronRight, Save, AlertTriangle, MapPin
 } from 'lucide-react';
-import { tournamentApi, eventRunningApi } from '../../services/api';
+import { tournamentApi, encounterApi, gameDayApi } from '../../services/api';
 
 /**
  * GameDayScoreEntry - Score entry interface for scorekeepers
@@ -90,9 +90,14 @@ export default function GameDayScoreEntry({ eventId, event, permissions, onRefre
     setSelectedEncounter(encounter);
     // Load detailed encounter data with games
     try {
-      const detailRes = await eventRunningApi.getEncounterDetail(encounter.id);
+      const detailRes = await encounterApi.getEncounter(encounter.id);
       if (detailRes.success) {
-        setSelectedEncounter(detailRes.data);
+        // Merge loaded data with division/phase info from list
+        setSelectedEncounter({
+          ...detailRes.data,
+          divisionName: encounter.divisionName,
+          phaseName: encounter.phaseName
+        });
         // Initialize scores from games
         const gameScores = {};
         detailRes.data.matches?.forEach(match => {
@@ -127,13 +132,15 @@ export default function GameDayScoreEntry({ eventId, event, permissions, onRefre
       setSaving(true);
       setError(null);
 
-      // Save each game score
+      // Save each game score using gameDayApi.submitScore
       for (const [gameId, gameScores] of Object.entries(scores)) {
         if (gameScores.unit1Score !== '' && gameScores.unit2Score !== '') {
-          await eventRunningApi.updateGameScore(gameId, {
-            unit1Score: parseInt(gameScores.unit1Score),
-            unit2Score: parseInt(gameScores.unit2Score)
-          });
+          await gameDayApi.submitScore(
+            parseInt(gameId),
+            parseInt(gameScores.unit1Score),
+            parseInt(gameScores.unit2Score),
+            false // don't finalize yet
+          );
         }
       }
 
@@ -151,7 +158,31 @@ export default function GameDayScoreEntry({ eventId, event, permissions, onRefre
   const handleCompleteMatch = async (matchId) => {
     try {
       setSaving(true);
-      await eventRunningApi.completeMatch(matchId);
+      setError(null);
+
+      // Find the match and finalize all its games
+      const match = selectedEncounter?.matches?.find(m => m.id === matchId);
+      if (!match?.games?.length) {
+        setError('No games to complete');
+        return;
+      }
+
+      // Finalize each game that has scores
+      for (const game of match.games) {
+        const gameScore = scores[game.id];
+        const unit1Score = gameScore?.unit1Score ?? game.unit1Score;
+        const unit2Score = gameScore?.unit2Score ?? game.unit2Score;
+
+        if (unit1Score !== '' && unit1Score !== null && unit2Score !== '' && unit2Score !== null) {
+          await gameDayApi.submitScore(
+            game.id,
+            parseInt(unit1Score),
+            parseInt(unit2Score),
+            true // finalize the game
+          );
+        }
+      }
+
       await handleSelectEncounter(selectedEncounter);
       onRefresh?.();
     } catch (err) {
