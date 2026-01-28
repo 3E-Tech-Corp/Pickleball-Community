@@ -136,9 +136,12 @@ export default function ScheduleOverview() {
         {divisionsWithSchedules.map(div => (
           <div key={div.id} className="bg-white rounded-lg shadow-sm overflow-hidden">
             {/* Division Header */}
-            <button
+            <div
               onClick={() => toggleDivision(div.id)}
-              className="w-full flex items-center justify-between px-6 py-4 hover:bg-gray-50 transition-colors"
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => e.key === 'Enter' && toggleDivision(div.id)}
+              className="w-full flex items-center justify-between px-6 py-4 hover:bg-gray-50 transition-colors cursor-pointer"
             >
               <div className="flex items-center gap-3">
                 {expandedDivisions[div.id] ? (
@@ -197,7 +200,7 @@ export default function ScheduleOverview() {
                   </>
                 )}
               </div>
-            </button>
+            </div>
 
             {/* Schedule Preview */}
             {expandedDivisions[div.id] && (
