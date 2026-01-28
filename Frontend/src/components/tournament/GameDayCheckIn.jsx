@@ -4,10 +4,9 @@ import {
   Loader2, User, ChevronUp, ChevronDown, AlertCircle, XCircle,
   Eye, ExternalLink, Send, Edit2
 } from 'lucide-react';
-import { checkInApi } from '../../services/api';
-import { getSharedAssetUrl } from '../../services/api';
+import { checkInApi, getSharedAssetUrl } from '../../services/api';
 import { toast } from 'react-hot-toast';
-import ProfileModal from '../ProfileModal';
+import PublicProfileModal from '../ui/PublicProfileModal';
 
 /**
  * GameDayCheckIn - Player check-in management for tournament game day
@@ -593,7 +592,7 @@ export default function GameDayCheckIn({ eventId, event, permissions, onRefresh 
 
       {/* Profile Modal */}
       {profileModalUserId && (
-        <ProfileModal
+        <PublicProfileModal
           userId={profileModalUserId}
           onClose={() => setProfileModalUserId(null)}
         />
