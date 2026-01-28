@@ -236,54 +236,21 @@ export default function MatchFormatEditor({ divisionId, onConfigChange }) {
             </span>
           </div>
 
-          {/* Quick Presets */}
-          {config.matchesPerEncounter <= 1 && (
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-gray-600">Quick presets:</span>
-              <button
-                onClick={() => applyPreset('team-scrimmage-3')}
-                className="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg"
-              >
-                3-Match Team Scrimmage
-              </button>
-              <button
-                onClick={() => applyPreset('team-scrimmage-5')}
-                className="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg"
-              >
-                5-Match Team Scrimmage
-              </button>
-            </div>
-          )}
 
           {/* Match Format Definitions */}
           {config.matchesPerEncounter > 1 && (
             <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <h4 className="font-medium text-gray-900 flex items-center gap-2">
-                  <Users className="w-4 h-4" />
-                  Match Definitions
-                </h4>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => applyPreset('team-scrimmage-3')}
-                    className="px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded"
-                  >
-                    3-Match Preset
-                  </button>
-                  <button
-                    onClick={() => applyPreset('team-scrimmage-5')}
-                    className="px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded"
-                  >
-                    5-Match Preset
-                  </button>
-                </div>
-              </div>
+              <h4 className="font-medium text-gray-900 flex items-center gap-2">
+                <Users className="w-4 h-4" />
+                Match Definitions
+              </h4>
 
               <div className="space-y-2">
                 {config.matchFormats.map((format, index) => (
                   <div key={index} className="p-3 border border-gray-200 rounded-lg bg-white">
-                    <div className="flex items-center gap-4">
-                      <span className="w-8 h-8 flex items-center justify-center bg-gray-100 rounded-full text-sm font-medium text-gray-600">
+                    {/* Row 1: Match number, name, code, best of */}
+                    <div className="flex items-center gap-3">
+                      <span className="w-8 h-8 flex items-center justify-center bg-gray-100 rounded-full text-sm font-medium text-gray-600 flex-shrink-0">
                         {index + 1}
                       </span>
 
@@ -292,10 +259,10 @@ export default function MatchFormatEditor({ divisionId, onConfigChange }) {
                         value={format.name}
                         onChange={(e) => handleFormatChange(index, 'name', e.target.value)}
                         placeholder="Match name"
-                        className="flex-1 border border-gray-300 rounded-lg p-2 text-sm"
+                        className="flex-1 border border-gray-300 rounded-lg p-2 text-sm min-w-0"
                       />
 
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1 flex-shrink-0">
                         <label className="text-xs text-gray-500">Code:</label>
                         <input
                           type="text"
@@ -303,52 +270,16 @@ export default function MatchFormatEditor({ divisionId, onConfigChange }) {
                           onChange={(e) => handleFormatChange(index, 'code', e.target.value.toUpperCase())}
                           placeholder="MD"
                           maxLength={10}
-                          className="w-16 border border-gray-300 rounded p-1 text-sm text-center uppercase"
+                          className="w-16 border border-gray-300 rounded p-1.5 text-sm text-center uppercase"
                         />
                       </div>
 
-                      <div className="flex items-center gap-2">
-                        <label className="text-xs text-gray-500">M:</label>
-                        <input
-                          type="number"
-                          min="0"
-                          max="4"
-                          value={format.maleCount}
-                          onChange={(e) => handleFormatChange(index, 'maleCount', parseInt(e.target.value) || 0)}
-                          className="w-14 border border-gray-300 rounded p-1 text-sm text-center"
-                        />
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        <label className="text-xs text-gray-500">F:</label>
-                        <input
-                          type="number"
-                          min="0"
-                          max="4"
-                          value={format.femaleCount}
-                          onChange={(e) => handleFormatChange(index, 'femaleCount', parseInt(e.target.value) || 0)}
-                          className="w-14 border border-gray-300 rounded p-1 text-sm text-center"
-                        />
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        <label className="text-xs text-gray-500">Any:</label>
-                        <input
-                          type="number"
-                          min="0"
-                          max="4"
-                          value={format.unisexCount}
-                          onChange={(e) => handleFormatChange(index, 'unisexCount', parseInt(e.target.value) || 0)}
-                          className="w-14 border border-gray-300 rounded p-1 text-sm text-center"
-                        />
-                      </div>
-
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1 flex-shrink-0">
                         <label className="text-xs text-gray-500">Best of:</label>
                         <select
                           value={format.bestOf}
                           onChange={(e) => handleFormatChange(index, 'bestOf', parseInt(e.target.value))}
-                          className="border border-gray-300 rounded p-1 text-sm"
+                          className="border border-gray-300 rounded p-1.5 text-sm"
                         >
                           <option value={1}>1</option>
                           <option value={3}>3</option>
@@ -357,12 +288,49 @@ export default function MatchFormatEditor({ divisionId, onConfigChange }) {
                       </div>
                     </div>
 
-                    <div className="mt-2 text-xs text-gray-500 ml-12">
-                      {format.code && <span className="font-medium mr-2">[{format.code}]</span>}
-                      Players per side: {(format.maleCount || 0) + (format.femaleCount || 0) + (format.unisexCount || 0)}
-                      {format.maleCount > 0 && ` (${format.maleCount} male)`}
-                      {format.femaleCount > 0 && ` (${format.femaleCount} female)`}
-                      {format.unisexCount > 0 && ` (${format.unisexCount} any gender)`}
+                    {/* Row 2: Player counts by gender */}
+                    <div className="flex items-center gap-4 mt-2 ml-11 text-sm">
+                      <span className="text-xs text-gray-500">Players per side:</span>
+
+                      <div className="flex items-center gap-1">
+                        <label className="text-xs text-blue-600 font-medium">M:</label>
+                        <input
+                          type="number"
+                          min="0"
+                          max="4"
+                          value={format.maleCount}
+                          onChange={(e) => handleFormatChange(index, 'maleCount', parseInt(e.target.value) || 0)}
+                          className="w-12 border border-gray-300 rounded p-1 text-sm text-center"
+                        />
+                      </div>
+
+                      <div className="flex items-center gap-1">
+                        <label className="text-xs text-pink-600 font-medium">F:</label>
+                        <input
+                          type="number"
+                          min="0"
+                          max="4"
+                          value={format.femaleCount}
+                          onChange={(e) => handleFormatChange(index, 'femaleCount', parseInt(e.target.value) || 0)}
+                          className="w-12 border border-gray-300 rounded p-1 text-sm text-center"
+                        />
+                      </div>
+
+                      <div className="flex items-center gap-1">
+                        <label className="text-xs text-gray-600 font-medium">Any:</label>
+                        <input
+                          type="number"
+                          min="0"
+                          max="4"
+                          value={format.unisexCount}
+                          onChange={(e) => handleFormatChange(index, 'unisexCount', parseInt(e.target.value) || 0)}
+                          className="w-12 border border-gray-300 rounded p-1 text-sm text-center"
+                        />
+                      </div>
+
+                      <span className="text-xs text-gray-400 ml-2">
+                        = {(format.maleCount || 0) + (format.femaleCount || 0) + (format.unisexCount || 0)} total
+                      </span>
                     </div>
                   </div>
                 ))}
