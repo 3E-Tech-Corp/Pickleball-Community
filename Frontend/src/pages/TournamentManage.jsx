@@ -2379,6 +2379,18 @@ export default function TournamentManage() {
                 </Link>
               )}
 
+              {/* Game Day Live link - organizers only */}
+              {isOrganizer && (dashboard?.tournamentStatus === 'Running' || dashboard?.tournamentStatus === 'Started' || dashboard?.divisions?.some(d => d.totalMatches > 0)) && (
+                <Link
+                  to={`/tournament/${eventId}/gameday`}
+                  className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium text-sm flex items-center gap-2"
+                  title="Game Day Live"
+                >
+                  <Radio className="w-4 h-4" />
+                  <span className="hidden sm:inline">Game Day</span>
+                </Link>
+              )}
+
               {/* Status dropdown - organizers only */}
               {isOrganizer && (
                 <select

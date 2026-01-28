@@ -1684,6 +1684,10 @@ export const tournamentApi = {
   processByes: (phaseId) =>
     api.post(`/phasetemplates/${phaseId}/process-byes`),
 
+  // Phase Advancement
+  processPhaseAdvancements: (phaseId) =>
+    api.post(`/divisionphases/${phaseId}/process-advancements`),
+
   // =====================================================
   // Court Groups
   // =====================================================

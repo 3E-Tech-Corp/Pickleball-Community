@@ -696,6 +696,94 @@ public class DivisionPhasesController : ControllerBase
         return Ok(new { success = true, data = new { updated = result.UpdatedCount, estimatedEndTime = result.EstimatedEndTime } });
     }
 
+    /// <summary>
+    /// Process advancements from a completed phase to the next phase
+    /// </summary>
+    [HttpPost("{id}/process-advancements")]
+    [Authorize(Roles = "Admin,Organizer")]
+    public async Task<IActionResult> ProcessAdvancements(int id)
+    {
+        var phase = await _context.DivisionPhases
+            .Include(p => p.Division)
+            .FirstOrDefaultAsync(p => p.Id == id);
+
+        if (phase == null)
+            return NotFound(new { success = false, message = "Phase not found" });
+
+        // Get all completed encounters in this phase
+        var completedEncounters = await _context.EventEncounters
+            .Where(e => e.PhaseId == id && e.Status == "Completed" && e.WinnerUnitId != null)
+            .ToListAsync();
+
+        if (!completedEncounters.Any())
+            return Ok(new { success = true, message = "No completed encounters to process", processed = 0 });
+
+        int advancementsProcessed = 0;
+        var errors = new List<string>();
+
+        foreach (var encounter in completedEncounters)
+        {
+            try
+            {
+                // Process winner advancement
+                if (encounter.WinnerNextEncounterId.HasValue && encounter.WinnerSlotPosition.HasValue)
+                {
+                    var nextEncounter = await _context.EventEncounters.FindAsync(encounter.WinnerNextEncounterId.Value);
+                    if (nextEncounter != null)
+                    {
+                        if (encounter.WinnerSlotPosition == 1)
+                        {
+                            nextEncounter.Unit1Id = encounter.WinnerUnitId;
+                        }
+                        else
+                        {
+                            nextEncounter.Unit2Id = encounter.WinnerUnitId;
+                        }
+                        advancementsProcessed++;
+                    }
+                }
+
+                // Process loser advancement (for double elimination)
+                if (encounter.LoserNextEncounterId.HasValue && encounter.LoserSlotPosition.HasValue)
+                {
+                    var loserUnitId = encounter.Unit1Id == encounter.WinnerUnitId
+                        ? encounter.Unit2Id
+                        : encounter.Unit1Id;
+
+                    var nextEncounter = await _context.EventEncounters.FindAsync(encounter.LoserNextEncounterId.Value);
+                    if (nextEncounter != null && loserUnitId.HasValue)
+                    {
+                        if (encounter.LoserSlotPosition == 1)
+                        {
+                            nextEncounter.Unit1Id = loserUnitId;
+                        }
+                        else
+                        {
+                            nextEncounter.Unit2Id = loserUnitId;
+                        }
+                        advancementsProcessed++;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                errors.Add($"Failed to process encounter {encounter.Id}: {ex.Message}");
+                _logger.LogError(ex, "Error processing advancement for encounter {EncounterId}", encounter.Id);
+            }
+        }
+
+        await _context.SaveChangesAsync();
+
+        return Ok(new {
+            success = true,
+            data = new {
+                processed = advancementsProcessed,
+                totalCompleted = completedEncounters.Count,
+                errors = errors.Any() ? errors : null
+            }
+        });
+    }
+
     #endregion
 
     #region Private Helpers
