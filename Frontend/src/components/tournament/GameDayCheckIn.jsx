@@ -5,13 +5,14 @@ import {
   Eye, ExternalLink, Send, Edit2
 } from 'lucide-react';
 import { checkInApi, getSharedAssetUrl } from '../../services/api';
-import { toast } from 'react-hot-toast';
+import { useToast } from '../../contexts/ToastContext';
 import PublicProfileModal from '../ui/PublicProfileModal';
 
 /**
  * GameDayCheckIn - Player check-in management for tournament game day
  */
 export default function GameDayCheckIn({ eventId, event, permissions, onRefresh }) {
+  const toast = useToast();
   const [loading, setLoading] = useState(false);
   const [checkInData, setCheckInData] = useState(null);
   const [checkInFilter, setCheckInFilter] = useState('all');
