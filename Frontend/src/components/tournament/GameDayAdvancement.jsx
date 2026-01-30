@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import {
   ChevronRight, Trophy, Users, CheckCircle2, AlertTriangle,
-  Play, Loader2, RefreshCw, Settings, ArrowRight, Lock, Unlock
+  Play, Loader2, RefreshCw, Settings, ArrowRight, Lock, Unlock,
+  Calculator, RotateCcw, UserPlus
 } from 'lucide-react';
-import { tournamentApi } from '../../services/api';
+import { tournamentApi, gameDayApi } from '../../services/api';
 
 /**
  * GameDayAdvancement - Manage automatic advancement between phases
@@ -307,6 +308,87 @@ export default function GameDayAdvancement({ eventId, event, permissions, onRefr
         )}
       </div>
 
+      {/* Standings Recalculation */}
+      {selectedDivision && (
+        <div className="bg-white rounded-lg shadow-sm p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+            <Calculator className="w-5 h-5 text-blue-500" />
+            Pool Standings
+          </h3>
+
+          <div className="space-y-3">
+            <p className="text-sm text-gray-600">
+              Recalculate pool rankings from game scores. This resets all statistics and recomputes
+              wins, losses, points, and rankings from completed games.
+            </p>
+
+            <div className="flex flex-wrap gap-3">
+              <button
+                onClick={async () => {
+                  try {
+                    setProcessing(true);
+                    setError(null);
+                    const res = await gameDayApi.calculatePoolRankings(event?.eventId || selectedDivision.eventId, selectedDivision.id);
+                    if (res.success) {
+                      await loadDivisionPhases();
+                      onRefresh?.();
+                    } else {
+                      setError(res.message || 'Failed to recalculate rankings');
+                    }
+                  } catch (err) {
+                    setError('Failed to recalculate rankings');
+                  } finally {
+                    setProcessing(false);
+                  }
+                }}
+                disabled={processing}
+                className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
+              >
+                {processing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Calculator className="w-4 h-4" />}
+                Recalculate Pool Rankings
+              </button>
+
+              <button
+                onClick={async () => {
+                  try {
+                    setProcessing(true);
+                    setError(null);
+                    const res = await gameDayApi.getStandings(event?.eventId || selectedDivision.eventId, selectedDivision.id);
+                    if (res.success && res.data) {
+                      // Show standings in a simple alert or log for now
+                      const byPool = {};
+                      res.data.forEach(u => {
+                        const pool = u.poolName || `Pool ${u.poolNumber || '?'}`;
+                        if (!byPool[pool]) byPool[pool] = [];
+                        byPool[pool].push(u);
+                      });
+
+                      const standingsText = Object.entries(byPool).map(([pool, units]) => {
+                        const sorted = units.sort((a, b) => (a.poolRank || 999) - (b.poolRank || 999));
+                        return `${pool}:\n` + sorted.map(u =>
+                          `  #${u.poolRank || '-'} ${u.unitName} (${u.matchesWon}W-${u.matchesLost}L, +${u.pointDiff})`
+                        ).join('\n');
+                      }).join('\n\n');
+
+                      alert(standingsText || 'No standings data');
+                    }
+                  } catch (err) {
+                    setError('Failed to load standings');
+                  } finally {
+                    setProcessing(false);
+                  }
+                }}
+                disabled={processing}
+                className="px-4 py-2 bg-white border border-gray-300 text-gray-700 text-sm rounded-lg hover:bg-gray-50 disabled:opacity-50 flex items-center gap-2"
+              >
+                <Users className="w-4 h-4" />
+                View Standings
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Manual Override Section */}
       <div className="bg-white rounded-lg shadow-sm p-6">
         <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
@@ -323,15 +405,60 @@ export default function GameDayAdvancement({ eventId, event, permissions, onRefr
                 Use manual override when automatic advancement cannot determine the correct result,
                 such as ties, disqualifications, or other special circumstances.
               </p>
-              <div className="mt-3 flex gap-3">
-                <button className="px-4 py-2 bg-white border border-yellow-300 text-yellow-800 text-sm rounded-lg hover:bg-yellow-100">
-                  Manual Slot Assignment
+              <div className="mt-3 flex flex-wrap gap-3">
+                <button
+                  onClick={async () => {
+                    if (!selectedDivision) return;
+                    const advancePerPool = prompt('How many teams per pool should advance to playoffs?', '2');
+                    if (!advancePerPool) return;
+                    try {
+                      setProcessing(true);
+                      const eventId = event?.eventId || selectedDivision.eventId;
+                      const res = await gameDayApi.finalizePools(eventId, selectedDivision.id, parseInt(advancePerPool));
+                      if (res.success) {
+                        await loadDivisionPhases();
+                        onRefresh?.();
+                        alert(`Pools finalized! ${res.data?.advancedCount || 0} teams advanced.`);
+                      } else {
+                        setError(res.message || 'Failed to finalize pools');
+                      }
+                    } catch (err) {
+                      setError('Failed to finalize pools');
+                    } finally {
+                      setProcessing(false);
+                    }
+                  }}
+                  disabled={processing}
+                  className="px-4 py-2 bg-white border border-yellow-300 text-yellow-800 text-sm rounded-lg hover:bg-yellow-100 disabled:opacity-50 flex items-center gap-2"
+                >
+                  <UserPlus className="w-4 h-4" />
+                  Finalize Pools & Advance
                 </button>
-                <button className="px-4 py-2 bg-white border border-yellow-300 text-yellow-800 text-sm rounded-lg hover:bg-yellow-100">
-                  Override Match Result
-                </button>
-                <button className="px-4 py-2 bg-white border border-yellow-300 text-yellow-800 text-sm rounded-lg hover:bg-yellow-100">
-                  Recalculate Standings
+                <button
+                  onClick={async () => {
+                    if (!selectedDivision) return;
+                    if (!confirm('Are you sure you want to reset pools? This will clear advancement status.')) return;
+                    try {
+                      setProcessing(true);
+                      const eventId = event?.eventId || selectedDivision.eventId;
+                      const res = await gameDayApi.resetPools(eventId, selectedDivision.id);
+                      if (res.success) {
+                        await loadDivisionPhases();
+                        onRefresh?.();
+                      } else {
+                        setError(res.message || 'Failed to reset pools');
+                      }
+                    } catch (err) {
+                      setError('Failed to reset pools');
+                    } finally {
+                      setProcessing(false);
+                    }
+                  }}
+                  disabled={processing}
+                  className="px-4 py-2 bg-white border border-yellow-300 text-yellow-800 text-sm rounded-lg hover:bg-yellow-100 disabled:opacity-50 flex items-center gap-2"
+                >
+                  <RotateCcw className="w-4 h-4" />
+                  Reset Pool Advancement
                 </button>
               </div>
             </div>
