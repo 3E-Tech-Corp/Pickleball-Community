@@ -12,7 +12,9 @@ using Pickleball.Community.Models.DTOs;
 using Pickleball.Community.Models.Entities;
 
 using Microsoft.AspNetCore.Mvc;
-using Stripe.Climate;
+
+// TODO: Password hashing and authentication is handled by Funtime-Shared auth service.
+// Local AuthService uses SHA256 for legacy/fallback support only.
 
 namespace Pickleball.Community.Services;
 
@@ -47,18 +49,17 @@ public class AuthService : IAuthService
     public async Task<User?> AuthenticateAsync(string email, string password)
     {
         var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == email);
-        //        if (user == null || !BCrypt.Net.BCrypt.Verify(password, user.PasswordHash))
         if (user == null)
         {
             throw (new Exception("User account not found"));
         }
 
-        if (user?.PasswordHash == null || string.IsNullOrEmpty(user.PasswordHash))
+        if (user.PasswordHash == null || string.IsNullOrEmpty(user.PasswordHash))
         {
-            user.PasswordHash = HashPassword(password);
-            await _context.SaveChangesAsync();
+            // No password set - authentication fails. User must set password via shared auth.
+            return null;
         }
-        else if (user == null || !VerifyPassword(password, user.PasswordHash))
+        else if (!VerifyPassword(password, user.PasswordHash))
         {
             throw (new Exception("Invalid email or password"));
         }
@@ -74,26 +75,9 @@ public class AuthService : IAuthService
 
     public async Task<User?> FastAuthenticateAsync(string token)
     {
-
-
-        //var orderIdParam = new SqlParameter("@OrderId", order.OrderId);
-        //var messageParam = new SqlParameter("@Message", SqlDbType.NVarChar, 500)
-        //{
-        //    Direction = ParameterDirection.Output
-        //};
-        ////var notificationTypeParam = new SqlParameter("@NotificationType", "Received");
-
-        //await _context.Database.ExecuteSqlRawAsync(
-        //    "EXEC csp_NewOrder @OrderId,  @Message OUTPUT",
-        //    orderIdParam, messageParam);
-
-        //var notificationMessage = messageParam.Value?.ToString() ??
-        //    $"Your order #{order.OrderNumber} has been received! Total: ${order.TotalAmount:F2}";
-
         var parameters = new[]
    {
         new SqlParameter("@token", token),
-       // new SqlParameter("@IsActive", isActive)
     };
         var users = await _context.Users
             .FromSqlRaw("EXEC dbo.FastLogin @token", parameters)
@@ -111,7 +95,6 @@ public class AuthService : IAuthService
             throw new ArgumentException("User already exists");
         }
 
-       // var passwordHash = BCrypt.Net.BCrypt.HashPassword(request.Password);
         var passwordHash = HashPassword(request.Password );
         var user = new User
         {

@@ -68,9 +68,6 @@ const api = axios.create({
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('jwtToken') ;
 
-  console.log('API Request:', config.method?.toUpperCase(), config.url);
-  console.log('Using token:', token ? token.substring(0, 20) + '...' : 'No token');
-
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
   }
@@ -84,46 +81,12 @@ api.interceptors.request.use((config) => {
 // Response interceptor for handling auth errors
 api.interceptors.response.use(
   (response) => {
-    console.log('API Response Success:', response.config.url, response.status);
     return response.data;
   },
   (error) => {
-    console.error('API Response Error:', {
-      url: error.config?.url,
-      method: error.config?.method,
-      status: error.response?.status,
-      data: error.response?.data,
-      headers: error.response?.headers
-    });
+    console.error('API error:', error.response?.status, error.config?.url);
 
     if (error.response?.status === 401) {
-      console.log('401 Unauthorized - Details:');
-
-      // Log token info for debugging
-      const token = localStorage.getItem('jwtToken');
-      if (token) {
-        try {
-          const payload = JSON.parse(atob(token.split('.')[1]));
-          console.log('Token payload:', {
-            iss: payload.iss,
-            aud: payload.aud,
-            sub: payload.sub,
-            exp: payload.exp,
-            expDate: new Date(payload.exp * 1000).toISOString()
-          });
-        } catch (e) {
-          console.log('Could not decode token:', e.message);
-        }
-      } else {
-        console.log('No token in localStorage');
-      }
-
-      // Log the WWW-Authenticate header which contains the validation error
-      const wwwAuth = error.response?.headers?.['www-authenticate'];
-      if (wwwAuth) {
-        console.log('WWW-Authenticate header:', wwwAuth);
-      }
-
       // Don't clear auth on most 401s - the token may be valid for shared auth
       // but local backend may have different JWT key
       // Only clear auth for explicit login failures
@@ -131,11 +94,9 @@ api.interceptors.response.use(
       const isAuthEndpoint = requestUrl.includes('/auth/login') || requestUrl.includes('/auth/register');
 
       if (!isAuthEndpoint) {
-        console.log('401 from non-auth endpoint - keeping auth data (JWT key mismatch between local and shared auth?)');
         return Promise.reject(error.response?.data || error.message);
       }
 
-      console.log('Clearing auth data due to auth endpoint failure...');
       localStorage.removeItem('jwtToken');
       localStorage.removeItem('authToken');
       localStorage.removeItem('pickleball_user');
@@ -362,8 +323,6 @@ export const authApi = {
 
   fastlogin: async (token) => {
     try {
-      console.log('Sending token to fastlogin API:', token.substring(0, 20) + '...');
-
       // Use the api instance, not raw axios
       const response = await api.post('/auth/fastlogin',
         JSON.stringify(token), // Send token as JSON string
@@ -374,10 +333,9 @@ export const authApi = {
         }
       );
 
-      console.log('Fastlogin API response:', response);
       return response;
     } catch (error) {
-      console.error('Fastlogin API error:', error);
+      console.error('Fastlogin failed:', error);
       throw error;
     }
   },
