@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Pickleball.Community.Database;
 using Pickleball.Community.Models.Entities;
 using Pickleball.Community.Controllers.Base;
+using Pickleball.Community.Hubs;
 
 namespace Pickleball.Community.API.Controllers;
 
@@ -16,11 +17,13 @@ namespace Pickleball.Community.API.Controllers;
 public class GameDayController : EventControllerBase
 {
     private readonly ILogger<GameDayController> _logger;
+    private readonly IScoreBroadcaster _scoreBroadcaster;
 
-    public GameDayController(ApplicationDbContext context, ILogger<GameDayController> logger)
+    public GameDayController(ApplicationDbContext context, ILogger<GameDayController> logger, IScoreBroadcaster scoreBroadcaster)
         : base(context)
     {
         _logger = logger;
+        _scoreBroadcaster = scoreBroadcaster;
     }
 
     // ==========================================
@@ -383,6 +386,29 @@ public class GameDayController : EventControllerBase
             .Include(m => m.Matches).ThenInclude(match => match.Games)
             .FirstOrDefaultAsync(m => m.Id == match.Id);
 
+        // Broadcast real-time updates
+        try
+        {
+            await _scoreBroadcaster.BroadcastScheduleRefresh(eventId, unit1.DivisionId);
+            if (court != null)
+            {
+                await _scoreBroadcaster.BroadcastCourtStatusChanged(eventId, new CourtStatusDto
+                {
+                    CourtId = court.Id,
+                    CourtLabel = court.CourtLabel,
+                    Status = court.Status,
+                    CurrentGameId = null,
+                    Unit1Name = unit1.Name,
+                    Unit2Name = unit2.Name,
+                    UpdatedAt = DateTime.UtcNow
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to broadcast create game update for event {EventId}", eventId);
+        }
+
         return Ok(new { success = true, data = MapToGameDto(match!) });
     }
 
@@ -444,6 +470,36 @@ public class GameDayController : EventControllerBase
         }
 
         await _context.SaveChangesAsync();
+
+        // Broadcast real-time updates
+        try
+        {
+            await _scoreBroadcaster.BroadcastScheduleRefresh(match.EventId, match.DivisionId);
+            await _scoreBroadcaster.BroadcastGameStatusChanged(match.EventId, match.DivisionId, new GameStatusChangeDto
+            {
+                GameId = currentGame?.Id ?? 0,
+                EncounterId = match.Id,
+                OldStatus = "",
+                NewStatus = dto.Status,
+                CourtId = match.TournamentCourtId,
+                UpdatedAt = DateTime.UtcNow
+            });
+            if (match.TournamentCourt != null)
+            {
+                await _scoreBroadcaster.BroadcastCourtStatusChanged(match.EventId, new CourtStatusDto
+                {
+                    CourtId = match.TournamentCourt.Id,
+                    CourtLabel = match.TournamentCourt.CourtLabel,
+                    Status = match.TournamentCourt.Status,
+                    CurrentGameId = match.TournamentCourt.CurrentGameId,
+                    UpdatedAt = DateTime.UtcNow
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to broadcast game status update for match {MatchId}", matchId);
+        }
 
         return Ok(new { success = true });
     }
@@ -558,6 +614,48 @@ public class GameDayController : EventControllerBase
         match.UpdatedAt = now;
         await _context.SaveChangesAsync();
 
+        // Broadcast score update
+        try
+        {
+            await _scoreBroadcaster.BroadcastGameScoreUpdated(match.EventId, match.DivisionId, new GameScoreUpdateDto
+            {
+                GameId = game.Id,
+                EncounterId = match.Id,
+                DivisionId = match.DivisionId,
+                GameNumber = game.GameNumber,
+                Unit1Score = game.Unit1Score,
+                Unit2Score = game.Unit2Score,
+                WinnerUnitId = game.WinnerUnitId,
+                Status = game.Status,
+                UpdatedAt = DateTime.UtcNow
+            });
+
+            // If match completed, also broadcast match completion
+            if (match.Status == "Completed" && match.WinnerUnitId.HasValue)
+            {
+                await _scoreBroadcaster.BroadcastMatchCompleted(match.EventId, match.DivisionId, new MatchCompletedDto
+                {
+                    EncounterId = match.Id,
+                    DivisionId = match.DivisionId,
+                    RoundType = match.RoundType ?? "",
+                    RoundName = match.RoundName ?? "",
+                    Unit1Id = match.Unit1Id,
+                    Unit1Name = match.Unit1?.Name,
+                    Unit2Id = match.Unit2Id,
+                    Unit2Name = match.Unit2?.Name,
+                    WinnerUnitId = match.WinnerUnitId,
+                    WinnerName = match.WinnerUnitId == match.Unit1Id ? match.Unit1?.Name : match.Unit2?.Name,
+                    Score = $"{game.Unit1Score}-{game.Unit2Score}",
+                    CompletedAt = DateTime.UtcNow
+                });
+                await _scoreBroadcaster.BroadcastScheduleRefresh(match.EventId, match.DivisionId);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to broadcast score update for match {MatchId}", matchId);
+        }
+
         return Ok(new { success = true });
     }
 
@@ -613,6 +711,27 @@ public class GameDayController : EventControllerBase
         }
 
         await _context.SaveChangesAsync();
+
+        // Broadcast real-time updates
+        try
+        {
+            await _scoreBroadcaster.BroadcastScheduleRefresh(match.EventId, match.DivisionId);
+            if (newCourt != null)
+            {
+                await _scoreBroadcaster.BroadcastCourtStatusChanged(match.EventId, new CourtStatusDto
+                {
+                    CourtId = newCourt.Id,
+                    CourtLabel = newCourt.CourtLabel,
+                    Status = newCourt.Status,
+                    CurrentGameId = currentGame?.Id,
+                    UpdatedAt = DateTime.UtcNow
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to broadcast court assignment update for match {MatchId}", matchId);
+        }
 
         return Ok(new { success = true });
     }
@@ -1027,6 +1146,16 @@ public class GameDayController : EventControllerBase
             .ToListAsync())
             .Where(m => matchIdSet.Contains(m.Id))
             .ToList();
+
+        // Broadcast real-time updates
+        try
+        {
+            await _scoreBroadcaster.BroadcastScheduleRefresh(eventId, divisionId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to broadcast generate round update for event {EventId}", eventId);
+        }
 
         return Ok(new
         {

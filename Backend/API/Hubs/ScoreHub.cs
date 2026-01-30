@@ -61,6 +61,26 @@ public class ScoreHub : Hub
             Context.ConnectionId, divisionId);
     }
 
+    /// <summary>
+    /// Join court updates group for an event
+    /// </summary>
+    public async Task JoinCourtUpdates(int eventId)
+    {
+        await Groups.AddToGroupAsync(Context.ConnectionId, $"courts_{eventId}");
+        _logger.LogInformation("Connection {ConnectionId} joined court updates for event {EventId}",
+            Context.ConnectionId, eventId);
+    }
+
+    /// <summary>
+    /// Leave court updates group for an event
+    /// </summary>
+    public async Task LeaveCourtUpdates(int eventId)
+    {
+        await Groups.RemoveFromGroupAsync(Context.ConnectionId, $"courts_{eventId}");
+        _logger.LogInformation("Connection {ConnectionId} left court updates for event {EventId}",
+            Context.ConnectionId, eventId);
+    }
+
     public override Task OnDisconnectedAsync(Exception? exception)
     {
         _logger.LogDebug("Connection {ConnectionId} disconnected from ScoreHub", Context.ConnectionId);
@@ -69,6 +89,7 @@ public class ScoreHub : Hub
 
     public static string GetEventGroupName(int eventId) => $"score_event_{eventId}";
     public static string GetDivisionGroupName(int divisionId) => $"score_division_{divisionId}";
+    public static string GetCourtGroupName(int eventId) => $"courts_{eventId}";
 }
 
 /// <summary>
@@ -95,6 +116,21 @@ public interface IScoreBroadcaster
     /// Broadcast a full schedule refresh signal (clients should reload data)
     /// </summary>
     Task BroadcastScheduleRefresh(int eventId, int divisionId);
+
+    /// <summary>
+    /// Broadcast a court status change (game queued, started, completed on court)
+    /// </summary>
+    Task BroadcastCourtStatusChanged(int eventId, CourtStatusDto update);
+
+    /// <summary>
+    /// Broadcast pool rankings update (after calculation or finalization)
+    /// </summary>
+    Task BroadcastStandingsUpdated(int eventId, int divisionId);
+
+    /// <summary>
+    /// Broadcast that a new game is ready/queued (for TD dashboard refresh)
+    /// </summary>
+    Task BroadcastGameStatusChanged(int eventId, int divisionId, GameStatusChangeDto update);
 }
 
 public class ScoreBroadcaster : IScoreBroadcaster
@@ -166,6 +202,50 @@ public class ScoreBroadcaster : IScoreBroadcaster
         _logger.LogDebug("Broadcasted schedule refresh for event {EventId}, division {DivisionId}",
             eventId, divisionId);
     }
+
+    public async Task BroadcastCourtStatusChanged(int eventId, CourtStatusDto update)
+    {
+        var eventGroup = ScoreHub.GetEventGroupName(eventId);
+        var courtGroup = ScoreHub.GetCourtGroupName(eventId);
+
+        await Task.WhenAll(
+            _hubContext.Clients.Group(eventGroup).SendAsync("CourtStatusChanged", update),
+            _hubContext.Clients.Group(courtGroup).SendAsync("CourtStatusChanged", update)
+        );
+
+        _logger.LogDebug("Broadcasted court status change: Court {CourtId} = {Status}",
+            update.CourtId, update.Status);
+    }
+
+    public async Task BroadcastStandingsUpdated(int eventId, int divisionId)
+    {
+        var eventGroup = ScoreHub.GetEventGroupName(eventId);
+        var divisionGroup = ScoreHub.GetDivisionGroupName(divisionId);
+
+        var message = new { eventId, divisionId, timestamp = DateTime.UtcNow };
+
+        await Task.WhenAll(
+            _hubContext.Clients.Group(eventGroup).SendAsync("StandingsUpdated", message),
+            _hubContext.Clients.Group(divisionGroup).SendAsync("StandingsUpdated", message)
+        );
+
+        _logger.LogDebug("Broadcasted standings update for event {EventId}, division {DivisionId}",
+            eventId, divisionId);
+    }
+
+    public async Task BroadcastGameStatusChanged(int eventId, int divisionId, GameStatusChangeDto update)
+    {
+        var eventGroup = ScoreHub.GetEventGroupName(eventId);
+        var divisionGroup = ScoreHub.GetDivisionGroupName(divisionId);
+
+        await Task.WhenAll(
+            _hubContext.Clients.Group(eventGroup).SendAsync("GameStatusChanged", update),
+            _hubContext.Clients.Group(divisionGroup).SendAsync("GameStatusChanged", update)
+        );
+
+        _logger.LogDebug("Broadcasted game status change: Game {GameId} = {NewStatus}",
+            update.GameId, update.NewStatus);
+    }
 }
 
 // DTOs for score broadcasts
@@ -211,4 +291,25 @@ public class BracketProgressionDto
     public string NextRoundName { get; set; } = string.Empty;
     public int SlotPosition { get; set; } // 1 = Unit1, 2 = Unit2
     public DateTime AdvancedAt { get; set; }
+}
+
+public class CourtStatusDto
+{
+    public int CourtId { get; set; }
+    public string CourtLabel { get; set; } = "";
+    public string Status { get; set; } = ""; // Available, InUse
+    public int? CurrentGameId { get; set; }
+    public string? Unit1Name { get; set; }
+    public string? Unit2Name { get; set; }
+    public DateTime UpdatedAt { get; set; }
+}
+
+public class GameStatusChangeDto
+{
+    public int GameId { get; set; }
+    public int EncounterId { get; set; }
+    public string OldStatus { get; set; } = "";
+    public string NewStatus { get; set; } = "";
+    public int? CourtId { get; set; }
+    public DateTime UpdatedAt { get; set; }
 }

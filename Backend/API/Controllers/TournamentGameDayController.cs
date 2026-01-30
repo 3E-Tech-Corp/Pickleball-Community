@@ -5,6 +5,7 @@ using Pickleball.Community.Database;
 using Pickleball.Community.Models.Entities;
 using Pickleball.Community.Models.DTOs;
 using Pickleball.Community.Services;
+using Pickleball.Community.Hubs;
 using System.Security.Claims;
 
 namespace Pickleball.Community.Controllers;
@@ -16,15 +17,18 @@ public class TournamentGameDayController : ControllerBase
     private readonly ApplicationDbContext _context;
     private readonly INotificationService _notificationService;
     private readonly ILogger<TournamentGameDayController> _logger;
+    private readonly IScoreBroadcaster _scoreBroadcaster;
 
     public TournamentGameDayController(
         ApplicationDbContext context,
         INotificationService notificationService,
-        ILogger<TournamentGameDayController> logger)
+        ILogger<TournamentGameDayController> logger,
+        IScoreBroadcaster scoreBroadcaster)
     {
         _context = context;
         _notificationService = notificationService;
         _logger = logger;
+        _scoreBroadcaster = scoreBroadcaster;
     }
 
     private int GetUserId()
@@ -487,6 +491,24 @@ public class TournamentGameDayController : ControllerBase
         // Send notifications to players
         await NotifyPlayersGameQueued(game, court);
 
+        // Broadcast real-time updates
+        try
+        {
+            await _scoreBroadcaster.BroadcastScheduleRefresh(encounter.EventId, encounter.DivisionId);
+            await _scoreBroadcaster.BroadcastCourtStatusChanged(encounter.EventId, new CourtStatusDto
+            {
+                CourtId = court.Id,
+                CourtLabel = court.CourtLabel,
+                Status = court.Status,
+                CurrentGameId = court.CurrentGameId,
+                UpdatedAt = DateTime.UtcNow
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to broadcast queue update for game {GameId}", game.Id);
+        }
+
         _logger.LogInformation("Game {GameId} queued to court {CourtId} by user {UserId}", game.Id, request.CourtId, userId);
 
         return Ok(new ApiResponse<GameQueueItemDto>
@@ -586,6 +608,24 @@ public class TournamentGameDayController : ControllerBase
             ReferenceId = game.Id
         });
 
+        // Broadcast real-time updates
+        try
+        {
+            await _scoreBroadcaster.BroadcastScheduleRefresh(encounter.EventId, encounter.DivisionId);
+            await _scoreBroadcaster.BroadcastCourtStatusChanged(encounter.EventId, new CourtStatusDto
+            {
+                CourtId = court.Id,
+                CourtLabel = court.CourtLabel,
+                Status = court.Status,
+                CurrentGameId = court.CurrentGameId,
+                UpdatedAt = DateTime.UtcNow
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to broadcast player queue update for game {GameId}", game.Id);
+        }
+
         _logger.LogInformation("Player {UserId} self-queued game {GameId} to court {CourtId}", userId, game.Id, request.CourtId);
 
         return Ok(new ApiResponse<GameQueueItemDto>
@@ -649,6 +689,25 @@ public class TournamentGameDayController : ControllerBase
 
         // Notify players
         await NotifyPlayersGameStarted(game);
+
+        // Broadcast real-time updates
+        try
+        {
+            await _scoreBroadcaster.BroadcastScheduleRefresh(encounter.EventId, encounter.DivisionId);
+            await _scoreBroadcaster.BroadcastGameStatusChanged(encounter.EventId, encounter.DivisionId, new GameStatusChangeDto
+            {
+                GameId = game.Id,
+                EncounterId = encounter.Id,
+                OldStatus = "Queued",
+                NewStatus = "Playing",
+                CourtId = game.TournamentCourtId,
+                UpdatedAt = DateTime.UtcNow
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to broadcast start game update for game {GameId}", game.Id);
+        }
 
         return Ok(new ApiResponse<object> { Success = true, Message = "Game started" });
     }
@@ -789,6 +848,27 @@ public class TournamentGameDayController : ControllerBase
 
         await _context.SaveChangesAsync();
 
+        // Broadcast score update
+        try
+        {
+            await _scoreBroadcaster.BroadcastGameScoreUpdated(encounter.EventId, encounter.DivisionId, new GameScoreUpdateDto
+            {
+                GameId = game.Id,
+                EncounterId = encounter.Id,
+                DivisionId = encounter.DivisionId,
+                GameNumber = game.GameNumber,
+                Unit1Score = game.Unit1Score,
+                Unit2Score = game.Unit2Score,
+                WinnerUnitId = game.WinnerUnitId,
+                Status = game.Status,
+                UpdatedAt = DateTime.UtcNow
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to broadcast score update for game {GameId}", game.Id);
+        }
+
         // If game finished, update stats and check for match completion
         if (game.Status == "Finished")
         {
@@ -798,6 +878,31 @@ public class TournamentGameDayController : ControllerBase
                 await CheckMatchCompletion(game.EncounterMatch.EncounterId);
             }
             await AdvanceCourtQueue(game);
+
+            // Broadcast match completion
+            try
+            {
+                await _scoreBroadcaster.BroadcastMatchCompleted(encounter.EventId, encounter.DivisionId, new MatchCompletedDto
+                {
+                    EncounterId = encounter.Id,
+                    DivisionId = encounter.DivisionId,
+                    RoundType = encounter.RoundType ?? "",
+                    RoundName = encounter.RoundName ?? "",
+                    Unit1Id = encounter.Unit1Id,
+                    Unit1Name = encounter.Unit1?.Name,
+                    Unit2Id = encounter.Unit2Id,
+                    Unit2Name = encounter.Unit2?.Name,
+                    WinnerUnitId = game.WinnerUnitId,
+                    WinnerName = game.WinnerUnitId == encounter.Unit1Id ? encounter.Unit1?.Name : encounter.Unit2?.Name,
+                    Score = $"{game.Unit1Score}-{game.Unit2Score}",
+                    CompletedAt = DateTime.UtcNow
+                });
+                await _scoreBroadcaster.BroadcastScheduleRefresh(encounter.EventId, encounter.DivisionId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to broadcast match completion for game {GameId}", game.Id);
+            }
         }
 
         // Notify spectators of score update
@@ -1147,6 +1252,16 @@ public class TournamentGameDayController : ControllerBase
 
         await _context.SaveChangesAsync();
 
+        // Broadcast standings update
+        try
+        {
+            await _scoreBroadcaster.BroadcastStandingsUpdated(eventId, divisionId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to broadcast standings update for division {DivisionId}", divisionId);
+        }
+
         return Ok(new ApiResponse<List<PoolStandingsResultDto>>
         {
             Success = true,
@@ -1283,6 +1398,17 @@ public class TournamentGameDayController : ControllerBase
 
         _logger.LogInformation("TD {UserId} finalized pools for division {DivisionId}, {Count} teams advancing",
             userId, divisionId, advancingUnits.Count);
+
+        // Broadcast schedule refresh and standings update
+        try
+        {
+            await _scoreBroadcaster.BroadcastScheduleRefresh(eventId, divisionId);
+            await _scoreBroadcaster.BroadcastStandingsUpdated(eventId, divisionId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to broadcast finalize pools update for division {DivisionId}", divisionId);
+        }
 
         return Ok(new ApiResponse<AdvancementResultDto>
         {

@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Pickleball.Community.Database;
 using Pickleball.Community.Models.DTOs;
 using Pickleball.Community.Models.Entities;
+using Pickleball.Community.Hubs;
 using System.Security.Claims;
 
 namespace Pickleball.Community.API.Controllers;
@@ -18,11 +19,13 @@ public class EncounterController : ControllerBase
 {
     private readonly ApplicationDbContext _context;
     private readonly ILogger<EncounterController> _logger;
+    private readonly IScoreBroadcaster _scoreBroadcaster;
 
-    public EncounterController(ApplicationDbContext context, ILogger<EncounterController> logger)
+    public EncounterController(ApplicationDbContext context, ILogger<EncounterController> logger, IScoreBroadcaster scoreBroadcaster)
     {
         _context = context;
         _logger = logger;
+        _scoreBroadcaster = scoreBroadcaster;
     }
 
     private int? GetUserId()
@@ -506,6 +509,16 @@ public class EncounterController : ControllerBase
         encounter.UpdatedAt = DateTime.UtcNow;
         await _context.SaveChangesAsync();
 
+        // Broadcast real-time updates
+        try
+        {
+            await _scoreBroadcaster.BroadcastScheduleRefresh(encounter.EventId, encounter.DivisionId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to broadcast start encounter update for encounter {EncounterId}", encounterId);
+        }
+
         return Ok(new { success = true, message = "Encounter started" });
     }
 
@@ -546,6 +559,28 @@ public class EncounterController : ControllerBase
         encounter.CompletedAt = DateTime.UtcNow;
         encounter.UpdatedAt = DateTime.UtcNow;
         await _context.SaveChangesAsync();
+
+        // Broadcast match completion
+        try
+        {
+            await _scoreBroadcaster.BroadcastMatchCompleted(encounter.EventId, encounter.DivisionId, new MatchCompletedDto
+            {
+                EncounterId = encounter.Id,
+                DivisionId = encounter.DivisionId,
+                RoundType = encounter.RoundType ?? "",
+                RoundName = encounter.RoundName ?? "",
+                Unit1Id = encounter.Unit1Id,
+                Unit2Id = encounter.Unit2Id,
+                WinnerUnitId = encounter.WinnerUnitId,
+                Score = $"{unit1Wins}-{unit2Wins}",
+                CompletedAt = DateTime.UtcNow
+            });
+            await _scoreBroadcaster.BroadcastScheduleRefresh(encounter.EventId, encounter.DivisionId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to broadcast encounter completion for encounter {EncounterId}", encounterId);
+        }
 
         return Ok(new { success = true, message = "Encounter completed" });
     }
@@ -629,6 +664,16 @@ public class EncounterController : ControllerBase
         match.UpdatedAt = DateTime.UtcNow;
         await _context.SaveChangesAsync();
 
+        // Broadcast real-time updates
+        try
+        {
+            await _scoreBroadcaster.BroadcastScheduleRefresh(match.Encounter!.EventId, match.Encounter.DivisionId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to broadcast start match update for match {MatchId}", matchId);
+        }
+
         return Ok(new { success = true, message = "Match started" });
     }
 
@@ -655,6 +700,16 @@ public class EncounterController : ControllerBase
         match.ScoreSubmittedAt = DateTime.UtcNow;
         match.UpdatedAt = DateTime.UtcNow;
         await _context.SaveChangesAsync();
+
+        // Broadcast score update
+        try
+        {
+            await _scoreBroadcaster.BroadcastScheduleRefresh(match.Encounter!.EventId, match.Encounter.DivisionId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to broadcast match score submission for match {MatchId}", matchId);
+        }
 
         return Ok(new { success = true, message = "Score submitted" });
     }
@@ -699,6 +754,29 @@ public class EncounterController : ControllerBase
         match.UpdatedAt = DateTime.UtcNow;
         await _context.SaveChangesAsync();
 
+        // Broadcast updates
+        try
+        {
+            if (dto.Confirmed && match.Status == "Completed")
+            {
+                await _scoreBroadcaster.BroadcastMatchCompleted(match.Encounter!.EventId, match.Encounter.DivisionId, new MatchCompletedDto
+                {
+                    EncounterId = match.EncounterId,
+                    DivisionId = match.Encounter.DivisionId,
+                    Unit1Id = match.Encounter.Unit1Id,
+                    Unit2Id = match.Encounter.Unit2Id,
+                    WinnerUnitId = match.WinnerUnitId,
+                    Score = $"{match.Unit1Score}-{match.Unit2Score}",
+                    CompletedAt = DateTime.UtcNow
+                });
+            }
+            await _scoreBroadcaster.BroadcastScheduleRefresh(match.Encounter!.EventId, match.Encounter.DivisionId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to broadcast match score confirmation for match {MatchId}", matchId);
+        }
+
         return Ok(new { success = true, message = dto.Confirmed ? "Score confirmed" : "Score disputed" });
     }
 
@@ -740,6 +818,29 @@ public class EncounterController : ControllerBase
 
         match.UpdatedAt = DateTime.UtcNow;
         await _context.SaveChangesAsync();
+
+        // Broadcast updates
+        try
+        {
+            if (match.Status == "Completed" && match.WinnerUnitId.HasValue)
+            {
+                await _scoreBroadcaster.BroadcastMatchCompleted(match.Encounter!.EventId, match.Encounter.DivisionId, new MatchCompletedDto
+                {
+                    EncounterId = match.EncounterId,
+                    DivisionId = match.Encounter.DivisionId,
+                    Unit1Id = match.Encounter.Unit1Id,
+                    Unit2Id = match.Encounter.Unit2Id,
+                    WinnerUnitId = match.WinnerUnitId,
+                    Score = $"{match.Unit1Score}-{match.Unit2Score}",
+                    CompletedAt = DateTime.UtcNow
+                });
+            }
+            await _scoreBroadcaster.BroadcastScheduleRefresh(match.Encounter!.EventId, match.Encounter.DivisionId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to broadcast match score update for match {MatchId}", matchId);
+        }
 
         return Ok(new { success = true, message = "Match score updated" });
     }
@@ -800,6 +901,31 @@ public class EncounterController : ControllerBase
             match.Unit2Score = allGames.Count(g => g.WinnerUnitId == match.Encounter?.Unit2Id);
             match.UpdatedAt = DateTime.UtcNow;
             await _context.SaveChangesAsync();
+        }
+
+        // Broadcast game score update
+        try
+        {
+            var encounter = game.EncounterMatch?.Encounter;
+            if (encounter != null)
+            {
+                await _scoreBroadcaster.BroadcastGameScoreUpdated(encounter.EventId, encounter.DivisionId, new GameScoreUpdateDto
+                {
+                    GameId = game.Id,
+                    EncounterId = encounter.Id,
+                    DivisionId = encounter.DivisionId,
+                    GameNumber = game.GameNumber,
+                    Unit1Score = game.Unit1Score,
+                    Unit2Score = game.Unit2Score,
+                    WinnerUnitId = game.WinnerUnitId,
+                    Status = game.Status,
+                    UpdatedAt = DateTime.UtcNow
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to broadcast game score update for game {GameId}", gameId);
         }
 
         return Ok(new { success = true, message = "Game score updated" });

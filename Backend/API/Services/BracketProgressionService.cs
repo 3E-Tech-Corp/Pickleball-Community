@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Pickleball.Community.Database;
+using Pickleball.Community.Hubs;
 using Pickleball.Community.Models.Entities;
 
 namespace Pickleball.Community.Services;
@@ -31,11 +32,13 @@ public class BracketProgressionService : IBracketProgressionService
 {
     private readonly ApplicationDbContext _context;
     private readonly ILogger<BracketProgressionService> _logger;
+    private readonly IScoreBroadcaster _scoreBroadcaster;
 
-    public BracketProgressionService(ApplicationDbContext context, ILogger<BracketProgressionService> logger)
+    public BracketProgressionService(ApplicationDbContext context, ILogger<BracketProgressionService> logger, IScoreBroadcaster scoreBroadcaster)
     {
         _context = context;
         _logger = logger;
+        _scoreBroadcaster = scoreBroadcaster;
     }
 
     public async Task<BracketProgressionResult> CheckAndAdvanceAsync(int encounterId)
@@ -131,6 +134,29 @@ public class BracketProgressionService : IBracketProgressionService
             _logger.LogInformation(
                 "Bracket progression: Match {MatchId} completed, advanced unit {WinnerUnitId} to match {NextMatchId} ({RoundName})",
                 match.Id, match.WinnerUnitId, nextMatch.Id, nextMatch.RoundName);
+
+            // Broadcast bracket progression
+            try
+            {
+                var currentBracketPos = match.BracketPosition ?? 0;
+                await _scoreBroadcaster.BroadcastBracketProgression(match.EventId, match.DivisionId, new BracketProgressionDto
+                {
+                    FromEncounterId = match.Id,
+                    ToEncounterId = nextMatch.Id,
+                    DivisionId = match.DivisionId,
+                    WinnerUnitId = match.WinnerUnitId.Value,
+                    WinnerName = match.WinnerUnitId == match.Unit1Id ? match.Unit1?.Name ?? "" : match.Unit2?.Name ?? "",
+                    FromRoundName = match.RoundName ?? "",
+                    NextRoundName = nextMatch.RoundName ?? "",
+                    SlotPosition = currentBracketPos % 2 == 1 ? 1 : 2,
+                    AdvancedAt = DateTime.UtcNow
+                });
+                await _scoreBroadcaster.BroadcastScheduleRefresh(match.EventId, match.DivisionId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to broadcast bracket progression for match {MatchId}", match.Id);
+            }
         }
     }
 

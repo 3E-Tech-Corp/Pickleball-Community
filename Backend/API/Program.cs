@@ -136,8 +136,15 @@ builder.Services.AddScoped<IScoreBroadcaster, ScoreBroadcaster>();
 builder.Services.AddScoped<IBracketProgressionService, BracketProgressionService>();
 builder.Services.AddScoped<ISharedAssetService, SharedAssetService>();
 builder.Services.AddScoped<IWaiverPdfService, WaiverPdfService>();
-builder.Services.AddScoped<ICourtAssignmentService, CourtAssignmentService>();
+builder.Services.AddScoped<ISchedulingService, SchedulingService>();
+builder.Services.AddScoped<ICourtAssignmentService>(sp => sp.GetRequiredService<ISchedulingService>() as ICourtAssignmentService
+    ?? throw new InvalidOperationException("SchedulingService must implement ICourtAssignmentService"));
 builder.Services.AddScoped<IEmailNotificationService, EmailNotificationService>();
+builder.Services.AddScoped<ITournamentRegistrationService, TournamentRegistrationService>();
+builder.Services.AddScoped<ITournamentPaymentService, TournamentPaymentService>();
+builder.Services.AddScoped<ITournamentDrawingService, TournamentDrawingService>();
+builder.Services.AddScoped<ITournamentFeeService, TournamentFeeService>();
+builder.Services.AddScoped<ITournamentManagementService, TournamentManagementService>();
 builder.Services.AddMemoryCache();
 builder.Services.AddHttpClient<IGeocodingService, GeocodingService>();
 

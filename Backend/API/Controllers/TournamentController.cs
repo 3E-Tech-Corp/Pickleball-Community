@@ -23,6 +23,11 @@ public class TournamentController : EventControllerBase
     private readonly IScoreBroadcaster _scoreBroadcaster;
     private readonly ICourtAssignmentService _courtAssignmentService;
     private readonly IEmailNotificationService _emailService;
+    private readonly ITournamentRegistrationService _registrationService;
+    private readonly ITournamentPaymentService _paymentService;
+    private readonly ITournamentDrawingService _drawingService;
+    private readonly ITournamentFeeService _feeService;
+    private readonly ITournamentManagementService _managementService;
 
     public TournamentController(
         ApplicationDbContext context,
@@ -32,7 +37,12 @@ public class TournamentController : EventControllerBase
         IBracketProgressionService bracketProgressionService,
         IScoreBroadcaster scoreBroadcaster,
         ICourtAssignmentService courtAssignmentService,
-        IEmailNotificationService emailService)
+        IEmailNotificationService emailService,
+        ITournamentRegistrationService registrationService,
+        ITournamentPaymentService paymentService,
+        ITournamentDrawingService drawingService,
+        ITournamentFeeService feeService,
+        ITournamentManagementService managementService)
         : base(context)
     {
         _logger = logger;
@@ -42,6 +52,11 @@ public class TournamentController : EventControllerBase
         _scoreBroadcaster = scoreBroadcaster;
         _courtAssignmentService = courtAssignmentService;
         _emailService = emailService;
+        _registrationService = registrationService;
+        _paymentService = paymentService;
+        _drawingService = drawingService;
+        _feeService = feeService;
+        _managementService = managementService;
     }
 
     // ============================================

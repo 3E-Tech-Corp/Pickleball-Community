@@ -1729,6 +1729,25 @@ export const tournamentApi = {
     api.delete(`/tournament/court-planning/division-assignment/${assignmentId}`),
 
   // =====================================================
+  // Server-Side Scheduling (constraint-solving scheduler)
+  // =====================================================
+
+  /** Generate schedule with constraint solving (player overlap, rest times, court groups, round deps) */
+  schedulingGenerate: (data) => api.post('/api/scheduling/generate', data),
+  /** Validate schedule for conflicts */
+  schedulingValidate: (eventId, divisionId) =>
+    api.get(`/api/scheduling/validate/${eventId}${divisionId ? `?divisionId=${divisionId}` : ''}`),
+  /** Clear schedule assignments for a division (optionally a specific phase) */
+  schedulingClear: (divisionId, phaseId) =>
+    api.post(`/api/scheduling/clear/${divisionId}${phaseId ? `?phaseId=${phaseId}` : ''}`),
+  /** Auto-assign a single encounter to best available court/time */
+  schedulingAssignSingle: (encounterId) =>
+    api.post(`/api/scheduling/assign-single/${encounterId}`),
+  /** Get available courts for a division/phase from court group assignments */
+  schedulingGetAvailableCourts: (divisionId, phaseId) =>
+    api.get(`/api/scheduling/available-courts/${divisionId}${phaseId ? `?phaseId=${phaseId}` : ''}`),
+
+  // =====================================================
   // Division Fees
   // =====================================================
 
