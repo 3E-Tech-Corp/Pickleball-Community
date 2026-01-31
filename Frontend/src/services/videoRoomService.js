@@ -1,5 +1,6 @@
 import axios from 'axios'
 import * as signalR from '@microsoft/signalr'
+import api from './api'
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || ''
 
@@ -12,19 +13,19 @@ function getHubUrl() {
     // Dev mode: use full URL
     return `${apiUrl.replace(/\/api\/?$/, '')}/hubs/videoroom`
   }
-  // Production: relative path (hubs are at root, not under /api)
-  return '/hubs/videoroom'
+  // Production: hubs are under /api since backend is a virtual app at /api
+  return '/api/hubs/videoroom'
 }
 
-// REST API calls
+// REST API calls — use the project's api instance (has auth interceptor)
 export const videoRoomApi = {
-  createRoom: (data) => axios.post(`${API_BASE_URL}/VideoRoom`, data),
-  getRoom: (roomCode) => axios.get(`${API_BASE_URL}/VideoRoom/${roomCode}`),
-  getActiveRooms: () => axios.get(`${API_BASE_URL}/VideoRoom`),
-  joinRoom: (roomCode, data) => axios.post(`${API_BASE_URL}/VideoRoom/${roomCode}/join`, data),
-  getParticipants: (roomCode) => axios.get(`${API_BASE_URL}/VideoRoom/${roomCode}/participants`),
-  endRoom: (roomCode) => axios.post(`${API_BASE_URL}/VideoRoom/${roomCode}/end`),
-  lockRoom: (roomCode, locked) => axios.post(`${API_BASE_URL}/VideoRoom/${roomCode}/lock?locked=${locked}`),
+  createRoom: (data) => api.post(`/VideoRoom`, data),
+  getRoom: (roomCode) => api.get(`/VideoRoom/${roomCode}`),
+  getActiveRooms: () => api.get(`/VideoRoom`),
+  joinRoom: (roomCode, data) => api.post(`/VideoRoom/${roomCode}/join`, data),
+  getParticipants: (roomCode) => api.get(`/VideoRoom/${roomCode}/participants`),
+  endRoom: (roomCode) => api.post(`/VideoRoom/${roomCode}/end`),
+  lockRoom: (roomCode, locked) => api.post(`/VideoRoom/${roomCode}/lock?locked=${locked}`),
 }
 
 // SignalR connection for video room
