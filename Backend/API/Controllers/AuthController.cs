@@ -9,7 +9,6 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Pickleball.Community.Models.DTOs;
 using Pickleball.Community.Services;
-using Stripe.Climate;
 
 namespace Pickleball.Community.API.Controllers;
 
