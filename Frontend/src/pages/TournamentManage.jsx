@@ -6917,6 +6917,12 @@ export default function TournamentManage() {
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold text-gray-900">Court & Time Planning</h2>
               <div className="flex items-center gap-2">
+                <Link
+                  to={`/event/${eventId}/auto-scheduler`}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2 text-sm font-medium"
+                >
+                  ⚡ Auto Scheduler
+                </Link>
                 {courtTimeAllocations.some(a => a.isNew) && (
                   <button
                     onClick={savePlanningData}

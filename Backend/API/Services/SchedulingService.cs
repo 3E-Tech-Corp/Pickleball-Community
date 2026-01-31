@@ -64,6 +64,163 @@ public class ScheduleValidationResultNew
 }
 
 // =====================================================
+// Auto-Allocation DTOs
+// =====================================================
+
+public class AutoAllocateRequest
+{
+    public int EventId { get; set; }
+    public List<ScheduleBlockAllocation> Blocks { get; set; } = new();
+    public bool ClearExisting { get; set; } = true;
+    public bool RespectPlayerOverlap { get; set; } = true;
+}
+
+public class ScheduleBlockAllocation
+{
+    public int DivisionId { get; set; }
+    public int? PhaseId { get; set; }
+    public List<int> CourtIds { get; set; } = new();
+    public int? CourtGroupId { get; set; }
+    public DateTime StartTime { get; set; }
+    public DateTime EndTime { get; set; }
+    public int? MatchDurationMinutes { get; set; }
+    public int? RestTimeMinutes { get; set; }
+}
+
+public class AutoAllocateResult
+{
+    public bool Success { get; set; }
+    public string? Message { get; set; }
+    public int TotalAssigned { get; set; }
+    public int TotalSkipped { get; set; }
+    public List<BlockAllocationResult> BlockResults { get; set; } = new();
+    public List<ScheduleConflict> Conflicts { get; set; } = new();
+}
+
+public class BlockAllocationResult
+{
+    public int DivisionId { get; set; }
+    public string? DivisionName { get; set; }
+    public int? PhaseId { get; set; }
+    public string? PhaseName { get; set; }
+    public int AssignedCount { get; set; }
+    public int TotalEncounters { get; set; }
+    public DateTime? StartTime { get; set; }
+    public DateTime? EndTime { get; set; }
+    public int CourtsUsed { get; set; }
+    public string? Warning { get; set; }
+}
+
+public class MoveEncounterRequest
+{
+    public int CourtId { get; set; }
+    public DateTime StartTime { get; set; }
+}
+
+public class MoveEncounterResult
+{
+    public int EncounterId { get; set; }
+    public int CourtId { get; set; }
+    public DateTime StartTime { get; set; }
+    public DateTime EndTime { get; set; }
+    public bool HasConflicts { get; set; }
+    public List<ScheduleConflict> Conflicts { get; set; } = new();
+}
+
+public class SaveBlocksRequest
+{
+    public List<BlockAllocationSave> Blocks { get; set; } = new();
+}
+
+public class BlockAllocationSave
+{
+    public int DivisionId { get; set; }
+    public int? PhaseId { get; set; }
+    public int CourtGroupId { get; set; }
+    public DateTime? StartTime { get; set; }
+    public DateTime? EndTime { get; set; }
+    public int? Priority { get; set; }
+}
+
+// Schedule Grid DTOs
+public class ScheduleGridData
+{
+    public int EventId { get; set; }
+    public string EventName { get; set; } = "";
+    public DateTime EventDate { get; set; }
+    public DateTime GridStartTime { get; set; }
+    public DateTime GridEndTime { get; set; }
+    public List<ScheduleGridCourt> Courts { get; set; } = new();
+    public List<ScheduleGridDivision> Divisions { get; set; } = new();
+    public List<ScheduleGridEncounter> Encounters { get; set; } = new();
+    public List<ScheduleGridBlock> Blocks { get; set; } = new();
+    public int TotalEncounters { get; set; }
+    public int ScheduledEncounters { get; set; }
+    public int UnscheduledEncounters { get; set; }
+}
+
+public class ScheduleGridCourt
+{
+    public int Id { get; set; }
+    public string Label { get; set; } = "";
+    public int SortOrder { get; set; }
+}
+
+public class ScheduleGridDivision
+{
+    public int Id { get; set; }
+    public string Name { get; set; } = "";
+    public int EstimatedMatchDurationMinutes { get; set; }
+    public int MinRestTimeMinutes { get; set; }
+    public List<ScheduleGridPhase> Phases { get; set; } = new();
+}
+
+public class ScheduleGridPhase
+{
+    public int Id { get; set; }
+    public string Name { get; set; } = "";
+    public string PhaseType { get; set; } = "";
+    public int PhaseOrder { get; set; }
+    public DateTime? StartTime { get; set; }
+    public DateTime? EstimatedEndTime { get; set; }
+}
+
+public class ScheduleGridEncounter
+{
+    public int Id { get; set; }
+    public int DivisionId { get; set; }
+    public int? PhaseId { get; set; }
+    public string RoundType { get; set; } = "";
+    public int RoundNumber { get; set; }
+    public string? RoundName { get; set; }
+    public int EncounterNumber { get; set; }
+    public string? EncounterLabel { get; set; }
+    public string? Unit1Name { get; set; }
+    public string? Unit2Name { get; set; }
+    public int? CourtId { get; set; }
+    public string? CourtLabel { get; set; }
+    public DateTime? StartTime { get; set; }
+    public DateTime? EndTime { get; set; }
+    public int? DurationMinutes { get; set; }
+    public string Status { get; set; } = "";
+    public string? PhaseName { get; set; }
+}
+
+public class ScheduleGridBlock
+{
+    public int Id { get; set; }
+    public int DivisionId { get; set; }
+    public string DivisionName { get; set; } = "";
+    public int? PhaseId { get; set; }
+    public string? PhaseName { get; set; }
+    public int CourtGroupId { get; set; }
+    public string CourtGroupName { get; set; } = "";
+    public List<int> CourtIds { get; set; } = new();
+    public string? ValidFromTime { get; set; }
+    public string? ValidToTime { get; set; }
+}
+
+// =====================================================
 // Interface
 // =====================================================
 
@@ -95,6 +252,13 @@ public interface ISchedulingService
     /// Used during game day for on-the-fly scheduling.
     /// </summary>
     Task<ScheduleResult> AssignSingleEncounterAsync(int encounterId);
+
+    /// <summary>
+    /// Auto-allocate encounters across time blocks.
+    /// Each block specifies division+phase → courts + time window.
+    /// The scheduler places matches within those constraints, avoiding player conflicts.
+    /// </summary>
+    Task<AutoAllocateResult> AutoAllocateAsync(AutoAllocateRequest request);
 }
 
 // =====================================================
@@ -1130,5 +1294,372 @@ public class SchedulingService : ISchedulingService, ICourtAssignmentService
                 playerNextAvailable.GetValueOrDefault(pid, DateTime.MinValue),
                 availableAfterRest);
         }
+    }
+
+    // =====================================================
+    // Auto-Allocation Implementation
+    // =====================================================
+
+    public async Task<AutoAllocateResult> AutoAllocateAsync(AutoAllocateRequest request)
+    {
+        var result = new AutoAllocateResult();
+
+        try
+        {
+            var evt = await _context.Events.FindAsync(request.EventId);
+            if (evt == null)
+                return new AutoAllocateResult { Success = false, Message = "Event not found" };
+
+            if (!request.Blocks.Any())
+                return new AutoAllocateResult { Success = false, Message = "No time blocks specified" };
+
+            // Global trackers for cross-block conflict detection
+            var playerNextAvailable = new Dictionary<int, DateTime>();
+            var unitNextAvailable = new Dictionary<int, DateTime>();
+            var courtNextAvailable = new Dictionary<int, DateTime>();
+
+            // Load all event units for player mapping
+            var allEventUnits = await _context.EventUnits
+                .Include(u => u.Members)
+                .Where(u => u.EventId == request.EventId)
+                .ToListAsync();
+
+            var playerUnitMap = new Dictionary<int, HashSet<int>>();
+            foreach (var unit in allEventUnits)
+            {
+                foreach (var member in unit.Members)
+                {
+                    if (!playerUnitMap.ContainsKey(member.UserId))
+                        playerUnitMap[member.UserId] = new HashSet<int>();
+                    playerUnitMap[member.UserId].Add(unit.Id);
+                }
+            }
+
+            // Process each block allocation
+            foreach (var block in request.Blocks.OrderBy(b => b.StartTime))
+            {
+                var blockResult = new BlockAllocationResult
+                {
+                    DivisionId = block.DivisionId,
+                    PhaseId = block.PhaseId,
+                    StartTime = block.StartTime,
+                    EndTime = block.EndTime
+                };
+
+                // Load division info
+                var division = await _context.EventDivisions
+                    .Include(d => d.Phases)
+                    .FirstOrDefaultAsync(d => d.Id == block.DivisionId);
+
+                if (division == null)
+                {
+                    blockResult.Warning = "Division not found";
+                    result.BlockResults.Add(blockResult);
+                    continue;
+                }
+
+                blockResult.DivisionName = division.Name;
+
+                if (block.PhaseId.HasValue)
+                {
+                    var phase = division.Phases?.FirstOrDefault(p => p.Id == block.PhaseId.Value);
+                    blockResult.PhaseName = phase?.Name;
+                }
+
+                // Resolve courts for this block
+                List<TournamentCourt> blockCourts;
+                if (block.CourtIds.Any())
+                {
+                    blockCourts = await _context.TournamentCourts
+                        .Where(c => block.CourtIds.Contains(c.Id) && c.IsActive)
+                        .OrderBy(c => c.SortOrder)
+                        .ToListAsync();
+                }
+                else if (block.CourtGroupId.HasValue)
+                {
+                    var group = await _context.CourtGroups
+                        .Include(g => g.CourtGroupCourts)
+                            .ThenInclude(cgc => cgc.Court)
+                        .FirstOrDefaultAsync(g => g.Id == block.CourtGroupId.Value);
+
+                    blockCourts = group?.CourtGroupCourts?
+                        .Select(cgc => cgc.Court!)
+                        .Where(c => c != null && c.IsActive)
+                        .OrderBy(c => c.SortOrder)
+                        .ToList() ?? new List<TournamentCourt>();
+                }
+                else
+                {
+                    // Fallback to division's assigned courts
+                    blockCourts = await GetAvailableCourtsAsync(block.DivisionId, block.PhaseId);
+                }
+
+                if (!blockCourts.Any())
+                {
+                    blockResult.Warning = "No courts available for this block";
+                    result.BlockResults.Add(blockResult);
+                    continue;
+                }
+
+                blockResult.CourtsUsed = blockCourts.Count;
+
+                // Initialize court availability for this block
+                foreach (var court in blockCourts)
+                {
+                    if (!courtNextAvailable.ContainsKey(court.Id))
+                        courtNextAvailable[court.Id] = block.StartTime;
+                    else
+                        courtNextAvailable[court.Id] = MaxDateTime(courtNextAvailable[court.Id], block.StartTime);
+                }
+
+                // Load encounters for this block's division+phase
+                var encountersQuery = _context.EventEncounters
+                    .Include(e => e.Unit1).ThenInclude(u => u!.Members)
+                    .Include(e => e.Unit2).ThenInclude(u => u!.Members)
+                    .Include(e => e.Division)
+                    .Include(e => e.Phase)
+                    .Include(e => e.WinnerSourceEncounters)
+                    .Include(e => e.LoserSourceEncounters)
+                    .Where(e => e.DivisionId == block.DivisionId
+                             && e.Status != "Bye" && e.Status != "Cancelled"
+                             && e.Status != "Completed" && e.Status != "InProgress");
+
+                if (block.PhaseId.HasValue)
+                    encountersQuery = encountersQuery.Where(e => e.PhaseId == block.PhaseId.Value);
+
+                var encounters = await encountersQuery.ToListAsync();
+
+                // Filter to unassigned encounters if not clearing
+                if (!request.ClearExisting)
+                    encounters = encounters.Where(e => !e.TournamentCourtId.HasValue || !e.EstimatedStartTime.HasValue).ToList();
+
+                if (request.ClearExisting)
+                {
+                    foreach (var enc in encounters)
+                    {
+                        enc.TournamentCourtId = null;
+                        enc.EstimatedStartTime = null;
+                        enc.EstimatedEndTime = null;
+                        enc.EstimatedDurationMinutes = null;
+                        enc.ScheduledTime = null;
+                    }
+                }
+
+                blockResult.TotalEncounters = encounters.Count;
+
+                if (!encounters.Any())
+                {
+                    blockResult.Warning = "No encounters to schedule";
+                    result.BlockResults.Add(blockResult);
+                    continue;
+                }
+
+                // Sort encounters by priority
+                var sortedEncounters = SortEncountersByPriority(encounters);
+
+                // Settings for this block
+                var matchDuration = block.MatchDurationMinutes
+                    ?? division.EstimatedMatchDurationMinutes
+                    ?? 20;
+                var restMinutes = block.RestTimeMinutes
+                    ?? division.MinRestTimeMinutes
+                    ?? 15;
+
+                // Bracket round completion tracking
+                var roundCompletionTimes = new Dictionary<(int divisionId, int? phaseId, int roundNumber), DateTime>();
+
+                int assigned = 0;
+                foreach (var encounter in sortedEncounters)
+                {
+                    // Find best slot within the block's time window
+                    var slot = FindSlotWithinBlock(
+                        encounter, blockCourts, matchDuration, restMinutes,
+                        block.StartTime, block.EndTime,
+                        courtNextAvailable, unitNextAvailable, playerNextAvailable,
+                        playerUnitMap, roundCompletionTimes,
+                        request.RespectPlayerOverlap);
+
+                    if (slot == null)
+                    {
+                        result.Conflicts.Add(new ScheduleConflict
+                        {
+                            Type = "BlockOverflow",
+                            Description = $"Cannot fit {encounter.EncounterLabel ?? $"Match #{encounter.EncounterNumber}"} ({division.Name}) within time block {block.StartTime:h:mm tt}-{block.EndTime:h:mm tt}",
+                            EncounterId1 = encounter.Id
+                        });
+                        result.TotalSkipped++;
+                        continue;
+                    }
+
+                    var (courtId, startTime, endTime) = slot.Value;
+
+                    encounter.TournamentCourtId = courtId;
+                    encounter.EstimatedStartTime = startTime;
+                    encounter.EstimatedDurationMinutes = matchDuration;
+                    encounter.EstimatedEndTime = endTime;
+                    encounter.UpdatedAt = DateTime.Now;
+
+                    // Update trackers
+                    courtNextAvailable[courtId] = endTime;
+                    var availableAfterRest = endTime.AddMinutes(restMinutes);
+
+                    if (encounter.Unit1Id.HasValue)
+                        unitNextAvailable[encounter.Unit1Id.Value] = availableAfterRest;
+                    if (encounter.Unit2Id.HasValue)
+                        unitNextAvailable[encounter.Unit2Id.Value] = availableAfterRest;
+
+                    if (request.RespectPlayerOverlap)
+                        UpdatePlayerAvailability(encounter, playerNextAvailable, availableAfterRest);
+
+                    // Track bracket round completion
+                    if (encounter.RoundType == "Bracket" || encounter.RoundType == "BracketRound")
+                    {
+                        var roundKey = (encounter.DivisionId, encounter.PhaseId, encounter.RoundNumber);
+                        roundCompletionTimes[roundKey] = MaxDateTime(
+                            roundCompletionTimes.GetValueOrDefault(roundKey, DateTime.MinValue),
+                            endTime);
+                    }
+
+                    assigned++;
+                }
+
+                blockResult.AssignedCount = assigned;
+
+                if (assigned > 0)
+                {
+                    blockResult.StartTime = block.StartTime;
+                    blockResult.EndTime = block.EndTime;
+                }
+
+                result.BlockResults.Add(blockResult);
+                result.TotalAssigned += assigned;
+            }
+
+            await _context.SaveChangesAsync();
+
+            result.Success = result.TotalAssigned > 0;
+            result.Message = $"Auto-allocated {result.TotalAssigned} encounters across {request.Blocks.Count} block(s)";
+            if (result.TotalSkipped > 0)
+                result.Message += $" ({result.TotalSkipped} could not be scheduled)";
+            if (result.Conflicts.Any())
+                result.Message += $" ({result.Conflicts.Count} conflict(s))";
+
+            _logger.LogInformation(
+                "Auto-allocated {Assigned} encounters for event {EventId} across {Blocks} blocks, {Skipped} skipped",
+                result.TotalAssigned, request.EventId, request.Blocks.Count, result.TotalSkipped);
+
+            return result;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error auto-allocating schedule for event {EventId}", request.EventId);
+            return new AutoAllocateResult { Success = false, Message = $"Error: {ex.Message}" };
+        }
+    }
+
+    /// <summary>
+    /// Find the earliest time slot within a specific time block where:
+    /// - A court from the block's court list is available
+    /// - Neither unit is playing
+    /// - Both units have had sufficient rest
+    /// - The match fits within the block's time window
+    /// </summary>
+    private (int courtId, DateTime startTime, DateTime endTime)? FindSlotWithinBlock(
+        EventEncounter encounter,
+        List<TournamentCourt> courts,
+        int matchDuration,
+        int restMinutes,
+        DateTime blockStart,
+        DateTime blockEnd,
+        Dictionary<int, DateTime> courtNextAvailable,
+        Dictionary<int, DateTime> unitNextAvailable,
+        Dictionary<int, DateTime> playerNextAvailable,
+        Dictionary<int, HashSet<int>> playerUnitMap,
+        Dictionary<(int divisionId, int? phaseId, int roundNumber), DateTime> roundCompletionTimes,
+        bool respectPlayerOverlap)
+    {
+        // Determine minimum start time from constraints
+        var minStart = blockStart;
+
+        // Unit availability
+        if (encounter.Unit1Id.HasValue && unitNextAvailable.TryGetValue(encounter.Unit1Id.Value, out var u1Avail))
+            minStart = MaxDateTime(minStart, u1Avail);
+        if (encounter.Unit2Id.HasValue && unitNextAvailable.TryGetValue(encounter.Unit2Id.Value, out var u2Avail))
+            minStart = MaxDateTime(minStart, u2Avail);
+
+        // Player-level availability
+        if (respectPlayerOverlap)
+        {
+            var playerIds = GetPlayerIdsForEncounter(encounter);
+            foreach (var pid in playerIds)
+            {
+                if (playerNextAvailable.TryGetValue(pid, out var pAvail))
+                    minStart = MaxDateTime(minStart, pAvail);
+            }
+        }
+
+        // Bracket round dependency
+        if (encounter.RoundType == "Bracket" || encounter.RoundType == "BracketRound"
+            || encounter.RoundType == "SingleElimination" || encounter.RoundType == "DoubleElimination"
+            || encounter.RoundType == "Final")
+        {
+            if (encounter.RoundNumber > 1)
+            {
+                var prevRoundKey = (encounter.DivisionId, encounter.PhaseId, encounter.RoundNumber - 1);
+                if (roundCompletionTimes.TryGetValue(prevRoundKey, out var prevRoundEnd))
+                    minStart = MaxDateTime(minStart, prevRoundEnd);
+            }
+
+            if (encounter.WinnerSourceEncounters?.Any() == true)
+            {
+                foreach (var src in encounter.WinnerSourceEncounters)
+                {
+                    if (src.EstimatedEndTime.HasValue)
+                        minStart = MaxDateTime(minStart, src.EstimatedEndTime.Value);
+                    else if (src.EstimatedStartTime.HasValue)
+                        minStart = MaxDateTime(minStart, src.EstimatedStartTime.Value.AddMinutes(src.EstimatedDurationMinutes ?? 20));
+                }
+            }
+
+            if (encounter.LoserSourceEncounters?.Any() == true)
+            {
+                foreach (var src in encounter.LoserSourceEncounters)
+                {
+                    if (src.EstimatedEndTime.HasValue)
+                        minStart = MaxDateTime(minStart, src.EstimatedEndTime.Value);
+                    else if (src.EstimatedStartTime.HasValue)
+                        minStart = MaxDateTime(minStart, src.EstimatedStartTime.Value.AddMinutes(src.EstimatedDurationMinutes ?? 20));
+                }
+            }
+        }
+
+        // Find best court within block
+        TournamentCourt? bestCourt = null;
+        DateTime bestStart = DateTime.MaxValue;
+
+        foreach (var court in courts)
+        {
+            if (!courtNextAvailable.TryGetValue(court.Id, out var courtAvail))
+                courtAvail = blockStart;
+
+            var candidateStart = MaxDateTime(minStart, courtAvail);
+            var candidateEnd = candidateStart.AddMinutes(matchDuration);
+
+            // Must fit within the block's time window
+            if (candidateEnd > blockEnd)
+                continue;
+
+            if (candidateStart < bestStart)
+            {
+                bestStart = candidateStart;
+                bestCourt = court;
+            }
+        }
+
+        if (bestCourt == null)
+            return null;
+
+        var endTime = bestStart.AddMinutes(matchDuration);
+        return (bestCourt.Id, bestStart, endTime);
     }
 }

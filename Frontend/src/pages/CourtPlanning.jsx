@@ -326,6 +326,12 @@ export default function CourtPlanning() {
               </div>
             </div>
             <div className="flex items-center gap-2">
+              <Link
+                to={`/event/${eventId}/auto-scheduler`}
+                className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2 text-sm font-medium"
+              >
+                ⚡ Auto Scheduler
+              </Link>
               <button
                 onClick={loadData}
                 disabled={loading}

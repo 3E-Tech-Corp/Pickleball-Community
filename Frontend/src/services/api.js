@@ -1747,6 +1747,17 @@ export const tournamentApi = {
   schedulingGetAvailableCourts: (divisionId, phaseId) =>
     api.get(`/api/scheduling/available-courts/${divisionId}${phaseId ? `?phaseId=${phaseId}` : ''}`),
 
+  /** Auto-allocate matches across time blocks (division+phase → courts + time window) */
+  schedulingAutoAllocate: (data) => api.post('/api/scheduling/auto-allocate', data),
+  /** Move a single encounter to a new court/time (drag-drop) */
+  schedulingMoveEncounter: (encounterId, data) =>
+    api.put(`/api/scheduling/move-encounter/${encounterId}`, data),
+  /** Get full schedule grid data for visual scheduler */
+  schedulingGetGrid: (eventId) => api.get(`/api/scheduling/grid/${eventId}`),
+  /** Save time block allocations */
+  schedulingSaveBlocks: (eventId, blocks) =>
+    api.post(`/api/scheduling/blocks/${eventId}`, { blocks }),
+
   // =====================================================
   // Division Fees
   // =====================================================
