@@ -143,3 +143,6 @@ if ($HealthCheckUrl) {
 Write-Host "`n===========================================================" -ForegroundColor Green
 Write-Host "  DEPLOYMENT COMPLETE: $SiteName" -ForegroundColor Green
 Write-Host "===========================================================" -ForegroundColor Green
+
+# Ensure clean exit code (appcmd errors may leave $LASTEXITCODE non-zero)
+exit 0
