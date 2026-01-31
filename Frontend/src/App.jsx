@@ -63,6 +63,9 @@ import AuthCallback from './pages/AuthCallback'
 import InstaGameList from './pages/InstaGame/InstaGameList'
 import InstaGameCreate from './pages/InstaGame/InstaGameCreate'
 import InstaGameMain from './pages/InstaGame/InstaGameMain'
+import VideoRoomList from './pages/VideoRooms/VideoRoomList'
+import VideoRoomJoin from './pages/VideoRooms/VideoRoomJoin'
+import VideoRoomCall from './pages/VideoRooms/VideoRoomCall'
 
 
 function App() {
@@ -195,6 +198,11 @@ function App() {
           <InstaGameMain />
         </ProtectedRoute>
       } />
+
+      {/* Video Rooms */}
+      <Route path="/rooms" element={<VideoRoomList />} />
+      <Route path="/rooms/:roomCode" element={<VideoRoomJoin />} />
+      <Route path="/rooms/:roomCode/call" element={<VideoRoomCall />} />
 
       {/* My Blog - For writers to manage their posts */}
       <Route path="/my-blog" element={

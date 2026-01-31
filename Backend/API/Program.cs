@@ -145,6 +145,7 @@ builder.Services.AddScoped<ITournamentPaymentService, TournamentPaymentService>(
 builder.Services.AddScoped<ITournamentDrawingService, TournamentDrawingService>();
 builder.Services.AddScoped<ITournamentFeeService, TournamentFeeService>();
 builder.Services.AddScoped<ITournamentManagementService, TournamentManagementService>();
+builder.Services.AddScoped<IVideoRoomService, VideoRoomService>();
 builder.Services.AddMemoryCache();
 builder.Services.AddHttpClient<IGeocodingService, GeocodingService>();
 
@@ -196,6 +197,7 @@ app.MapHub<ChatHub>("/hubs/chat");
 app.MapHub<NotificationHub>("/hubs/notifications");
 app.MapHub<DrawingHub>("/hubs/drawing");
 app.MapHub<ScoreHub>("/hubs/scores");
+app.MapHub<VideoRoomHub>("/hubs/videoroom");
 
 // Initialize database
 using (var scope = app.Services.CreateScope())

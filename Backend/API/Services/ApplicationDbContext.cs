@@ -194,6 +194,9 @@ public class ApplicationDbContext : DbContext
     public DbSet<EventStaff> EventStaff { get; set; }
     public DbSet<DivisionCourtBlock> DivisionCourtBlocks { get; set; }
 
+    // Video Chat Rooms
+    public DbSet<VideoRoom> VideoRooms { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<User>(entity =>
@@ -2129,6 +2132,22 @@ public class ApplicationDbContext : DbContext
                   .WithMany()
                   .HasForeignKey(b => b.TournamentCourtId)
                   .OnDelete(DeleteBehavior.NoAction);
+        });
+
+        // Video Rooms
+        modelBuilder.Entity<VideoRoom>(entity =>
+        {
+            entity.HasKey(r => r.RoomId);
+            entity.HasIndex(r => r.RoomCode).IsUnique();
+            entity.Property(r => r.RoomCode).IsRequired().HasMaxLength(20);
+            entity.Property(r => r.Name).IsRequired().HasMaxLength(200);
+            entity.Property(r => r.PasscodeHash).IsRequired().HasMaxLength(128);
+            entity.Property(r => r.CreatorName).HasMaxLength(200);
+
+            entity.HasOne(r => r.Creator)
+                  .WithMany()
+                  .HasForeignKey(r => r.CreatedBy)
+                  .OnDelete(DeleteBehavior.SetNull);
         });
     }
 }
