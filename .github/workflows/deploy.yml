@@ -89,11 +89,11 @@ jobs:
         run: |
           $env_name = "${{ inputs.environment || 'staging' }}"
           if ($env_name -eq "production") {
-            echo "SITE_NAME=Pickleball_Community" >> $env:GITHUB_ENV
-            echo "APP_POOL=Pickleball_Community" >> $env:GITHUB_ENV
+            echo "SITE_NAME=_pb.community" >> $env:GITHUB_ENV
+            echo "APP_POOL=_pb.community" >> $env:GITHUB_ENV
             echo "APP_DOMAIN=pickleball.community" >> $env:GITHUB_ENV
-            echo "FRONTEND_PATH=F:\New_WWW\Pickleball_Community\WWW" >> $env:GITHUB_ENV
-            echo "BACKEND_PATH=F:\New_WWW\Pickleball_Community\API" >> $env:GITHUB_ENV
+            echo "FRONTEND_PATH=F:\New_WWW\_pb.community\WWW" >> $env:GITHUB_ENV
+            echo "BACKEND_PATH=F:\New_WWW\_pb.community\API" >> $env:GITHUB_ENV
           } else {
             echo "SITE_NAME=Pickleball_Community_STG" >> $env:GITHUB_ENV
             echo "APP_POOL=Pickleball_Community_STG" >> $env:GITHUB_ENV
