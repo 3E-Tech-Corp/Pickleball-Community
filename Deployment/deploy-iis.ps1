@@ -43,8 +43,16 @@ Write-Host "[INFO] Backend path:  $BackendPath"
 # Verify artifacts exist
 if (-not (Test-Path $FrontendArtifact)) { throw "Frontend artifact not found: $FrontendArtifact" }
 if (-not (Test-Path $BackendArtifact)) { throw "Backend artifact not found: $BackendArtifact" }
-if (-not (Test-Path $FrontendPath)) { throw "Frontend target path not found: $FrontendPath" }
-if (-not (Test-Path $BackendPath)) { throw "Backend target path not found: $BackendPath" }
+
+# Create target paths if they don't exist
+if (-not (Test-Path $FrontendPath)) {
+    Write-Host "[INFO] Creating frontend target path: $FrontendPath" -ForegroundColor Yellow
+    New-Item -ItemType Directory -Path $FrontendPath -Force | Out-Null
+}
+if (-not (Test-Path $BackendPath)) {
+    Write-Host "[INFO] Creating backend target path: $BackendPath" -ForegroundColor Yellow
+    New-Item -ItemType Directory -Path $BackendPath -Force | Out-Null
+}
 
 # -- Backup current deployment --
 if (-not $SkipBackup) {
