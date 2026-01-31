@@ -92,8 +92,8 @@ jobs:
             echo "SITE_NAME=_pb.community" >> $env:GITHUB_ENV
             echo "APP_POOL=_pb.community" >> $env:GITHUB_ENV
             echo "APP_DOMAIN=pickleball.community" >> $env:GITHUB_ENV
-            echo "FRONTEND_PATH=F:\New_WWW\_pb.community\WWW" >> $env:GITHUB_ENV
-            echo "BACKEND_PATH=F:\New_WWW\_pb.community\API" >> $env:GITHUB_ENV
+            echo "FRONTEND_PATH=F:\New_WWW\Pickleball\Community\www" >> $env:GITHUB_ENV
+            echo "BACKEND_PATH=F:\New_WWW\Pickleball\Community\api" >> $env:GITHUB_ENV
           } else {
             echo "SITE_NAME=Pickleball_Community_STG" >> $env:GITHUB_ENV
             echo "APP_POOL=Pickleball_Community_STG" >> $env:GITHUB_ENV
