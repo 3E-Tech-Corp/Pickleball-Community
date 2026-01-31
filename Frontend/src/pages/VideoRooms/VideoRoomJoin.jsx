@@ -30,7 +30,7 @@ export default function VideoRoomJoin() {
     try {
       setLoading(true)
       const res = await videoRoomApi.getRoom(roomCode)
-      setRoom(res.data)
+      setRoom(res?.data || res || null)
     } catch (err) {
       if (err.response?.status === 404) {
         setError('Room not found or has ended.')
@@ -63,17 +63,18 @@ export default function VideoRoomJoin() {
         displayName: isAuthenticated ? null : displayName,
       })
 
-      if (res.data.success) {
+      const joinResult = res?.data || res
+      if (joinResult?.success) {
         // Navigate to the actual video room
         navigate(`/rooms/${roomCode}/call`, {
           state: {
-            room: res.data.room,
+            room: joinResult.room,
             displayName: displayName || `${user?.firstName || ''} ${user?.lastName || ''}`.trim(),
-            isCreator: res.data.room?.creatorName === displayName || user?.id === res.data.room?.createdBy,
+            isCreator: joinResult.room?.creatorName === displayName || user?.id === joinResult.room?.createdBy,
           }
         })
       } else {
-        setError(res.data.error || 'Failed to join room')
+        setError(joinResult?.error || 'Failed to join room')
       }
     } catch (err) {
       const msg = err.response?.data?.error || err.response?.data?.Error || 'Failed to join room'

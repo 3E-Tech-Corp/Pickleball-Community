@@ -27,7 +27,7 @@ export default function VideoRoomList() {
     try {
       setLoading(true)
       const res = await videoRoomApi.getActiveRooms()
-      setRooms(res.data)
+      setRooms(Array.isArray(res) ? res : (res?.data || []))
     } catch (err) {
       console.error('Failed to load rooms:', err)
     } finally {
@@ -46,7 +46,7 @@ export default function VideoRoomList() {
         passcode: formData.passcode || null,
         maxParticipants: formData.maxParticipants || 6,
       })
-      setCreatedRoom(res.data)
+      setCreatedRoom(res?.data || res)
       loadRooms()
     } catch (err) {
       console.error('Failed to create room:', err)
