@@ -30,13 +30,29 @@ export const AuthProvider = ({ children }) => {
 
     if (storedUser && token) {
       try {
-        const parsedUser = JSON.parse(storedUser)
-        console.log('AuthContext: Setting user from localStorage', parsedUser?.email)
-        setUser(parsedUser)
-        setIsAuthenticated(true)
+        // Check if token is expired before restoring session
+        let isExpired = false
+        try {
+          const payload = JSON.parse(atob(token.split('.')[1]))
+          if (payload.exp && (payload.exp * 1000) < (Date.now() - 30000)) {
+            isExpired = true
+            console.log('AuthContext: Stored token is EXPIRED (expired at', new Date(payload.exp * 1000).toISOString(), '). Clearing auth data.')
+          }
+        } catch (e) {
+          console.warn('AuthContext: Could not decode token to check expiry:', e.message)
+        }
 
-        // Set Authorization header for all future requests
-        axios.defaults.headers.common['Authorization'] = `Bearer ${token}`
+        if (isExpired) {
+          clearAuthData()
+        } else {
+          const parsedUser = JSON.parse(storedUser)
+          console.log('AuthContext: Setting user from localStorage', parsedUser?.email)
+          setUser(parsedUser)
+          setIsAuthenticated(true)
+
+          // Set Authorization header for all future requests
+          axios.defaults.headers.common['Authorization'] = `Bearer ${token}`
+        }
       } catch (error) {
         console.error('Error parsing stored user:', error)
         clearAuthData()

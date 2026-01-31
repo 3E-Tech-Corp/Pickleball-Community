@@ -99,7 +99,8 @@ api.interceptors.response.use(
     if (error.response?.status === 401) {
       console.log('401 Unauthorized - Details:');
 
-      // Log token info for debugging
+      // Check if token is expired
+      let isTokenExpired = false;
       const token = localStorage.getItem('jwtToken');
       if (token) {
         try {
@@ -111,6 +112,11 @@ api.interceptors.response.use(
             exp: payload.exp,
             expDate: new Date(payload.exp * 1000).toISOString()
           });
+          // Check if token has expired (with 30s buffer for clock skew)
+          if (payload.exp && (payload.exp * 1000) < (Date.now() - 30000)) {
+            isTokenExpired = true;
+            console.log('Token is EXPIRED (expired at', new Date(payload.exp * 1000).toISOString(), ')');
+          }
         } catch (e) {
           console.log('Could not decode token:', e.message);
         }
@@ -118,33 +124,40 @@ api.interceptors.response.use(
         console.log('No token in localStorage');
       }
 
-      // Log the WWW-Authenticate header which contains the validation error
+      // Also check WWW-Authenticate header for expiry indication
       const wwwAuth = error.response?.headers?.['www-authenticate'];
       if (wwwAuth) {
         console.log('WWW-Authenticate header:', wwwAuth);
+        if (wwwAuth.toLowerCase().includes('expired')) {
+          isTokenExpired = true;
+        }
       }
 
-      // Don't clear auth on most 401s - the token may be valid for shared auth
-      // but local backend may have different JWT key
-      // Only clear auth for explicit login failures
       const requestUrl = error.config?.url || '';
       const isAuthEndpoint = requestUrl.includes('/auth/login') || requestUrl.includes('/auth/register');
 
-      if (!isAuthEndpoint) {
-        console.log('401 from non-auth endpoint - keeping auth data (JWT key mismatch between local and shared auth?)');
+      // Clear auth and redirect to login if:
+      // 1. Token is expired (regardless of endpoint), OR
+      // 2. Auth endpoint returned 401 (login/register failure)
+      if (isTokenExpired || isAuthEndpoint) {
+        console.log('Clearing auth data -', isTokenExpired ? 'token expired' : 'auth endpoint failure');
+        localStorage.removeItem('jwtToken');
+        localStorage.removeItem('sharedAuthToken');
+        localStorage.removeItem('authToken');
+        localStorage.removeItem('pickleball_user');
+        localStorage.removeItem('refreshToken');
+
+        // Redirect to login page (skip if already on auth pages to avoid redirect loops)
+        if (window.location.pathname !== '/login' && window.location.pathname !== '/auth/callback' && window.location.pathname !== '/register') {
+          window.location.href = '/login';
+        }
+
         return Promise.reject(error.response?.data || error.message);
       }
 
-      console.log('Clearing auth data due to auth endpoint failure...');
-      localStorage.removeItem('jwtToken');
-      localStorage.removeItem('authToken');
-      localStorage.removeItem('pickleball_user');
-      localStorage.removeItem('refreshToken');
-
-      // Redirect to local login page (which uses shared auth components)
-      if (window.location.pathname !== '/login' && window.location.pathname !== '/auth/callback' && window.location.pathname !== '/register') {
-        window.location.href = '/login';
-      }
+      // Non-expired token got 401 from non-auth endpoint - likely JWT key mismatch
+      // between local and shared auth. Keep auth data to avoid unnecessary logouts.
+      console.log('401 from non-auth endpoint with valid token - keeping auth data (possible JWT key mismatch)');
     }
 
     return Promise.reject(error.response?.data || error.message);
