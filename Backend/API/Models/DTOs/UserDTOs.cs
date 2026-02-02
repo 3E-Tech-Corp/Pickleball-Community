@@ -29,6 +29,7 @@ public class UserProfileDto
     public int? YearsPlaying { get; set; }
     public string? TournamentLevel { get; set; }
     public string? FavoriteShot { get; set; }
+    public decimal? DuprRating { get; set; }
     public string? IntroVideo { get; set; }
 
     public DateTime? CreatedAt { get; set; }
@@ -72,6 +73,7 @@ public class UpdateProfileRequest
     public int? YearsPlaying { get; set; }
     public string? TournamentLevel { get; set; }
     public string? FavoriteShot { get; set; }
+    public decimal? DuprRating { get; set; }
     public string? IntroVideo { get; set; }
 
     // Profile visibility preferences
@@ -125,6 +127,7 @@ public class PublicProfileDto
     public int? YearsPlaying { get; set; }
     public string? TournamentLevel { get; set; }
     public string? FavoriteShot { get; set; }
+    public decimal? DuprRating { get; set; }
     public string? IntroVideo { get; set; }
 
     public DateTime CreatedAt { get; set; }

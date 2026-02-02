@@ -74,6 +74,11 @@ public class User
     [MaxLength(100)]
     public string? FavoriteShot { get; set; }
 
+    /// <summary>
+    /// DUPR rating (Dynamic Universal Pickleball Rating), e.g. 3.5, 5.0, 6.25
+    /// </summary>
+    public decimal? DuprRating { get; set; }
+
     [MaxLength(500)]
     public string? IntroVideo { get; set; }
 

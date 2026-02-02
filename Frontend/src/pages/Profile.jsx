@@ -93,7 +93,8 @@ const Profile = () => {
       paddleModel: '',
       yearsPlaying: '',
       tournamentLevel: '',
-      favoriteShot: ''
+      favoriteShot: '',
+      duprRating: ''
     }
   })
 
@@ -153,7 +154,8 @@ const Profile = () => {
         paddleModel: user.paddleModel || '',
         yearsPlaying: user.yearsPlaying || '',
         tournamentLevel: user.tournamentLevel || '',
-        favoriteShot: user.favoriteShot || ''
+        favoriteShot: user.favoriteShot || '',
+        duprRating: user.duprRating || ''
       })
 
       setHandedness(user.handedness || '')
@@ -577,10 +579,11 @@ const Profile = () => {
   const handleSavePickleballInfo = async (data) => {
     setSavingPickleballInfo(true)
     try {
-      // Handle yearsPlaying - convert empty string to null, string to number
+      // Handle yearsPlaying and duprRating - convert empty string to null
       const profileData = {
         ...data,
-        yearsPlaying: data.yearsPlaying ? parseInt(data.yearsPlaying, 10) : null
+        yearsPlaying: data.yearsPlaying ? parseInt(data.yearsPlaying, 10) : null,
+        duprRating: data.duprRating ? parseFloat(data.duprRating) : null
       }
 
       // Identify what fields were changed
@@ -591,7 +594,8 @@ const Profile = () => {
         paddleModel: 'Paddle Model',
         yearsPlaying: 'Years Playing',
         tournamentLevel: 'Tournament Level',
-        favoriteShot: 'Favorite Shot'
+        favoriteShot: 'Favorite Shot',
+        duprRating: 'DUPR Rating'
       }
 
       const changedFields = Object.keys(fieldLabels).filter(key => {
@@ -1396,6 +1400,19 @@ const Profile = () => {
                           <option key={level} value={level}>{level}</option>
                         ))}
                       </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">DUPR Rating</label>
+                      <input
+                        {...pickleballForm.register('duprRating')}
+                        type="number"
+                        step="0.01"
+                        min="1.0"
+                        max="8.0"
+                        disabled={!isEditingPickleballInfo}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg disabled:bg-gray-50 disabled:text-gray-600"
+                        placeholder="e.g., 3.50, 5.00"
+                      />
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Favorite Shot</label>

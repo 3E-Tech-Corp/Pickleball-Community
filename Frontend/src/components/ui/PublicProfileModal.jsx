@@ -406,6 +406,13 @@ export default function PublicProfileModal({ userId, onClose, onFriendshipChange
                         <span className="font-medium text-gray-900">{profile.yearsPlaying}</span>
                       </div>
                     )}
+                    {profile.duprRating && (
+                      <div className="flex items-center gap-2">
+                        <Award className="w-4 h-4 text-gray-400" />
+                        <span className="text-gray-500">DUPR:</span>
+                        <span className="font-medium text-gray-900">{profile.duprRating}</span>
+                      </div>
+                    )}
                     {profile.favoriteShot && (
                       <div className="flex items-center gap-2">
                         <Heart className="w-4 h-4 text-gray-400" />
@@ -413,7 +420,7 @@ export default function PublicProfileModal({ userId, onClose, onFriendshipChange
                         <span className="font-medium text-gray-900">{profile.favoriteShot}</span>
                       </div>
                     )}
-                    {!profile.experienceLevel && !profile.playingStyle && !profile.handedness && !profile.yearsPlaying && !profile.favoriteShot && (
+                    {!profile.experienceLevel && !profile.playingStyle && !profile.handedness && !profile.yearsPlaying && !profile.favoriteShot && !profile.duprRating && (
                       <p className="text-gray-400 italic">No info available</p>
                     )}
                   </div>

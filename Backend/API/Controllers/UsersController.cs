@@ -226,6 +226,7 @@ public class UsersController : ControllerBase
                 YearsPlaying = user.YearsPlaying,
                 TournamentLevel = user.TournamentLevel,
                 FavoriteShot = user.FavoriteShot,
+                DuprRating = user.DuprRating,
                 IntroVideo = user.IntroVideo,
                 CreatedAt = user.CreatedAt,
                 FriendshipStatus = "none",
@@ -366,6 +367,8 @@ public class UsersController : ControllerBase
                 user.TournamentLevel = request.TournamentLevel;
             if (request.FavoriteShot != null)
                 user.FavoriteShot = request.FavoriteShot;
+            if (request.DuprRating.HasValue)
+                user.DuprRating = request.DuprRating;
             if (request.IntroVideo != null)
                 user.IntroVideo = request.IntroVideo;
 
@@ -742,6 +745,7 @@ public class UsersController : ControllerBase
                     YearsPlaying = u.YearsPlaying,
                     TournamentLevel = u.TournamentLevel,
                     FavoriteShot = u.FavoriteShot,
+                    DuprRating = u.DuprRating,
                     IntroVideo = u.IntroVideo,
                     CreatedAt = u.CreatedAt,
                     IsActive = u.IsActive
@@ -860,6 +864,7 @@ public class UsersController : ControllerBase
             YearsPlaying = user.YearsPlaying,
             TournamentLevel = user.TournamentLevel,
             FavoriteShot = user.FavoriteShot,
+            DuprRating = user.DuprRating,
             IntroVideo = user.IntroVideo,
             CreatedAt = user.CreatedAt,
             IsActive = user.IsActive,
