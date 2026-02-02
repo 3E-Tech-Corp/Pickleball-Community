@@ -107,6 +107,23 @@ jobs:
         with:
           path: artifacts
 
+      - name: Backup SQL Database
+        shell: powershell
+        run: |
+          $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
+          $backupDir = "F:\SQLBackup"
+          if (-not (Test-Path $backupDir)) { New-Item -ItemType Directory -Path $backupDir -Force }
+          $backupFile = "$backupDir\PickleballCommunity_$timestamp.bak"
+          Write-Host "[BACKUP] Backing up database to $backupFile ..."
+          try {
+            $sql = "BACKUP DATABASE [PickleballCommunity] TO DISK = N'$backupFile' WITH NOFORMAT, NOINIT, NAME = N'PickleballCommunity-Pre-Deploy', SKIP, NOREWIND, NOUNLOAD, COMPRESSION, STATS = 10"
+            Invoke-Sqlcmd -Query $sql -ServerInstance "localhost" -TrustServerCertificate -QueryTimeout 120
+            Write-Host "[BACKUP] Database backup completed: $backupFile"
+          } catch {
+            Write-Host "[BACKUP] WARNING: Backup failed: $($_.Exception.Message)"
+            Write-Host "[BACKUP] Continuing with deploy..."
+          }
+
       - name: Deploy to IIS
         shell: powershell
         run: |
