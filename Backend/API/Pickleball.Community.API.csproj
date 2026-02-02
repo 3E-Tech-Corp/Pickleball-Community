@@ -36,4 +36,9 @@
     <Folder Include="wwwroot\" />
   </ItemGroup>
 
+  <!-- Include SQL migration scripts in publish output -->
+  <ItemGroup>
+    <Content Include="Scripts\archives\**\*.sql" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>
