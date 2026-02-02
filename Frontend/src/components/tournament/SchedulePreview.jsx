@@ -19,6 +19,7 @@ export default function SchedulePreview({ divisionId, phaseId = null, showFilter
   const [phases, setPhases] = useState([]);
   const [schedule, setSchedule] = useState(null);
   const [selectedPhase, setSelectedPhase] = useState(phaseId);
+  const [phaseDetails, setPhaseDetails] = useState(null); // full phase with advancement rules
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [viewMode, setViewMode] = useState('table'); // 'list', 'table', 'bracket'
@@ -59,9 +60,15 @@ export default function SchedulePreview({ divisionId, phaseId = null, showFilter
     try {
       setLoading(true);
       setError(null);
-      const response = await tournamentApi.getPhaseSchedule(phaseId);
-      if (response.success) {
-        setSchedule(response.data);
+      const [scheduleRes, phaseRes] = await Promise.all([
+        tournamentApi.getPhaseSchedule(phaseId),
+        tournamentApi.getPhase(phaseId),
+      ]);
+      if (scheduleRes.success) {
+        setSchedule(scheduleRes.data);
+      }
+      if (phaseRes.success) {
+        setPhaseDetails(phaseRes.data);
       }
     } catch (err) {
       setError('Failed to load schedule');
@@ -244,6 +251,11 @@ export default function SchedulePreview({ divisionId, phaseId = null, showFilter
         </div>
       )}
 
+      {/* Phase Advancement Rules */}
+      {!loading && phaseDetails && (
+        <PhaseAdvancementInfo phaseDetails={phaseDetails} phases={phases} />
+      )}
+
       {/* Empty State */}
       {!loading && !error && schedule?.encounters?.length === 0 && (
         <div className="text-center py-12 bg-gray-50 rounded-lg">
@@ -299,6 +311,80 @@ export default function SchedulePreview({ divisionId, phaseId = null, showFilter
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function PhaseAdvancementInfo({ phaseDetails, phases }) {
+  const incomingRules = phaseDetails.incomingRules || [];
+  const outgoingRules = phaseDetails.outgoingRules || [];
+
+  if (incomingRules.length === 0 && outgoingRules.length === 0) return null;
+
+  // Build phase name lookup
+  const phaseNameById = {};
+  phases.forEach(p => { phaseNameById[p.id] = p.name; });
+
+  return (
+    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+      <div className="flex items-center gap-2 mb-3">
+        <GitBranch className="w-4 h-4 text-blue-600" />
+        <span className="text-sm font-semibold text-blue-800">Phase Advancement</span>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Incoming: where units come from */}
+        {incomingRules.length > 0 && (
+          <div>
+            <h4 className="text-xs font-medium text-blue-700 uppercase tracking-wider mb-2 flex items-center gap-1">
+              <ArrowRight className="w-3 h-3 rotate-180" />
+              Incoming From
+            </h4>
+            <div className="space-y-1">
+              {incomingRules.map((rule, idx) => (
+                <div key={rule.id || idx} className="flex items-center gap-2 text-sm text-gray-700">
+                  <span className="w-1.5 h-1.5 rounded-full bg-green-500 flex-shrink-0" />
+                  <span>
+                    {rule.description || (
+                      <>
+                        <span className="font-medium">{phaseNameById[rule.sourcePhaseId] || `Phase ${rule.sourcePhaseId}`}</span>
+                        {' '}#{rule.sourceRank} → Slot {rule.targetSlotNumber}
+                      </>
+                    )}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Outgoing: where winners/losers go */}
+        {outgoingRules.length > 0 && (
+          <div>
+            <h4 className="text-xs font-medium text-blue-700 uppercase tracking-wider mb-2 flex items-center gap-1">
+              <ArrowRight className="w-3 h-3" />
+              Advances To
+            </h4>
+            <div className="space-y-1">
+              {outgoingRules.map((rule, idx) => (
+                <div key={rule.id || idx} className="flex items-center gap-2 text-sm text-gray-700">
+                  <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
+                    rule.description?.toLowerCase().includes('loser') ? 'bg-orange-500' : 'bg-green-500'
+                  }`} />
+                  <span>
+                    {rule.description || (
+                      <>
+                        #{rule.sourceRank} → <span className="font-medium">{phaseNameById[rule.targetPhaseId] || `Phase ${rule.targetPhaseId}`}</span>
+                        {' '}Slot {rule.targetSlotNumber}
+                      </>
+                    )}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
