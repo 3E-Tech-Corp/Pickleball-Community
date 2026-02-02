@@ -199,7 +199,7 @@ app.MapHub<DrawingHub>("/hubs/drawing");
 app.MapHub<ScoreHub>("/hubs/scores");
 app.MapHub<VideoRoomHub>("/hubs/videoroom");
 
-// Initialize database
+// Verify database connectivity on startup
 using (var scope = app.Services.CreateScope())
 {
     var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
@@ -207,47 +207,23 @@ using (var scope = app.Services.CreateScope())
 
     try
     {
-        // Check if database can be connected to
         if (context.Database.CanConnect())
         {
-            logger.LogInformation("Database connection successful. Database already exists.");
+            logger.LogInformation("Database connection successful.");
         }
         else
         {
-            logger.LogInformation("Database does not exist. Attempting to create...");
-            context.Database.EnsureCreated();
-            logger.LogInformation("Database created successfully.");
+            logger.LogError("Cannot connect to database. Please ensure the database exists and the connection string is correct.");
         }
     }
     catch (Exception ex)
     {
-        logger.LogWarning(ex, "Database initialization warning. This may be normal if the database already exists or was created manually.");
-
-        // Try to ensure tables exist even if database creation failed
-        try
-        {
-            if (context.Database.CanConnect())
-            {
-                logger.LogInformation("Database is accessible. Ensuring schema is up to date...");
-                // Tables should already exist if database was created manually
-            }
-        }
-        catch (Exception innerEx)
-        {
-            logger.LogError(innerEx, "Failed to connect to database. Please ensure the database exists and the connection string is correct.");
-            throw;
-        }
+        logger.LogError(ex, "Database connection failed on startup.");
     }
 
-    // Run pending SQL migration scripts from Scripts/archives/
-    try
-    {
-        await RunPendingSqlMigrationsAsync(context, logger);
-    }
-    catch (Exception ex)
-    {
-        logger.LogWarning(ex, "Failed to run SQL migrations. Some features may not work until migrations are applied.");
-    }
+    // NOTE: SQL migrations are run manually before/after deploys.
+    // Use Scripts/archives/ as reference. Do NOT auto-run migrations at startup.
+    // See: sp_fxbackup for pre-deploy backups.
 
     // Seed phase templates if they don't exist
     try
@@ -263,114 +239,8 @@ Utility.Initialize(app.Configuration);
 
 app.Run();
 
-/// <summary>
-/// Run pending SQL migration scripts from Backend/API/Scripts/archives/.
-/// Tracks applied migrations in a __SqlMigrations table.
-/// All migration scripts must be idempotent (IF NOT EXISTS checks).
-/// </summary>
-static async Task RunPendingSqlMigrationsAsync(ApplicationDbContext context, ILogger logger)
-{
-    // Ensure tracking table exists
-    await context.Database.ExecuteSqlRawAsync(@"
-        IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = '__SqlMigrations')
-        BEGIN
-            CREATE TABLE __SqlMigrations (
-                Id INT IDENTITY(1,1) PRIMARY KEY,
-                ScriptName NVARCHAR(500) NOT NULL,
-                AppliedAt DATETIME2 NOT NULL DEFAULT GETUTCDATE()
-            );
-            CREATE UNIQUE INDEX IX_SqlMigrations_ScriptName ON __SqlMigrations(ScriptName);
-        END");
-
-    // Find migration scripts directory
-    var scriptsDir = Path.Combine(AppContext.BaseDirectory, "Scripts", "archives");
-    if (!Directory.Exists(scriptsDir))
-    {
-        // Try relative path (development)
-        scriptsDir = Path.Combine(Directory.GetCurrentDirectory(), "Scripts", "archives");
-    }
-    if (!Directory.Exists(scriptsDir))
-    {
-        logger.LogInformation("No Scripts/archives directory found. Skipping SQL migrations.");
-        return;
-    }
-
-    // Get already-applied migrations
-    var applied = new HashSet<string>();
-    try
-    {
-        var conn = context.Database.GetDbConnection();
-        await conn.OpenAsync();
-        using var cmd = conn.CreateCommand();
-        cmd.CommandText = "SELECT ScriptName FROM __SqlMigrations";
-        using var reader = await cmd.ExecuteReaderAsync();
-        while (await reader.ReadAsync())
-        {
-            applied.Add(reader.GetString(0));
-        }
-        await conn.CloseAsync();
-    }
-    catch
-    {
-        // Table might not exist yet on very first run
-    }
-
-    // Get all migration files, sorted by name
-    var migrationFiles = Directory.GetFiles(scriptsDir, "Migration_*.sql")
-        .OrderBy(f => Path.GetFileName(f))
-        .ToList();
-
-    var pending = migrationFiles
-        .Where(f => !applied.Contains(Path.GetFileName(f)))
-        .ToList();
-
-    if (pending.Count == 0)
-    {
-        logger.LogInformation("SQL migrations: all {Count} scripts already applied.", migrationFiles.Count);
-        return;
-    }
-
-    logger.LogInformation("SQL migrations: {Pending} pending out of {Total} total.", pending.Count, migrationFiles.Count);
-
-    foreach (var file in pending)
-    {
-        var scriptName = Path.GetFileName(file);
-        try
-        {
-            var sql = await File.ReadAllTextAsync(file);
-            
-            // Split on GO statements (SQL Server batch separator)
-            var batches = System.Text.RegularExpressions.Regex.Split(sql, @"^\s*GO\s*$",
-                System.Text.RegularExpressions.RegexOptions.Multiline | System.Text.RegularExpressions.RegexOptions.IgnoreCase)
-                .Where(b => !string.IsNullOrWhiteSpace(b))
-                .ToList();
-
-            foreach (var batch in batches)
-            {
-                await context.Database.ExecuteSqlRawAsync(batch);
-            }
-
-            // Record as applied
-            await context.Database.ExecuteSqlRawAsync(
-                "INSERT INTO __SqlMigrations (ScriptName) VALUES ({0})", scriptName);
-
-            logger.LogInformation("SQL migration applied: {Script}", scriptName);
-        }
-        catch (Exception ex)
-        {
-            logger.LogWarning(ex, "SQL migration failed (may be OK if idempotent): {Script}", scriptName);
-            // Still record it so we don't retry every startup — scripts are idempotent
-            try
-            {
-                await context.Database.ExecuteSqlRawAsync(
-                    "INSERT INTO __SqlMigrations (ScriptName) VALUES ({0})", scriptName);
-            }
-            catch { /* ignore duplicate insert */ }
-        }
-    }
-
-    logger.LogInformation("SQL migrations complete. Applied {Count} new scripts.", pending.Count);
-}
+// NOTE: Auto-migration runner removed for safety (was root cause of Users table drop on 2026-02-02).
+// Migration scripts in Scripts/archives/ are kept as reference — run manually via SSMS/sqlcmd.
 
 /// <summary>
 /// Seeds the default system phase templates if none exist.

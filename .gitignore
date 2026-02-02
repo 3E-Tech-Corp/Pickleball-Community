@@ -28,6 +28,10 @@ yarn-error.log*
 .env.local
 .env.*.local
 
+# Production secrets — NEVER commit
+appsettings.production.json
+appsettings.Production.json
+
 # Temporary files
 tmp/
 temp/
