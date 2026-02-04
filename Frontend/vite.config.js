@@ -32,7 +32,7 @@ export default defineConfig({
         // Exclude manifest.webmanifest since we use manifest.json from public folder
         globPatterns: ['**/*.{js,css,html}'],
         // Increase limit for larger bundles (default is 2 MiB)
-        maximumFileSizeToCacheInBytes: 3 * 1024 * 1024, // 3 MiB
+        maximumFileSizeToCacheInBytes: 4 * 1024 * 1024, // 4 MiB
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/.*\.(js|css)$/,

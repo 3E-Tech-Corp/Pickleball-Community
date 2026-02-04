@@ -1,10 +1,28 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useRef, useMemo, memo } from 'react'
 import { tournamentApi } from '../services/api'
 import {
   Layers, Plus, Edit2, Trash2, Check, X, RefreshCw, AlertTriangle,
   Copy, ChevronDown, ChevronUp, Eye, Code, FileJson, Save, GitBranch,
-  Trophy, Users, Hash, ArrowRight, Clock, Zap, Settings, Award, Move
+  Trophy, Users, Hash, ArrowRight, Clock, Zap, Settings, Award, Move,
+  LayoutGrid, List, Shuffle, Repeat, Grid3X3, Swords, Target, GripVertical
 } from 'lucide-react'
+import {
+  ReactFlow,
+  Background,
+  Controls,
+  MiniMap,
+  useNodesState,
+  useEdgesState,
+  addEdge,
+  Handle,
+  Position,
+  MarkerType,
+  Panel,
+  useReactFlow,
+  ReactFlowProvider
+} from '@xyflow/react'
+import '@xyflow/react/dist/style.css'
+import dagre from 'dagre'
 
 const CATEGORIES = [
   { value: 'SingleElimination', label: 'Single Elimination', icon: GitBranch },
@@ -168,9 +186,9 @@ function autoGenerateRules(phases) {
 
 
 // ══════════════════════════════════════════
-// VisualPhaseEditor — inline sub-component
+// ListPhaseEditor — inline sub-component (formerly VisualPhaseEditor)
 // ══════════════════════════════════════════
-const VisualPhaseEditor = ({ visualState, onChange }) => {
+const ListPhaseEditor = ({ visualState, onChange }) => {
   const [collapsedPhases, setCollapsedPhases] = useState(new Set())
   const vs = visualState
 
@@ -731,6 +749,633 @@ const VisualPhaseEditor = ({ visualState, onChange }) => {
 
 
 // ══════════════════════════════════════════
+// Canvas Phase Editor — React Flow based
+// ══════════════════════════════════════════
+
+const PHASE_TYPE_COLORS = {
+  SingleElimination: { bg: 'bg-indigo-500', light: 'bg-indigo-50', border: 'border-indigo-300', text: 'text-indigo-700', hex: '#6366f1' },
+  DoubleElimination: { bg: 'bg-purple-500', light: 'bg-purple-50', border: 'border-purple-300', text: 'text-purple-700', hex: '#a855f7' },
+  RoundRobin: { bg: 'bg-green-500', light: 'bg-green-50', border: 'border-green-300', text: 'text-green-700', hex: '#22c55e' },
+  Pools: { bg: 'bg-blue-500', light: 'bg-blue-50', border: 'border-blue-300', text: 'text-blue-700', hex: '#3b82f6' },
+  Swiss: { bg: 'bg-amber-500', light: 'bg-amber-50', border: 'border-amber-300', text: 'text-amber-700', hex: '#f59e0b' },
+  BracketRound: { bg: 'bg-rose-500', light: 'bg-rose-50', border: 'border-rose-300', text: 'text-rose-700', hex: '#f43f5e' }
+}
+
+const PHASE_TYPE_ICONS = {
+  SingleElimination: GitBranch,
+  DoubleElimination: Swords,
+  RoundRobin: Repeat,
+  Pools: Grid3X3,
+  Swiss: Shuffle,
+  BracketRound: Target
+}
+
+const NODE_WIDTH = 220
+const NODE_HEIGHT = 100
+
+// Dagre auto-layout
+function getLayoutedElements(nodes, edges) {
+  const g = new dagre.graphlib.Graph()
+  g.setDefaultEdgeLabel(() => ({}))
+  g.setGraph({ rankdir: 'TB', nodesep: 60, ranksep: 80 })
+
+  nodes.forEach((node) => {
+    g.setNode(node.id, { width: NODE_WIDTH, height: NODE_HEIGHT })
+  })
+  edges.forEach((edge) => {
+    g.setEdge(edge.source, edge.target)
+  })
+
+  dagre.layout(g)
+
+  const layoutedNodes = nodes.map((node) => {
+    const nodeWithPosition = g.node(node.id)
+    return {
+      ...node,
+      position: {
+        x: nodeWithPosition.x - NODE_WIDTH / 2,
+        y: nodeWithPosition.y - NODE_HEIGHT / 2,
+      },
+    }
+  })
+
+  return { nodes: layoutedNodes, edges }
+}
+
+// Custom Phase Node
+const PhaseNode = memo(({ data, selected }) => {
+  const colors = PHASE_TYPE_COLORS[data.phaseType] || PHASE_TYPE_COLORS.SingleElimination
+  const Icon = PHASE_TYPE_ICONS[data.phaseType] || GitBranch
+
+  return (
+    <div
+      className={`rounded-lg shadow-md border-2 overflow-hidden transition-all ${
+        selected ? 'ring-2 ring-purple-400 ring-offset-2' : ''
+      } ${colors.border}`}
+      style={{ width: NODE_WIDTH }}
+    >
+      <Handle type="target" position={Position.Top} className="!bg-gray-400 !w-3 !h-3 !border-2 !border-white" />
+      <div className={`${colors.bg} px-3 py-1.5 flex items-center gap-2`}>
+        <Icon className="w-3.5 h-3.5 text-white" />
+        <span className="text-white text-xs font-semibold truncate flex-1">{data.label}</span>
+        <span className="text-white/70 text-[10px]">#{data.sortOrder}</span>
+      </div>
+      <div className={`${colors.light} px-3 py-2`}>
+        <div className="flex items-center justify-between">
+          <span className={`text-xs font-medium ${colors.text}`}>{data.phaseType}</span>
+          <span className="text-xs text-gray-500">
+            {data.incomingSlotCount} in → {data.advancingSlotCount} out
+          </span>
+        </div>
+        {data.phaseType === 'Pools' && data.poolCount > 0 && (
+          <div className="text-[10px] text-gray-400 mt-0.5">{data.poolCount} pools</div>
+        )}
+      </div>
+      <Handle type="source" position={Position.Bottom} className="!bg-gray-400 !w-3 !h-3 !border-2 !border-white" />
+    </div>
+  )
+})
+
+const nodeTypes = { phaseNode: PhaseNode }
+
+// Palette item
+const PaletteItem = ({ phaseType, label }) => {
+  const colors = PHASE_TYPE_COLORS[phaseType] || PHASE_TYPE_COLORS.SingleElimination
+  const Icon = PHASE_TYPE_ICONS[phaseType] || GitBranch
+
+  const onDragStart = (event) => {
+    event.dataTransfer.setData('application/reactflow-phasetype', phaseType)
+    event.dataTransfer.effectAllowed = 'move'
+  }
+
+  return (
+    <div
+      draggable
+      onDragStart={onDragStart}
+      className={`flex items-center gap-2 px-3 py-2 rounded-lg border cursor-grab active:cursor-grabbing hover:shadow-md transition-shadow ${colors.light} ${colors.border}`}
+    >
+      <Icon className={`w-4 h-4 ${colors.text}`} />
+      <span className={`text-xs font-medium ${colors.text}`}>{label}</span>
+    </div>
+  )
+}
+
+// Config Panel for selected node
+const NodeConfigPanel = ({ phase, phaseIndex, onChange, onDelete }) => {
+  if (!phase) return null
+  const isBracket = BRACKET_TYPES.includes(phase.phaseType)
+  const isPools = phase.phaseType === 'Pools'
+
+  const update = (field, value) => onChange(phaseIndex, field, value)
+
+  return (
+    <div className="space-y-3 p-3">
+      <h4 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+        <Settings className="w-4 h-4 text-purple-600" />
+        Phase Config
+      </h4>
+      <div className="space-y-2">
+        <div>
+          <label className="block text-[11px] font-medium text-gray-500 mb-0.5">Name</label>
+          <input type="text" value={phase.name} onChange={e => update('name', e.target.value)}
+            className="w-full px-2 py-1 border rounded text-sm focus:ring-2 focus:ring-purple-500" />
+        </div>
+        <div>
+          <label className="block text-[11px] font-medium text-gray-500 mb-0.5">Type</label>
+          <select value={phase.phaseType} onChange={e => update('phaseType', e.target.value)}
+            className="w-full px-2 py-1 border rounded text-sm focus:ring-2 focus:ring-purple-500">
+            {PHASE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+          </select>
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <label className="block text-[11px] font-medium text-gray-500 mb-0.5">In Slots</label>
+            <input type="number" min={1} value={phase.incomingSlotCount}
+              onChange={e => update('incomingSlotCount', parseInt(e.target.value) || 0)}
+              className="w-full px-2 py-1 border rounded text-sm focus:ring-2 focus:ring-purple-500" />
+          </div>
+          <div>
+            <label className="block text-[11px] font-medium text-gray-500 mb-0.5">Adv Slots</label>
+            <input type="number" min={0} value={phase.advancingSlotCount}
+              onChange={e => update('advancingSlotCount', parseInt(e.target.value) || 0)}
+              className="w-full px-2 py-1 border rounded text-sm focus:ring-2 focus:ring-purple-500" />
+          </div>
+        </div>
+        {isPools && (
+          <div>
+            <label className="block text-[11px] font-medium text-gray-500 mb-0.5">Pool Count</label>
+            <input type="number" min={1} value={phase.poolCount}
+              onChange={e => update('poolCount', parseInt(e.target.value) || 0)}
+              className="w-full px-2 py-1 border rounded text-sm focus:ring-2 focus:ring-purple-500" />
+          </div>
+        )}
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <label className="block text-[11px] font-medium text-gray-500 mb-0.5">Best Of</label>
+            <select value={phase.bestOf} onChange={e => update('bestOf', parseInt(e.target.value))}
+              className="w-full px-2 py-1 border rounded text-sm focus:ring-2 focus:ring-purple-500">
+              <option value={1}>1</option>
+              <option value={3}>3</option>
+              <option value={5}>5</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-[11px] font-medium text-gray-500 mb-0.5">Duration</label>
+            <input type="number" min={1} value={phase.matchDurationMinutes}
+              onChange={e => update('matchDurationMinutes', parseInt(e.target.value) || 0)}
+              className="w-full px-2 py-1 border rounded text-sm focus:ring-2 focus:ring-purple-500" />
+          </div>
+        </div>
+        <div>
+          <label className="block text-[11px] font-medium text-gray-500 mb-0.5">Seeding</label>
+          <select value={phase.seedingStrategy || 'Sequential'} onChange={e => update('seedingStrategy', e.target.value)}
+            className="w-full px-2 py-1 border rounded text-sm focus:ring-2 focus:ring-purple-500">
+            {SEEDING_STRATEGIES.map(s => <option key={s} value={s}>{s}</option>)}
+          </select>
+        </div>
+        {isBracket && (
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" checked={phase.includeConsolation || false}
+              onChange={e => update('includeConsolation', e.target.checked)}
+              className="rounded border-gray-300 text-purple-600 focus:ring-purple-500" />
+            <span className="text-xs text-gray-700">Include consolation</span>
+          </label>
+        )}
+      </div>
+      <button type="button" onClick={onDelete}
+        className="w-full flex items-center justify-center gap-1 px-3 py-1.5 text-sm text-red-600 border border-red-200 rounded-lg hover:bg-red-50 mt-3">
+        <Trash2 className="w-3.5 h-3.5" /> Delete Phase
+      </button>
+    </div>
+  )
+}
+
+// Inner canvas component (needs ReactFlowProvider)
+const CanvasPhaseEditorInner = ({ visualState, onChange }) => {
+  const vs = visualState
+  const reactFlowWrapper = useRef(null)
+  const { screenToFlowPosition } = useReactFlow()
+  const [selectedNodeId, setSelectedNodeId] = useState(null)
+
+  // Convert visualState phases to React Flow nodes
+  const buildNodes = useCallback((phases) => {
+    return phases.map((phase, idx) => ({
+      id: `phase-${idx}`,
+      type: 'phaseNode',
+      position: { x: 0, y: idx * 150 },
+      data: {
+        label: phase.name,
+        phaseType: phase.phaseType,
+        sortOrder: idx + 1,
+        incomingSlotCount: phase.incomingSlotCount,
+        advancingSlotCount: phase.advancingSlotCount,
+        poolCount: phase.poolCount,
+      },
+    }))
+  }, [])
+
+  // Convert advancement rules to React Flow edges
+  const buildEdges = useCallback((rules, phases) => {
+    const edgeMap = new Map()
+    rules.forEach((rule) => {
+      const key = `${rule.sourcePhaseOrder}-${rule.targetPhaseOrder}`
+      if (!edgeMap.has(key)) {
+        edgeMap.set(key, { sourcePhaseOrder: rule.sourcePhaseOrder, targetPhaseOrder: rule.targetPhaseOrder, count: 0 })
+      }
+      edgeMap.get(key).count++
+    })
+
+    return Array.from(edgeMap.values()).map(({ sourcePhaseOrder, targetPhaseOrder, count }) => {
+      const srcPhase = phases[sourcePhaseOrder - 1]
+      const label = srcPhase ? `Top ${count}` : `${count} slots`
+      return {
+        id: `e-${sourcePhaseOrder}-${targetPhaseOrder}`,
+        source: `phase-${sourcePhaseOrder - 1}`,
+        target: `phase-${targetPhaseOrder - 1}`,
+        animated: true,
+        label,
+        style: { stroke: '#a78bfa' },
+        labelStyle: { fontSize: 11, fontWeight: 600, fill: '#6d28d9' },
+        labelBgStyle: { fill: '#f5f3ff', stroke: '#c4b5fd' },
+        labelBgPadding: [6, 3],
+        labelBgBorderRadius: 4,
+        markerEnd: { type: MarkerType.ArrowClosed, color: '#a78bfa' },
+      }
+    })
+  }, [])
+
+  // Initialize nodes/edges from visual state
+  const initialNodes = useMemo(() => {
+    const nodes = buildNodes(vs.phases)
+    const edges = buildEdges(vs.advancementRules, vs.phases)
+    const { nodes: layoutedNodes } = getLayoutedElements(nodes, edges)
+    return layoutedNodes
+  }, []) // Only on mount
+
+  const initialEdges = useMemo(() => {
+    return buildEdges(vs.advancementRules, vs.phases)
+  }, []) // Only on mount
+
+  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes)
+  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges)
+
+  // Sync nodes/edges when visualState changes from outside (e.g., list editor toggle)
+  const vsRef = useRef(vs)
+  useEffect(() => {
+    // Only re-sync if phases array length changed (structural change from outside)
+    if (vsRef.current === vs) return
+    const prevLen = vsRef.current.phases.length
+    const newLen = vs.phases.length
+    vsRef.current = vs
+
+    // Always update node data to reflect current phase state
+    setNodes(prev => {
+      if (prev.length !== newLen) {
+        // Structural change — full rebuild with layout
+        const newNodes = buildNodes(vs.phases)
+        const newEdges = buildEdges(vs.advancementRules, vs.phases)
+        const { nodes: layoutedNodes } = getLayoutedElements(newNodes, newEdges)
+        setEdges(newEdges)
+        return layoutedNodes
+      }
+      // Just update data on existing nodes
+      return prev.map((node, idx) => {
+        const phase = vs.phases[idx]
+        if (!phase) return node
+        return {
+          ...node,
+          data: {
+            label: phase.name,
+            phaseType: phase.phaseType,
+            sortOrder: idx + 1,
+            incomingSlotCount: phase.incomingSlotCount,
+            advancingSlotCount: phase.advancingSlotCount,
+            poolCount: phase.poolCount,
+          }
+        }
+      })
+    })
+  }, [vs, buildNodes, buildEdges, setNodes, setEdges])
+
+  // When a connection is made, create advancement rules
+  const onConnect = useCallback((params) => {
+    const sourceIdx = parseInt(params.source.replace('phase-', ''))
+    const targetIdx = parseInt(params.target.replace('phase-', ''))
+    if (sourceIdx === targetIdx) return
+
+    // Add edge
+    setEdges((eds) => {
+      // Check if edge already exists
+      const exists = eds.some(e => e.source === params.source && e.target === params.target)
+      if (exists) return eds
+      const srcPhase = vs.phases[sourceIdx]
+      const advancing = srcPhase ? parseInt(srcPhase.advancingSlotCount) || 1 : 1
+      return addEdge({
+        ...params,
+        animated: true,
+        label: `Top ${advancing}`,
+        style: { stroke: '#a78bfa' },
+        labelStyle: { fontSize: 11, fontWeight: 600, fill: '#6d28d9' },
+        labelBgStyle: { fill: '#f5f3ff', stroke: '#c4b5fd' },
+        labelBgPadding: [6, 3],
+        labelBgBorderRadius: 4,
+        markerEnd: { type: MarkerType.ArrowClosed, color: '#a78bfa' },
+      }, eds)
+    })
+
+    // Generate advancement rules for this connection
+    const srcPhase = vs.phases[sourceIdx]
+    const tgtPhase = vs.phases[targetIdx]
+    const srcOrder = sourceIdx + 1
+    const tgtOrder = targetIdx + 1
+    const slotsToAdvance = Math.min(
+      parseInt(srcPhase?.advancingSlotCount) || 1,
+      parseInt(tgtPhase?.incomingSlotCount) || 1
+    )
+
+    const newRules = []
+    if (srcPhase?.phaseType === 'Pools' && (parseInt(srcPhase.poolCount) || 0) > 1) {
+      const poolCount = parseInt(srcPhase.poolCount)
+      const advPerPool = Math.max(1, Math.floor(slotsToAdvance / poolCount))
+      let slot = 1
+      for (let pool = 0; pool < poolCount; pool++) {
+        for (let pos = 1; pos <= advPerPool; pos++) {
+          newRules.push({ sourcePhaseOrder: srcOrder, targetPhaseOrder: tgtOrder, finishPosition: pos, targetSlotNumber: slot++, sourcePoolIndex: pool })
+        }
+      }
+    } else {
+      for (let pos = 1; pos <= slotsToAdvance; pos++) {
+        newRules.push({ sourcePhaseOrder: srcOrder, targetPhaseOrder: tgtOrder, finishPosition: pos, targetSlotNumber: pos, sourcePoolIndex: null })
+      }
+    }
+
+    // Remove existing rules for this connection, then add new ones
+    const filteredRules = vs.advancementRules.filter(
+      r => !(r.sourcePhaseOrder === srcOrder && r.targetPhaseOrder === tgtOrder)
+    )
+    onChange({ ...vs, advancementRules: [...filteredRules, ...newRules] })
+  }, [vs, onChange, setEdges])
+
+  // When edges are deleted, remove corresponding advancement rules
+  const onEdgesDelete = useCallback((deletedEdges) => {
+    const pairsToRemove = deletedEdges.map(e => ({
+      src: parseInt(e.source.replace('phase-', '')) + 1,
+      tgt: parseInt(e.target.replace('phase-', '')) + 1,
+    }))
+    const filteredRules = vs.advancementRules.filter(r =>
+      !pairsToRemove.some(p => p.src === r.sourcePhaseOrder && p.tgt === r.targetPhaseOrder)
+    )
+    onChange({ ...vs, advancementRules: filteredRules })
+  }, [vs, onChange])
+
+  // Node selection
+  const onNodeClick = useCallback((_, node) => {
+    setSelectedNodeId(node.id)
+  }, [])
+
+  const onPaneClick = useCallback(() => {
+    setSelectedNodeId(null)
+  }, [])
+
+  // Update phase config from panel
+  const handlePhaseUpdate = useCallback((phaseIdx, field, value) => {
+    const phases = [...vs.phases]
+    phases[phaseIdx] = { ...phases[phaseIdx], [field]: value }
+    onChange({ ...vs, phases })
+  }, [vs, onChange])
+
+  // Delete selected phase
+  const handleDeletePhase = useCallback(() => {
+    if (!selectedNodeId) return
+    const idx = parseInt(selectedNodeId.replace('phase-', ''))
+    if (vs.phases.length <= 1) return
+
+    const phases = vs.phases.filter((_, i) => i !== idx).map((p, i) => ({ ...p, sortOrder: i + 1 }))
+    const rules = vs.advancementRules.filter(r =>
+      r.sourcePhaseOrder !== idx + 1 && r.targetPhaseOrder !== idx + 1
+    ).map(r => ({
+      ...r,
+      sourcePhaseOrder: r.sourcePhaseOrder > idx + 1 ? r.sourcePhaseOrder - 1 : r.sourcePhaseOrder,
+      targetPhaseOrder: r.targetPhaseOrder > idx + 1 ? r.targetPhaseOrder - 1 : r.targetPhaseOrder
+    }))
+
+    setSelectedNodeId(null)
+    onChange({ ...vs, phases, advancementRules: rules })
+  }, [selectedNodeId, vs, onChange])
+
+  // Drop handler — add new phase from palette
+  const onDragOver = useCallback((event) => {
+    event.preventDefault()
+    event.dataTransfer.dropEffect = 'move'
+  }, [])
+
+  const onDrop = useCallback((event) => {
+    event.preventDefault()
+    const phaseType = event.dataTransfer.getData('application/reactflow-phasetype')
+    if (!phaseType) return
+
+    const position = screenToFlowPosition({ x: event.clientX, y: event.clientY })
+    const order = vs.phases.length + 1
+    const prev = vs.phases[vs.phases.length - 1]
+    const incoming = prev ? (parseInt(prev.advancingSlotCount) || 4) : 8
+
+    const newPhase = {
+      ...DEFAULT_PHASE,
+      name: `${phaseType} Phase`,
+      phaseType,
+      sortOrder: order,
+      incomingSlotCount: incoming,
+      advancingSlotCount: Math.max(1, Math.floor(incoming / 2)),
+      poolCount: phaseType === 'Pools' ? 4 : 0,
+    }
+
+    // Add node immediately at drop position
+    const newNodeId = `phase-${vs.phases.length}`
+    setNodes(prev => [...prev, {
+      id: newNodeId,
+      type: 'phaseNode',
+      position,
+      data: {
+        label: newPhase.name,
+        phaseType: newPhase.phaseType,
+        sortOrder: order,
+        incomingSlotCount: newPhase.incomingSlotCount,
+        advancingSlotCount: newPhase.advancingSlotCount,
+        poolCount: newPhase.poolCount,
+      }
+    }])
+
+    onChange({ ...vs, phases: [...vs.phases, newPhase] })
+  }, [vs, onChange, screenToFlowPosition, setNodes])
+
+  // Auto-layout button
+  const handleAutoLayout = useCallback(() => {
+    const currentEdges = edges
+    const { nodes: layoutedNodes } = getLayoutedElements(nodes, currentEdges)
+    setNodes(layoutedNodes)
+  }, [nodes, edges, setNodes])
+
+  // Compute topological sort order and sync to phases
+  const handleSyncSortOrder = useCallback(() => {
+    // Build adjacency from edges
+    const adj = new Map()
+    const inDegree = new Map()
+    nodes.forEach(n => { adj.set(n.id, []); inDegree.set(n.id, 0) })
+    edges.forEach(e => {
+      adj.get(e.source)?.push(e.target)
+      inDegree.set(e.target, (inDegree.get(e.target) || 0) + 1)
+    })
+
+    // Kahn's algorithm
+    const queue = []
+    inDegree.forEach((deg, id) => { if (deg === 0) queue.push(id) })
+    const order = []
+    while (queue.length > 0) {
+      // Sort by Y position to maintain visual ordering for ties
+      queue.sort((a, b) => {
+        const na = nodes.find(n => n.id === a)
+        const nb = nodes.find(n => n.id === b)
+        return (na?.position?.y || 0) - (nb?.position?.y || 0)
+      })
+      const id = queue.shift()
+      order.push(id)
+      for (const neighbor of (adj.get(id) || [])) {
+        inDegree.set(neighbor, inDegree.get(neighbor) - 1)
+        if (inDegree.get(neighbor) === 0) queue.push(neighbor)
+      }
+    }
+
+    // Re-order phases by topological order
+    const phases = [...vs.phases]
+    const reordered = order.map((nodeId, newIdx) => {
+      const oldIdx = parseInt(nodeId.replace('phase-', ''))
+      return { ...phases[oldIdx], sortOrder: newIdx + 1 }
+    })
+
+    // Remap advancement rules
+    const idxMap = new Map()
+    order.forEach((nodeId, newIdx) => {
+      const oldIdx = parseInt(nodeId.replace('phase-', ''))
+      idxMap.set(oldIdx + 1, newIdx + 1)
+    })
+    const remappedRules = vs.advancementRules.map(r => ({
+      ...r,
+      sourcePhaseOrder: idxMap.get(r.sourcePhaseOrder) || r.sourcePhaseOrder,
+      targetPhaseOrder: idxMap.get(r.targetPhaseOrder) || r.targetPhaseOrder,
+    }))
+
+    onChange({ ...vs, phases: reordered, advancementRules: remappedRules })
+  }, [nodes, edges, vs, onChange])
+
+  // Validation warnings
+  const warnings = useMemo(() => {
+    const w = []
+    nodes.forEach((node, idx) => {
+      if (idx === 0 && nodes.length > 0) return // First phase doesn't need incoming
+      const hasIncoming = edges.some(e => e.target === node.id)
+      if (!hasIncoming && nodes.length > 1) {
+        w.push(`"${vs.phases[idx]?.name || node.id}" has no incoming connection`)
+      }
+    })
+    return w
+  }, [nodes, edges, vs.phases])
+
+  const selectedPhaseIdx = selectedNodeId ? parseInt(selectedNodeId.replace('phase-', '')) : null
+  const selectedPhase = selectedPhaseIdx !== null ? vs.phases[selectedPhaseIdx] : null
+
+  return (
+    <div className="flex border rounded-lg overflow-hidden bg-white" style={{ height: 500 }}>
+      {/* Left Palette */}
+      <div className="w-48 border-r bg-gray-50 p-3 flex flex-col gap-2 flex-shrink-0 overflow-y-auto">
+        <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Phase Types</h4>
+        <p className="text-[10px] text-gray-400 mb-2">Drag onto canvas</p>
+        <PaletteItem phaseType="RoundRobin" label="Round Robin" />
+        <PaletteItem phaseType="SingleElimination" label="Single Elim" />
+        <PaletteItem phaseType="DoubleElimination" label="Double Elim" />
+        <PaletteItem phaseType="Pools" label="Pools" />
+        <PaletteItem phaseType="Swiss" label="Swiss" />
+        <PaletteItem phaseType="BracketRound" label="Bracket Round" />
+      </div>
+
+      {/* Center Canvas */}
+      <div className="flex-1" ref={reactFlowWrapper}>
+        <ReactFlow
+          nodes={nodes}
+          edges={edges}
+          onNodesChange={onNodesChange}
+          onEdgesChange={onEdgesChange}
+          onConnect={onConnect}
+          onEdgesDelete={onEdgesDelete}
+          onNodeClick={onNodeClick}
+          onPaneClick={onPaneClick}
+          onDragOver={onDragOver}
+          onDrop={onDrop}
+          nodeTypes={nodeTypes}
+          fitView
+          deleteKeyCode={['Backspace', 'Delete']}
+          proOptions={{ hideAttribution: true }}
+          className="bg-gray-50"
+        >
+          <Background color="#e5e7eb" gap={20} />
+          <Controls showInteractive={false} />
+          <MiniMap
+            nodeColor={(node) => {
+              const phaseType = node.data?.phaseType
+              return PHASE_TYPE_COLORS[phaseType]?.hex || '#6366f1'
+            }}
+            style={{ height: 80, width: 120 }}
+          />
+          <Panel position="top-left" className="flex gap-1.5">
+            <button onClick={handleAutoLayout}
+              className="flex items-center gap-1 px-2.5 py-1.5 bg-white border rounded-lg shadow-sm text-xs font-medium text-gray-600 hover:bg-gray-50">
+              <LayoutGrid className="w-3.5 h-3.5" /> Auto Layout
+            </button>
+            <button onClick={handleSyncSortOrder}
+              className="flex items-center gap-1 px-2.5 py-1.5 bg-white border rounded-lg shadow-sm text-xs font-medium text-gray-600 hover:bg-gray-50">
+              <ArrowRight className="w-3.5 h-3.5" /> Sync Order
+            </button>
+          </Panel>
+          {warnings.length > 0 && (
+            <Panel position="bottom-left">
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-2 max-w-xs">
+                {warnings.map((w, i) => (
+                  <div key={i} className="flex items-start gap-1.5 text-[11px] text-amber-700">
+                    <AlertTriangle className="w-3 h-3 mt-0.5 flex-shrink-0" />
+                    <span>{w}</span>
+                  </div>
+                ))}
+              </div>
+            </Panel>
+          )}
+        </ReactFlow>
+      </div>
+
+      {/* Right Config Panel */}
+      {selectedPhase && (
+        <div className="w-64 border-l bg-gray-50 overflow-y-auto flex-shrink-0">
+          <NodeConfigPanel
+            phase={selectedPhase}
+            phaseIndex={selectedPhaseIdx}
+            onChange={handlePhaseUpdate}
+            onDelete={handleDeletePhase}
+          />
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Wrapped canvas editor with ReactFlowProvider
+const CanvasPhaseEditor = ({ visualState, onChange }) => {
+  return (
+    <ReactFlowProvider>
+      <CanvasPhaseEditorInner visualState={visualState} onChange={onChange} />
+    </ReactFlowProvider>
+  )
+}
+
+
+// ══════════════════════════════════════════
 // Main PhaseTemplatesAdmin component
 // ══════════════════════════════════════════
 const PhaseTemplatesAdmin = ({ embedded = false }) => {
@@ -746,6 +1391,8 @@ const PhaseTemplatesAdmin = ({ embedded = false }) => {
 
   // Editor mode: 'visual' or 'json'
   const [editorMode, setEditorMode] = useState('visual')
+  // Visual sub-mode: 'canvas' or 'list'
+  const [visualSubMode, setVisualSubMode] = useState('canvas')
   // Visual state for the editor
   const [visualState, setVisualState] = useState(null)
 
@@ -1448,11 +2095,45 @@ const PhaseTemplatesAdmin = ({ embedded = false }) => {
                 </div>
 
                 {editorMode === 'visual' && visualState ? (
-                  <div className="border rounded-lg p-4 bg-gray-50 space-y-4">
-                    <VisualPhaseEditor
-                      visualState={visualState}
-                      onChange={handleVisualChange}
-                    />
+                  <div className="space-y-3">
+                    {/* Canvas / List sub-toggle */}
+                    <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-0.5 w-fit">
+                      <button
+                        type="button"
+                        onClick={() => setVisualSubMode('canvas')}
+                        className={`flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-medium transition-colors ${
+                          visualSubMode === 'canvas'
+                            ? 'bg-white text-purple-700 shadow-sm'
+                            : 'text-gray-500 hover:text-gray-700'
+                        }`}
+                      >
+                        <LayoutGrid className="w-3 h-3" /> Canvas
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setVisualSubMode('list')}
+                        className={`flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-medium transition-colors ${
+                          visualSubMode === 'list'
+                            ? 'bg-white text-purple-700 shadow-sm'
+                            : 'text-gray-500 hover:text-gray-700'
+                        }`}
+                      >
+                        <List className="w-3 h-3" /> List
+                      </button>
+                    </div>
+                    {visualSubMode === 'canvas' ? (
+                      <CanvasPhaseEditor
+                        visualState={visualState}
+                        onChange={handleVisualChange}
+                      />
+                    ) : (
+                      <div className="border rounded-lg p-4 bg-gray-50 space-y-4">
+                        <ListPhaseEditor
+                          visualState={visualState}
+                          onChange={handleVisualChange}
+                        />
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <div>
