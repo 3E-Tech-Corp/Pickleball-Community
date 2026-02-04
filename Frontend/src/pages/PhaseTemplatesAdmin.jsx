@@ -789,18 +789,18 @@ const PhaseInternalDiagram = memo(({ phaseType, incomingSlots, advancingSlots, p
   const LINE_GRAY = '#d1d5db'
   const LINE_GREEN = '#86efac'
 
-  // Render an incoming slot with number label
+  // Render an incoming slot with number inside the dot
   const InSlot = ({ x, y, num }) => (
     <g>
-      <circle cx={x} cy={y} r={3.5} fill={GRAY} />
-      <text x={x - 8} y={y + 3} fontSize="7" fill={GRAY} textAnchor="end" fontFamily="system-ui">S{num}</text>
+      <circle cx={x} cy={y} r={7} fill={GRAY} />
+      <text x={x} y={y + 3} fontSize="7" fill="white" textAnchor="middle" fontWeight="600" fontFamily="system-ui">{num}</text>
     </g>
   )
-  // Render an exit slot with number label
+  // Render an exit slot with number inside the dot
   const ExitSlot = ({ x, y, num }) => (
     <g>
-      <circle cx={x} cy={y} r={3.5} fill={PURPLE} />
-      <text x={x + 8} y={y + 3} fontSize="7" fill={GREEN} textAnchor="start" fontFamily="system-ui">E{num}</text>
+      <circle cx={x} cy={y} r={7} fill={PURPLE} />
+      <text x={x} y={y + 3} fontSize="7" fill="white" textAnchor="middle" fontWeight="600" fontFamily="system-ui">{num}</text>
     </g>
   )
 
@@ -827,14 +827,17 @@ const PhaseInternalDiagram = memo(({ phaseType, incomingSlots, advancingSlots, p
           const poolH = 22
           return (
             <g key={pi}>
-              {/* Incoming slots with numbers */}
+              {/* Incoming slots with snake-order numbers */}
               {Array.from({ length: Math.min(perPool, 4) }, (_, si) => {
                 const slotY = cy - (Math.min(perPool, 4) - 1) * 5 + si * 10
-                const slotNum = pi * perPool + si + 1
+                // Snake draft: even pools (0,2,4..) go forward, odd pools (1,3,5..) go reverse
+                const slotNum = pi % 2 === 0
+                  ? pi * perPool + si + 1
+                  : (pi + 1) * perPool - si
                 return (
                   <g key={`in-${si}`}>
                     <InSlot x={22} y={slotY} num={slotNum} />
-                    <line x1={26} y1={slotY} x2={poolX - 2} y2={cy} stroke={LINE_GRAY} strokeWidth={1} />
+                    <line x1={29} y1={slotY} x2={poolX - 2} y2={cy} stroke={LINE_GRAY} strokeWidth={1} />
                   </g>
                 )
               })}
@@ -889,7 +892,7 @@ const PhaseInternalDiagram = memo(({ phaseType, incomingSlots, advancingSlots, p
           return (
             <g key={`in-${i}`}>
               <InSlot x={22} y={sy} num={i + 1} />
-              <line x1={26} y1={sy} x2={boxX - 2} y2={svgH / 2} stroke={LINE_GRAY} strokeWidth={0.8} />
+              <line x1={29} y1={sy} x2={boxX - 2} y2={svgH / 2} stroke={LINE_GRAY} strokeWidth={0.8} />
             </g>
           )
         })}
@@ -939,7 +942,7 @@ const PhaseInternalDiagram = memo(({ phaseType, incomingSlots, advancingSlots, p
           return (
             <g key={`in-${i}`}>
               <InSlot x={22} y={sy} num={i + 1} />
-              <line x1={26} y1={sy} x2={boxX - 2} y2={svgH / 2} stroke={LINE_GRAY} strokeWidth={0.8} />
+              <line x1={29} y1={sy} x2={boxX - 2} y2={svgH / 2} stroke={LINE_GRAY} strokeWidth={0.8} />
             </g>
           )
         })}
@@ -990,8 +993,8 @@ const PhaseInternalDiagram = memo(({ phaseType, incomingSlots, advancingSlots, p
             <g key={`wb-${i}`}>
               <InSlot x={20} y={my - 4} num={i * 2 + 1} />
               <InSlot x={20} y={my + 4} num={i * 2 + 2} />
-              <line x1={24} y1={my - 4} x2={50} y2={my - 4} stroke={LINE_GRAY} strokeWidth={0.8} />
-              <line x1={24} y1={my + 4} x2={50} y2={my + 4} stroke={LINE_GRAY} strokeWidth={0.8} />
+              <line x1={27} y1={my - 4} x2={50} y2={my - 4} stroke={LINE_GRAY} strokeWidth={0.8} />
+              <line x1={27} y1={my + 4} x2={50} y2={my + 4} stroke={LINE_GRAY} strokeWidth={0.8} />
               <line x1={50} y1={my - 4} x2={50} y2={my + 4} stroke={LINE_GRAY} strokeWidth={0.8} />
               <rect x={52} y={my - 7} width={36} height={14} rx={3} fill={phaseHex} fillOpacity={0.12} stroke={phaseHex} strokeWidth={1} />
               <text x={70} y={my + 3} fontSize="7" fill={phaseHex} textAnchor="middle" fontFamily="system-ui">M{i + 1}</text>
@@ -1057,8 +1060,8 @@ const PhaseInternalDiagram = memo(({ phaseType, incomingSlots, advancingSlots, p
                 {/* Two incoming slots with numbers */}
                 <InSlot x={22} y={my - 5} num={i * 2 + 1} />
                 <InSlot x={22} y={my + 5} num={i * 2 + 2} />
-                <line x1={26} y1={my - 5} x2={55} y2={my - 5} stroke={LINE_GRAY} strokeWidth={0.8} />
-                <line x1={26} y1={my + 5} x2={55} y2={my + 5} stroke={LINE_GRAY} strokeWidth={0.8} />
+                <line x1={29} y1={my - 5} x2={55} y2={my - 5} stroke={LINE_GRAY} strokeWidth={0.8} />
+                <line x1={29} y1={my + 5} x2={55} y2={my + 5} stroke={LINE_GRAY} strokeWidth={0.8} />
                 <line x1={55} y1={my - 5} x2={55} y2={my + 5} stroke={LINE_GRAY} strokeWidth={0.8} />
                 {/* Match box */}
                 <rect x={57} y={my - 8} width={40} height={16} rx={4} fill={phaseHex} fillOpacity={0.12} stroke={phaseHex} strokeWidth={1.2} />
@@ -1130,13 +1133,13 @@ const PhaseInternalDiagram = memo(({ phaseType, incomingSlots, advancingSlots, p
               <g key={`r${ri}-m${mi}`}>
                 {ri === 0 && (
                   <g>
-                    <text x={x - 14} y={my - 1} fontSize="6" fill={GRAY} textAnchor="end" fontFamily="system-ui">S{mi * 2 + 1}</text>
-                    <circle cx={x - 8} cy={my - 4} r={2.5} fill={GRAY} />
-                    <text x={x - 14} y={my + 7} fontSize="6" fill={GRAY} textAnchor="end" fontFamily="system-ui">S{mi * 2 + 2}</text>
-                    <circle cx={x - 8} cy={my + 4} r={2.5} fill={GRAY} />
-                    <line x1={x - 5} y1={my - 4} x2={x + 2} y2={my - 4} stroke={LINE_GRAY} strokeWidth={0.6} />
-                    <line x1={x - 5} y1={my + 4} x2={x + 2} y2={my + 4} stroke={LINE_GRAY} strokeWidth={0.6} />
-                    <line x1={x + 2} y1={my - 4} x2={x + 2} y2={my + 4} stroke={LINE_GRAY} strokeWidth={0.6} />
+                    <circle cx={x - 8} cy={my - 5} r={5} fill={GRAY} />
+                    <text x={x - 8} y={my - 2.5} fontSize="6" fill="white" textAnchor="middle" fontWeight="600" fontFamily="system-ui">{mi * 2 + 1}</text>
+                    <circle cx={x - 8} cy={my + 5} r={5} fill={GRAY} />
+                    <text x={x - 8} y={my + 7.5} fontSize="6" fill="white" textAnchor="middle" fontWeight="600" fontFamily="system-ui">{mi * 2 + 2}</text>
+                    <line x1={x - 3} y1={my - 5} x2={x + 2} y2={my - 5} stroke={LINE_GRAY} strokeWidth={0.6} />
+                    <line x1={x - 3} y1={my + 5} x2={x + 2} y2={my + 5} stroke={LINE_GRAY} strokeWidth={0.6} />
+                    <line x1={x + 2} y1={my - 5} x2={x + 2} y2={my + 5} stroke={LINE_GRAY} strokeWidth={0.6} />
                   </g>
                 )}
                 <rect x={x + 4} y={my - 6} width={bw} height={12} rx={3} fill={phaseHex} fillOpacity={ri === maxVisibleRounds - 1 ? 0.25 : 0.1} stroke={phaseHex} strokeWidth={1} />
