@@ -989,8 +989,11 @@ public class PhaseTemplatesController : ControllerBase
 
     private async Task CreateAdvancementRuleFromJson(JsonElement ruleJson, Dictionary<int, DivisionPhase> phases)
     {
-        var fromPhaseOrder = ruleJson.GetProperty("fromPhase").GetInt32();
-        var toPhaseOrder = ruleJson.GetProperty("toPhase").GetInt32();
+        // Support both old format (fromPhase/toPhase) and new visual editor format (sourcePhaseOrder/targetPhaseOrder)
+        var fromPhaseOrder = ruleJson.TryGetProperty("sourcePhaseOrder", out var spo) ? spo.GetInt32()
+            : ruleJson.TryGetProperty("fromPhase", out var fp) ? fp.GetInt32() : 0;
+        var toPhaseOrder = ruleJson.TryGetProperty("targetPhaseOrder", out var tpo) ? tpo.GetInt32()
+            : ruleJson.TryGetProperty("toPhase", out var tp) ? tp.GetInt32() : 0;
 
         if (!phases.TryGetValue(fromPhaseOrder, out var fromPhase) ||
             !phases.TryGetValue(toPhaseOrder, out var toPhase))
@@ -998,15 +1001,31 @@ public class PhaseTemplatesController : ControllerBase
             return; // Skip invalid rules
         }
 
+        var targetSlot = ruleJson.TryGetProperty("targetSlotNumber", out var tsn) ? tsn.GetInt32()
+            : ruleJson.TryGetProperty("toSlot", out var ts) ? ts.GetInt32() : 1;
+        var sourceRank = ruleJson.TryGetProperty("finishPosition", out var fpos) ? fpos.GetInt32()
+            : ruleJson.TryGetProperty("fromRank", out var rank) ? rank.GetInt32() : 1;
+
         var rule = new PhaseAdvancementRule
         {
             SourcePhaseId = fromPhase.Id,
             TargetPhaseId = toPhase.Id,
-            TargetSlotNumber = ruleJson.GetProperty("toSlot").GetInt32(),
-            SourceRank = ruleJson.TryGetProperty("fromRank", out var rank) ? rank.GetInt32() : 1
-            // Note: Pool-specific rules (fromPool in JSON) require pools to be created first
-            // SourcePoolId can be set after pools are created
+            TargetSlotNumber = targetSlot,
+            SourceRank = sourceRank,
         };
+
+        // Resolve pool-specific rules: sourcePoolIndex → SourcePoolId
+        if (ruleJson.TryGetProperty("sourcePoolIndex", out var poolIdx) && poolIdx.ValueKind == JsonValueKind.Number)
+        {
+            var poolIndex = poolIdx.GetInt32();
+            var pool = await _context.PhasePools
+                .Where(p => p.PhaseId == fromPhase.Id && p.PoolOrder == poolIndex + 1) // poolIndex is 0-based, PoolOrder is 1-based
+                .FirstOrDefaultAsync();
+            if (pool != null)
+            {
+                rule.SourcePoolId = pool.Id;
+            }
+        }
 
         _context.PhaseAdvancementRules.Add(rule);
     }
