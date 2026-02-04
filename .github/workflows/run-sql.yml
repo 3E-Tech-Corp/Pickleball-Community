@@ -23,7 +23,7 @@ jobs:
           $sql = "${{ github.event.inputs.sql }}"
           Write-Host "Running SQL on [$db]..."
           try {
-            $result = Invoke-Sqlcmd -Query $sql -Database $db -ServerInstance "localhost" -TrustServerCertificate -QueryTimeout 300
+            $result = Invoke-Sqlcmd -Query $sql -Database $db -ServerInstance "localhost" -QueryTimeout 300
             if ($result) { $result | Format-Table -AutoSize | Out-String | Write-Host }
             Write-Host "SQL executed successfully."
           } catch {
