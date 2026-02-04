@@ -35,7 +35,7 @@ const CATEGORIES = [
 ]
 
 const PHASE_TYPES = [
-  'SingleElimination', 'DoubleElimination', 'RoundRobin', 'Pools', 'BracketRound', 'Swiss', 'Award'
+  'Draw', 'SingleElimination', 'DoubleElimination', 'RoundRobin', 'Pools', 'BracketRound', 'Swiss', 'Award'
 ]
 
 const BRACKET_TYPES = ['SingleElimination', 'DoubleElimination', 'BracketRound']
@@ -94,7 +94,8 @@ function parseStructureToVisual(jsonStr) {
         matchDurationMinutes: p.matchDurationMinutes || 30,
         seedingStrategy: p.seedingStrategy || 'Sequential',
         includeConsolation: p.includeConsolation || p.hasConsolationMatch || false,
-        awardType: p.awardType || null
+        awardType: p.awardType || null,
+        drawMethod: p.drawMethod || null
       })) : [],
       advancementRules: Array.isArray(s.advancementRules) ? s.advancementRules.map(r => ({
         sourcePhaseOrder: r.sourcePhaseOrder ?? r.fromPhase ?? 1,
@@ -137,7 +138,8 @@ function serializeVisualToJson(vs) {
       matchDurationMinutes: parseInt(p.matchDurationMinutes) || 30,
       ...(p.seedingStrategy && p.seedingStrategy !== 'Sequential' ? { seedingStrategy: p.seedingStrategy } : {}),
       ...(BRACKET_TYPES.includes(p.phaseType) && p.includeConsolation ? { includeConsolation: true } : {}),
-      ...(p.phaseType === 'Award' && p.awardType ? { awardType: p.awardType } : {})
+      ...(p.phaseType === 'Award' && p.awardType ? { awardType: p.awardType } : {}),
+      ...(p.phaseType === 'Draw' && p.drawMethod ? { drawMethod: p.drawMethod } : {})
     })),
     advancementRules: vs.advancementRules,
     ...(vs.exitPositions.length > 0 ? { exitPositions: vs.exitPositions } : {})
@@ -756,6 +758,7 @@ const ListPhaseEditor = ({ visualState, onChange }) => {
 // ══════════════════════════════════════════
 
 const PHASE_TYPE_COLORS = {
+  Draw: { bg: 'bg-cyan-500', light: 'bg-cyan-50', border: 'border-cyan-300', text: 'text-cyan-700', hex: '#06b6d4' },
   SingleElimination: { bg: 'bg-indigo-500', light: 'bg-indigo-50', border: 'border-indigo-300', text: 'text-indigo-700', hex: '#6366f1' },
   DoubleElimination: { bg: 'bg-purple-500', light: 'bg-purple-50', border: 'border-purple-300', text: 'text-purple-700', hex: '#a855f7' },
   RoundRobin: { bg: 'bg-green-500', light: 'bg-green-50', border: 'border-green-300', text: 'text-green-700', hex: '#22c55e' },
@@ -766,6 +769,7 @@ const PHASE_TYPE_COLORS = {
 }
 
 const PHASE_TYPE_ICONS = {
+  Draw: Users,
   SingleElimination: GitBranch,
   DoubleElimination: Swords,
   RoundRobin: Repeat,
@@ -814,6 +818,37 @@ const PhaseInternalDiagram = memo(({ phaseType, incomingSlots, advancingSlots, p
       <text x={x} y={y + 3} fontSize="7" fill="white" textAnchor="middle" fontWeight="600" fontFamily="system-ui">{num}</text>
     </g>
   )
+
+  if (phaseType === 'Draw') {
+    const exitCount = Math.min(advancing, 8)
+    const svgW = 260
+    const svgH = Math.min(200, Math.max(60, exitCount * 14 + 30))
+    const boxW = 80
+    const boxH = 28
+    const boxX = 40
+    const boxY = svgH / 2 - boxH / 2
+    return (
+      <svg width={svgW} height={svgH} viewBox={`0 0 ${svgW} ${svgH}`}>
+        <text x={svgW / 2} y={12} fontSize="9" fill={GRAY} textAnchor="middle" fontWeight="600" fontFamily="system-ui">
+          Draw → {advancing} slots
+        </text>
+        <rect x={boxX} y={boxY} width={boxW} height={boxH} rx={8} fill="#06b6d4" fillOpacity={0.12} stroke="#06b6d4" strokeWidth={1.5} />
+        <text x={boxX + boxW / 2} y={boxY + boxH / 2 + 3.5} fontSize="9" fill="#06b6d4" textAnchor="middle" fontWeight="600" fontFamily="system-ui">🎲 Draw</text>
+        {Array.from({ length: exitCount }, (_, i) => {
+          const ey = svgH / 2 - (exitCount - 1) * 7 + i * 14
+          return (
+            <g key={`out-${i}`}>
+              <line x1={boxX + boxW + 2} y1={svgH / 2} x2={svgW - 30} y2={ey} stroke={LINE_GREEN} strokeWidth={1} />
+              <ExitSlot x={svgW - 24} y={ey} num={i + 1} />
+            </g>
+          )
+        })}
+        {advancing > 8 && (
+          <text x={svgW - 24} y={svgH - 4} fontSize="7" fill={PURPLE} textAnchor="middle" fontFamily="system-ui">+{advancing - 8}</text>
+        )}
+      </svg>
+    )
+  }
 
   if (phaseType === 'Award') {
     const svgW = 260
@@ -1244,7 +1279,9 @@ const PhaseNode = memo(({ data, selected }) => {
       } ${colors.border}`}
       style={{ width: expanded ? 280 : NODE_WIDTH }}
     >
-      <Handle type="target" position={Position.Top} className="!bg-gray-400 !w-3 !h-3 !border-2 !border-white" />
+      {data.phaseType !== 'Draw' && (
+        <Handle type="target" position={Position.Top} className="!bg-gray-400 !w-3 !h-3 !border-2 !border-white" />
+      )}
       <div className={`${colors.bg} px-3 py-1.5 flex items-center gap-2`}>
         <Icon className="w-3.5 h-3.5 text-white" />
         <span className="text-white text-xs font-semibold truncate flex-1">{data.label}</span>
@@ -1261,7 +1298,7 @@ const PhaseNode = memo(({ data, selected }) => {
         <div className="flex items-center justify-between">
           <span className={`text-xs font-medium ${colors.text}`}>{data.phaseType}</span>
           <span className="text-xs text-gray-500">
-            {data.phaseType === 'Award' ? `${data.incomingSlotCount} in → 🏆` : `${data.incomingSlotCount} in → ${data.advancingSlotCount} out`}
+            {data.phaseType === 'Award' ? `${data.incomingSlotCount} in → 🏆` : data.phaseType === 'Draw' ? `🎲 → ${data.advancingSlotCount} out` : `${data.incomingSlotCount} in → ${data.advancingSlotCount} out`}
             {(data.phaseType === 'BracketRound' && (data.includeConsolation || data.advancingSlotCount >= data.incomingSlotCount)) && (
               <span className="text-[9px] ml-1 text-gray-400">
                 ({Math.floor(data.incomingSlotCount / 2)}W+{Math.floor(data.incomingSlotCount / 2)}L)
@@ -1721,6 +1758,24 @@ const NodeConfigPanel = ({ phase, phaseIndex, onChange, onDelete }) => {
               {AWARD_TYPES.map(t => <option key={t} value={t}>{t === 'none' ? 'None' : t}</option>)}
             </select>
           </div>
+        ) : phase.phaseType === 'Draw' ? (
+          <div className="space-y-2">
+            <div>
+              <label className="block text-[11px] font-medium text-gray-500 mb-0.5">Slot Count</label>
+              <input type="number" min={1} value={phase.advancingSlotCount}
+                onChange={e => update('advancingSlotCount', parseInt(e.target.value) || 0)}
+                className="w-full px-2 py-1 border rounded text-sm focus:ring-2 focus:ring-purple-500" />
+            </div>
+            <div>
+              <label className="block text-[11px] font-medium text-gray-500 mb-0.5">Draw Method</label>
+              <select value={phase.drawMethod || 'Random'} onChange={e => update('drawMethod', e.target.value)}
+                className="w-full px-2 py-1 border rounded text-sm focus:ring-2 focus:ring-purple-500">
+                <option value="Random">Random</option>
+                <option value="Manual">Manual (TD assigns)</option>
+                <option value="Seeded">Seeded (by ranking)</option>
+              </select>
+            </div>
+          </div>
         ) : (
           <div className="grid grid-cols-2 gap-2">
             <div>
@@ -1737,7 +1792,7 @@ const NodeConfigPanel = ({ phase, phaseIndex, onChange, onDelete }) => {
             </div>
           </div>
         )}
-        {phase.phaseType !== 'Award' && isPools && (
+        {phase.phaseType !== 'Award' && phase.phaseType !== 'Draw' && isPools && (
           <div>
             <label className="block text-[11px] font-medium text-gray-500 mb-0.5">Pool Count</label>
             <input type="number" min={1} value={phase.poolCount}
@@ -1745,7 +1800,7 @@ const NodeConfigPanel = ({ phase, phaseIndex, onChange, onDelete }) => {
               className="w-full px-2 py-1 border rounded text-sm focus:ring-2 focus:ring-purple-500" />
           </div>
         )}
-        {phase.phaseType !== 'Award' && (
+        {phase.phaseType !== 'Award' && phase.phaseType !== 'Draw' && (
           <>
             <div className="grid grid-cols-2 gap-2">
               <div>
@@ -1814,6 +1869,7 @@ const CanvasPhaseEditorInner = ({ visualState, onChange }) => {
         bestOf: phase.bestOf,
         includeConsolation: phase.includeConsolation,
         awardType: phase.awardType,
+        drawMethod: phase.drawMethod,
       },
     }))
   }, [])
@@ -1965,6 +2021,7 @@ const CanvasPhaseEditorInner = ({ visualState, onChange }) => {
             bestOf: phase.bestOf,
             includeConsolation: phase.includeConsolation,
             awardType: phase.awardType,
+            drawMethod: phase.drawMethod,
             incomingRules: vs.advancementRules.filter(r => r.targetPhaseOrder === order),
             outgoingRules: vs.advancementRules.filter(r => r.sourcePhaseOrder === order),
             phaseNames,
@@ -2153,15 +2210,17 @@ const CanvasPhaseEditorInner = ({ visualState, onChange }) => {
     const incoming = prev ? (parseInt(prev.advancingSlotCount) || 4) : 8
 
     const isAward = phaseType === 'Award'
+    const isDraw = phaseType === 'Draw'
     const newPhase = {
       ...DEFAULT_PHASE,
-      name: isAward ? 'Award' : `${phaseType} Phase`,
+      name: isAward ? 'Award' : isDraw ? 'Draw' : `${phaseType} Phase`,
       phaseType,
       sortOrder: order,
-      incomingSlotCount: isAward ? 1 : incoming,
-      advancingSlotCount: isAward ? 0 : Math.max(1, Math.floor(incoming / 2)),
+      incomingSlotCount: isAward ? 1 : isDraw ? 0 : incoming,
+      advancingSlotCount: isAward ? 0 : isDraw ? 8 : Math.max(1, Math.floor(incoming / 2)),
       poolCount: phaseType === 'Pools' ? 4 : 0,
       ...(isAward ? { awardType: 'Gold' } : {}),
+      ...(isDraw ? { drawMethod: 'Random' } : {}),
     }
 
     // Add node immediately at drop position
@@ -2178,13 +2237,14 @@ const CanvasPhaseEditorInner = ({ visualState, onChange }) => {
         advancingSlotCount: newPhase.advancingSlotCount,
         poolCount: newPhase.poolCount,
         awardType: newPhase.awardType,
+        drawMethod: newPhase.drawMethod,
       }
     }])
 
     // Auto-connect to previous phase if one exists
     const newPhases = [...vs.phases, newPhase]
     let newRules = [...vs.advancementRules]
-    if (vs.phases.length > 0) {
+    if (vs.phases.length > 0 && !isDraw) {
       const prevIdx = vs.phases.length - 1
       const prevPhase = vs.phases[prevIdx]
       const prevNodeId = `phase-${prevIdx}`
@@ -2351,6 +2411,9 @@ const CanvasPhaseEditorInner = ({ visualState, onChange }) => {
         <PaletteItem phaseType="Pools" label="Pools" />
         <PaletteItem phaseType="Swiss" label="Swiss" />
         <PaletteItem phaseType="BracketRound" label="Bracket Round" />
+        <div className="border-t my-2" />
+        <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Entry</h4>
+        <PaletteItem phaseType="Draw" label="Draw" />
         <div className="border-t my-2" />
         <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Awards</h4>
         <PaletteItem phaseType="Award" label="Award" />
