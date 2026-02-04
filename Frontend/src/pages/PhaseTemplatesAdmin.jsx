@@ -2295,7 +2295,9 @@ const CanvasPhaseEditorInner = ({ visualState, onChange }) => {
       const { nodes: layoutedNodes } = getLayoutedElements(updated, edges, dir)
       return layoutedNodes
     })
-  }, [edges, setNodes])
+    // Force edge rebuild so React Flow recalculates paths for new handle positions
+    setEdges(prev => prev.map(e => ({ ...e })))
+  }, [edges, setNodes, setEdges])
 
   // Compute topological sort order and sync to phases
   const handleSyncSortOrder = useCallback(() => {
