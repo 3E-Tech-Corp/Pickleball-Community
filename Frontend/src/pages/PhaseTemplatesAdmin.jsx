@@ -789,13 +789,18 @@ const PhaseInternalDiagram = memo(({ phaseType, incomingSlots, advancingSlots, p
   const LINE_GRAY = '#d1d5db'
   const LINE_GREEN = '#86efac'
 
-  // Render a small circle slot
-  const Slot = ({ x, y, color, label, anchor = 'middle' }) => (
+  // Render an incoming slot with number label
+  const InSlot = ({ x, y, num }) => (
     <g>
-      <circle cx={x} cy={y} r={5} fill={color} />
-      {label && (
-        <text x={anchor === 'start' ? x + 9 : anchor === 'end' ? x - 9 : x} y={y + 3} fontSize="8" fill={color} textAnchor={anchor} fontFamily="system-ui">{label}</text>
-      )}
+      <circle cx={x} cy={y} r={3.5} fill={GRAY} />
+      <text x={x - 8} y={y + 3} fontSize="7" fill={GRAY} textAnchor="end" fontFamily="system-ui">S{num}</text>
+    </g>
+  )
+  // Render an exit slot with number label
+  const ExitSlot = ({ x, y, num }) => (
+    <g>
+      <circle cx={x} cy={y} r={3.5} fill={PURPLE} />
+      <text x={x + 8} y={y + 3} fontSize="7" fill={GREEN} textAnchor="start" fontFamily="system-ui">E{num}</text>
     </g>
   )
 
@@ -822,37 +827,38 @@ const PhaseInternalDiagram = memo(({ phaseType, incomingSlots, advancingSlots, p
           const poolH = 22
           return (
             <g key={pi}>
-              {/* Incoming slots */}
+              {/* Incoming slots with numbers */}
               {Array.from({ length: Math.min(perPool, 4) }, (_, si) => {
                 const slotY = cy - (Math.min(perPool, 4) - 1) * 5 + si * 10
+                const slotNum = pi * perPool + si + 1
                 return (
                   <g key={`in-${si}`}>
-                    <circle cx={16} cy={slotY} r={3.5} fill={GRAY} />
-                    <line x1={20} y1={slotY} x2={poolX - 2} y2={cy} stroke={LINE_GRAY} strokeWidth={1} />
+                    <InSlot x={22} y={slotY} num={slotNum} />
+                    <line x1={26} y1={slotY} x2={poolX - 2} y2={cy} stroke={LINE_GRAY} strokeWidth={1} />
                   </g>
                 )
               })}
               {perPool > 4 && (
-                <text x={16} y={cy + (4 * 5) + 10} fontSize="7" fill={GRAY} textAnchor="middle" fontFamily="system-ui">+{perPool - 4}</text>
+                <text x={22} y={cy + (4 * 5) + 10} fontSize="7" fill={GRAY} textAnchor="middle" fontFamily="system-ui">+{perPool - 4}</text>
               )}
               {/* Pool box */}
               <rect x={poolX} y={cy - poolH / 2} width={poolW} height={poolH} rx={6} fill={phaseHex} fillOpacity={0.12} stroke={phaseHex} strokeWidth={1.5} />
               <text x={poolX + poolW / 2} y={cy + 3.5} fontSize="9" fill={phaseHex} textAnchor="middle" fontWeight="600" fontFamily="system-ui">
                 Pool {poolNames[pi] || pi + 1}
               </text>
-              {/* Advancing slots */}
+              {/* Advancing slots with exit numbers */}
               {Array.from({ length: Math.min(advPerPool, 3) }, (_, ai) => {
                 const exitY = cy - (Math.min(advPerPool, 3) - 1) * 5 + ai * 10
+                const exitNum = pi * advPerPool + ai + 1
                 return (
                   <g key={`out-${ai}`}>
-                    <line x1={poolX + poolW + 2} y1={cy} x2={svgW - 26} y2={exitY} stroke={LINE_GREEN} strokeWidth={1} />
-                    <circle cx={svgW - 20} cy={exitY} r={3.5} fill={PURPLE} />
-                    <text x={svgW - 12} y={exitY + 3} fontSize="7" fill={GREEN} textAnchor="start" fontFamily="system-ui">#{ai + 1}</text>
+                    <line x1={poolX + poolW + 2} y1={cy} x2={svgW - 30} y2={exitY} stroke={LINE_GREEN} strokeWidth={1} />
+                    <ExitSlot x={svgW - 24} y={exitY} num={exitNum} />
                   </g>
                 )
               })}
               {advPerPool > 3 && (
-                <text x={svgW - 20} y={cy + (3 * 5) + 10} fontSize="7" fill={PURPLE} textAnchor="middle" fontFamily="system-ui">+{advPerPool - 3}</text>
+                <text x={svgW - 24} y={cy + (3 * 5) + 10} fontSize="7" fill={PURPLE} textAnchor="middle" fontFamily="system-ui">+{advPerPool - 3}</text>
               )}
             </g>
           )
@@ -877,35 +883,34 @@ const PhaseInternalDiagram = memo(({ phaseType, incomingSlots, advancingSlots, p
           {incoming} in → Round Robin → Top {advancing}
           {bo > 1 ? ` (Bo${bo})` : ''}
         </text>
-        {/* Incoming slots */}
+        {/* Incoming slots with numbers */}
         {Array.from({ length: inCount }, (_, i) => {
           const sy = 24 + i * ((svgH - 30) / Math.max(inCount - 1, 1))
           return (
             <g key={`in-${i}`}>
-              <circle cx={16} cy={sy} r={3.5} fill={GRAY} />
-              <line x1={20} y1={sy} x2={boxX - 2} y2={svgH / 2} stroke={LINE_GRAY} strokeWidth={0.8} />
+              <InSlot x={22} y={sy} num={i + 1} />
+              <line x1={26} y1={sy} x2={boxX - 2} y2={svgH / 2} stroke={LINE_GRAY} strokeWidth={0.8} />
             </g>
           )
         })}
         {incoming > 8 && (
-          <text x={16} y={svgH - 4} fontSize="7" fill={GRAY} textAnchor="middle" fontFamily="system-ui">+{incoming - 8}</text>
+          <text x={22} y={svgH - 4} fontSize="7" fill={GRAY} textAnchor="middle" fontFamily="system-ui">+{incoming - 8}</text>
         )}
         {/* Round Robin box */}
         <rect x={boxX} y={boxY} width={boxW} height={boxH} rx={8} fill={phaseHex} fillOpacity={0.12} stroke={phaseHex} strokeWidth={1.5} />
         <text x={boxX + boxW / 2} y={boxY + boxH / 2 + 3.5} fontSize="9" fill={phaseHex} textAnchor="middle" fontWeight="600" fontFamily="system-ui">Round Robin</text>
-        {/* Advancing slots */}
+        {/* Exit slots with numbers */}
         {Array.from({ length: outCount }, (_, i) => {
           const ey = svgH / 2 - (outCount - 1) * 7 + i * 14
           return (
             <g key={`out-${i}`}>
-              <line x1={boxX + boxW + 2} y1={svgH / 2} x2={svgW - 26} y2={ey} stroke={LINE_GREEN} strokeWidth={1} />
-              <circle cx={svgW - 20} cy={ey} r={3.5} fill={PURPLE} />
-              <text x={svgW - 12} y={ey + 3} fontSize="7" fill={GREEN} textAnchor="start" fontFamily="system-ui">#{i + 1}</text>
+              <line x1={boxX + boxW + 2} y1={svgH / 2} x2={svgW - 30} y2={ey} stroke={LINE_GREEN} strokeWidth={1} />
+              <ExitSlot x={svgW - 24} y={ey} num={i + 1} />
             </g>
           )
         })}
         {advancing > 6 && (
-          <text x={svgW - 20} y={svgH - 4} fontSize="7" fill={PURPLE} textAnchor="middle" fontFamily="system-ui">+{advancing - 6}</text>
+          <text x={svgW - 24} y={svgH - 4} fontSize="7" fill={PURPLE} textAnchor="middle" fontFamily="system-ui">+{advancing - 6}</text>
         )}
       </svg>
     )
@@ -928,36 +933,35 @@ const PhaseInternalDiagram = memo(({ phaseType, incomingSlots, advancingSlots, p
           {incoming} in → Swiss ({rounds} rounds) → Top {advancing}
           {bo > 1 ? ` (Bo${bo})` : ''}
         </text>
-        {/* Incoming slots */}
+        {/* Incoming slots with numbers */}
         {Array.from({ length: inCount }, (_, i) => {
           const sy = 24 + i * ((svgH - 30) / Math.max(inCount - 1, 1))
           return (
             <g key={`in-${i}`}>
-              <circle cx={16} cy={sy} r={3.5} fill={GRAY} />
-              <line x1={20} y1={sy} x2={boxX - 2} y2={svgH / 2} stroke={LINE_GRAY} strokeWidth={0.8} />
+              <InSlot x={22} y={sy} num={i + 1} />
+              <line x1={26} y1={sy} x2={boxX - 2} y2={svgH / 2} stroke={LINE_GRAY} strokeWidth={0.8} />
             </g>
           )
         })}
         {incoming > 8 && (
-          <text x={16} y={svgH - 4} fontSize="7" fill={GRAY} textAnchor="middle" fontFamily="system-ui">+{incoming - 8}</text>
+          <text x={22} y={svgH - 4} fontSize="7" fill={GRAY} textAnchor="middle" fontFamily="system-ui">+{incoming - 8}</text>
         )}
         {/* Swiss box */}
         <rect x={boxX} y={boxY} width={boxW} height={boxH} rx={8} fill={phaseHex} fillOpacity={0.12} stroke={phaseHex} strokeWidth={1.5} />
         <text x={boxX + boxW / 2} y={boxY + boxH / 2 - 2} fontSize="9" fill={phaseHex} textAnchor="middle" fontWeight="600" fontFamily="system-ui">Swiss</text>
         <text x={boxX + boxW / 2} y={boxY + boxH / 2 + 9} fontSize="8" fill={phaseHex} textAnchor="middle" fontFamily="system-ui" fillOpacity={0.7}>{rounds} rounds</text>
-        {/* Advancing slots */}
+        {/* Exit slots with numbers */}
         {Array.from({ length: outCount }, (_, i) => {
           const ey = svgH / 2 - (outCount - 1) * 7 + i * 14
           return (
             <g key={`out-${i}`}>
-              <line x1={boxX + boxW + 2} y1={svgH / 2} x2={svgW - 26} y2={ey} stroke={LINE_GREEN} strokeWidth={1} />
-              <circle cx={svgW - 20} cy={ey} r={3.5} fill={PURPLE} />
-              <text x={svgW - 12} y={ey + 3} fontSize="7" fill={GREEN} textAnchor="start" fontFamily="system-ui">#{i + 1}</text>
+              <line x1={boxX + boxW + 2} y1={svgH / 2} x2={svgW - 30} y2={ey} stroke={LINE_GREEN} strokeWidth={1} />
+              <ExitSlot x={svgW - 24} y={ey} num={i + 1} />
             </g>
           )
         })}
         {advancing > 6 && (
-          <text x={svgW - 20} y={svgH - 4} fontSize="7" fill={PURPLE} textAnchor="middle" fontFamily="system-ui">+{advancing - 6}</text>
+          <text x={svgW - 24} y={svgH - 4} fontSize="7" fill={PURPLE} textAnchor="middle" fontFamily="system-ui">+{advancing - 6}</text>
         )}
       </svg>
     )
@@ -984,8 +988,8 @@ const PhaseInternalDiagram = memo(({ phaseType, incomingSlots, advancingSlots, p
           const my = 34 + i * 18
           return (
             <g key={`wb-${i}`}>
-              <circle cx={20} cy={my - 4} r={3} fill={GRAY} />
-              <circle cx={20} cy={my + 4} r={3} fill={GRAY} />
+              <InSlot x={20} y={my - 4} num={i * 2 + 1} />
+              <InSlot x={20} y={my + 4} num={i * 2 + 2} />
               <line x1={24} y1={my - 4} x2={50} y2={my - 4} stroke={LINE_GRAY} strokeWidth={0.8} />
               <line x1={24} y1={my + 4} x2={50} y2={my + 4} stroke={LINE_GRAY} strokeWidth={0.8} />
               <line x1={50} y1={my - 4} x2={50} y2={my + 4} stroke={LINE_GRAY} strokeWidth={0.8} />
@@ -1011,13 +1015,12 @@ const PhaseInternalDiagram = memo(({ phaseType, incomingSlots, advancingSlots, p
             </g>
           )
         })}
-        {/* Exit slots on far right */}
+        {/* Exit slots on far right with numbers */}
         {Array.from({ length: Math.min(advancing, 4) }, (_, i) => {
           const ey = 34 + i * 16
           return (
             <g key={`exit-${i}`}>
-              <circle cx={svgW - 28} cy={ey} r={3.5} fill={PURPLE} />
-              <text x={svgW - 20} y={ey + 3} fontSize="7" fill={GREEN} textAnchor="start" fontFamily="system-ui">#{i + 1}</text>
+              <ExitSlot x={svgW - 28} y={ey} num={i + 1} />
             </g>
           )
         })}
@@ -1051,20 +1054,19 @@ const PhaseInternalDiagram = memo(({ phaseType, incomingSlots, advancingSlots, p
             const my = 22 + i * rowH + rowH / 2
             return (
               <g key={i}>
-                {/* Two incoming slots */}
-                <circle cx={16} cy={my - 5} r={3.5} fill={GRAY} />
-                <circle cx={16} cy={my + 5} r={3.5} fill={GRAY} />
-                <line x1={20} y1={my - 5} x2={55} y2={my - 5} stroke={LINE_GRAY} strokeWidth={0.8} />
-                <line x1={20} y1={my + 5} x2={55} y2={my + 5} stroke={LINE_GRAY} strokeWidth={0.8} />
+                {/* Two incoming slots with numbers */}
+                <InSlot x={22} y={my - 5} num={i * 2 + 1} />
+                <InSlot x={22} y={my + 5} num={i * 2 + 2} />
+                <line x1={26} y1={my - 5} x2={55} y2={my - 5} stroke={LINE_GRAY} strokeWidth={0.8} />
+                <line x1={26} y1={my + 5} x2={55} y2={my + 5} stroke={LINE_GRAY} strokeWidth={0.8} />
                 <line x1={55} y1={my - 5} x2={55} y2={my + 5} stroke={LINE_GRAY} strokeWidth={0.8} />
                 {/* Match box */}
                 <rect x={57} y={my - 8} width={40} height={16} rx={4} fill={phaseHex} fillOpacity={0.12} stroke={phaseHex} strokeWidth={1.2} />
                 <text x={77} y={my + 3} fontSize="8" fill={phaseHex} textAnchor="middle" fontWeight="500" fontFamily="system-ui">M{i + 1}</text>
                 {/* Winner line */}
-                <line x1={97} y1={my} x2={svgW - 34} y2={my} stroke={LINE_GREEN} strokeWidth={1.2} />
-                <polygon points={`${svgW - 36},${my - 3} ${svgW - 30},${my} ${svgW - 36},${my + 3}`} fill={GREEN} />
-                <circle cx={svgW - 24} cy={my} r={3.5} fill={PURPLE} />
-                <text x={svgW - 16} y={my + 3} fontSize="7" fill={GREEN} textAnchor="start" fontFamily="system-ui">W{i + 1}</text>
+                <line x1={97} y1={my} x2={svgW - 38} y2={my} stroke={LINE_GREEN} strokeWidth={1.2} />
+                <polygon points={`${svgW - 40},${my - 3} ${svgW - 34},${my} ${svgW - 40},${my + 3}`} fill={GREEN} />
+                <ExitSlot x={svgW - 28} y={my} num={i + 1} />
                 {/* Consolation loser line */}
                 {includeConsolation && (
                   <g>
@@ -1128,7 +1130,9 @@ const PhaseInternalDiagram = memo(({ phaseType, incomingSlots, advancingSlots, p
               <g key={`r${ri}-m${mi}`}>
                 {ri === 0 && (
                   <g>
+                    <text x={x - 14} y={my - 1} fontSize="6" fill={GRAY} textAnchor="end" fontFamily="system-ui">S{mi * 2 + 1}</text>
                     <circle cx={x - 8} cy={my - 4} r={2.5} fill={GRAY} />
+                    <text x={x - 14} y={my + 7} fontSize="6" fill={GRAY} textAnchor="end" fontFamily="system-ui">S{mi * 2 + 2}</text>
                     <circle cx={x - 8} cy={my + 4} r={2.5} fill={GRAY} />
                     <line x1={x - 5} y1={my - 4} x2={x + 2} y2={my - 4} stroke={LINE_GRAY} strokeWidth={0.6} />
                     <line x1={x - 5} y1={my + 4} x2={x + 2} y2={my + 4} stroke={LINE_GRAY} strokeWidth={0.6} />
@@ -1153,10 +1157,13 @@ const PhaseInternalDiagram = memo(({ phaseType, incomingSlots, advancingSlots, p
           return (
             <g>
               <line x1={lastRoundX + 4 + bw} y1={exitY} x2={exitX} y2={exitY} stroke={LINE_GREEN} strokeWidth={1.2} />
-              <circle cx={exitX + 6} cy={exitY} r={4} fill={PURPLE} />
-              <text x={exitX + 14} y={exitY + 3} fontSize="8" fill={GREEN} textAnchor="start" fontWeight="600" fontFamily="system-ui">
-                {advancing === 1 ? '🏆' : `Top ${advancing}`}
-              </text>
+              <ExitSlot x={exitX + 6} y={exitY} num={1} />
+              {advancing === 1 && (
+                <text x={exitX + 20} y={exitY + 3} fontSize="8" fill={GREEN} textAnchor="start" fontWeight="600" fontFamily="system-ui">🏆</text>
+              )}
+              {advancing > 1 && Array.from({ length: Math.min(advancing - 1, 3) }, (_, i) => (
+                <ExitSlot key={i} x={exitX + 6} y={exitY + (i + 1) * 14} num={i + 2} />
+              ))}
             </g>
           )
         })()}
