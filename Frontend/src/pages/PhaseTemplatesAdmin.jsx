@@ -20,10 +20,13 @@ import {
   MarkerType,
   Panel,
   useReactFlow,
-  ReactFlowProvider
+  ReactFlowProvider,
+  getNodesBounds,
+  getViewportForBounds
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import dagre from 'dagre'
+import { toPng } from 'html-to-image'
 
 const CATEGORIES = [
   { value: 'SingleElimination', label: 'Single Elimination', icon: GitBranch },
@@ -2327,6 +2330,44 @@ const CanvasPhaseEditorInner = ({ visualState, onChange }) => {
     onChange({ ...vs, phases: reordered, advancementRules: remappedRules })
   }, [nodes, edges, vs, onChange])
 
+  // Export canvas as PNG image
+  const handleExportImage = useCallback(() => {
+    const nodesBounds = getNodesBounds(nodes)
+    const padding = 50
+    const imageWidth = nodesBounds.width + padding * 2
+    const imageHeight = nodesBounds.height + padding * 2
+
+    const viewport = getViewportForBounds(
+      nodesBounds,
+      imageWidth,
+      imageHeight,
+      0.5,
+      2,
+      padding
+    )
+
+    const viewportEl = document.querySelector('.react-flow__viewport')
+    if (!viewportEl) return
+
+    toPng(viewportEl, {
+      backgroundColor: '#f9fafb',
+      width: imageWidth,
+      height: imageHeight,
+      style: {
+        width: `${imageWidth}px`,
+        height: `${imageHeight}px`,
+        transform: `translate(${viewport.x}px, ${viewport.y}px) scale(${viewport.zoom})`,
+      },
+    }).then((dataUrl) => {
+      const a = document.createElement('a')
+      a.setAttribute('download', 'tournament-structure.png')
+      a.setAttribute('href', dataUrl)
+      a.click()
+    }).catch((err) => {
+      console.error('Failed to export image:', err)
+    })
+  }, [nodes])
+
   // Validation warnings
   const warnings = useMemo(() => {
     const w = []
@@ -2400,6 +2441,10 @@ const CanvasPhaseEditorInner = ({ visualState, onChange }) => {
             <button onClick={handleSyncSortOrder}
               className="flex items-center gap-1 px-2.5 py-1.5 bg-white border rounded-lg shadow-sm text-xs font-medium text-gray-600 hover:bg-gray-50">
               <ArrowRight className="w-3.5 h-3.5" /> Sync Order
+            </button>
+            <button onClick={handleExportImage}
+              className="flex items-center gap-1 px-2.5 py-1.5 bg-white border rounded-lg shadow-sm text-xs font-medium text-gray-600 hover:bg-gray-50">
+              <Eye className="w-3.5 h-3.5" /> Export PNG
             </button>
           </Panel>
           {warnings.length > 0 && (
