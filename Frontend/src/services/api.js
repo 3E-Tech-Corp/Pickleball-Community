@@ -1694,6 +1694,12 @@ export const tournamentApi = {
     api.put(`/phasetemplates/${templateId}`, data),
   deletePhaseTemplate: (templateId) =>
     api.delete(`/phasetemplates/${templateId}`),
+  getMyPhaseTemplates: () =>
+    api.get('/phasetemplates/my-templates'),
+  getUserPhaseTemplates: () =>
+    api.get('/phasetemplates/user-templates'),
+  copyToSystemTemplate: (templateId) =>
+    api.post(`/phasetemplates/${templateId}/copy-to-system`),
 
   // Template Application
   previewTemplate: (templateId, divisionId, unitCount = null) =>

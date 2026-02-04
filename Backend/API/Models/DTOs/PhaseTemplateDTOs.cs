@@ -19,6 +19,8 @@ public class PhaseTemplateListDto
     public string? DiagramText { get; set; }
     public string? Tags { get; set; }
     public string StructureJson { get; set; } = "{}";
+    public int? CreatedByUserId { get; set; }
+    public string? CreatedByName { get; set; }
 }
 
 /// <summary>

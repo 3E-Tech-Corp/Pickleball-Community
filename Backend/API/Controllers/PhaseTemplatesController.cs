@@ -58,7 +58,9 @@ public class PhaseTemplatesController : ControllerBase
                 IsActive = t.IsActive,
                 DiagramText = t.DiagramText,
                 Tags = t.Tags,
-                StructureJson = t.StructureJson
+                StructureJson = t.StructureJson,
+                CreatedByUserId = t.CreatedByUserId,
+                CreatedByName = t.CreatedBy != null ? t.CreatedBy.FirstName + " " + t.CreatedBy.LastName : null
             })
             .ToListAsync();
 
@@ -161,10 +163,133 @@ public class PhaseTemplatesController : ControllerBase
     }
 
     /// <summary>
-    /// Create a custom template (Admin only)
+    /// Get templates created by the current user
+    /// </summary>
+    [HttpGet("my-templates")]
+    [Authorize]
+    public async Task<ActionResult<List<PhaseTemplateListDto>>> GetMyTemplates()
+    {
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (!int.TryParse(userIdClaim, out var userId))
+            return Unauthorized();
+
+        var templates = await _context.PhaseTemplates
+            .Where(t => t.CreatedByUserId == userId && t.IsActive)
+            .OrderBy(t => t.SortOrder)
+            .Select(t => new PhaseTemplateListDto
+            {
+                Id = t.Id,
+                Name = t.Name,
+                Description = t.Description,
+                Category = t.Category,
+                MinUnits = t.MinUnits,
+                MaxUnits = t.MaxUnits,
+                DefaultUnits = t.DefaultUnits,
+                IsSystemTemplate = t.IsSystemTemplate,
+                IsActive = t.IsActive,
+                DiagramText = t.DiagramText,
+                Tags = t.Tags,
+                StructureJson = t.StructureJson
+            })
+            .ToListAsync();
+
+        return Ok(templates);
+    }
+
+    /// <summary>
+    /// Get all user-created templates (Admin only) — for reviewing community templates
+    /// </summary>
+    [HttpGet("user-templates")]
+    [Authorize(Roles = "Admin")]
+    public async Task<ActionResult<List<PhaseTemplateDetailDto>>> GetAllUserTemplates()
+    {
+        var templates = await _context.PhaseTemplates
+            .Include(t => t.CreatedBy)
+            .Where(t => !t.IsSystemTemplate && t.IsActive && t.CreatedByUserId != null)
+            .OrderByDescending(t => t.CreatedAt)
+            .Select(t => new PhaseTemplateDetailDto
+            {
+                Id = t.Id,
+                Name = t.Name,
+                Description = t.Description,
+                Category = t.Category,
+                MinUnits = t.MinUnits,
+                MaxUnits = t.MaxUnits,
+                DefaultUnits = t.DefaultUnits,
+                IsSystemTemplate = t.IsSystemTemplate,
+                SortOrder = t.SortOrder,
+                StructureJson = t.StructureJson,
+                DiagramText = t.DiagramText,
+                Tags = t.Tags,
+                CreatedAt = t.CreatedAt,
+                CreatedByUserId = t.CreatedByUserId,
+                CreatedByName = t.CreatedBy != null ? t.CreatedBy.FirstName + " " + t.CreatedBy.LastName : null
+            })
+            .ToListAsync();
+
+        return Ok(templates);
+    }
+
+    /// <summary>
+    /// Copy a user template to a system template (Admin only)
+    /// </summary>
+    [HttpPost("{id}/copy-to-system")]
+    [Authorize(Roles = "Admin")]
+    public async Task<ActionResult<PhaseTemplateDetailDto>> CopyToSystemTemplate(int id)
+    {
+        var source = await _context.PhaseTemplates.FindAsync(id);
+        if (source == null)
+            return NotFound("Template not found");
+
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        int? userId = int.TryParse(userIdClaim, out var uid) ? uid : null;
+
+        var systemTemplate = new PhaseTemplate
+        {
+            Name = source.Name,
+            Description = source.Description,
+            Category = source.Category,
+            MinUnits = source.MinUnits,
+            MaxUnits = source.MaxUnits,
+            DefaultUnits = source.DefaultUnits,
+            IsSystemTemplate = true,
+            IsActive = true,
+            SortOrder = source.SortOrder,
+            StructureJson = source.StructureJson,
+            DiagramText = source.DiagramText,
+            Tags = source.Tags,
+            CreatedByUserId = userId
+        };
+
+        _context.PhaseTemplates.Add(systemTemplate);
+        await _context.SaveChangesAsync();
+
+        _logger.LogInformation("Admin {UserId} copied template {SourceId} to system template {NewId}", userId, id, systemTemplate.Id);
+
+        return CreatedAtAction(nameof(GetTemplate), new { id = systemTemplate.Id }, new PhaseTemplateDetailDto
+        {
+            Id = systemTemplate.Id,
+            Name = systemTemplate.Name,
+            Description = systemTemplate.Description,
+            Category = systemTemplate.Category,
+            MinUnits = systemTemplate.MinUnits,
+            MaxUnits = systemTemplate.MaxUnits,
+            DefaultUnits = systemTemplate.DefaultUnits,
+            IsSystemTemplate = systemTemplate.IsSystemTemplate,
+            SortOrder = systemTemplate.SortOrder,
+            StructureJson = systemTemplate.StructureJson,
+            DiagramText = systemTemplate.DiagramText,
+            Tags = systemTemplate.Tags,
+            CreatedAt = systemTemplate.CreatedAt,
+            CreatedByUserId = systemTemplate.CreatedByUserId
+        });
+    }
+
+    /// <summary>
+    /// Create a custom template (any authenticated user)
     /// </summary>
     [HttpPost]
-    [Authorize(Roles = "Admin")]
+    [Authorize]
     public async Task<ActionResult<PhaseTemplateDetailDto>> CreateTemplate([FromBody] PhaseTemplateCreateDto dto)
     {
         var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
@@ -222,10 +347,10 @@ public class PhaseTemplatesController : ControllerBase
     }
 
     /// <summary>
-    /// Update a template (Admin only, cannot modify system templates)
+    /// Update a template (owner or Admin, cannot modify system templates)
     /// </summary>
     [HttpPut("{id}")]
-    [Authorize(Roles = "Admin")]
+    [Authorize]
     public async Task<ActionResult<PhaseTemplateDetailDto>> UpdateTemplate(int id, [FromBody] PhaseTemplateCreateDto dto)
     {
         var template = await _context.PhaseTemplates.FindAsync(id);
@@ -234,6 +359,13 @@ public class PhaseTemplatesController : ControllerBase
 
         if (template.IsSystemTemplate)
             return BadRequest("Cannot modify system templates");
+
+        // Check ownership: must be admin or the creator
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        var isAdmin = User.IsInRole("Admin");
+        int.TryParse(userIdClaim, out var currentUserId);
+        if (!isAdmin && template.CreatedByUserId != currentUserId)
+            return Forbid();
 
         // Validate JSON structure
         try
@@ -281,10 +413,10 @@ public class PhaseTemplatesController : ControllerBase
     }
 
     /// <summary>
-    /// Delete (deactivate) a template (Admin only, cannot delete system templates)
+    /// Delete (deactivate) a template (owner or Admin, cannot delete system templates)
     /// </summary>
     [HttpDelete("{id}")]
-    [Authorize(Roles = "Admin")]
+    [Authorize]
     public async Task<ActionResult> DeleteTemplate(int id)
     {
         var template = await _context.PhaseTemplates.FindAsync(id);
@@ -293,6 +425,13 @@ public class PhaseTemplatesController : ControllerBase
 
         if (template.IsSystemTemplate)
             return BadRequest("Cannot delete system templates");
+
+        // Check ownership: must be admin or the creator
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        var isAdmin = User.IsInRole("Admin");
+        int.TryParse(userIdClaim, out var currentUserId);
+        if (!isAdmin && template.CreatedByUserId != currentUserId)
+            return Forbid();
 
         template.IsActive = false;
         template.UpdatedAt = DateTime.UtcNow;
