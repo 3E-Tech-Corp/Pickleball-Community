@@ -1340,76 +1340,139 @@ const EdgeConfigPanel = ({ sourcePhase, targetPhase, sourceIdx, targetIdx, rules
   const connectionRules = rules.filter(r => r.sourcePhaseOrder === srcOrder && r.targetPhaseOrder === tgtOrder)
   const isPools = sourcePhase.phaseType === 'Pools' && (parseInt(sourcePhase.poolCount) || 0) > 1
   const poolCount = parseInt(sourcePhase.poolCount) || 1
+  const [pendingSource, setPendingSource] = useState(null) // source slot being connected
+  const [showAdvanced, setShowAdvanced] = useState(false)
 
-  const handleRegenerate = () => {
-    const slotsToAdvance = Math.min(
-      parseInt(sourcePhase.advancingSlotCount) || 1,
-      parseInt(targetPhase.incomingSlotCount) || 1
-    )
-    const newRules = []
+  // Build source exit slots
+  const exitSlots = useMemo(() => {
+    const advancing = parseInt(sourcePhase.advancingSlotCount) || 0
     if (isPools) {
-      const advPerPool = Math.max(1, Math.floor(slotsToAdvance / poolCount))
-      let slot = 1
-      for (let pool = 0; pool < poolCount; pool++) {
-        for (let pos = 1; pos <= advPerPool; pos++) {
-          newRules.push({ sourcePhaseOrder: srcOrder, targetPhaseOrder: tgtOrder, finishPosition: pos, targetSlotNumber: slot++, sourcePoolIndex: pool })
+      const advPerPool = Math.max(1, Math.floor(advancing / poolCount))
+      const slots = []
+      for (let p = 0; p < poolCount; p++) {
+        for (let r = 1; r <= advPerPool; r++) {
+          slots.push({ id: `${p}-${r}`, label: `${String.fromCharCode(65 + p)}${r}`, poolIndex: p, position: r })
         }
       }
-    } else {
-      for (let pos = 1; pos <= slotsToAdvance; pos++) {
-        newRules.push({ sourcePhaseOrder: srcOrder, targetPhaseOrder: tgtOrder, finishPosition: pos, targetSlotNumber: pos, sourcePoolIndex: null })
-      }
+      return slots
     }
+    return Array.from({ length: advancing }, (_, i) => ({ id: `${i + 1}`, label: `#${i + 1}`, poolIndex: null, position: i + 1 }))
+  }, [sourcePhase, isPools, poolCount])
+
+  // Build target incoming slots
+  const inSlots = useMemo(() => {
+    const count = parseInt(targetPhase.incomingSlotCount) || 0
+    return Array.from({ length: count }, (_, i) => ({ id: `${i + 1}`, label: `${i + 1}`, slotNumber: i + 1 }))
+  }, [targetPhase])
+
+  // Map: source slot id → target slot number (from rules)
+  const mappings = useMemo(() => {
+    const m = new Map()
+    connectionRules.forEach(r => {
+      const srcId = r.sourcePoolIndex != null ? `${r.sourcePoolIndex}-${r.finishPosition}` : `${r.finishPosition}`
+      m.set(srcId, r.targetSlotNumber)
+    })
+    return m
+  }, [connectionRules])
+
+  // Reverse map: target slot number → source slot id
+  const reverseMappings = useMemo(() => {
+    const m = new Map()
+    mappings.forEach((tgt, src) => m.set(tgt, src))
+    return m
+  }, [mappings])
+
+  const updateRules = (newMappings) => {
     const otherRules = rules.filter(r => !(r.sourcePhaseOrder === srcOrder && r.targetPhaseOrder === tgtOrder))
-    onRulesChange([...otherRules, ...newRules])
+    const newConnectionRules = []
+    newMappings.forEach((targetSlot, srcId) => {
+      const slot = exitSlots.find(s => s.id === srcId)
+      if (!slot) return
+      newConnectionRules.push({
+        sourcePhaseOrder: srcOrder,
+        targetPhaseOrder: tgtOrder,
+        finishPosition: slot.position,
+        targetSlotNumber: targetSlot,
+        sourcePoolIndex: slot.poolIndex,
+      })
+    })
+    onRulesChange([...otherRules, ...newConnectionRules])
   }
 
-  const handleUpdateRule = (ruleIdx, field, value) => {
-    // Find the actual index in the full rules array
-    let count = 0
-    const newRules = rules.map(r => {
-      if (r.sourcePhaseOrder === srcOrder && r.targetPhaseOrder === tgtOrder) {
-        if (count === ruleIdx) {
-          count++
-          return { ...r, [field]: parseInt(value) || (field === 'sourcePoolIndex' ? null : 0) }
+  const handleResetDefault = () => {
+    const newMap = new Map()
+    exitSlots.forEach((slot, i) => {
+      if (i < inSlots.length) newMap.set(slot.id, inSlots[i].slotNumber)
+    })
+    updateRules(newMap)
+    setPendingSource(null)
+  }
+
+  const handleCrossPool = () => {
+    if (!isPools || poolCount < 2) return
+    // Cross-pool: A1→1, B2→2, B1→3, A2→4 (for 2 pools)
+    // General: interleave rank 1s from each pool, then rank 2s reversed, etc.
+    const advPerPool = Math.max(1, Math.floor(exitSlots.length / poolCount))
+    const newMap = new Map()
+    let slot = 1
+    for (let rank = 1; rank <= advPerPool; rank++) {
+      const forward = rank % 2 === 1
+      for (let p = 0; p < poolCount; p++) {
+        const poolIdx = forward ? p : poolCount - 1 - p
+        const srcSlot = exitSlots.find(s => s.poolIndex === poolIdx && s.position === rank)
+        if (srcSlot && slot <= inSlots.length) {
+          newMap.set(srcSlot.id, slot++)
         }
-        count++
       }
-      return r
-    })
-    onRulesChange(newRules)
-  }
-
-  const handleAddRule = () => {
-    const maxSlot = connectionRules.reduce((max, r) => Math.max(max, r.targetSlotNumber || 0), 0)
-    const newRule = {
-      sourcePhaseOrder: srcOrder,
-      targetPhaseOrder: tgtOrder,
-      finishPosition: 1,
-      targetSlotNumber: maxSlot + 1,
-      sourcePoolIndex: isPools ? 0 : null
     }
-    onRulesChange([...rules, newRule])
+    updateRules(newMap)
+    setPendingSource(null)
   }
 
-  const handleRemoveRule = (ruleIdx) => {
-    let count = 0
-    const newRules = rules.filter(r => {
-      if (r.sourcePhaseOrder === srcOrder && r.targetPhaseOrder === tgtOrder) {
-        if (count === ruleIdx) { count++; return false }
-        count++
-      }
-      return true
-    })
-    onRulesChange(newRules)
+  // Click source slot: select it for connecting
+  const handleSourceClick = (slotId) => {
+    if (pendingSource === slotId) {
+      setPendingSource(null) // deselect
+    } else {
+      setPendingSource(slotId)
+    }
   }
+
+  // Click target slot: connect pending source to it
+  const handleTargetClick = (slotNumber) => {
+    if (!pendingSource) return
+    const newMap = new Map(mappings)
+    // Remove any existing connection TO this target
+    for (const [src, tgt] of newMap) {
+      if (tgt === slotNumber) newMap.delete(src)
+    }
+    newMap.set(pendingSource, slotNumber)
+    updateRules(newMap)
+    setPendingSource(null)
+  }
+
+  // Click a connection line to remove it
+  const handleRemoveMapping = (srcId) => {
+    const newMap = new Map(mappings)
+    newMap.delete(srcId)
+    updateRules(newMap)
+  }
+
+  // SVG dimensions
+  const dotR = 8
+  const dotSpacing = 28
+  const padding = 14
+  const leftX = 40
+  const rightX = 210
+  const maxSlots = Math.max(exitSlots.length, inSlots.length, 1)
+  const svgH = maxSlots * dotSpacing + padding * 2
 
   return (
     <div className="space-y-3 p-3">
       <div className="flex items-center justify-between">
         <h4 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
           <ArrowRight className="w-4 h-4 text-purple-600" />
-          Advancement Rules
+          Slot Mapping
         </h4>
         <button onClick={onClose} className="p-1 hover:bg-gray-200 rounded">
           <X className="w-3.5 h-3.5 text-gray-500" />
@@ -1418,65 +1481,208 @@ const EdgeConfigPanel = ({ sourcePhase, targetPhase, sourceIdx, targetIdx, rules
 
       <div className="bg-purple-50 rounded-lg p-2 text-[11px] text-purple-700 space-y-0.5">
         <div className="font-medium">{sourcePhase.name} → {targetPhase.name}</div>
-        <div>{sourcePhase.advancingSlotCount} advancing → {targetPhase.incomingSlotCount} incoming slots</div>
+        <div>{exitSlots.length} exit → {inSlots.length} incoming</div>
       </div>
 
-      {/* Slot mappings */}
-      <div className="space-y-1.5">
-        <div className="flex items-center justify-between">
-          <span className="text-[11px] font-medium text-gray-500">Slot Mappings ({connectionRules.length})</span>
-          <button onClick={handleRegenerate}
-            className="text-[10px] text-purple-600 hover:text-purple-800 flex items-center gap-0.5">
-            <RefreshCw className="w-3 h-3" /> Regenerate
+      {/* Preset buttons */}
+      <div className="flex gap-1.5">
+        <button onClick={handleResetDefault}
+          className="flex-1 px-2 py-1.5 text-[10px] font-medium bg-white border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-600 transition-colors">
+          🔄 Default (1:1)
+        </button>
+        {isPools && poolCount >= 2 && (
+          <button onClick={handleCrossPool}
+            className="flex-1 px-2 py-1.5 text-[10px] font-medium bg-white border border-purple-200 rounded-lg hover:bg-purple-50 text-purple-600 transition-colors">
+            🔀 Cross-Pool
           </button>
+        )}
+      </div>
+
+      {/* Visual slot mapper */}
+      <div className="bg-white border rounded-lg p-2 relative">
+        {/* Headers */}
+        <div className="flex justify-between px-2 mb-1">
+          <span className="text-[9px] font-semibold text-blue-600 uppercase tracking-wider">Exit Slots</span>
+          <span className="text-[9px] font-semibold text-green-600 uppercase tracking-wider">Incoming Slots</span>
         </div>
 
-        {connectionRules.length === 0 ? (
-          <div className="text-[11px] text-gray-400 text-center py-2">No rules. Click "Regenerate" or add manually.</div>
-        ) : (
-          <div className="space-y-1 max-h-64 overflow-y-auto">
-            {connectionRules.map((rule, idx) => (
-              <div key={idx} className="flex items-center gap-1 bg-white border rounded p-1.5 text-[11px]">
-                {isPools && (
-                  <div className="flex flex-col">
-                    <span className="text-[9px] text-gray-400">Pool</span>
-                    <input type="number" min={0} value={rule.sourcePoolIndex ?? 0}
-                      onChange={e => handleUpdateRule(idx, 'sourcePoolIndex', e.target.value)}
-                      className="w-10 px-1 py-0.5 border rounded text-center text-[11px]" />
-                  </div>
-                )}
-                <div className="flex flex-col">
-                  <span className="text-[9px] text-gray-400">Finish</span>
-                  <input type="number" min={1} value={rule.finishPosition}
-                    onChange={e => handleUpdateRule(idx, 'finishPosition', e.target.value)}
-                    className="w-10 px-1 py-0.5 border rounded text-center text-[11px]" />
-                </div>
-                <ArrowRight className="w-3 h-3 text-gray-300 flex-shrink-0 mt-3" />
-                <div className="flex flex-col">
-                  <span className="text-[9px] text-gray-400">Slot</span>
-                  <input type="number" min={1} value={rule.targetSlotNumber}
-                    onChange={e => handleUpdateRule(idx, 'targetSlotNumber', e.target.value)}
-                    className="w-10 px-1 py-0.5 border rounded text-center text-[11px]" />
-                </div>
-                <button onClick={() => handleRemoveRule(idx)}
-                  className="ml-auto p-0.5 text-red-400 hover:text-red-600 mt-3">
-                  <X className="w-3 h-3" />
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
+        <svg width="100%" height={svgH} viewBox={`0 0 250 ${svgH}`} className="block">
+          {/* Connection lines */}
+          {exitSlots.map((slot) => {
+            const tgt = mappings.get(slot.id)
+            if (tgt == null) return null
+            const tgtIdx = inSlots.findIndex(s => s.slotNumber === tgt)
+            if (tgtIdx === -1) return null
+            const srcIdx = exitSlots.indexOf(slot)
+            const y1 = padding + srcIdx * dotSpacing + dotR
+            const y2 = padding + tgtIdx * dotSpacing + dotR
+            const isHighlighted = pendingSource === slot.id
+            return (
+              <g key={`line-${slot.id}`} onClick={() => handleRemoveMapping(slot.id)} className="cursor-pointer group">
+                <line x1={leftX + dotR + 4} y1={y1} x2={rightX - dotR - 4} y2={y2}
+                  stroke="transparent" strokeWidth={12} />
+                <line x1={leftX + dotR + 4} y1={y1} x2={rightX - dotR - 4} y2={y2}
+                  stroke={isHighlighted ? '#7c3aed' : '#a78bfa'}
+                  strokeWidth={isHighlighted ? 2.5 : 2}
+                  strokeDasharray={isHighlighted ? '4 2' : 'none'}
+                  className="group-hover:stroke-red-400 transition-colors" />
+                {/* Arrow head */}
+                <polygon
+                  points={(() => {
+                    const ax = rightX - dotR - 4
+                    const ay = y2
+                    return `${ax},${ay} ${ax - 6},${ay - 3} ${ax - 6},${ay + 3}`
+                  })()}
+                  fill="#a78bfa"
+                  className="group-hover:fill-red-400 transition-colors" />
+              </g>
+            )
+          })}
 
-        <button onClick={handleAddRule}
-          className="w-full flex items-center justify-center gap-1 px-2 py-1 text-[11px] text-purple-600 border border-purple-200 rounded hover:bg-purple-50">
-          <Plus className="w-3 h-3" /> Add Rule
-        </button>
+          {/* Exit slot dots (left) */}
+          {exitSlots.map((slot, i) => {
+            const y = padding + i * dotSpacing + dotR
+            const isConnected = mappings.has(slot.id)
+            const isSelected = pendingSource === slot.id
+            return (
+              <g key={`src-${slot.id}`} onClick={() => handleSourceClick(slot.id)} className="cursor-pointer">
+                <circle cx={leftX} cy={y} r={dotR + 2} fill="transparent" />
+                <circle cx={leftX} cy={y} r={dotR}
+                  fill={isSelected ? '#7c3aed' : isConnected ? '#818cf8' : '#e5e7eb'}
+                  stroke={isSelected ? '#5b21b6' : isConnected ? '#6366f1' : '#9ca3af'}
+                  strokeWidth={isSelected ? 2.5 : 1.5}
+                  className="transition-all" />
+                <text x={leftX} y={y + 1} textAnchor="middle" fontSize="8" fontWeight="700" fontFamily="ui-monospace,monospace"
+                  fill={isSelected || isConnected ? 'white' : '#6b7280'}>{slot.label.length > 3 ? slot.label.slice(0,3) : slot.label}</text>
+              </g>
+            )
+          })}
+
+          {/* Incoming slot dots (right) */}
+          {inSlots.map((slot, i) => {
+            const y = padding + i * dotSpacing + dotR
+            const isConnected = reverseMappings.has(slot.slotNumber)
+            const isTarget = pendingSource != null
+            return (
+              <g key={`tgt-${slot.id}`} onClick={() => handleTargetClick(slot.slotNumber)}
+                className={isTarget ? 'cursor-pointer' : ''}>
+                <circle cx={rightX} cy={y} r={dotR + 2} fill="transparent" />
+                <circle cx={rightX} cy={y} r={dotR}
+                  fill={isConnected ? '#4ade80' : isTarget ? '#fef3c7' : '#e5e7eb'}
+                  stroke={isConnected ? '#16a34a' : isTarget ? '#f59e0b' : '#9ca3af'}
+                  strokeWidth={isTarget && !isConnected ? 2 : 1.5}
+                  className="transition-all" />
+                <text x={rightX} y={y + 1} textAnchor="middle" fontSize="9" fontWeight="700" fontFamily="ui-monospace,monospace"
+                  fill={isConnected ? 'white' : '#6b7280'}>{slot.label}</text>
+              </g>
+            )
+          })}
+        </svg>
+
+        {/* Instruction */}
+        <div className="text-[9px] text-gray-400 text-center mt-1">
+          {pendingSource
+            ? '👆 Click a green slot to connect — or click elsewhere to cancel'
+            : connectionRules.length > 0
+              ? '✏️ Click an exit slot to rewire — click a line to remove it'
+              : '👆 Click an exit slot, then an incoming slot to connect'
+          }
+        </div>
       </div>
 
-      <div className="text-[10px] text-gray-400 space-y-0.5 border-t pt-2">
-        <div>💡 <strong>Finish #</strong> = position in source phase</div>
-        <div>💡 <strong>Slot #</strong> = seed position in target phase</div>
-        {isPools && <div>💡 <strong>Pool #</strong> = 0-based pool index</div>}
+      {/* Unconnected warnings */}
+      {exitSlots.some(s => !mappings.has(s.id)) && (
+        <div className="text-[10px] text-amber-600 bg-amber-50 rounded px-2 py-1.5 flex items-start gap-1">
+          <AlertTriangle className="w-3 h-3 mt-0.5 flex-shrink-0" />
+          <span>{exitSlots.filter(s => !mappings.has(s.id)).length} exit slot(s) not connected</span>
+        </div>
+      )}
+
+      {/* Advanced: numerical editor (collapsible) */}
+      <div className="border-t pt-2">
+        <button onClick={() => setShowAdvanced(v => !v)}
+          className="text-[10px] text-gray-400 hover:text-gray-600 flex items-center gap-0.5">
+          {showAdvanced ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+          Advanced: Edit by numbers ({connectionRules.length})
+        </button>
+        {showAdvanced && (
+          <div className="mt-2 space-y-1.5">
+            {connectionRules.length === 0 ? (
+              <div className="text-[11px] text-gray-400 text-center py-2">No rules defined.</div>
+            ) : (
+              <div className="space-y-1 max-h-48 overflow-y-auto">
+                {connectionRules.map((rule, idx) => (
+                  <div key={idx} className="flex items-center gap-1 bg-white border rounded p-1.5 text-[11px]">
+                    {isPools && (
+                      <div className="flex flex-col">
+                        <span className="text-[9px] text-gray-400">Pool</span>
+                        <input type="number" min={0} value={rule.sourcePoolIndex ?? 0}
+                          onChange={e => {
+                            let count = 0
+                            const newRules = rules.map(r => {
+                              if (r.sourcePhaseOrder === srcOrder && r.targetPhaseOrder === tgtOrder) {
+                                if (count === idx) { count++; return { ...r, sourcePoolIndex: parseInt(e.target.value) || 0 } }
+                                count++
+                              }
+                              return r
+                            })
+                            onRulesChange(newRules)
+                          }}
+                          className="w-10 px-1 py-0.5 border rounded text-center text-[11px]" />
+                      </div>
+                    )}
+                    <div className="flex flex-col">
+                      <span className="text-[9px] text-gray-400">Finish</span>
+                      <input type="number" min={1} value={rule.finishPosition}
+                        onChange={e => {
+                          let count = 0
+                          const newRules = rules.map(r => {
+                            if (r.sourcePhaseOrder === srcOrder && r.targetPhaseOrder === tgtOrder) {
+                              if (count === idx) { count++; return { ...r, finishPosition: parseInt(e.target.value) || 1 } }
+                              count++
+                            }
+                            return r
+                          })
+                          onRulesChange(newRules)
+                        }}
+                        className="w-10 px-1 py-0.5 border rounded text-center text-[11px]" />
+                    </div>
+                    <ArrowRight className="w-3 h-3 text-gray-300 flex-shrink-0 mt-3" />
+                    <div className="flex flex-col">
+                      <span className="text-[9px] text-gray-400">Slot</span>
+                      <input type="number" min={1} value={rule.targetSlotNumber}
+                        onChange={e => {
+                          let count = 0
+                          const newRules = rules.map(r => {
+                            if (r.sourcePhaseOrder === srcOrder && r.targetPhaseOrder === tgtOrder) {
+                              if (count === idx) { count++; return { ...r, targetSlotNumber: parseInt(e.target.value) || 1 } }
+                              count++
+                            }
+                            return r
+                          })
+                          onRulesChange(newRules)
+                        }}
+                        className="w-10 px-1 py-0.5 border rounded text-center text-[11px]" />
+                    </div>
+                    <button onClick={() => {
+                      let count = 0
+                      const newRules = rules.filter(r => {
+                        if (r.sourcePhaseOrder === srcOrder && r.targetPhaseOrder === tgtOrder) {
+                          if (count === idx) { count++; return false }
+                          count++
+                        }
+                        return true
+                      })
+                      onRulesChange(newRules)
+                    }} className="ml-auto p-0.5 text-red-400 hover:text-red-600 mt-3">
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   )
