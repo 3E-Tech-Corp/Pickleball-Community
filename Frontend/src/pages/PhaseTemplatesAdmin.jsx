@@ -35,7 +35,7 @@ const CATEGORIES = [
 ]
 
 const PHASE_TYPES = [
-  'SingleElimination', 'DoubleElimination', 'RoundRobin', 'Pools', 'BracketRound', 'Swiss'
+  'SingleElimination', 'DoubleElimination', 'RoundRobin', 'Pools', 'BracketRound', 'Swiss', 'Award'
 ]
 
 const BRACKET_TYPES = ['SingleElimination', 'DoubleElimination', 'BracketRound']
@@ -93,7 +93,8 @@ function parseStructureToVisual(jsonStr) {
         bestOf: p.bestOf || 1,
         matchDurationMinutes: p.matchDurationMinutes || 30,
         seedingStrategy: p.seedingStrategy || 'Sequential',
-        includeConsolation: p.includeConsolation || p.hasConsolationMatch || false
+        includeConsolation: p.includeConsolation || p.hasConsolationMatch || false,
+        awardType: p.awardType || null
       })) : [],
       advancementRules: Array.isArray(s.advancementRules) ? s.advancementRules.map(r => ({
         sourcePhaseOrder: r.sourcePhaseOrder ?? r.fromPhase ?? 1,
@@ -135,7 +136,8 @@ function serializeVisualToJson(vs) {
       bestOf: parseInt(p.bestOf) || 1,
       matchDurationMinutes: parseInt(p.matchDurationMinutes) || 30,
       ...(p.seedingStrategy && p.seedingStrategy !== 'Sequential' ? { seedingStrategy: p.seedingStrategy } : {}),
-      ...(BRACKET_TYPES.includes(p.phaseType) && p.includeConsolation ? { includeConsolation: true } : {})
+      ...(BRACKET_TYPES.includes(p.phaseType) && p.includeConsolation ? { includeConsolation: true } : {}),
+      ...(p.phaseType === 'Award' && p.awardType ? { awardType: p.awardType } : {})
     })),
     advancementRules: vs.advancementRules,
     ...(vs.exitPositions.length > 0 ? { exitPositions: vs.exitPositions } : {})
@@ -759,7 +761,8 @@ const PHASE_TYPE_COLORS = {
   RoundRobin: { bg: 'bg-green-500', light: 'bg-green-50', border: 'border-green-300', text: 'text-green-700', hex: '#22c55e' },
   Pools: { bg: 'bg-blue-500', light: 'bg-blue-50', border: 'border-blue-300', text: 'text-blue-700', hex: '#3b82f6' },
   Swiss: { bg: 'bg-amber-500', light: 'bg-amber-50', border: 'border-amber-300', text: 'text-amber-700', hex: '#f59e0b' },
-  BracketRound: { bg: 'bg-rose-500', light: 'bg-rose-50', border: 'border-rose-300', text: 'text-rose-700', hex: '#f43f5e' }
+  BracketRound: { bg: 'bg-rose-500', light: 'bg-rose-50', border: 'border-rose-300', text: 'text-rose-700', hex: '#f43f5e' },
+  Award: { bg: 'bg-yellow-500', light: 'bg-yellow-50', border: 'border-yellow-300', text: 'text-yellow-700', hex: '#eab308' }
 }
 
 const PHASE_TYPE_ICONS = {
@@ -768,7 +771,8 @@ const PHASE_TYPE_ICONS = {
   RoundRobin: Repeat,
   Pools: Grid3X3,
   Swiss: Shuffle,
-  BracketRound: Target
+  BracketRound: Target,
+  Award: Award
 }
 
 const NODE_WIDTH = 220
@@ -810,6 +814,21 @@ const PhaseInternalDiagram = memo(({ phaseType, incomingSlots, advancingSlots, p
       <text x={x} y={y + 3} fontSize="7" fill="white" textAnchor="middle" fontWeight="600" fontFamily="system-ui">{num}</text>
     </g>
   )
+
+  if (phaseType === 'Award') {
+    const svgW = 260
+    const svgH = 60
+    return (
+      <svg width={svgW} height={svgH} viewBox={`0 0 ${svgW} ${svgH}`}>
+        <text x={svgW / 2} y={14} fontSize="9" fill={GRAY} textAnchor="middle" fontWeight="600" fontFamily="system-ui">
+          {incoming} in → Placement Award
+        </text>
+        <InSlot x={60} y={38} num={1} />
+        <line x1={67} y1={38} x2={110} y2={38} stroke={LINE_GRAY} strokeWidth={1} />
+        <text x={170} y={42} fontSize="20" textAnchor="middle">🏆</text>
+      </svg>
+    )
+  }
 
   if (phaseType === 'Pools') {
     const pc = Math.max(pools, 1)
@@ -1242,7 +1261,7 @@ const PhaseNode = memo(({ data, selected }) => {
         <div className="flex items-center justify-between">
           <span className={`text-xs font-medium ${colors.text}`}>{data.phaseType}</span>
           <span className="text-xs text-gray-500">
-            {data.incomingSlotCount} in → {data.advancingSlotCount} out
+            {data.phaseType === 'Award' ? `${data.incomingSlotCount} in → 🏆` : `${data.incomingSlotCount} in → ${data.advancingSlotCount} out`}
             {(data.phaseType === 'BracketRound' && (data.includeConsolation || data.advancingSlotCount >= data.incomingSlotCount)) && (
               <span className="text-[9px] ml-1 text-gray-400">
                 ({Math.floor(data.incomingSlotCount / 2)}W+{Math.floor(data.incomingSlotCount / 2)}L)
@@ -1267,7 +1286,9 @@ const PhaseNode = memo(({ data, selected }) => {
           />
         </div>
       )}
-      <Handle type="source" position={Position.Bottom} className="!bg-gray-400 !w-3 !h-3 !border-2 !border-white" />
+      {data.phaseType !== 'Award' && (
+        <Handle type="source" position={Position.Bottom} className="!bg-gray-400 !w-3 !h-3 !border-2 !border-white" />
+      )}
     </div>
   )
 })
@@ -1692,21 +1713,31 @@ const NodeConfigPanel = ({ phase, phaseIndex, onChange, onDelete }) => {
             {PHASE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
           </select>
         </div>
-        <div className="grid grid-cols-2 gap-2">
+        {phase.phaseType === 'Award' ? (
           <div>
-            <label className="block text-[11px] font-medium text-gray-500 mb-0.5">In Slots</label>
-            <input type="number" min={1} value={phase.incomingSlotCount}
-              onChange={e => update('incomingSlotCount', parseInt(e.target.value) || 0)}
-              className="w-full px-2 py-1 border rounded text-sm focus:ring-2 focus:ring-purple-500" />
+            <label className="block text-[11px] font-medium text-gray-500 mb-0.5">Award Type</label>
+            <select value={phase.awardType || 'Gold'} onChange={e => update('awardType', e.target.value)}
+              className="w-full px-2 py-1 border rounded text-sm focus:ring-2 focus:ring-purple-500">
+              {AWARD_TYPES.map(t => <option key={t} value={t}>{t === 'none' ? 'None' : t}</option>)}
+            </select>
           </div>
-          <div>
-            <label className="block text-[11px] font-medium text-gray-500 mb-0.5">Adv Slots</label>
-            <input type="number" min={0} value={phase.advancingSlotCount}
-              onChange={e => update('advancingSlotCount', parseInt(e.target.value) || 0)}
-              className="w-full px-2 py-1 border rounded text-sm focus:ring-2 focus:ring-purple-500" />
+        ) : (
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="block text-[11px] font-medium text-gray-500 mb-0.5">In Slots</label>
+              <input type="number" min={1} value={phase.incomingSlotCount}
+                onChange={e => update('incomingSlotCount', parseInt(e.target.value) || 0)}
+                className="w-full px-2 py-1 border rounded text-sm focus:ring-2 focus:ring-purple-500" />
+            </div>
+            <div>
+              <label className="block text-[11px] font-medium text-gray-500 mb-0.5">Adv Slots</label>
+              <input type="number" min={0} value={phase.advancingSlotCount}
+                onChange={e => update('advancingSlotCount', parseInt(e.target.value) || 0)}
+                className="w-full px-2 py-1 border rounded text-sm focus:ring-2 focus:ring-purple-500" />
+            </div>
           </div>
-        </div>
-        {isPools && (
+        )}
+        {phase.phaseType !== 'Award' && isPools && (
           <div>
             <label className="block text-[11px] font-medium text-gray-500 mb-0.5">Pool Count</label>
             <input type="number" min={1} value={phase.poolCount}
@@ -1714,37 +1745,41 @@ const NodeConfigPanel = ({ phase, phaseIndex, onChange, onDelete }) => {
               className="w-full px-2 py-1 border rounded text-sm focus:ring-2 focus:ring-purple-500" />
           </div>
         )}
-        <div className="grid grid-cols-2 gap-2">
-          <div>
-            <label className="block text-[11px] font-medium text-gray-500 mb-0.5">Best Of</label>
-            <select value={phase.bestOf} onChange={e => update('bestOf', parseInt(e.target.value))}
-              className="w-full px-2 py-1 border rounded text-sm focus:ring-2 focus:ring-purple-500">
-              <option value={1}>1</option>
-              <option value={3}>3</option>
-              <option value={5}>5</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-[11px] font-medium text-gray-500 mb-0.5">Duration</label>
-            <input type="number" min={1} value={phase.matchDurationMinutes}
-              onChange={e => update('matchDurationMinutes', parseInt(e.target.value) || 0)}
-              className="w-full px-2 py-1 border rounded text-sm focus:ring-2 focus:ring-purple-500" />
-          </div>
-        </div>
-        <div>
-          <label className="block text-[11px] font-medium text-gray-500 mb-0.5">Seeding</label>
-          <select value={phase.seedingStrategy || 'Sequential'} onChange={e => update('seedingStrategy', e.target.value)}
-            className="w-full px-2 py-1 border rounded text-sm focus:ring-2 focus:ring-purple-500">
-            {SEEDING_STRATEGIES.map(s => <option key={s} value={s}>{s}</option>)}
-          </select>
-        </div>
-        {isBracket && (
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input type="checkbox" checked={phase.includeConsolation || false}
-              onChange={e => update('includeConsolation', e.target.checked)}
-              className="rounded border-gray-300 text-purple-600 focus:ring-purple-500" />
-            <span className="text-xs text-gray-700">Include consolation</span>
-          </label>
+        {phase.phaseType !== 'Award' && (
+          <>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="block text-[11px] font-medium text-gray-500 mb-0.5">Best Of</label>
+                <select value={phase.bestOf} onChange={e => update('bestOf', parseInt(e.target.value))}
+                  className="w-full px-2 py-1 border rounded text-sm focus:ring-2 focus:ring-purple-500">
+                  <option value={1}>1</option>
+                  <option value={3}>3</option>
+                  <option value={5}>5</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-[11px] font-medium text-gray-500 mb-0.5">Duration</label>
+                <input type="number" min={1} value={phase.matchDurationMinutes}
+                  onChange={e => update('matchDurationMinutes', parseInt(e.target.value) || 0)}
+                  className="w-full px-2 py-1 border rounded text-sm focus:ring-2 focus:ring-purple-500" />
+              </div>
+            </div>
+            <div>
+              <label className="block text-[11px] font-medium text-gray-500 mb-0.5">Seeding</label>
+              <select value={phase.seedingStrategy || 'Sequential'} onChange={e => update('seedingStrategy', e.target.value)}
+                className="w-full px-2 py-1 border rounded text-sm focus:ring-2 focus:ring-purple-500">
+                {SEEDING_STRATEGIES.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+            {isBracket && (
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={phase.includeConsolation || false}
+                  onChange={e => update('includeConsolation', e.target.checked)}
+                  className="rounded border-gray-300 text-purple-600 focus:ring-purple-500" />
+                <span className="text-xs text-gray-700">Include consolation</span>
+              </label>
+            )}
+          </>
         )}
       </div>
       <button type="button" onClick={onDelete}
@@ -1778,6 +1813,7 @@ const CanvasPhaseEditorInner = ({ visualState, onChange }) => {
         poolCount: phase.poolCount,
         bestOf: phase.bestOf,
         includeConsolation: phase.includeConsolation,
+        awardType: phase.awardType,
       },
     }))
   }, [])
@@ -1928,6 +1964,7 @@ const CanvasPhaseEditorInner = ({ visualState, onChange }) => {
             poolCount: phase.poolCount,
             bestOf: phase.bestOf,
             includeConsolation: phase.includeConsolation,
+            awardType: phase.awardType,
             incomingRules: vs.advancementRules.filter(r => r.targetPhaseOrder === order),
             outgoingRules: vs.advancementRules.filter(r => r.sourcePhaseOrder === order),
             phaseNames,
@@ -2115,14 +2152,16 @@ const CanvasPhaseEditorInner = ({ visualState, onChange }) => {
     const prev = vs.phases[vs.phases.length - 1]
     const incoming = prev ? (parseInt(prev.advancingSlotCount) || 4) : 8
 
+    const isAward = phaseType === 'Award'
     const newPhase = {
       ...DEFAULT_PHASE,
-      name: `${phaseType} Phase`,
+      name: isAward ? 'Award' : `${phaseType} Phase`,
       phaseType,
       sortOrder: order,
-      incomingSlotCount: incoming,
-      advancingSlotCount: Math.max(1, Math.floor(incoming / 2)),
+      incomingSlotCount: isAward ? 1 : incoming,
+      advancingSlotCount: isAward ? 0 : Math.max(1, Math.floor(incoming / 2)),
       poolCount: phaseType === 'Pools' ? 4 : 0,
+      ...(isAward ? { awardType: 'Gold' } : {}),
     }
 
     // Add node immediately at drop position
@@ -2138,6 +2177,7 @@ const CanvasPhaseEditorInner = ({ visualState, onChange }) => {
         incomingSlotCount: newPhase.incomingSlotCount,
         advancingSlotCount: newPhase.advancingSlotCount,
         poolCount: newPhase.poolCount,
+        awardType: newPhase.awardType,
       }
     }])
 
@@ -2311,6 +2351,9 @@ const CanvasPhaseEditorInner = ({ visualState, onChange }) => {
         <PaletteItem phaseType="Pools" label="Pools" />
         <PaletteItem phaseType="Swiss" label="Swiss" />
         <PaletteItem phaseType="BracketRound" label="Bracket Round" />
+        <div className="border-t my-2" />
+        <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Awards</h4>
+        <PaletteItem phaseType="Award" label="Award" />
       </div>
 
       {/* Center Canvas */}
