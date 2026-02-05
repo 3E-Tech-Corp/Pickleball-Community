@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
+using Microsoft.EntityFrameworkCore;
+using Pickleball.Community.Database;
 using System.Security.Claims;
 
 namespace Pickleball.Community.Hubs;
@@ -12,12 +14,14 @@ namespace Pickleball.Community.Hubs;
 public class NotificationHub : Hub
 {
     private readonly ILogger<NotificationHub> _logger;
+    private readonly IServiceProvider _serviceProvider;
     private static readonly Dictionary<int, HashSet<string>> _userConnections = new();
     private static readonly object _lock = new();
 
-    public NotificationHub(ILogger<NotificationHub> logger)
+    public NotificationHub(ILogger<NotificationHub> logger, IServiceProvider serviceProvider)
     {
         _logger = logger;
+        _serviceProvider = serviceProvider;
     }
 
     private int? GetCurrentUserId()
@@ -46,6 +50,9 @@ public class NotificationHub : Hub
             _userConnections[userId.Value].Add(Context.ConnectionId);
         }
 
+        // Update LastActiveAt in DB
+        await UpdateLastActiveAsync(userId.Value);
+
         // Add user to their personal notification group
         await Groups.AddToGroupAsync(Context.ConnectionId, $"user_{userId.Value}");
 
@@ -71,6 +78,9 @@ public class NotificationHub : Hub
                     }
                 }
             }
+
+            // Update LastActiveAt on disconnect (marks when they left)
+            await UpdateLastActiveAsync(userId.Value);
 
             _logger.LogInformation("User {UserId} disconnected from notification hub", userId.Value);
         }
@@ -112,6 +122,39 @@ public class NotificationHub : Hub
         lock (_lock)
         {
             return _userConnections.Count;
+        }
+    }
+
+    /// <summary>
+    /// Get all currently connected user IDs
+    /// </summary>
+    public static List<int> GetAllConnectedUserIds()
+    {
+        lock (_lock)
+        {
+            return _userConnections.Keys.ToList();
+        }
+    }
+
+    /// <summary>
+    /// Update LastActiveAt timestamp in the database for a user
+    /// </summary>
+    private async Task UpdateLastActiveAsync(int userId)
+    {
+        try
+        {
+            using var scope = _serviceProvider.CreateScope();
+            var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var user = await dbContext.Users.FindAsync(userId);
+            if (user != null)
+            {
+                user.LastActiveAt = DateTime.Now;
+                await dbContext.SaveChangesAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to update LastActiveAt for user {UserId}", userId);
         }
     }
 

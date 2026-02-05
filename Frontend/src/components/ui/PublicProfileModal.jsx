@@ -9,6 +9,7 @@ import {
   KeyRound, Mail, Phone, BadgeCheck
 } from 'lucide-react'
 import AdminEditCredentialsModal from './AdminEditCredentialsModal'
+import OnlineStatusDot from './OnlineStatusDot'
 
 export default function PublicProfileModal({ userId, onClose, onFriendshipChange }) {
   const navigate = useNavigate()
@@ -238,7 +239,14 @@ export default function PublicProfileModal({ userId, onClose, onFriendshipChange
 
                 {/* Name and Basic Info */}
                 <div className="text-center sm:text-left flex-1">
-                  <h1 className="text-2xl font-bold text-white">{getFullName()}</h1>
+                  <h1 className="text-2xl font-bold text-white flex items-center gap-2">
+                    {getFullName()}
+                    <OnlineStatusDot
+                      isOnline={profile.isOnline}
+                      lastActiveAt={profile.lastActiveAt}
+                      size="md"
+                    />
+                  </h1>
 
                   {getLocation() && (
                     <div className="flex items-center justify-center sm:justify-start gap-2 text-white/80 mt-1">

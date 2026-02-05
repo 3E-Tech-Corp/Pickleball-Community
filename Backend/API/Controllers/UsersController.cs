@@ -6,6 +6,7 @@ using Pickleball.Community.Database;
 using Pickleball.Community.Models.Entities;
 using Pickleball.Community.Models.DTOs;
 using Pickleball.Community.Services;
+using Pickleball.Community.Hubs;
 
 namespace Pickleball.Community.API.Controllers;
 
@@ -229,6 +230,8 @@ public class UsersController : ControllerBase
                 DuprRating = user.DuprRating,
                 IntroVideo = user.IntroVideo,
                 CreatedAt = user.CreatedAt,
+                IsOnline = NotificationHub.IsUserConnected(user.Id),
+                LastActiveAt = user.LastActiveAt,
                 FriendshipStatus = "none",
                 FriendRequestId = null,
                 SocialLinks = socialLinks
@@ -616,6 +619,155 @@ public class UsersController : ControllerBase
         }
     }
 
+    // GET: api/Users/online (Admin only) - Get list of currently online users
+    [Authorize(Roles = "Admin")]
+    [HttpGet("online")]
+    public async Task<ActionResult<ApiResponse<List<UserProfileDto>>>> GetOnlineUsers()
+    {
+        try
+        {
+            var connectedUserIds = NotificationHub.GetAllConnectedUserIds();
+
+            if (connectedUserIds.Count == 0)
+            {
+                return Ok(new ApiResponse<List<UserProfileDto>>
+                {
+                    Success = true,
+                    Data = new List<UserProfileDto>()
+                });
+            }
+
+            var users = await _context.Users
+                .Where(u => connectedUserIds.Contains(u.Id))
+                .Select(u => new UserProfileDto
+                {
+                    Id = u.Id,
+                    Email = u.Email,
+                    FirstName = u.FirstName,
+                    LastName = u.LastName,
+                    Role = u.Role,
+                    ProfileImageUrl = u.ProfileImageUrl,
+                    City = u.City,
+                    State = u.State,
+                    IsActive = u.IsActive,
+                    IsOnline = true,
+                    LastActiveAt = u.LastActiveAt,
+                    CreatedAt = u.CreatedAt
+                })
+                .ToListAsync();
+
+            return Ok(new ApiResponse<List<UserProfileDto>>
+            {
+                Success = true,
+                Data = users
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error fetching online users");
+            return StatusCode(500, new ApiResponse<List<UserProfileDto>>
+            {
+                Success = false,
+                Message = "An error occurred while fetching online users"
+            });
+        }
+    }
+
+    // GET: api/Users/online-status/{id} (public) - Get online status for a specific user
+    [HttpGet("online-status/{id}")]
+    [AllowAnonymous]
+    public async Task<ActionResult<ApiResponse<OnlineStatusDto>>> GetUserOnlineStatus(int id)
+    {
+        try
+        {
+            var user = await _context.Users
+                .Where(u => u.Id == id && u.IsActive)
+                .Select(u => new { u.LastActiveAt })
+                .FirstOrDefaultAsync();
+
+            if (user == null)
+            {
+                return NotFound(new ApiResponse<OnlineStatusDto>
+                {
+                    Success = false,
+                    Message = "User not found"
+                });
+            }
+
+            return Ok(new ApiResponse<OnlineStatusDto>
+            {
+                Success = true,
+                Data = new OnlineStatusDto
+                {
+                    UserId = id,
+                    IsOnline = NotificationHub.IsUserConnected(id),
+                    LastActiveAt = user.LastActiveAt
+                }
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error fetching online status for user {UserId}", id);
+            return StatusCode(500, new ApiResponse<OnlineStatusDto>
+            {
+                Success = false,
+                Message = "An error occurred"
+            });
+        }
+    }
+
+    // GET: api/Users/online-status?ids=1,2,3 (public) - Batch get online status
+    [HttpGet("online-status")]
+    [AllowAnonymous]
+    public async Task<ActionResult<ApiResponse<List<OnlineStatusDto>>>> GetBatchOnlineStatus([FromQuery] string ids)
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(ids))
+            {
+                return BadRequest(new ApiResponse<List<OnlineStatusDto>>
+                {
+                    Success = false,
+                    Message = "ids parameter is required"
+                });
+            }
+
+            var userIds = ids.Split(',')
+                .Select(s => int.TryParse(s.Trim(), out var id) ? id : -1)
+                .Where(id => id > 0)
+                .Distinct()
+                .Take(100) // Limit batch size
+                .ToList();
+
+            var users = await _context.Users
+                .Where(u => userIds.Contains(u.Id) && u.IsActive)
+                .Select(u => new { u.Id, u.LastActiveAt })
+                .ToListAsync();
+
+            var result = users.Select(u => new OnlineStatusDto
+            {
+                UserId = u.Id,
+                IsOnline = NotificationHub.IsUserConnected(u.Id),
+                LastActiveAt = u.LastActiveAt
+            }).ToList();
+
+            return Ok(new ApiResponse<List<OnlineStatusDto>>
+            {
+                Success = true,
+                Data = result
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error fetching batch online status");
+            return StatusCode(500, new ApiResponse<List<OnlineStatusDto>>
+            {
+                Success = false,
+                Message = "An error occurred"
+            });
+        }
+    }
+
     // GET: api/Users/coaches (Public - anyone can browse coaches)
     [HttpGet("coaches")]
     [AllowAnonymous]
@@ -719,6 +871,8 @@ public class UsersController : ControllerBase
     {
         try
         {
+            var connectedUserIds = NotificationHub.GetAllConnectedUserIds();
+
             var users = await _context.Users
                 .Select(u => new UserProfileDto
                 {
@@ -748,9 +902,16 @@ public class UsersController : ControllerBase
                     DuprRating = u.DuprRating,
                     IntroVideo = u.IntroVideo,
                     CreatedAt = u.CreatedAt,
-                    IsActive = u.IsActive
+                    IsActive = u.IsActive,
+                    LastActiveAt = u.LastActiveAt
                 })
                 .ToListAsync();
+
+            // Set IsOnline based on SignalR connections (done in-memory since it's static state)
+            foreach (var user in users)
+            {
+                user.IsOnline = connectedUserIds.Contains(user.Id);
+            }
 
             return Ok(new ApiResponse<List<UserProfileDto>>
             {
@@ -868,6 +1029,8 @@ public class UsersController : ControllerBase
             IntroVideo = user.IntroVideo,
             CreatedAt = user.CreatedAt,
             IsActive = user.IsActive,
+            IsOnline = NotificationHub.IsUserConnected(user.Id),
+            LastActiveAt = user.LastActiveAt,
             EmailVerified = user.EmailVerified,
             PhoneVerified = user.PhoneVerified,
             ShowEmailInProfile = user.ShowEmailInProfile,

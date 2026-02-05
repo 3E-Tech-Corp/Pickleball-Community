@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Pickleball.Community.Services;
+using Pickleball.Community.Hubs;
 using System.Security.Claims;
 
 namespace Pickleball.Community.API.Controllers;
@@ -196,9 +197,99 @@ public class PushController : ControllerBase
             return StatusCode(500, new { success = false, message = "Failed to send test notification" });
         }
     }
+    /// <summary>
+    /// Admin: Send push notification to specific users
+    /// </summary>
+    [HttpPost("send")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> AdminSendPush([FromBody] AdminPushRequest dto)
+    {
+        try
+        {
+            if (dto.UserIds == null || dto.UserIds.Length == 0)
+            {
+                return BadRequest(new { success = false, message = "At least one user ID is required" });
+            }
+
+            if (string.IsNullOrWhiteSpace(dto.Title) || string.IsNullOrWhiteSpace(dto.Body))
+            {
+                return BadRequest(new { success = false, message = "Title and body are required" });
+            }
+
+            var count = await _pushService.SendToUsersAsync(
+                dto.UserIds,
+                dto.Title,
+                dto.Body,
+                dto.Url);
+
+            _logger.LogInformation("Admin sent push to {UserCount} users ({SentCount} subscriptions): {Title}",
+                dto.UserIds.Length, count, dto.Title);
+
+            return Ok(new { success = true, sentTo = count, targetUsers = dto.UserIds.Length });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error sending admin push notification");
+            return StatusCode(500, new { success = false, message = "Failed to send push notification" });
+        }
+    }
+
+    /// <summary>
+    /// Admin: Send push notification to all currently online users
+    /// </summary>
+    [HttpPost("send-online")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> AdminSendPushToOnline([FromBody] AdminPushOnlineRequest dto)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(dto.Title) || string.IsNullOrWhiteSpace(dto.Body))
+            {
+                return BadRequest(new { success = false, message = "Title and body are required" });
+            }
+
+            var onlineUserIds = NotificationHub.GetAllConnectedUserIds();
+
+            if (onlineUserIds.Count == 0)
+            {
+                return Ok(new { success = true, sentTo = 0, onlineUsers = 0, message = "No users currently online" });
+            }
+
+            var count = await _pushService.SendToUsersAsync(
+                onlineUserIds,
+                dto.Title,
+                dto.Body,
+                dto.Url);
+
+            _logger.LogInformation("Admin sent push to {OnlineCount} online users ({SentCount} subscriptions): {Title}",
+                onlineUserIds.Count, count, dto.Title);
+
+            return Ok(new { success = true, sentTo = count, onlineUsers = onlineUserIds.Count });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error sending admin push to online users");
+            return StatusCode(500, new { success = false, message = "Failed to send push notification" });
+        }
+    }
 }
 
 // DTOs
+public class AdminPushRequest
+{
+    public int[] UserIds { get; set; } = Array.Empty<int>();
+    public string Title { get; set; } = string.Empty;
+    public string Body { get; set; } = string.Empty;
+    public string? Url { get; set; }
+}
+
+public class AdminPushOnlineRequest
+{
+    public string Title { get; set; } = string.Empty;
+    public string Body { get; set; } = string.Empty;
+    public string? Url { get; set; }
+}
+
 public class PushSubscriptionDto
 {
     public string Endpoint { get; set; } = string.Empty;

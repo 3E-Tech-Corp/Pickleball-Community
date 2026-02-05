@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
-import { userApi, themeApi, notificationTemplateApi, getAssetUrl, sharedAssetApi, getSharedAssetUrl, SHARED_AUTH_URL, notificationsApi, API_BASE_URL } from '../services/api'
+import { userApi, themeApi, notificationTemplateApi, getAssetUrl, sharedAssetApi, getSharedAssetUrl, SHARED_AUTH_URL, notificationsApi, API_BASE_URL, pushApi } from '../services/api'
 import {
   Users, BookOpen, Calendar, DollarSign, Search, Edit2, Trash2,
   ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Filter, MoreVertical, Eye, X,
@@ -13,6 +13,7 @@ import {
 } from 'lucide-react'
 import VideoUploadModal from '../components/ui/VideoUploadModal'
 import PublicProfileModal from '../components/ui/PublicProfileModal'
+import OnlineStatusDot from '../components/ui/OnlineStatusDot'
 
 // Import admin components for inline rendering
 import BlogAdmin from './BlogAdmin'
@@ -61,6 +62,15 @@ const AdminDashboard = () => {
   const [confirmPassword, setConfirmPassword] = useState('')
   const [savingPassword, setSavingPassword] = useState(false)
   const [sendingTestEmail, setSendingTestEmail] = useState(false)
+  const [userOnlineFilter, setUserOnlineFilter] = useState('all') // 'all' | 'online' | 'offline'
+  const [pushModalOpen, setPushModalOpen] = useState(false)
+  const [pushTargetUsers, setPushTargetUsers] = useState([]) // user IDs for push
+  const [pushTargetMode, setPushTargetMode] = useState('selected') // 'selected' | 'online'
+  const [pushTitle, setPushTitle] = useState('')
+  const [pushBody, setPushBody] = useState('')
+  const [pushUrl, setPushUrl] = useState('')
+  const [sendingPush, setSendingPush] = useState(false)
+  const [pushResult, setPushResult] = useState(null)
   const [editingPhone, setEditingPhone] = useState(false)
   const [newPhone, setNewPhone] = useState('')
   const [savingPhone, setSavingPhone] = useState(false)
@@ -725,9 +735,14 @@ const AdminDashboard = () => {
         (u.lastName?.toLowerCase() || '').includes(userSearch.toLowerCase()) ||
         (u.email?.toLowerCase() || '').includes(userSearch.toLowerCase())
       const matchesRole = userRoleFilter === 'all' || u.role?.toLowerCase() === userRoleFilter.toLowerCase()
-      return matchesSearch && matchesRole
+      const matchesOnline = userOnlineFilter === 'all' ||
+        (userOnlineFilter === 'online' && u.isOnline) ||
+        (userOnlineFilter === 'offline' && !u.isOnline)
+      return matchesSearch && matchesRole && matchesOnline
     })
     .sort((a, b) => b.id - a.id)
+
+  const onlineUserCount = users.filter(u => u.isOnline).length
 
   // Filter templates
   const filteredTemplates = templates.filter(t => {
@@ -1110,7 +1125,32 @@ const AdminDashboard = () => {
                       <option value="coach">Coach</option>
                       <option value="student">Student</option>
                     </select>
+                    <select
+                      value={userOnlineFilter}
+                      onChange={(e) => { setUserOnlineFilter(e.target.value); setCurrentPage(1); }}
+                      className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="all">All Status</option>
+                      <option value="online">🟢 Online ({onlineUserCount})</option>
+                      <option value="offline">⚪ Offline</option>
+                    </select>
                   </div>
+                  <button
+                    onClick={() => {
+                      setPushTargetMode('online')
+                      setPushTargetUsers([])
+                      setPushTitle('')
+                      setPushBody('')
+                      setPushUrl('')
+                      setPushResult(null)
+                      setPushModalOpen(true)
+                    }}
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors whitespace-nowrap"
+                    title="Send push notification to online users"
+                  >
+                    <Megaphone className="w-4 h-4" />
+                    Push Online ({onlineUserCount})
+                  </button>
                 </div>
               </div>
 
@@ -1129,6 +1169,7 @@ const AdminDashboard = () => {
                           <th className="px-4 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
                           <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
                           <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
+                          <th className="px-4 py-4 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Online</th>
                           <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Location</th>
                           <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                           <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Joined</th>
@@ -1176,6 +1217,14 @@ const AdminDashboard = () => {
                                 <span className="ml-1 capitalize">{u.role || 'User'}</span>
                               </span>
                             </td>
+                            <td className="px-4 py-4 text-center">
+                              <OnlineStatusDot
+                                isOnline={u.isOnline}
+                                lastActiveAt={u.lastActiveAt}
+                                size="md"
+                                showLabel={true}
+                              />
+                            </td>
                             <td className="px-6 py-4 text-sm text-gray-600">
                               {(u.city || u.state) ? (
                                 <span className="inline-flex items-center">
@@ -1203,6 +1252,21 @@ const AdminDashboard = () => {
                               {u.createdAt ? new Date(u.createdAt).toLocaleDateString() : '-'}
                             </td>
                             <td className="px-6 py-4 text-right flex items-center justify-end gap-1">
+                              <button
+                                onClick={() => {
+                                  setPushTargetMode('selected')
+                                  setPushTargetUsers([u.id])
+                                  setPushTitle('')
+                                  setPushBody('')
+                                  setPushUrl('')
+                                  setPushResult(null)
+                                  setPushModalOpen(true)
+                                }}
+                                className="text-orange-600 hover:text-orange-800 p-2 rounded-lg hover:bg-orange-50"
+                                title="Send push notification"
+                              >
+                                <Megaphone className="w-4 h-4" />
+                              </button>
                               <button
                                 onClick={() => {
                                   setNotifTestUserId(u.id.toString())
@@ -3555,6 +3619,130 @@ const AdminDashboard = () => {
         title="Add Hero Video"
         maxSizeMB={100}
       />
+
+      {/* Push Notification Modal */}
+      {pushModalOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-[1100]">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                <Megaphone className="w-5 h-5 text-orange-600" />
+                Send Push Notification
+              </h3>
+              <button
+                onClick={() => setPushModalOpen(false)}
+                className="p-1 text-gray-400 hover:text-gray-600 rounded"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="mb-3 text-sm text-gray-600">
+              {pushTargetMode === 'online' ? (
+                <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-50 text-green-700 rounded-full">
+                  🟢 Sending to all online users ({onlineUserCount})
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 px-2 py-1 bg-blue-50 text-blue-700 rounded-full">
+                  👤 Sending to {pushTargetUsers.length} selected user{pushTargetUsers.length !== 1 ? 's' : ''}
+                </span>
+              )}
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Title *</label>
+                <input
+                  type="text"
+                  value={pushTitle}
+                  onChange={(e) => setPushTitle(e.target.value)}
+                  placeholder="Notification title..."
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Body *</label>
+                <textarea
+                  value={pushBody}
+                  onChange={(e) => setPushBody(e.target.value)}
+                  placeholder="Notification message..."
+                  rows={3}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">URL (optional)</label>
+                <input
+                  type="text"
+                  value={pushUrl}
+                  onChange={(e) => setPushUrl(e.target.value)}
+                  placeholder="/notifications or https://..."
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                />
+              </div>
+            </div>
+
+            {pushResult && (
+              <div className={`mt-3 p-3 rounded-lg text-sm ${pushResult.success ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+                {pushResult.message}
+              </div>
+            )}
+
+            <div className="flex justify-end gap-3 mt-4">
+              <button
+                onClick={() => setPushModalOpen(false)}
+                className="px-4 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  if (!pushTitle.trim() || !pushBody.trim()) {
+                    setPushResult({ success: false, message: 'Title and body are required' })
+                    return
+                  }
+                  setSendingPush(true)
+                  setPushResult(null)
+                  try {
+                    let response
+                    if (pushTargetMode === 'online') {
+                      response = await pushApi.adminSendOnline(pushTitle, pushBody, pushUrl || null)
+                    } else {
+                      response = await pushApi.adminSend(pushTargetUsers, pushTitle, pushBody, pushUrl || null)
+                    }
+                    const data = response?.data || response
+                    const sentTo = data?.sentTo ?? 0
+                    const targetCount = pushTargetMode === 'online' ? (data?.onlineUsers ?? 0) : pushTargetUsers.length
+                    setPushResult({
+                      success: true,
+                      message: `Push sent to ${sentTo} subscription${sentTo !== 1 ? 's' : ''} across ${targetCount} user${targetCount !== 1 ? 's' : ''}`
+                    })
+                  } catch (err) {
+                    console.error('Error sending push:', err)
+                    setPushResult({ success: false, message: err?.response?.data?.message || 'Failed to send push notification' })
+                  } finally {
+                    setSendingPush(false)
+                  }
+                }}
+                disabled={sendingPush || !pushTitle.trim() || !pushBody.trim()}
+                className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-2"
+              >
+                {sendingPush ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
+                    Sending...
+                  </>
+                ) : (
+                  <>
+                    <Send className="w-4 h-4" />
+                    Send Push
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Public Profile Modal */}
       {selectedProfileUserId && (

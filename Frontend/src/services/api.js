@@ -512,6 +512,11 @@ export const userApi = {
   // Get recently joined players (public, for marquee)
   getRecentPlayers: (count = 20, days = 30) => api.get(`/users/recent?count=${count}&days=${days}`),
 
+  // Online status endpoints
+  getOnlineUsers: () => api.get('/users/online'),
+  getUserOnlineStatus: (userId) => api.get(`/users/online-status/${userId}`),
+  getBatchOnlineStatus: (ids) => api.get(`/users/online-status?ids=${ids.join(',')}`),
+
   // Social Links
   getSocialLinks: () => api.get('/users/social-links'),
   addSocialLink: (data) => api.post('/users/social-links', data),
@@ -2007,7 +2012,13 @@ export const pushApi = {
   getSubscriptions: () => api.get('/push/subscriptions'),
 
   // Send test push notification
-  test: () => api.post('/push/test')
+  test: () => api.post('/push/test'),
+
+  // Admin: Send push to specific users
+  adminSend: (userIds, title, body, url = null) => api.post('/push/send', { userIds, title, body, url }),
+
+  // Admin: Send push to all online users
+  adminSendOnline: (title, body, url = null) => api.post('/push/send-online', { title, body, url })
 }
 
 // Grants API (club grant account management)

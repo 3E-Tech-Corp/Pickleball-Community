@@ -86,6 +86,11 @@ public class User
     public DateTime UpdatedAt { get; set; } = DateTime.Now;
     public bool IsActive { get; set; } = true;
 
+    /// <summary>
+    /// Last time the user was active (connected/disconnected from SignalR hub)
+    /// </summary>
+    public DateTime? LastActiveAt { get; set; }
+
     // Blog permissions
     public bool CanWriteBlog { get; set; } = false;
 

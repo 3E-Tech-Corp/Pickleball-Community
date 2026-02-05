@@ -35,6 +35,10 @@ public class UserProfileDto
     public DateTime? CreatedAt { get; set; }
     public bool IsActive { get; set; }
 
+    // Online presence
+    public bool IsOnline { get; set; }
+    public DateTime? LastActiveAt { get; set; }
+
     // Verification status
     public bool EmailVerified { get; set; }
     public bool PhoneVerified { get; set; }
@@ -132,6 +136,10 @@ public class PublicProfileDto
 
     public DateTime CreatedAt { get; set; }
 
+    // Online presence
+    public bool IsOnline { get; set; }
+    public DateTime? LastActiveAt { get; set; }
+
     // Friendship status (for logged-in users)
     public string? FriendshipStatus { get; set; } // "friends", "pending_sent", "pending_received", "none"
     public int? FriendRequestId { get; set; }
@@ -183,4 +191,12 @@ public class UpdateSocialLinkRequest
 public class BulkUpdateSocialLinksRequest
 {
     public List<CreateSocialLinkRequest> Links { get; set; } = new();
+}
+
+// DTO for online status info
+public class OnlineStatusDto
+{
+    public int UserId { get; set; }
+    public bool IsOnline { get; set; }
+    public DateTime? LastActiveAt { get; set; }
 }
