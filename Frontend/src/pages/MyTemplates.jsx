@@ -4,7 +4,8 @@ import { tournamentApi } from '../services/api'
 import {
   Layers, Plus, Edit2, Trash2, X, RefreshCw, AlertTriangle, Copy,
   Code, Save, GitBranch, Trophy, Users, Hash, Tag, FileJson,
-  Info, LayoutList, Lightbulb, ArrowLeft, Search, Settings, Grid3X3, List
+  Info, LayoutList, Lightbulb, ArrowLeft, Search, Settings, Grid3X3, List,
+  Maximize2, Minimize2
 } from 'lucide-react'
 
 // Import shared constants, helpers, and the reusable editor
@@ -85,6 +86,7 @@ const MyTemplates = () => {
   const [editorMode, setEditorMode] = useState('visual')
   const [visualSubMode, setVisualSubMode] = useState('canvas') // 'canvas' | 'list'
   const [visualState, setVisualState] = useState(null)
+  const [isFullscreen, setIsFullscreen] = useState(false)
   const [formData, setFormData] = useState({...EMPTY_FORM})
   const [categoryFilter, setCategoryFilter] = useState('all')
   const [showDuplicateModal, setShowDuplicateModal] = useState(false)
@@ -188,9 +190,33 @@ const MyTemplates = () => {
           </div>
           {editorMode==='visual'&&visualState?(
             visualSubMode==='canvas'?(
-              <div className="h-[500px] border rounded-lg overflow-hidden">
-                <CanvasPhaseEditor visualState={visualState} onChange={handleVisualChange}/>
-              </div>
+              isFullscreen?(
+                <div className="fixed inset-0 z-50 bg-white flex flex-col">
+                  <div className="flex items-center justify-between px-4 py-2 border-b bg-gray-50">
+                    <h3 className="font-semibold text-gray-900">{formData.name || 'Template Editor'}</h3>
+                    <div className="flex items-center gap-2">
+                      <button onClick={handleSave} disabled={saving} className="flex items-center gap-1.5 px-4 py-1.5 text-sm bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50">
+                        {saving?<RefreshCw className="w-4 h-4 animate-spin"/>:<Save className="w-4 h-4"/>}{saving?'Saving...':'Save'}
+                      </button>
+                      <button onClick={()=>setIsFullscreen(false)} className="flex items-center gap-1.5 px-3 py-1.5 text-sm border rounded-lg hover:bg-gray-100">
+                        <Minimize2 className="w-4 h-4"/>Exit Fullscreen
+                      </button>
+                    </div>
+                  </div>
+                  <div className="flex-1">
+                    <CanvasPhaseEditor visualState={visualState} onChange={handleVisualChange}/>
+                  </div>
+                </div>
+              ):(
+                <div className="relative">
+                  <button onClick={()=>setIsFullscreen(true)} className="absolute top-2 right-2 z-10 p-2 bg-white/90 border rounded-lg shadow-sm hover:bg-gray-100" title="Fullscreen">
+                    <Maximize2 className="w-4 h-4 text-gray-600"/>
+                  </button>
+                  <div className="h-[500px] border rounded-lg overflow-hidden">
+                    <CanvasPhaseEditor visualState={visualState} onChange={handleVisualChange}/>
+                  </div>
+                </div>
+              )
             ):(
               <ListPhaseEditor visualState={visualState} onChange={handleVisualChange}/>
             )
