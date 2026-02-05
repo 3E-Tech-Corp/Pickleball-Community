@@ -2015,10 +2015,10 @@ export const pushApi = {
   test: () => api.post('/push/test'),
 
   // Admin: Send push to specific users
-  adminSend: (userIds, title, body, url = null) => api.post('/push/send', { userIds, title, body, url }),
+  adminSend: (userIds, title, body, url = null, icon = null) => api.post('/push/send', { userIds, title, body, url, icon }),
 
   // Admin: Send push to all online users
-  adminSendOnline: (title, body, url = null) => api.post('/push/send-online', { title, body, url })
+  adminSendOnline: (title, body, url = null, icon = null) => api.post('/push/send-online', { title, body, url, icon })
 }
 
 // Grants API (club grant account management)

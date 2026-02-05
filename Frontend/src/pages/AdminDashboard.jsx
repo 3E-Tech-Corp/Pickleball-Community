@@ -69,6 +69,7 @@ const AdminDashboard = () => {
   const [pushTitle, setPushTitle] = useState('')
   const [pushBody, setPushBody] = useState('')
   const [pushUrl, setPushUrl] = useState('')
+  const [pushIcon, setPushIcon] = useState('')
   const [sendingPush, setSendingPush] = useState(false)
   const [pushResult, setPushResult] = useState(null)
   const [editingPhone, setEditingPhone] = useState(false)
@@ -1142,6 +1143,7 @@ const AdminDashboard = () => {
                       setPushTitle('')
                       setPushBody('')
                       setPushUrl('')
+                      setPushIcon('')
                       setPushResult(null)
                       setPushModalOpen(true)
                     }}
@@ -1259,6 +1261,7 @@ const AdminDashboard = () => {
                                   setPushTitle('')
                                   setPushBody('')
                                   setPushUrl('')
+                                  setPushIcon('')
                                   setPushResult(null)
                                   setPushModalOpen(true)
                                 }}
@@ -3680,6 +3683,17 @@ const AdminDashboard = () => {
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                 />
               </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Icon (optional)</label>
+                <input
+                  type="text"
+                  value={pushIcon}
+                  onChange={(e) => setPushIcon(e.target.value)}
+                  placeholder="/logo-192.png (default)"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                />
+                <p className="mt-1 text-xs text-gray-400">Path or URL to a square image (192×192 recommended)</p>
+              </div>
             </div>
 
             {pushResult && (
@@ -3706,9 +3720,9 @@ const AdminDashboard = () => {
                   try {
                     let response
                     if (pushTargetMode === 'online') {
-                      response = await pushApi.adminSendOnline(pushTitle, pushBody, pushUrl || null)
+                      response = await pushApi.adminSendOnline(pushTitle, pushBody, pushUrl || null, pushIcon || null)
                     } else {
-                      response = await pushApi.adminSend(pushTargetUsers, pushTitle, pushBody, pushUrl || null)
+                      response = await pushApi.adminSend(pushTargetUsers, pushTitle, pushBody, pushUrl || null, pushIcon || null)
                     }
                     const data = response?.data || response
                     const sentTo = data?.sentTo ?? 0

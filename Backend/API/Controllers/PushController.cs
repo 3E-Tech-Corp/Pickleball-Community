@@ -220,7 +220,8 @@ public class PushController : ControllerBase
                 dto.UserIds,
                 dto.Title,
                 dto.Body,
-                dto.Url);
+                dto.Url,
+                dto.Icon);
 
             _logger.LogInformation("Admin sent push to {UserCount} users ({SentCount} subscriptions): {Title}",
                 dto.UserIds.Length, count, dto.Title);
@@ -259,7 +260,8 @@ public class PushController : ControllerBase
                 onlineUserIds,
                 dto.Title,
                 dto.Body,
-                dto.Url);
+                dto.Url,
+                dto.Icon);
 
             _logger.LogInformation("Admin sent push to {OnlineCount} online users ({SentCount} subscriptions): {Title}",
                 onlineUserIds.Count, count, dto.Title);
@@ -281,6 +283,7 @@ public class AdminPushRequest
     public string Title { get; set; } = string.Empty;
     public string Body { get; set; } = string.Empty;
     public string? Url { get; set; }
+    public string? Icon { get; set; }
 }
 
 public class AdminPushOnlineRequest
@@ -288,6 +291,7 @@ public class AdminPushOnlineRequest
     public string Title { get; set; } = string.Empty;
     public string Body { get; set; } = string.Empty;
     public string? Url { get; set; }
+    public string? Icon { get; set; }
 }
 
 public class PushSubscriptionDto
