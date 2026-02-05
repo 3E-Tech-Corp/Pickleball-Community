@@ -229,8 +229,8 @@ public class PushNotificationService : IPushNotificationService
         {
             title,
             body,
-            icon = icon ?? "/icon-192.png",
-            badge = "/icon-192.png",
+            icon = icon ?? "/logo-192.png",
+            badge = "/logo-192.png",
             url = url ?? "/notifications",
             timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
         });
