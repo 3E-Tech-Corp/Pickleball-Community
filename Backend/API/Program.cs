@@ -31,7 +31,8 @@ builder.Services.Configure<FileStorageOptions>(
 
 // Database
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection"),
+        sqlOptions => sqlOptions.UseCompatibilityLevel(120)));
 
 // Authentication - Accept tokens from both local and shared auth
 var jwtKey = builder.Configuration["Jwt:Key"];
