@@ -36,7 +36,7 @@ self.addEventListener('push', function(event) {
       { action: 'dismiss', title: 'Dismiss' }
     ],
     requireInteraction: false,
-    tag: data.tag || 'pickleball-notification'
+    tag: data.tag || `pickleball-${Date.now()}`
   };
 
   event.waitUntil(
