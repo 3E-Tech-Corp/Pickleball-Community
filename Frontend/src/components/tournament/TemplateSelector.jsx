@@ -33,6 +33,8 @@ export default function TemplateSelector({ divisionId, unitCount = 8, onApply, o
   const [applying, setApplying] = useState(false);
   const [customUnitCount, setCustomUnitCount] = useState(unitCount);
 
+  const [activeTab, setActiveTab] = useState('my'); // 'my' | 'system'
+
   useEffect(() => {
     fetchTemplates();
   }, [unitCount]);
@@ -40,10 +42,25 @@ export default function TemplateSelector({ divisionId, unitCount = 8, onApply, o
   const fetchTemplates = async () => {
     try {
       setLoading(true);
-      // Get all templates, then filter by unit count on frontend for better UX
-      const response = await tournamentApi.getPhaseTemplates();
-      // Response is the array directly (axios interceptor returns response.data)
-      setTemplates(Array.isArray(response) ? response : (response?.data || response || []));
+      // Get both system templates and user's own templates
+      const [systemResponse, myResponse] = await Promise.all([
+        tournamentApi.getPhaseTemplates(),
+        tournamentApi.getMyPhaseTemplates().catch(() => []) // User might not be logged in
+      ]);
+      
+      const systemTemplates = (Array.isArray(systemResponse) ? systemResponse : (systemResponse?.data || systemResponse || []))
+        .map(t => ({ ...t, isSystem: true }));
+      const myTemplates = (Array.isArray(myResponse) ? myResponse : (myResponse?.data || myResponse || []))
+        .map(t => ({ ...t, isSystem: false }));
+      
+      setTemplates([...myTemplates, ...systemTemplates]);
+      
+      // Default to 'my' tab if user has templates, otherwise 'system'
+      if (myTemplates.length > 0) {
+        setActiveTab('my');
+      } else {
+        setActiveTab('system');
+      }
     } catch (err) {
       setError('Failed to load templates');
       console.error('Error fetching templates:', err);
@@ -167,23 +184,46 @@ export default function TemplateSelector({ divisionId, unitCount = 8, onApply, o
         <div className="flex-1 overflow-hidden flex">
           {/* Template List */}
           <div className="w-1/2 border-r overflow-y-auto p-4">
+            {/* Tab toggle: My Templates / System Templates */}
+            <div className="flex gap-1 p-1 bg-gray-100 rounded-lg mb-4">
+              <button
+                onClick={() => setActiveTab('my')}
+                className={`flex-1 px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                  activeTab === 'my' ? 'bg-white shadow text-purple-700' : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                My Templates ({templates.filter(t => !t.isSystem).length})
+              </button>
+              <button
+                onClick={() => setActiveTab('system')}
+                className={`flex-1 px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                  activeTab === 'system' ? 'bg-white shadow text-purple-700' : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                System ({templates.filter(t => t.isSystem).length})
+              </button>
+            </div>
+
             {/* Quick recommendations */}
-            {suitableTemplates.length > 0 && (
+            {suitableTemplates.filter(t => activeTab === 'my' ? !t.isSystem : t.isSystem).length > 0 && (
               <div className="mb-6">
                 <h3 className="text-sm font-medium text-gray-700 mb-2 flex items-center">
                   <Zap className="w-4 h-4 mr-1 text-yellow-500" />
                   Recommended for {customUnitCount || unitCount} teams
                 </h3>
                 <div className="grid gap-2">
-                  {suitableTemplates.slice(0, 4).map(template => (
-                    <TemplateCard
-                      key={template.id}
-                      template={template}
-                      isSelected={selectedTemplate?.id === template.id}
-                      onSelect={() => handleSelectTemplate(template)}
-                      recommended
-                    />
-                  ))}
+                  {suitableTemplates
+                    .filter(t => activeTab === 'my' ? !t.isSystem : t.isSystem)
+                    .slice(0, 4)
+                    .map(template => (
+                      <TemplateCard
+                        key={template.id}
+                        template={template}
+                        isSelected={selectedTemplate?.id === template.id}
+                        onSelect={() => handleSelectTemplate(template)}
+                        recommended
+                      />
+                    ))}
                 </div>
               </div>
             )}
@@ -191,6 +231,9 @@ export default function TemplateSelector({ divisionId, unitCount = 8, onApply, o
             {/* All templates by category */}
             <h3 className="text-sm font-medium text-gray-700 mb-2">All Formats</h3>
             {Object.entries(groupedTemplates).map(([category, categoryTemplates]) => {
+              const filteredTemplates = categoryTemplates.filter(t => activeTab === 'my' ? !t.isSystem : t.isSystem);
+              if (filteredTemplates.length === 0) return null;
+              
               const categoryInfo = CATEGORY_INFO[category] || CATEGORY_INFO.Custom;
               const isExpanded = expandedCategories.includes(category);
 
@@ -209,12 +252,12 @@ export default function TemplateSelector({ divisionId, unitCount = 8, onApply, o
                       <categoryInfo.icon className={`w-4 h-4 mr-2 ${categoryInfo.color}`} />
                       <span className="font-medium text-gray-700">{categoryInfo.label}</span>
                     </div>
-                    <span className="text-xs text-gray-400">{categoryTemplates.length}</span>
+                    <span className="text-xs text-gray-400">{filteredTemplates.length}</span>
                   </button>
 
                   {isExpanded && (
                     <div className="ml-6 mt-1 space-y-1">
-                      {categoryTemplates.map(template => (
+                      {filteredTemplates.map(template => (
                         <TemplateCard
                           key={template.id}
                           template={template}
@@ -228,6 +271,15 @@ export default function TemplateSelector({ divisionId, unitCount = 8, onApply, o
                 </div>
               );
             })}
+            
+            {/* Empty state for My Templates */}
+            {activeTab === 'my' && templates.filter(t => !t.isSystem).length === 0 && (
+              <div className="text-center py-8 text-gray-500">
+                <FileText className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                <p className="font-medium">No custom templates yet</p>
+                <p className="text-sm mt-1">Create templates in "My Templates" to see them here</p>
+              </div>
+            )}
           </div>
 
           {/* Preview Panel */}
