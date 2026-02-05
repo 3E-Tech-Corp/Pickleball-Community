@@ -858,7 +858,28 @@ export const venuesApi = {
     if (longitude) params.append('longitude', longitude);
     if (topN) params.append('topN', topN);
     return api.get(`/venues/top-for-events?${params.toString()}`);
-  }
+  },
+
+  // Get nearby venues that need verification (Phase 3)
+  getNeedsVerification: (latitude, longitude, radiusMiles = 50, maxResults = 20) => {
+    const params = new URLSearchParams();
+    if (latitude) params.append('latitude', latitude);
+    if (longitude) params.append('longitude', longitude);
+    params.append('radiusMiles', radiusMiles);
+    params.append('maxResults', maxResults);
+    return api.get(`/venues/needs-verification?${params.toString()}`);
+  },
+
+  // Admin: Run auto-flag stored procedure (Phase 4)
+  runAutoFlag: () => api.post('/venues/admin/run-auto-flag'),
+
+  // Admin: Get flagged venues for review (Phase 4)
+  getFlaggedVenues: (page = 1, pageSize = 20) =>
+    api.get(`/venues/admin/flagged?page=${page}&pageSize=${pageSize}`),
+
+  // Admin: Update venue data quality (approve/reject) (Phase 4)
+  updateVenueQuality: (venueId, dataQuality) =>
+    api.put(`/venues/admin/${venueId}/quality`, { dataQuality })
 }
 
 // Backward compatibility alias

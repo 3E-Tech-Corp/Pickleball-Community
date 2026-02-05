@@ -58,6 +58,7 @@ public class VenuesController : ControllerBase
                 command.Parameters.Add(new SqlParameter("@UserLng", SqlDbType.Float) { Value = (object?)request.Longitude ?? DBNull.Value });
                 command.Parameters.Add(new SqlParameter("@RadiusMiles", SqlDbType.Float) { Value = (object?)request.RadiusMiles ?? DBNull.Value });
                 command.Parameters.Add(new SqlParameter("@VenueTypeId", SqlDbType.Int) { Value = (object?)request.VenueTypeId ?? DBNull.Value });
+                command.Parameters.Add(new SqlParameter("@DataQuality", SqlDbType.TinyInt) { Value = (object?)request.DataQuality ?? DBNull.Value });
                 command.Parameters.Add(new SqlParameter("@SortBy", SqlDbType.NVarChar, 20) { Value = (object?)request.SortBy ?? DBNull.Value });
                 command.Parameters.Add(new SqlParameter("@SortOrder", SqlDbType.NVarChar, 4) { Value = (object?)request.SortOrder ?? "asc" });
                 command.Parameters.Add(new SqlParameter("@Page", SqlDbType.Int) { Value = request.Page });
@@ -86,6 +87,9 @@ public class VenuesController : ControllerBase
                         Latitude = reader.IsDBNull(reader.GetOrdinal("Latitude")) ? null : reader.GetDouble(reader.GetOrdinal("Latitude")),
                         Longitude = reader.IsDBNull(reader.GetOrdinal("Longitude")) ? null : reader.GetDouble(reader.GetOrdinal("Longitude")),
                         Distance = reader.IsDBNull(reader.GetOrdinal("Distance")) ? null : reader.GetDouble(reader.GetOrdinal("Distance")),
+                        DataQuality = reader.GetByte(reader.GetOrdinal("DataQuality")),
+                        LastVerifiedAt = reader.IsDBNull(reader.GetOrdinal("LastVerifiedAt")) ? null : reader.GetDateTime(reader.GetOrdinal("LastVerifiedAt")),
+                        VerificationCount = reader.GetInt32(reader.GetOrdinal("VerificationCount")),
                         AggregatedInfo = new VenueAggregatedInfoDto
                         {
                             ConfirmationCount = reader.GetInt32(reader.GetOrdinal("ConfirmationCount")),
@@ -312,7 +316,10 @@ public class VenuesController : ControllerBase
                         HasLights = reader.GetInt32(reader.GetOrdinal("HasLights")) == 1,
                         Latitude = reader.IsDBNull(reader.GetOrdinal("Latitude")) ? null : reader.GetDouble(reader.GetOrdinal("Latitude")),
                         Longitude = reader.IsDBNull(reader.GetOrdinal("Longitude")) ? null : reader.GetDouble(reader.GetOrdinal("Longitude")),
-                        Distance = reader.IsDBNull(reader.GetOrdinal("Distance")) ? null : reader.GetDouble(reader.GetOrdinal("Distance"))
+                        Distance = reader.IsDBNull(reader.GetOrdinal("Distance")) ? null : reader.GetDouble(reader.GetOrdinal("Distance")),
+                        DataQuality = reader.GetByte(reader.GetOrdinal("DataQuality")),
+                        LastVerifiedAt = reader.IsDBNull(reader.GetOrdinal("LastVerifiedAt")) ? null : reader.GetDateTime(reader.GetOrdinal("LastVerifiedAt")),
+                        VerificationCount = reader.GetInt32(reader.GetOrdinal("VerificationCount"))
                     };
                 }
 
@@ -486,6 +493,8 @@ public class VenuesController : ControllerBase
             var existingConfirmation = await _context.VenueConfirmations
                 .FirstOrDefaultAsync(vc => vc.VenueId == id && vc.UserId == userId.Value);
 
+            bool isNewConfirmation = false;
+
             if (existingConfirmation != null)
             {
                 existingConfirmation.NameConfirmed = dto.NameConfirmed ?? existingConfirmation.NameConfirmed;
@@ -509,18 +518,10 @@ public class VenuesController : ControllerBase
                 if (dto.Amenities != null)
                     existingConfirmation.Amenities = string.Join(",", dto.Amenities);
                 existingConfirmation.UpdatedAt = DateTime.Now;
-
-                await _context.SaveChangesAsync();
-
-                return Ok(new ApiResponse<VenueConfirmationDto>
-                {
-                    Success = true,
-                    Message = "Confirmation updated",
-                    Data = MapToConfirmationDto(existingConfirmation)
-                });
             }
             else
             {
+                isNewConfirmation = true;
                 var confirmation = new VenueConfirmation
                 {
                     VenueId = id,
@@ -547,15 +548,44 @@ public class VenuesController : ControllerBase
                 };
 
                 _context.VenueConfirmations.Add(confirmation);
-                await _context.SaveChangesAsync();
-
-                return Ok(new ApiResponse<VenueConfirmationDto>
-                {
-                    Success = true,
-                    Message = "Confirmation submitted",
-                    Data = MapToConfirmationDto(confirmation)
-                });
+                existingConfirmation = confirmation;
             }
+
+            // Update venue verification tracking
+            if (isNewConfirmation)
+            {
+                venue.VerificationCount++;
+            }
+            venue.LastVerifiedAt = DateTime.Now;
+
+            // Update DataQuality: Unverified -> Confirmed on first confirmation
+            if (venue.DataQuality == 0)
+            {
+                venue.DataQuality = 1; // Confirmed
+            }
+
+            await _context.SaveChangesAsync();
+
+            // Phase 4: Auto-flag/reject based on NotACourt consensus
+            var notACourtCount = await _context.VenueConfirmations
+                .CountAsync(vc => vc.VenueId == id && vc.NotACourt == true);
+            if (notACourtCount >= 5 && venue.DataQuality != 3)
+            {
+                venue.DataQuality = 3; // Rejected
+                await _context.SaveChangesAsync();
+            }
+            else if (notACourtCount >= 3 && venue.DataQuality < 2)
+            {
+                venue.DataQuality = 2; // Flagged
+                await _context.SaveChangesAsync();
+            }
+
+            return Ok(new ApiResponse<VenueConfirmationDto>
+            {
+                Success = true,
+                Message = isNewConfirmation ? "Confirmation submitted" : "Confirmation updated",
+                Data = MapToConfirmationDto(existingConfirmation)
+            });
         }
         catch (Exception ex)
         {
@@ -958,6 +988,237 @@ public class VenuesController : ControllerBase
         {
             _logger.LogError(ex, "Error adding venue");
             return StatusCode(500, new ApiResponse<VenueDto> { Success = false, Message = "An error occurred" });
+        }
+    }
+
+    // GET: /venues/needs-verification - Get nearby venues that need verification
+    [HttpGet("needs-verification")]
+    public async Task<ActionResult<ApiResponse<NeedsVerificationResponse>>> GetNeedsVerification(
+        [FromQuery] double? latitude,
+        [FromQuery] double? longitude,
+        [FromQuery] double radiusMiles = 50,
+        [FromQuery] int maxResults = 20)
+    {
+        try
+        {
+            var venues = new List<NeedsVerificationVenueDto>();
+            int totalUnverifiedCount = 0;
+
+            var connection = _context.Database.GetDbConnection();
+            await connection.OpenAsync();
+
+            try
+            {
+                using var command = connection.CreateCommand();
+                command.CommandText = "sp_GetNeedsVerification";
+                command.CommandType = CommandType.StoredProcedure;
+
+                command.Parameters.Add(new SqlParameter("@UserLat", SqlDbType.Float) { Value = (object?)latitude ?? DBNull.Value });
+                command.Parameters.Add(new SqlParameter("@UserLng", SqlDbType.Float) { Value = (object?)longitude ?? DBNull.Value });
+                command.Parameters.Add(new SqlParameter("@RadiusMiles", SqlDbType.Float) { Value = radiusMiles });
+                command.Parameters.Add(new SqlParameter("@MaxResults", SqlDbType.Int) { Value = maxResults });
+
+                using var reader = await command.ExecuteReaderAsync();
+                while (await reader.ReadAsync())
+                {
+                    venues.Add(new NeedsVerificationVenueDto
+                    {
+                        Id = reader.GetInt32(reader.GetOrdinal("VenueId")),
+                        Name = reader.IsDBNull(reader.GetOrdinal("Name")) ? null : reader.GetString(reader.GetOrdinal("Name")),
+                        Address = reader.IsDBNull(reader.GetOrdinal("Address")) ? null : reader.GetString(reader.GetOrdinal("Address")),
+                        City = reader.IsDBNull(reader.GetOrdinal("City")) ? null : reader.GetString(reader.GetOrdinal("City")),
+                        State = reader.IsDBNull(reader.GetOrdinal("State")) ? null : reader.GetString(reader.GetOrdinal("State")),
+                        Country = reader.IsDBNull(reader.GetOrdinal("Country")) ? null : reader.GetString(reader.GetOrdinal("Country")),
+                        IndoorNum = reader.IsDBNull(reader.GetOrdinal("IndoorNum")) ? null : reader.GetInt32(reader.GetOrdinal("IndoorNum")),
+                        OutdoorNum = reader.IsDBNull(reader.GetOrdinal("OutdoorNum")) ? null : reader.GetInt32(reader.GetOrdinal("OutdoorNum")),
+                        HasLights = reader.GetInt32(reader.GetOrdinal("HasLights")) == 1,
+                        Latitude = reader.IsDBNull(reader.GetOrdinal("Latitude")) ? null : reader.GetDouble(reader.GetOrdinal("Latitude")),
+                        Longitude = reader.IsDBNull(reader.GetOrdinal("Longitude")) ? null : reader.GetDouble(reader.GetOrdinal("Longitude")),
+                        DataQuality = reader.GetByte(reader.GetOrdinal("DataQuality")),
+                        VerificationCount = reader.GetInt32(reader.GetOrdinal("VerificationCount")),
+                        LastVerifiedAt = reader.IsDBNull(reader.GetOrdinal("LastVerifiedAt")) ? null : reader.GetDateTime(reader.GetOrdinal("LastVerifiedAt")),
+                        Distance = reader.IsDBNull(reader.GetOrdinal("Distance")) ? null : reader.GetDouble(reader.GetOrdinal("Distance"))
+                    });
+                    totalUnverifiedCount = reader.GetInt32(reader.GetOrdinal("TotalUnverifiedCount"));
+                }
+            }
+            finally
+            {
+                await connection.CloseAsync();
+            }
+
+            return Ok(new ApiResponse<NeedsVerificationResponse>
+            {
+                Success = true,
+                Data = new NeedsVerificationResponse
+                {
+                    Venues = venues,
+                    TotalUnverifiedCount = totalUnverifiedCount
+                }
+            });
+        }
+        catch (SqlException ex) when (ex.Message.Contains("Could not find stored procedure"))
+        {
+            _logger.LogWarning("sp_GetNeedsVerification not found, returning empty");
+            return Ok(new ApiResponse<NeedsVerificationResponse>
+            {
+                Success = true,
+                Data = new NeedsVerificationResponse(),
+                Message = "Please run migration 150"
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error fetching needs-verification venues");
+            return StatusCode(500, new ApiResponse<NeedsVerificationResponse> { Success = false, Message = "An error occurred" });
+        }
+    }
+
+    // POST: /venues/admin/run-auto-flag - Run auto-flag stored procedure (admin only)
+    [HttpPost("admin/run-auto-flag")]
+    [Authorize(Roles = "Admin")]
+    public async Task<ActionResult<ApiResponse<int>>> RunAutoFlag()
+    {
+        try
+        {
+            var connection = _context.Database.GetDbConnection();
+            await connection.OpenAsync();
+
+            try
+            {
+                using var command = connection.CreateCommand();
+                command.CommandText = "sp_AutoFlagVenues";
+                command.CommandType = CommandType.StoredProcedure;
+
+                using var reader = await command.ExecuteReaderAsync();
+                int totalFlagged = 0;
+                if (await reader.ReadAsync())
+                {
+                    totalFlagged = reader.GetInt32(reader.GetOrdinal("TotalFlagged"));
+                }
+
+                _logger.LogInformation("Auto-flag run: {Count} venues flagged", totalFlagged);
+
+                return Ok(new ApiResponse<int>
+                {
+                    Success = true,
+                    Data = totalFlagged,
+                    Message = $"Auto-flagged {totalFlagged} venues"
+                });
+            }
+            finally
+            {
+                await connection.CloseAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error running auto-flag");
+            return StatusCode(500, new ApiResponse<int> { Success = false, Message = "An error occurred" });
+        }
+    }
+
+    // GET: /venues/admin/flagged - Get flagged venues for admin review
+    [HttpGet("admin/flagged")]
+    [Authorize(Roles = "Admin")]
+    public async Task<ActionResult<ApiResponse<PagedResult<FlaggedVenueDto>>>> GetFlaggedVenues(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20)
+    {
+        try
+        {
+            var venues = new List<FlaggedVenueDto>();
+            int totalCount = 0;
+
+            var connection = _context.Database.GetDbConnection();
+            await connection.OpenAsync();
+
+            try
+            {
+                using var command = connection.CreateCommand();
+                command.CommandText = "sp_GetFlaggedVenues";
+                command.CommandType = CommandType.StoredProcedure;
+
+                command.Parameters.Add(new SqlParameter("@Page", SqlDbType.Int) { Value = page });
+                command.Parameters.Add(new SqlParameter("@PageSize", SqlDbType.Int) { Value = pageSize });
+
+                using var reader = await command.ExecuteReaderAsync();
+                while (await reader.ReadAsync())
+                {
+                    venues.Add(new FlaggedVenueDto
+                    {
+                        Id = reader.GetInt32(reader.GetOrdinal("VenueId")),
+                        Name = reader.IsDBNull(reader.GetOrdinal("Name")) ? null : reader.GetString(reader.GetOrdinal("Name")),
+                        Address = reader.IsDBNull(reader.GetOrdinal("Address")) ? null : reader.GetString(reader.GetOrdinal("Address")),
+                        City = reader.IsDBNull(reader.GetOrdinal("City")) ? null : reader.GetString(reader.GetOrdinal("City")),
+                        State = reader.IsDBNull(reader.GetOrdinal("State")) ? null : reader.GetString(reader.GetOrdinal("State")),
+                        Country = reader.IsDBNull(reader.GetOrdinal("Country")) ? null : reader.GetString(reader.GetOrdinal("Country")),
+                        DataQuality = reader.GetByte(reader.GetOrdinal("DataQuality")),
+                        VerificationCount = reader.GetInt32(reader.GetOrdinal("VerificationCount")),
+                        LastVerifiedAt = reader.IsDBNull(reader.GetOrdinal("LastVerifiedAt")) ? null : reader.GetDateTime(reader.GetOrdinal("LastVerifiedAt")),
+                        Latitude = reader.IsDBNull(reader.GetOrdinal("Latitude")) ? null : reader.GetDouble(reader.GetOrdinal("Latitude")),
+                        Longitude = reader.IsDBNull(reader.GetOrdinal("Longitude")) ? null : reader.GetDouble(reader.GetOrdinal("Longitude")),
+                        NotACourtCount = reader.GetInt32(reader.GetOrdinal("NotACourtCount")),
+                        ConfirmationCount = reader.GetInt32(reader.GetOrdinal("ConfirmationCount"))
+                    });
+                    totalCount = reader.GetInt32(reader.GetOrdinal("TotalCount"));
+                }
+            }
+            finally
+            {
+                await connection.CloseAsync();
+            }
+
+            return Ok(new ApiResponse<PagedResult<FlaggedVenueDto>>
+            {
+                Success = true,
+                Data = new PagedResult<FlaggedVenueDto>
+                {
+                    Items = venues,
+                    TotalCount = totalCount,
+                    Page = page,
+                    PageSize = pageSize
+                }
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error fetching flagged venues");
+            return StatusCode(500, new ApiResponse<PagedResult<FlaggedVenueDto>> { Success = false, Message = "An error occurred" });
+        }
+    }
+
+    // PUT: /venues/admin/{id}/quality - Update venue data quality (admin approve/reject)
+    [HttpPut("admin/{id}/quality")]
+    [Authorize(Roles = "Admin")]
+    public async Task<ActionResult<ApiResponse<bool>>> UpdateVenueQuality(int id, [FromBody] AdminVenueQualityRequest request)
+    {
+        try
+        {
+            var venue = await _context.Venues.FindAsync(id);
+            if (venue == null)
+                return NotFound(new ApiResponse<bool> { Success = false, Message = "Venue not found" });
+
+            if (request.DataQuality != 1 && request.DataQuality != 3)
+                return BadRequest(new ApiResponse<bool> { Success = false, Message = "DataQuality must be 1 (approve) or 3 (reject)" });
+
+            venue.DataQuality = (byte)request.DataQuality;
+            await _context.SaveChangesAsync();
+
+            var action = request.DataQuality == 1 ? "approved" : "rejected";
+            _logger.LogInformation("Admin {Action} venue {VenueId}", action, id);
+
+            return Ok(new ApiResponse<bool>
+            {
+                Success = true,
+                Data = true,
+                Message = $"Venue {action} successfully"
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating venue quality for {VenueId}", id);
+            return StatusCode(500, new ApiResponse<bool> { Success = false, Message = "An error occurred" });
         }
     }
 

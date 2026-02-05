@@ -22,6 +22,9 @@ public class VenueDto
     public double? Latitude { get; set; }
     public double? Longitude { get; set; }
     public double? Distance { get; set; } // Calculated distance from user
+    public int DataQuality { get; set; } // 0=Unverified, 1=Confirmed, 2=Flagged, 3=Rejected
+    public DateTime? LastVerifiedAt { get; set; }
+    public int VerificationCount { get; set; }
     public VenueAggregatedInfoDto? AggregatedInfo { get; set; }
 }
 
@@ -117,6 +120,7 @@ public class VenueSearchRequest
     public int? VenueTypeId { get; set; }
     public bool? HasLights { get; set; }
     public bool? IsIndoor { get; set; }
+    public int? DataQuality { get; set; } // Filter by data quality: 0=Unverified, 1=Confirmed, 2=Flagged, 3=Rejected
     // Map bounds for viewport-based search
     public double? MinLat { get; set; }
     public double? MaxLat { get; set; }
@@ -225,6 +229,56 @@ public class AddVenueRequest
     public int? VenueTypeId { get; set; }
     public double Latitude { get; set; }
     public double Longitude { get; set; }
+}
+
+// Needs verification response
+public class NeedsVerificationResponse
+{
+    public List<NeedsVerificationVenueDto> Venues { get; set; } = new();
+    public int TotalUnverifiedCount { get; set; }
+}
+
+public class NeedsVerificationVenueDto
+{
+    public int Id { get; set; }
+    public string? Name { get; set; }
+    public string? Address { get; set; }
+    public string? City { get; set; }
+    public string? State { get; set; }
+    public string? Country { get; set; }
+    public int? IndoorNum { get; set; }
+    public int? OutdoorNum { get; set; }
+    public bool HasLights { get; set; }
+    public double? Latitude { get; set; }
+    public double? Longitude { get; set; }
+    public int DataQuality { get; set; }
+    public int VerificationCount { get; set; }
+    public DateTime? LastVerifiedAt { get; set; }
+    public double? Distance { get; set; }
+}
+
+// Flagged venues for admin review
+public class FlaggedVenueDto
+{
+    public int Id { get; set; }
+    public string? Name { get; set; }
+    public string? Address { get; set; }
+    public string? City { get; set; }
+    public string? State { get; set; }
+    public string? Country { get; set; }
+    public int DataQuality { get; set; }
+    public int VerificationCount { get; set; }
+    public DateTime? LastVerifiedAt { get; set; }
+    public double? Latitude { get; set; }
+    public double? Longitude { get; set; }
+    public int NotACourtCount { get; set; }
+    public int ConfirmationCount { get; set; }
+}
+
+// Admin venue quality action
+public class AdminVenueQualityRequest
+{
+    public int DataQuality { get; set; } // 1=Confirmed (approve), 3=Rejected (reject)
 }
 
 // Top venues for event creation (returned by sp_GetTopVenuesForUser)

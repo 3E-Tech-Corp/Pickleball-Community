@@ -77,6 +77,11 @@ export default function Venues() {
   const [showSearchAreaButton, setShowSearchAreaButton] = useState(false);
   const mapInitializedRef = useRef(false); // Track if map has finished initial load
 
+  // Needs Verification (Phase 3)
+  const [needsVerification, setNeedsVerification] = useState([]);
+  const [totalUnverifiedCount, setTotalUnverifiedCount] = useState(0);
+  const [verifyBannerDismissed, setVerifyBannerDismissed] = useState(false);
+
   // Check if location permission is blocked
   const [locationBlocked, setLocationBlocked] = useState(false);
 
@@ -350,6 +355,23 @@ export default function Venues() {
     loadCourts();
   }, [loadCourts]);
 
+  // Load needs-verification venues (Phase 3)
+  useEffect(() => {
+    if (!userLocation || verifyBannerDismissed) return;
+    const loadNeedsVerification = async () => {
+      try {
+        const response = await venuesApi.getNeedsVerification(userLocation.lat, userLocation.lng, 50, 5);
+        if (response.success && response.data) {
+          setNeedsVerification(response.data.venues || []);
+          setTotalUnverifiedCount(response.data.totalUnverifiedCount || 0);
+        }
+      } catch (err) {
+        console.error('Error loading needs-verification:', err);
+      }
+    };
+    loadNeedsVerification();
+  }, [userLocation, verifyBannerDismissed]);
+
   // Handle map bounds change - show "Search this area" button
   const handleMapBoundsChange = useCallback((bounds) => {
     setPendingBounds(bounds);
@@ -412,8 +434,24 @@ export default function Venues() {
     setSortOrder('asc');
   };
 
+  // Track which tab to open the modal on
+  const [initialModalTab, setInitialModalTab] = useState('details');
+
   const handleViewDetails = async (court) => {
     try {
+      setInitialModalTab('details');
+      const response = await venuesApi.getCourt(court.id, userLocation?.lat, userLocation?.lng);
+      if (response.success) {
+        setSelectedCourt(response.data);
+      }
+    } catch (err) {
+      console.error('Error loading court details:', err);
+    }
+  };
+
+  const handleViewDetailsConfirm = async (court) => {
+    try {
+      setInitialModalTab('confirm');
       const response = await venuesApi.getCourt(court.id, userLocation?.lat, userLocation?.lng);
       if (response.success) {
         setSelectedCourt(response.data);
@@ -758,6 +796,39 @@ export default function Venues() {
           </div>
         </div>
 
+        {/* Help Verify Nearby Banner (Phase 3) */}
+        {!verifyBannerDismissed && needsVerification.length > 0 && isAuthenticated && (
+          <div className="mb-4 bg-amber-50 border border-amber-200 rounded-xl p-4">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <span className="text-amber-600 text-lg">🔍</span>
+                <div>
+                  <h3 className="font-semibold text-amber-900 text-sm">Help Verify Nearby</h3>
+                  <p className="text-xs text-amber-700">{totalUnverifiedCount} unverified venue{totalUnverifiedCount !== 1 ? 's' : ''} near you</p>
+                </div>
+              </div>
+              <button onClick={() => setVerifyBannerDismissed(true)} className="p-1 text-amber-400 hover:text-amber-600">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="flex gap-3 overflow-x-auto pb-1">
+              {needsVerification.slice(0, 5).map(venue => (
+                <div key={venue.id} className="flex-shrink-0 w-52 bg-white rounded-lg border border-amber-100 p-3">
+                  <h4 className="font-medium text-gray-900 text-sm truncate">{venue.name || 'Unnamed Venue'}</h4>
+                  <p className="text-xs text-gray-500 truncate">{[venue.city, venue.state].filter(Boolean).join(', ')}</p>
+                  {venue.distance && <p className="text-xs text-green-600 mt-0.5">{venue.distance.toFixed(1)} mi away</p>}
+                  <button
+                    onClick={() => handleViewDetailsConfirm(venue)}
+                    className="mt-2 w-full py-1.5 bg-amber-500 text-white rounded-lg text-xs font-medium hover:bg-amber-600 transition-colors"
+                  >
+                    ✓ Verify
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Results Count */}
         {!loading && venues.length > 0 && (
           <div className="mb-4 text-sm text-gray-600">
@@ -1023,11 +1094,12 @@ export default function Venues() {
         <CourtDetailModal
           court={selectedCourt}
           isAuthenticated={isAuthenticated}
-          onClose={() => setSelectedCourt(null)}
+          onClose={() => { setSelectedCourt(null); setInitialModalTab('details'); }}
           onConfirmationSubmitted={(updatedCourt) => {
             setSelectedCourt(updatedCourt);
             loadCourts();
           }}
+          initialTab={initialModalTab}
         />
       )}
 
@@ -1122,14 +1194,22 @@ function CourtCard({ court, onViewDetails }) {
           )}
         </div>
 
-        {court.aggregatedInfo?.confirmationCount > 0 && (
-          <div className="mt-3 pt-3 border-t text-xs text-gray-500 flex items-center gap-1">
-            <MessageSquare className="w-3 h-3" />
-            {court.aggregatedInfo.confirmationCount} user confirmation{court.aggregatedInfo.confirmationCount !== 1 ? 's' : ''}
-          </div>
-        )}
+        {/* Verification Badge */}
+        <div className="mt-3 pt-3 border-t">
+          {court.verificationCount > 0 ? (
+            <div className="flex items-center gap-1 text-xs text-green-600">
+              <CheckCircle className="w-3.5 h-3.5" />
+              <span className="font-medium">Verified by {court.verificationCount} player{court.verificationCount !== 1 ? 's' : ''}</span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-1 text-xs text-amber-500">
+              <span>&#9888;</span>
+              <span className="font-medium">Unverified</span>
+            </div>
+          )}
+        </div>
 
-        <div className="mt-4">
+        <div className="mt-3">
           <button
             onClick={onViewDetails}
             className="w-full py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors"
@@ -1142,8 +1222,8 @@ function CourtCard({ court, onViewDetails }) {
   );
 }
 
-function CourtDetailModal({ court, isAuthenticated, onClose, onConfirmationSubmitted }) {
-  const [activeTab, setActiveTab] = useState('details');
+function CourtDetailModal({ court, isAuthenticated, onClose, onConfirmationSubmitted, initialTab = 'details' }) {
+  const [activeTab, setActiveTab] = useState(initialTab);
   const [submitting, setSubmitting] = useState(false);
 
   // Asset state
@@ -1292,7 +1372,7 @@ function CourtDetailModal({ court, isAuthenticated, onClose, onConfirmationSubmi
   };
 
   const handleSubmitConfirmation = async (e) => {
-    e.preventDefault();
+    if (e?.preventDefault) e.preventDefault();
     if (!isAuthenticated) return;
 
     setSubmitting(true);
@@ -1337,10 +1417,30 @@ function CourtDetailModal({ court, isAuthenticated, onClose, onConfirmationSubmi
       <div className="bg-white rounded-xl shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <div className="sticky top-0 bg-white px-6 py-4 border-b flex items-center justify-between z-10">
           <div>
-            <h2 className="text-xl font-semibold text-gray-900">{court.name || 'Unnamed Venue'}</h2>
+            <div className="flex items-center gap-2">
+              <h2 className="text-xl font-semibold text-gray-900">{court.name || 'Unnamed Venue'}</h2>
+              {court.verificationCount > 0 ? (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-green-100 text-green-700 text-xs font-medium rounded-full">
+                  <CheckCircle className="w-3 h-3" /> Verified
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-100 text-amber-700 text-xs font-medium rounded-full">
+                  ⚠ Unverified
+                </span>
+              )}
+            </div>
             <p className="text-sm text-gray-500">
               {court.city}{court.state && `, ${court.state}`}
               {court.distance && ` - ${court.distance.toFixed(1)} miles away`}
+              {court.lastVerifiedAt && (() => {
+                const d = new Date(court.lastVerifiedAt);
+                const now = new Date();
+                const diffDays = Math.floor((now - d) / 86400000);
+                if (diffDays === 0) return ' - Last verified today';
+                if (diffDays === 1) return ' - Last verified yesterday';
+                if (diffDays < 30) return ` - Last verified ${diffDays} days ago`;
+                return ` - Last verified ${d.toLocaleDateString()}`;
+              })()}
             </p>
           </div>
           <button onClick={onClose} className="p-2 text-gray-400 hover:text-gray-600 rounded-lg">
@@ -1527,312 +1627,306 @@ function CourtDetailModal({ court, isAuthenticated, onClose, onConfirmationSubmi
                   <p className="text-gray-500">Help keep venue information accurate by confirming or updating details.</p>
                 </div>
               ) : (
-                <form onSubmit={handleSubmitConfirmation} className="space-y-6">
-                  {/* Not A Court Flag */}
-                  <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
-                    <label className="flex items-center gap-3 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={formData.notACourt === true}
-                        onChange={(e) => setFormData({ ...formData, notACourt: e.target.checked || null })}
-                        className="w-5 h-5 text-red-600 border-gray-300 rounded focus:ring-red-500"
-                      />
-                      <div>
-                        <span className="font-medium text-red-700">This venue no longer has pickleball courts</span>
-                        <p className="text-sm text-red-600">Check this if the location no longer has pickleball courts (closed, converted, etc.)</p>
-                      </div>
-                    </label>
-                    {agg.notACourtCount > 0 && (
-                      <p className="mt-2 text-sm text-red-500">
-                        {agg.notACourtCount} user{agg.notACourtCount !== 1 ? 's have' : ' has'} flagged this as not a court
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Name Confirmation */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Is the court name "{court.name || 'Unnamed'}" correct?
-                    </label>
-                    <div className="flex gap-4">
-                      <label className="flex items-center gap-2">
-                        <input
-                          type="radio"
-                          checked={formData.nameConfirmed === true}
-                          onChange={() => setFormData({ ...formData, nameConfirmed: true, suggestedName: '' })}
-                          className="text-green-600"
-                        />
-                        <span>Yes</span>
-                      </label>
-                      <label className="flex items-center gap-2">
-                        <input
-                          type="radio"
-                          checked={formData.nameConfirmed === false}
-                          onChange={() => setFormData({ ...formData, nameConfirmed: false })}
-                          className="text-green-600"
-                        />
-                        <span>No, suggest different name</span>
-                      </label>
-                    </div>
-                    {formData.nameConfirmed === false && (
-                      <input
-                        type="text"
-                        placeholder="Enter the correct name..."
-                        value={formData.suggestedName}
-                        onChange={(e) => setFormData({ ...formData, suggestedName: e.target.value })}
-                        className="mt-2 w-full border border-gray-300 rounded-lg p-2 focus:ring-green-500 focus:border-green-500"
-                      />
-                    )}
-                    {agg.mostSuggestedName && (
-                      <p className="mt-2 text-sm text-gray-500">
-                        Most suggested name: <span className="font-medium text-gray-700">{agg.mostSuggestedName}</span>
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Court Count */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Number of Courts</label>
-                    <div className="grid grid-cols-3 gap-4">
-                      <div>
-                        <label className="block text-xs text-gray-500 mb-1">Indoor</label>
-                        <input
-                          type="number"
-                          min="0"
-                          placeholder={court.indoorNum?.toString() || '0'}
-                          value={formData.confirmedIndoorCount}
-                          onChange={(e) => setFormData({ ...formData, confirmedIndoorCount: e.target.value })}
-                          className="w-full border border-gray-300 rounded-lg p-2 focus:ring-green-500 focus:border-green-500"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs text-gray-500 mb-1">Outdoor</label>
-                        <input
-                          type="number"
-                          min="0"
-                          placeholder={court.outdoorNum?.toString() || '0'}
-                          value={formData.confirmedOutdoorCount}
-                          onChange={(e) => setFormData({ ...formData, confirmedOutdoorCount: e.target.value })}
-                          className="w-full border border-gray-300 rounded-lg p-2 focus:ring-green-500 focus:border-green-500"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs text-gray-500 mb-1">Covered</label>
-                        <input
-                          type="number"
-                          min="0"
-                          placeholder={court.coveredNum?.toString() || '0'}
-                          value={formData.confirmedCoveredCount}
-                          onChange={(e) => setFormData({ ...formData, confirmedCoveredCount: e.target.value })}
-                          className="w-full border border-gray-300 rounded-lg p-2 focus:ring-green-500 focus:border-green-500"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Address Confirmation */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Confirm Address</label>
-                    <div className="space-y-2">
-                      <input
-                        type="text"
-                        placeholder={court.address || 'Street address...'}
-                        value={formData.confirmedAddress}
-                        onChange={(e) => setFormData({ ...formData, confirmedAddress: e.target.value })}
-                        className="w-full border border-gray-300 rounded-lg p-2 focus:ring-green-500 focus:border-green-500"
-                      />
-                      <div className="grid grid-cols-3 gap-2">
-                        <input
-                          type="text"
-                          placeholder={court.city || 'City...'}
-                          value={formData.confirmedCity}
-                          onChange={(e) => setFormData({ ...formData, confirmedCity: e.target.value })}
-                          className="w-full border border-gray-300 rounded-lg p-2 focus:ring-green-500 focus:border-green-500"
-                        />
-                        <input
-                          type="text"
-                          placeholder={court.state || 'State...'}
-                          value={formData.confirmedState}
-                          onChange={(e) => setFormData({ ...formData, confirmedState: e.target.value })}
-                          className="w-full border border-gray-300 rounded-lg p-2 focus:ring-green-500 focus:border-green-500"
-                        />
-                        <input
-                          type="text"
-                          placeholder={court.country || 'Country...'}
-                          value={formData.confirmedCountry}
-                          onChange={(e) => setFormData({ ...formData, confirmedCountry: e.target.value })}
-                          className="w-full border border-gray-300 rounded-lg p-2 focus:ring-green-500 focus:border-green-500"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Lights & Fee */}
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Has Lights?</label>
-                      <div className="flex gap-4">
-                        <label className="flex items-center gap-2">
-                          <input
-                            type="radio"
-                            checked={formData.hasLights === true}
-                            onChange={() => setFormData({ ...formData, hasLights: true })}
-                            className="text-green-600"
-                          />
-                          <span>Yes</span>
-                        </label>
-                        <label className="flex items-center gap-2">
-                          <input
-                            type="radio"
-                            checked={formData.hasLights === false}
-                            onChange={() => setFormData({ ...formData, hasLights: false })}
-                            className="text-green-600"
-                          />
-                          <span>No</span>
-                        </label>
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Has Fee?</label>
-                      <div className="flex gap-4">
-                        <label className="flex items-center gap-2">
-                          <input
-                            type="radio"
-                            checked={formData.hasFee === true}
-                            onChange={() => setFormData({ ...formData, hasFee: true })}
-                            className="text-green-600"
-                          />
-                          <span>Yes</span>
-                        </label>
-                        <label className="flex items-center gap-2">
-                          <input
-                            type="radio"
-                            checked={formData.hasFee === false}
-                            onChange={() => setFormData({ ...formData, hasFee: false })}
-                            className="text-green-600"
-                          />
-                          <span>No</span>
-                        </label>
-                      </div>
-                    </div>
-                  </div>
-
-                  {formData.hasFee && (
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Fee Amount</label>
-                        <input
-                          type="text"
-                          placeholder="e.g., $5/hour"
-                          value={formData.feeAmount}
-                          onChange={(e) => setFormData({ ...formData, feeAmount: e.target.value })}
-                          className="w-full border border-gray-300 rounded-lg p-2 focus:ring-green-500 focus:border-green-500"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Fee Notes</label>
-                        <input
-                          type="text"
-                          placeholder="e.g., Free for members"
-                          value={formData.feeNotes}
-                          onChange={(e) => setFormData({ ...formData, feeNotes: e.target.value })}
-                          className="w-full border border-gray-300 rounded-lg p-2 focus:ring-green-500 focus:border-green-500"
-                        />
-                      </div>
+                <div className="space-y-4">
+                  {/* Verification Status Badge */}
+                  {court.verificationCount > 0 && (
+                    <div className="flex items-center gap-2 px-3 py-2 bg-green-50 border border-green-200 rounded-lg text-sm">
+                      <CheckCircle className="w-4 h-4 text-green-600" />
+                      <span className="text-green-700 font-medium">Verified by {court.verificationCount} player{court.verificationCount !== 1 ? 's' : ''}</span>
+                      {court.lastVerifiedAt && (
+                        <span className="text-green-600 ml-auto">
+                          Last: {(() => {
+                            const d = new Date(court.lastVerifiedAt);
+                            const now = new Date();
+                            const diffMs = now - d;
+                            const diffDays = Math.floor(diffMs / 86400000);
+                            if (diffDays === 0) return 'today';
+                            if (diffDays === 1) return 'yesterday';
+                            if (diffDays < 30) return `${diffDays} days ago`;
+                            return d.toLocaleDateString();
+                          })()}
+                        </span>
+                      )}
                     </div>
                   )}
 
-                  {/* Hours */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Hours</label>
-                    <input
-                      type="text"
-                      placeholder="e.g., Dawn to Dusk, 6AM-10PM"
-                      value={formData.hours}
-                      onChange={(e) => setFormData({ ...formData, hours: e.target.value })}
-                      className="w-full border border-gray-300 rounded-lg p-2 focus:ring-green-500 focus:border-green-500"
-                    />
-                  </div>
-
-                  {/* Surface Type */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Surface Type</label>
-                    <select
-                      value={formData.surfaceType}
-                      onChange={(e) => setFormData({ ...formData, surfaceType: e.target.value })}
-                      className="w-full border border-gray-300 rounded-lg p-2 focus:ring-green-500 focus:border-green-500"
-                    >
-                      <option value="">Select surface type...</option>
-                      {SURFACE_TYPES.filter(s => s.value !== 'all').map(s => (
-                        <option key={s.value} value={s.value}>{s.label}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Amenities */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Amenities</label>
-                    <div className="flex flex-wrap gap-2">
-                      {AMENITY_OPTIONS.map(amenity => (
-                        <button
-                          key={amenity}
-                          type="button"
-                          onClick={() => toggleAmenity(amenity)}
-                          className={`px-3 py-1 rounded-full text-sm transition-colors ${
-                            formData.amenities.includes(amenity)
-                              ? 'bg-green-600 text-white'
-                              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                          }`}
-                        >
-                          {amenity.replace(/_/g, ' ')}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Rating */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Your Rating</label>
-                    <div className="flex gap-2">
-                      {[1, 2, 3, 4, 5].map(star => (
-                        <button
-                          key={star}
-                          type="button"
-                          onClick={() => setFormData({ ...formData, rating: star })}
-                          className="p-1"
-                        >
-                          <Star
-                            className={`w-8 h-8 ${
-                              star <= (formData.rating || 0)
-                                ? 'text-yellow-500 fill-current'
-                                : 'text-gray-300 hover:text-yellow-400'
-                            }`}
-                          />
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Notes */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Additional Notes</label>
-                    <textarea
-                      value={formData.notes}
-                      onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                      rows={3}
-                      placeholder="Any other information about this court..."
-                      className="w-full border border-gray-300 rounded-lg p-2 focus:ring-green-500 focus:border-green-500"
-                    />
-                  </div>
-
+                  {/* Quick Confirm Button */}
                   <button
-                    type="submit"
+                    type="button"
                     disabled={submitting}
+                    onClick={async () => {
+                      setSubmitting(true);
+                      try {
+                        const response = await venuesApi.submitConfirmation(court.id, { nameConfirmed: true });
+                        if (response.success) {
+                          const updatedCourt = await venuesApi.getCourt(court.id);
+                          if (updatedCourt.success) onConfirmationSubmitted(updatedCourt.data);
+                          setActiveTab('details');
+                        }
+                      } catch (err) { console.error('Error:', err); }
+                      finally { setSubmitting(false); }
+                    }}
+                    className="w-full py-3 bg-green-600 text-white rounded-xl font-semibold text-lg hover:bg-green-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                  >
+                    {submitting ? 'Submitting...' : 'Everything looks right 👍'}
+                  </button>
+
+                  <p className="text-center text-xs text-gray-400">Or answer specific questions below</p>
+
+                  {/* Quick-tap Cards */}
+                  <div className="space-y-3">
+
+                    {/* Is this a real pickleball venue? */}
+                    <div className="p-4 bg-white border border-gray-200 rounded-xl">
+                      <div className="flex items-center justify-between">
+                        <span className="font-medium text-gray-900 text-sm">Is this a real pickleball venue?</span>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setFormData(prev => ({ ...prev, notACourt: false }))}
+                            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${formData.notACourt === false ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+                          >
+                            ✅ Yes
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setFormData(prev => ({ ...prev, notACourt: true }))}
+                            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${formData.notACourt === true ? 'bg-red-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+                          >
+                            ❌ No
+                          </button>
+                        </div>
+                      </div>
+                      {agg.notACourtCount > 0 && (
+                        <p className="mt-2 text-xs text-red-500">{agg.notACourtCount} player{agg.notACourtCount !== 1 ? 's' : ''} flagged as not a court</p>
+                      )}
+                    </div>
+
+                    {/* Is the name correct? */}
+                    <div className="p-4 bg-white border border-gray-200 rounded-xl">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="font-medium text-gray-900 text-sm">Is the name correct?</span>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setFormData(prev => ({ ...prev, nameConfirmed: true, suggestedName: '' }))}
+                            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${formData.nameConfirmed === true ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+                          >
+                            ✅ Yes
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setFormData(prev => ({ ...prev, nameConfirmed: false }))}
+                            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${formData.nameConfirmed === false ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+                          >
+                            ✏️ Suggest
+                          </button>
+                        </div>
+                      </div>
+                      <p className="text-xs text-gray-500 mb-1">Current: "{court.name || 'Unnamed Venue'}"</p>
+                      {formData.nameConfirmed === false && (
+                        <input
+                          type="text"
+                          placeholder="Enter the correct name..."
+                          value={formData.suggestedName}
+                          onChange={(e) => setFormData(prev => ({ ...prev, suggestedName: e.target.value }))}
+                          className="mt-2 w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-green-500 focus:border-green-500"
+                        />
+                      )}
+                      {agg.mostSuggestedName && (
+                        <p className="mt-1 text-xs text-gray-500">Most suggested: <span className="font-medium">{agg.mostSuggestedName}</span></p>
+                      )}
+                    </div>
+
+                    {/* How many courts? */}
+                    <div className="p-4 bg-white border border-gray-200 rounded-xl">
+                      <span className="font-medium text-gray-900 text-sm block mb-3">How many courts?</span>
+                      <div className="grid grid-cols-3 gap-3">
+                        {[
+                          { label: 'Indoor', key: 'confirmedIndoorCount', current: agg.mostConfirmedIndoorCount ?? court.indoorNum ?? 0 },
+                          { label: 'Outdoor', key: 'confirmedOutdoorCount', current: agg.mostConfirmedOutdoorCount ?? court.outdoorNum ?? 0 },
+                          { label: 'Covered', key: 'confirmedCoveredCount', current: court.coveredNum ?? 0 }
+                        ].map(({ label, key, current }) => (
+                          <div key={key} className="text-center">
+                            <p className="text-xs text-gray-500 mb-1">{label}</p>
+                            <div className="flex items-center justify-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => setFormData(prev => ({ ...prev, [key]: Math.max(0, (prev[key] !== '' ? parseInt(prev[key]) : current) - 1).toString() }))}
+                                className="w-8 h-8 rounded-lg bg-gray-100 text-gray-700 font-bold hover:bg-gray-200 flex items-center justify-center"
+                              >-</button>
+                              <span className="w-8 text-center font-semibold text-gray-900">
+                                {formData[key] !== '' ? formData[key] : current}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => setFormData(prev => ({ ...prev, [key]: ((prev[key] !== '' ? parseInt(prev[key]) : current) + 1).toString() }))}
+                                className="w-8 h-8 rounded-lg bg-gray-100 text-gray-700 font-bold hover:bg-gray-200 flex items-center justify-center"
+                              >+</button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Has lights? */}
+                    <div className="p-4 bg-white border border-gray-200 rounded-xl">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <span className="font-medium text-gray-900 text-sm">Has lights?</span>
+                          {agg.mostConfirmedHasLights !== null && agg.mostConfirmedHasLights !== undefined && (
+                            <p className="text-xs text-gray-500">{agg.confirmationCount || 0} players say {agg.mostConfirmedHasLights ? 'Yes' : 'No'}</p>
+                          )}
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setFormData(prev => ({ ...prev, hasLights: true }))}
+                            className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${formData.hasLights === true ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+                          >Yes</button>
+                          <button
+                            type="button"
+                            onClick={() => setFormData(prev => ({ ...prev, hasLights: false }))}
+                            className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${formData.hasLights === false ? 'bg-gray-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+                          >No</button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Free to play? */}
+                    <div className="p-4 bg-white border border-gray-200 rounded-xl">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <span className="font-medium text-gray-900 text-sm">Free to play?</span>
+                          {agg.mostConfirmedHasFee !== null && agg.mostConfirmedHasFee !== undefined && (
+                            <p className="text-xs text-gray-500">Community says: {agg.mostConfirmedHasFee ? 'Paid' : 'Free'}</p>
+                          )}
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setFormData(prev => ({ ...prev, hasFee: false }))}
+                            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${formData.hasFee === false ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+                          >Free</button>
+                          <button
+                            type="button"
+                            onClick={() => setFormData(prev => ({ ...prev, hasFee: true }))}
+                            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${formData.hasFee === true ? 'bg-orange-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+                          >Paid</button>
+                        </div>
+                      </div>
+                      {formData.hasFee && (
+                        <div className="mt-2 grid grid-cols-2 gap-2">
+                          <input type="text" placeholder="Fee amount (e.g. $5/hr)" value={formData.feeAmount}
+                            onChange={(e) => setFormData(prev => ({ ...prev, feeAmount: e.target.value }))}
+                            className="border border-gray-300 rounded-lg p-2 text-sm focus:ring-green-500 focus:border-green-500" />
+                          <input type="text" placeholder="Notes (e.g. free for members)" value={formData.feeNotes}
+                            onChange={(e) => setFormData(prev => ({ ...prev, feeNotes: e.target.value }))}
+                            className="border border-gray-300 rounded-lg p-2 text-sm focus:ring-green-500 focus:border-green-500" />
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Rate this venue */}
+                    <div className="p-4 bg-white border border-gray-200 rounded-xl">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <span className="font-medium text-gray-900 text-sm">Rate this venue</span>
+                          {agg.averageRating && <p className="text-xs text-gray-500">Avg: {agg.averageRating.toFixed(1)}/5</p>}
+                        </div>
+                        <div className="flex gap-1">
+                          {[1, 2, 3, 4, 5].map(star => (
+                            <button key={star} type="button" onClick={() => setFormData(prev => ({ ...prev, rating: star }))} className="p-0.5">
+                              <Star className={`w-7 h-7 ${star <= (formData.rating || 0) ? 'text-yellow-500 fill-current' : 'text-gray-300 hover:text-yellow-400'}`} />
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Surface type */}
+                    <div className="p-4 bg-white border border-gray-200 rounded-xl">
+                      <span className="font-medium text-gray-900 text-sm block mb-2">Surface type?</span>
+                      {agg.commonSurfaceType && <p className="text-xs text-gray-500 mb-2">Community says: {agg.commonSurfaceType}</p>}
+                      <div className="flex flex-wrap gap-2">
+                        {SURFACE_TYPES.filter(s => s.value !== 'all').map(s => (
+                          <button
+                            key={s.value}
+                            type="button"
+                            onClick={() => setFormData(prev => ({ ...prev, surfaceType: prev.surfaceType === s.value ? '' : s.value }))}
+                            className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${formData.surfaceType === s.value ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+                          >{s.label}</button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Amenities */}
+                    <div className="p-4 bg-white border border-gray-200 rounded-xl">
+                      <span className="font-medium text-gray-900 text-sm block mb-2">Amenities?</span>
+                      <div className="flex flex-wrap gap-2">
+                        {AMENITY_OPTIONS.map(amenity => (
+                          <button
+                            key={amenity}
+                            type="button"
+                            onClick={() => toggleAmenity(amenity)}
+                            className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors capitalize ${
+                              formData.amenities.includes(amenity) ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                            }`}
+                          >{amenity.replace(/_/g, ' ')}</button>
+                        ))}
+                      </div>
+                    </div>
+
+                  </div>
+
+                  {/* More Details - Expandable */}
+                  <details className="border border-gray-200 rounded-xl overflow-hidden">
+                    <summary className="px-4 py-3 bg-gray-50 cursor-pointer font-medium text-sm text-gray-700 hover:bg-gray-100">
+                      More details (hours, address, notes)
+                    </summary>
+                    <div className="p-4 space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Hours</label>
+                        <input type="text" placeholder="e.g., Dawn to Dusk, 6AM-10PM" value={formData.hours}
+                          onChange={(e) => setFormData(prev => ({ ...prev, hours: e.target.value }))}
+                          className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-green-500 focus:border-green-500" />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Address Correction</label>
+                        <input type="text" placeholder={court.address || 'Street address...'} value={formData.confirmedAddress}
+                          onChange={(e) => setFormData(prev => ({ ...prev, confirmedAddress: e.target.value }))}
+                          className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-green-500 focus:border-green-500" />
+                        <div className="grid grid-cols-3 gap-2 mt-2">
+                          <input type="text" placeholder={court.city || 'City'} value={formData.confirmedCity}
+                            onChange={(e) => setFormData(prev => ({ ...prev, confirmedCity: e.target.value }))}
+                            className="border border-gray-300 rounded-lg p-2 text-sm focus:ring-green-500 focus:border-green-500" />
+                          <input type="text" placeholder={court.state || 'State'} value={formData.confirmedState}
+                            onChange={(e) => setFormData(prev => ({ ...prev, confirmedState: e.target.value }))}
+                            className="border border-gray-300 rounded-lg p-2 text-sm focus:ring-green-500 focus:border-green-500" />
+                          <input type="text" placeholder={court.country || 'Country'} value={formData.confirmedCountry}
+                            onChange={(e) => setFormData(prev => ({ ...prev, confirmedCountry: e.target.value }))}
+                            className="border border-gray-300 rounded-lg p-2 text-sm focus:ring-green-500 focus:border-green-500" />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Additional Notes</label>
+                        <textarea value={formData.notes} onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
+                          rows={3} placeholder="Any other information..."
+                          className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-green-500 focus:border-green-500" />
+                      </div>
+                    </div>
+                  </details>
+
+                  {/* Submit Button */}
+                  <button
+                    type="button"
+                    disabled={submitting}
+                    onClick={handleSubmitConfirmation}
                     className="w-full py-3 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors disabled:opacity-50"
                   >
                     {submitting ? 'Submitting...' : court.myConfirmation ? 'Update Verification' : 'Submit Confirmation'}
                   </button>
-                </form>
+                </div>
               )}
             </div>
           )}

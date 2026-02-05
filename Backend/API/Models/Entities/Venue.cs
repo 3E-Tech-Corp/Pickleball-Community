@@ -84,6 +84,13 @@ public class Venue
     [Column("VenueTypeId")]
     public int? VenueTypeId { get; set; }
 
+    // Data quality tracking (0=Unverified, 1=Confirmed, 2=Flagged, 3=Rejected)
+    public byte DataQuality { get; set; } = 0;
+
+    public DateTime? LastVerifiedAt { get; set; }
+
+    public int VerificationCount { get; set; } = 0;
+
     // Navigation properties
     public VenueType? VenueType { get; set; }
     public ICollection<VenueGeoCode>? GeoCodes { get; set; }
