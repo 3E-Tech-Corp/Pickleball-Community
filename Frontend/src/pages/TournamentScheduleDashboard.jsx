@@ -133,10 +133,16 @@ export default function TournamentScheduleDashboard() {
   const handleAutoAssignAll = async () => {
     try {
       setBusy(true)
-      // Use server-side scheduling for each division that has court groups
+      // Use server-side scheduling for each division that has court groups AND encounters
       const results = []
+      const skipped = []
       for (const div of data.divisions) {
-        if (!div.assignedCourtGroups?.length) continue
+        // Skip divisions without court groups or without encounters
+        const divEncounters = encounters.filter(e => e.divisionId === div.id)
+        if (!div.assignedCourtGroups?.length || divEncounters.length === 0) {
+          skipped.push(div.name)
+          continue
+        }
         try {
           const res = await tournamentApi.schedulingGenerate({
             eventId: parseInt(eventId),
@@ -144,13 +150,22 @@ export default function TournamentScheduleDashboard() {
             clearExisting: true,
             respectPlayerOverlap: true,
           })
-          results.push({ div: div.name, ...res.data })
+          if (res.success) {
+            results.push({ div: div.name, ...res.data })
+          }
         } catch (err) {
-          results.push({ div: div.name, success: false, message: err.message })
+          // Silently skip divisions that can't be scheduled (no encounters, bad config, etc.)
+          console.warn(`Auto-schedule skipped ${div.name}:`, err.response?.data?.message || err.message)
+          skipped.push(div.name)
         }
       }
       const totalAssigned = results.reduce((s, r) => s + (r.assignedCount || 0), 0)
-      toast.success(`Auto-scheduled ${totalAssigned} encounters across ${results.length} divisions`)
+      const msg = `Scheduled ${totalAssigned} encounters across ${results.length} division${results.length !== 1 ? 's' : ''}`
+      if (skipped.length > 0) {
+        toast.success(`${msg} (skipped ${skipped.length}: no courts/encounters)`)
+      } else {
+        toast.success(msg)
+      }
       await loadAll()
     } catch (err) {
       toast.error('Auto-schedule failed')
@@ -169,11 +184,18 @@ export default function TournamentScheduleDashboard() {
         respectPlayerOverlap: true,
       })
       if (res.success) {
-        toast.success(res.data?.message || `Assigned ${res.data?.assignedCount || 0} encounters`)
+        const count = res.data?.assignedCount || 0
+        const conflicts = res.data?.conflicts?.length || 0
+        let msg = `Assigned ${count} encounters`
+        if (conflicts > 0) msg += ` (${conflicts} conflict${conflicts !== 1 ? 's' : ''})`
+        toast.success(msg)
       }
       await loadAll()
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to auto-schedule division')
+      const msg = err.response?.data?.message || 'Failed to auto-schedule division'
+      toast.error(msg.includes('No encounters') || msg.includes('No courts')
+        ? `Cannot schedule: ${msg}`
+        : msg)
     } finally {
       setBusy(false)
     }
@@ -190,11 +212,13 @@ export default function TournamentScheduleDashboard() {
         respectPlayerOverlap: true,
       })
       if (res.success) {
-        toast.success(res.data?.message || 'Phase scheduled')
+        const count = res.data?.assignedCount || 0
+        toast.success(`Phase scheduled: ${count} encounters assigned`)
       }
       await loadAll()
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to schedule phase')
+      const msg = err.response?.data?.message || 'Failed to schedule phase'
+      toast.error(msg)
     } finally {
       setBusy(false)
     }
