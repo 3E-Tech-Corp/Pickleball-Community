@@ -406,14 +406,19 @@ public class SchedulingService : ISchedulingService, ICourtAssignmentService
             var sortedEncounters = SortEncountersByPriority(encountersToSchedule);
 
             // 9. Determine start time and match settings per division
+            // Now phase-aware: different phases can have different encounter durations
+            // based on MatchesPerEncounter, BestOf settings, and PhaseMatchSettings
             var divisionSettings = new Dictionary<int, (DateTime startTime, int matchDuration, int restTime)>();
+            // Phase-specific encounter durations (divisionId, phaseId) -> encounter duration in minutes
+            var phaseEncounterDurations = new Dictionary<(int divisionId, int? phaseId), int>();
+
             foreach (var division in divisions)
             {
                 var startTime = request.StartTime
                     ?? division.Phases?.OrderBy(p => p.PhaseOrder).FirstOrDefault()?.StartTime
                     ?? evt.StartDate.Date.AddHours(8);
 
-                var matchDuration = request.MatchDurationMinutes
+                var baseDivisionDuration = request.MatchDurationMinutes
                     ?? division.EstimatedMatchDurationMinutes
                     ?? 20;
 
@@ -421,7 +426,24 @@ public class SchedulingService : ISchedulingService, ICourtAssignmentService
                     ?? division.MinRestTimeMinutes
                     ?? 15;
 
-                divisionSettings[division.Id] = (startTime, matchDuration, restTime);
+                divisionSettings[division.Id] = (startTime, baseDivisionDuration, restTime);
+
+                // Pre-calculate encounter durations for each phase in this division
+                // This accounts for MatchesPerEncounter and per-phase BestOf settings
+                if (division.Phases != null)
+                {
+                    foreach (var phase in division.Phases)
+                    {
+                        var duration = await CalculateEncounterDurationMinutesAsync(
+                            // Use a representative encounter (any from this phase) or create a dummy
+                            encountersToSchedule.FirstOrDefault(e => e.PhaseId == phase.Id)
+                                ?? new EventEncounter { DivisionId = division.Id, PhaseId = phase.Id },
+                            division, phase);
+                        phaseEncounterDurations[(division.Id, phase.Id)] = duration;
+                    }
+                }
+                // Also cache the division-level default (for encounters without a phase)
+                phaseEncounterDurations[(division.Id, null)] = baseDivisionDuration;
             }
 
             // 10. Initialize availability trackers
@@ -516,13 +538,19 @@ public class SchedulingService : ISchedulingService, ICourtAssignmentService
                     continue;
                 }
 
-                var (divStartTime, matchDuration, restMinutes) = divisionSettings.ContainsKey(encounter.DivisionId)
+                var (divStartTime, baseDuration, restMinutes) = divisionSettings.ContainsKey(encounter.DivisionId)
                     ? divisionSettings[encounter.DivisionId]
                     : (evt.StartDate.Date.AddHours(8), 20, 15);
 
+                // Use phase-aware encounter duration (accounts for matches per encounter + BestOf)
+                var encounterDuration = phaseEncounterDurations.TryGetValue(
+                    (encounter.DivisionId, encounter.PhaseId), out var cachedDuration)
+                    ? cachedDuration
+                    : baseDuration;
+
                 // Find earliest available slot
                 var bestSlot = FindEarliestSlot(
-                    encounter, courts, matchDuration, restMinutes,
+                    encounter, courts, encounterDuration, restMinutes,
                     courtNextAvailable, unitNextAvailable, playerNextAvailable,
                     playerUnitMap, roundCompletionTimes,
                     request.RespectPlayerOverlap, divStartTime);
@@ -543,7 +571,7 @@ public class SchedulingService : ISchedulingService, ICourtAssignmentService
 
                 encounter.TournamentCourtId = courtId;
                 encounter.EstimatedStartTime = startTime;
-                encounter.EstimatedDurationMinutes = matchDuration;
+                encounter.EstimatedDurationMinutes = encounterDuration;
                 encounter.EstimatedEndTime = endTime;
                 encounter.UpdatedAt = DateTime.Now;
 
@@ -989,10 +1017,6 @@ public class SchedulingService : ISchedulingService, ICourtAssignmentService
         if (!phase.StartTime.HasValue)
             return new TimeCalculationResult { Success = false, Message = "Phase start time not set" };
 
-        var matchDuration = phase.EstimatedMatchDurationMinutes
-            ?? phase.Division?.EstimatedMatchDurationMinutes
-            ?? 20;
-
         var restTime = phase.Division?.MinRestTimeMinutes ?? 15;
 
         var encounters = await _context.EventEncounters
@@ -1004,6 +1028,11 @@ public class SchedulingService : ISchedulingService, ICourtAssignmentService
 
         if (!encounters.Any())
             return new TimeCalculationResult { Success = false, Message = "No encounters with courts assigned" };
+
+        // Calculate encounter duration for this phase
+        // (accounts for matches per encounter, BestOf per phase, match format BestOf)
+        var encounterDuration = await CalculateEncounterDurationMinutesAsync(
+            encounters.First(), phase.Division!, phase);
 
         // Calculate times per court, respecting unit rest times
         var courtTimes = new Dictionary<int, DateTime>();
@@ -1029,14 +1058,14 @@ public class SchedulingService : ISchedulingService, ICourtAssignmentService
             var startTime = MaxDateTime(earliestCourtTime, earliestUnitTime);
 
             encounter.EstimatedStartTime = startTime;
-            encounter.EstimatedDurationMinutes = matchDuration;
-            encounter.EstimatedEndTime = startTime.AddMinutes(matchDuration);
+            encounter.EstimatedDurationMinutes = encounterDuration;
+            encounter.EstimatedEndTime = startTime.AddMinutes(encounterDuration);
             encounter.UpdatedAt = DateTime.Now;
 
-            courtTimes[courtId] = startTime.AddMinutes(matchDuration);
+            courtTimes[courtId] = startTime.AddMinutes(encounterDuration);
 
             // Update unit availability with rest
-            var afterRest = startTime.AddMinutes(matchDuration + restTime);
+            var afterRest = startTime.AddMinutes(encounterDuration + restTime);
             if (encounter.Unit1Id.HasValue)
                 unitNextAvail[encounter.Unit1Id.Value] = afterRest;
             if (encounter.Unit2Id.HasValue)
@@ -1055,14 +1084,16 @@ public class SchedulingService : ISchedulingService, ICourtAssignmentService
             await _context.SaveChangesAsync();
         }
 
-        _logger.LogInformation("Calculated times for {Count} encounters in phase {PhaseId}", updated, phaseId);
+        _logger.LogInformation(
+            "Calculated times for {Count} encounters in phase {PhaseId} ({Duration}min/encounter)",
+            updated, phaseId, encounterDuration);
 
         return new TimeCalculationResult
         {
             Success = true,
             UpdatedCount = updated,
             EstimatedEndTime = estimatedEndTime,
-            Message = $"Calculated times for {updated} encounters"
+            Message = $"Calculated times for {updated} encounters ({encounterDuration}min each)"
         };
     }
 
@@ -1074,6 +1105,93 @@ public class SchedulingService : ISchedulingService, ICourtAssignmentService
     public async Task<List<TournamentCourt>> GetAvailableCourtsForDivisionAsync(int divisionId, int? phaseId = null)
     {
         return await GetAvailableCourtsAsync(divisionId, phaseId);
+    }
+
+    /// <inheritdoc />
+    public async Task<int> CalculateEncounterDurationMinutesAsync(
+        EventEncounter encounter, EventDivision division, DivisionPhase? phase)
+    {
+        // Base per-game duration: phase override > division override > 20 min default
+        var gameDuration = phase?.EstimatedMatchDurationMinutes
+            ?? division.EstimatedMatchDurationMinutes
+            ?? 20;
+
+        // Get match formats for this division (defines how many matches per encounter)
+        var matchFormats = await _context.EncounterMatchFormats
+            .Where(f => f.DivisionId == division.Id && f.IsActive)
+            .OrderBy(f => f.SortOrder)
+            .ToListAsync();
+
+        // Get phase-specific match settings (BestOf overrides per phase)
+        List<PhaseMatchSettings>? phaseSettings = null;
+        if (phase != null)
+        {
+            phaseSettings = await _context.PhaseMatchSettings
+                .Where(s => s.PhaseId == phase.Id)
+                .ToListAsync();
+        }
+
+        int totalDuration;
+
+        if (matchFormats.Count > 0)
+        {
+            // Multi-match encounter: sum duration of each match format
+            totalDuration = 0;
+            foreach (var format in matchFormats)
+            {
+                var bestOf = ResolveEffectiveBestOf(format, phase, phaseSettings, division);
+                totalDuration += bestOf * gameDuration;
+            }
+        }
+        else if (division.MatchesPerEncounter > 1)
+        {
+            // Division says multiple matches but no explicit formats defined
+            var bestOf = phase?.BestOf ?? division.GamesPerMatch;
+            if (bestOf < 1) bestOf = 1;
+            totalDuration = division.MatchesPerEncounter * bestOf * gameDuration;
+        }
+        else
+        {
+            // Simple single-match encounter
+            var bestOf = phase?.BestOf ?? division.GamesPerMatch;
+            if (bestOf < 1) bestOf = 1;
+            totalDuration = bestOf * gameDuration;
+        }
+
+        return totalDuration;
+    }
+
+    /// <summary>
+    /// Resolve the effective BestOf for a specific match format within a phase.
+    /// Priority: PhaseMatchSettings(format) > PhaseMatchSettings(null) > Phase.BestOf > Format.BestOf > Division.GamesPerMatch > 1
+    /// </summary>
+    private static int ResolveEffectiveBestOf(
+        EncounterMatchFormat format,
+        DivisionPhase? phase,
+        List<PhaseMatchSettings>? phaseSettings,
+        EventDivision division)
+    {
+        if (phaseSettings != null && phaseSettings.Count > 0)
+        {
+            var formatSetting = phaseSettings.FirstOrDefault(s => s.MatchFormatId == format.Id);
+            if (formatSetting != null && formatSetting.BestOf > 0)
+                return formatSetting.BestOf;
+
+            var phaseSetting = phaseSettings.FirstOrDefault(s => s.MatchFormatId == null);
+            if (phaseSetting != null && phaseSetting.BestOf > 0)
+                return phaseSetting.BestOf;
+        }
+
+        if (phase?.BestOf.HasValue == true && phase.BestOf.Value > 0)
+            return phase.BestOf.Value;
+
+        if (format.BestOf > 0)
+            return format.BestOf;
+
+        if (division.GamesPerMatch > 0)
+            return division.GamesPerMatch;
+
+        return 1;
     }
 
     // =====================================================
