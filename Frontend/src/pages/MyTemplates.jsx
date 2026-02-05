@@ -3,7 +3,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { tournamentApi } from '../services/api'
 import {
   Layers, Plus, Edit2, Trash2, X, RefreshCw, AlertTriangle, Copy,
-  Code, Save, GitBranch, Trophy,
+  Code, Save, GitBranch, Trophy, Users,
   ArrowLeft, Search, Settings
 } from 'lucide-react'
 import Navigation from '../components/ui/Navigation'
