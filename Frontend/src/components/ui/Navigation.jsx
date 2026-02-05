@@ -216,7 +216,6 @@ const Navigation = () => {
       icon: HomeIcon,
       isDashboard: true
     },
-    { name: t('myTemplates') || 'My Templates', href: '/my-templates', icon: Layers },
     { name: t('profile'), href: '/profile', icon: User },
     { name: t('messages'), href: '/messages', icon: MessageCircle },
     { name: t('notifications'), href: '/notifications', icon: Bell },

@@ -3862,6 +3862,16 @@ export default function TournamentManage() {
                           View Schedule
                         </Link>
                       )}
+
+                      {/* My Templates - TD can create/manage their own phase templates */}
+                      <Link
+                        to="/my-templates"
+                        className="px-3 py-2 text-sm font-medium text-purple-600 border border-purple-300 rounded-lg hover:bg-purple-50 flex items-center gap-2"
+                        title="Create or manage your own phase templates"
+                      >
+                        <Layers className="w-4 h-4" />
+                        My Templates
+                      </Link>
                     </div>
                   )}
                 </div>
