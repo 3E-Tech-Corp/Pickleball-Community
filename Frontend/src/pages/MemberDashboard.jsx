@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import {
-  Settings, Loader2, Users, Calendar, Building2, Trophy, Eye, UserPlus
+  Settings, Loader2, Users, Calendar, Building2, Trophy, Eye, UserPlus, Layers
 } from 'lucide-react'
 import { userApi } from '../services/api'
 import PublicProfileModal from '../components/ui/PublicProfileModal'
@@ -79,6 +79,13 @@ const MemberDashboard = () => {
       icon: Trophy,
       color: 'yellow',
       link: '/history'
+    },
+    {
+      title: 'My Templates',
+      description: 'Create and manage tournament phase templates',
+      icon: Layers,
+      color: 'purple',
+      link: '/my-templates'
     }
   ]
 

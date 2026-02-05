@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Menu, X, LogOut, HomeIcon, School2Icon, User, Bell, FileText, Calendar, MapPin, Users, MessageCircle, HelpCircle, MessageSquarePlus, Network, Zap, Trophy, Video } from 'lucide-react';
+import { Menu, X, LogOut, HomeIcon, School2Icon, User, Bell, FileText, Calendar, MapPin, Users, MessageCircle, HelpCircle, MessageSquarePlus, Network, Zap, Trophy, Video, Layers } from 'lucide-react';
 import api from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { getAssetUrl, getSharedAssetUrl, notificationsApi, leaguesApi } from '../../services/api';
@@ -216,6 +216,7 @@ const Navigation = () => {
       icon: HomeIcon,
       isDashboard: true
     },
+    { name: t('myTemplates') || 'My Templates', href: '/my-templates', icon: Layers },
     { name: t('profile'), href: '/profile', icon: User },
     { name: t('messages'), href: '/messages', icon: MessageCircle },
     { name: t('notifications'), href: '/notifications', icon: Bell },

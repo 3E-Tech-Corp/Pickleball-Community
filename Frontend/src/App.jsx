@@ -67,6 +67,7 @@ import InstaGameMain from './pages/InstaGame/InstaGameMain'
 import VideoRoomList from './pages/VideoRooms/VideoRoomList'
 import VideoRoomJoin from './pages/VideoRooms/VideoRoomJoin'
 import VideoRoomCall from './pages/VideoRooms/VideoRoomCall'
+import MyTemplates from './pages/MyTemplates'
 
 
 function App() {
@@ -214,6 +215,13 @@ function App() {
       <Route path="/my-blog" element={
         <ProtectedRoute>
           <MyBlog />
+        </ProtectedRoute>
+      } />
+
+      {/* My Templates - For TDs to manage their phase templates */}
+      <Route path="/my-templates" element={
+        <ProtectedRoute>
+          <MyTemplates />
         </ProtectedRoute>
       } />
 
