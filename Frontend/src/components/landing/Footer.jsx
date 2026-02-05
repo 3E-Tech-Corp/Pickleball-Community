@@ -57,6 +57,10 @@ const Footer = () => {
       { key: 'support', href: '#' },
       { key: 'becomeACoach', href: '#' },
       { key: 'partnerships', href: '#' }
+    ],
+    legal: [
+      { key: 'privacyPolicy', href: 'https://shared.funtimepb.com/privacy-policy?site=community', external: true },
+      { key: 'termsOfService', href: 'https://shared.funtimepb.com/terms-of-service?site=community', external: true }
     ]
   };
 
@@ -116,6 +120,22 @@ const Footer = () => {
             <ul>
               {footerLinks.contact.map((contact, index) => (
                 <li key={index}><a href="#">{t(`footer.${contact.key}`)}</a></li>
+              ))}
+            </ul>
+          </div>
+          <div className="footer-column">
+            <h3 className="text-xl font-bold mb-4">{t('footer.legal')}</h3>
+            <ul>
+              {footerLinks.legal.map((link, index) => (
+                <li key={index}>
+                  <a
+                    href={link.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    {t(`footer.${link.key}`)}
+                  </a>
+                </li>
               ))}
             </ul>
           </div>
