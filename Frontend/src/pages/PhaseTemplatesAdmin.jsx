@@ -2130,11 +2130,6 @@ const PhaseTemplatesAdmin = ({ embedded = false }) => {
 
   // Load template into form for editing
   const handleEdit = (template) => {
-    if (template.isSystemTemplate) {
-      alert('System templates cannot be edited. Clone it instead to create a custom version.')
-      return
-    }
-
     const structure = typeof template.structureJson === 'string'
       ? template.structureJson
       : JSON.stringify(template.structureJson, null, 2)
@@ -2540,41 +2535,29 @@ const PhaseTemplatesAdmin = ({ embedded = false }) => {
                         >
                           <Copy className="w-4 h-4" />
                         </button>
-                        {template.isSystemTemplate ? (
-                          <>
-                            <button
-                              onClick={() => handleToggleActive(template)}
-                              className={`p-2 rounded-lg ${template.isActive !== false ? 'text-green-500 hover:text-red-600 hover:bg-red-50' : 'text-gray-400 hover:text-green-600 hover:bg-green-50'}`}
-                              title={template.isActive !== false ? 'Disable template' : 'Enable template'}
-                            >
-                              {template.isActive !== false ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
-                            </button>
-                            <button
-                              onClick={() => handleDelete(template)}
-                              className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg"
-                              title="Delete system template"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </>
-                        ) : (
-                          <>
-                            <button
-                              onClick={() => handleEdit(template)}
-                              className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg"
-                              title="Edit template"
-                            >
-                              <Edit2 className="w-4 h-4" />
-                            </button>
-                            <button
-                              onClick={() => handleDelete(template)}
-                              className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg"
-                              title="Delete template"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </>
+                        {template.isSystemTemplate && (
+                          <button
+                            onClick={() => handleToggleActive(template)}
+                            className={`p-2 rounded-lg ${template.isActive !== false ? 'text-green-500 hover:text-red-600 hover:bg-red-50' : 'text-gray-400 hover:text-green-600 hover:bg-green-50'}`}
+                            title={template.isActive !== false ? 'Disable template' : 'Enable template'}
+                          >
+                            {template.isActive !== false ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+                          </button>
                         )}
+                        <button
+                          onClick={() => handleEdit(template)}
+                          className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg"
+                          title="Edit template"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(template)}
+                          className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg"
+                          title="Delete template"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
                         <button
                           onClick={() => toggleExpand(template.id)}
                           className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg ml-2"
