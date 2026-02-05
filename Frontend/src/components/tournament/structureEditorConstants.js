@@ -1,0 +1,198 @@
+/**
+ * Shared constants, defaults, and helper functions for tournament structure editing.
+ * Used by ListPhaseEditor, CanvasPhaseEditor, TournamentStructureEditor, and PhaseTemplatesAdmin.
+ */
+import {
+  GitBranch, RefreshCw, Layers, Trophy, Code, Users, Shuffle, Repeat,
+  Grid3X3, Swords, Target, Award
+} from 'lucide-react'
+
+// ── Category definitions ──
+export const CATEGORIES = [
+  { value: 'SingleElimination', label: 'Single Elimination', icon: GitBranch },
+  { value: 'DoubleElimination', label: 'Double Elimination', icon: GitBranch },
+  { value: 'RoundRobin', label: 'Round Robin', icon: RefreshCw },
+  { value: 'Pools', label: 'Pools', icon: Layers },
+  { value: 'Combined', label: 'Combined (Pools + Bracket)', icon: Trophy },
+  { value: 'Custom', label: 'Custom', icon: Code }
+]
+
+// ── Phase types ──
+export const PHASE_TYPES = [
+  'Draw', 'SingleElimination', 'DoubleElimination', 'RoundRobin', 'Pools', 'BracketRound', 'Swiss', 'Award'
+]
+
+export const BRACKET_TYPES = ['SingleElimination', 'DoubleElimination', 'BracketRound']
+
+export const SEEDING_STRATEGIES = ['CrossPool', 'Sequential', 'Manual']
+
+export const AWARD_TYPES = ['Gold', 'Silver', 'Bronze', 'none']
+
+// ── Default objects ──
+export const DEFAULT_PHASE = {
+  name: 'New Phase',
+  phaseType: 'SingleElimination',
+  sortOrder: 1,
+  incomingSlotCount: 8,
+  advancingSlotCount: 4,
+  poolCount: 0,
+  bestOf: 1,
+  matchDurationMinutes: 30,
+  seedingStrategy: 'Sequential',
+  includeConsolation: false
+}
+
+export const DEFAULT_EXIT_POSITION = { rank: 1, label: 'Champion', awardType: 'Gold' }
+
+export const DEFAULT_ADVANCEMENT_RULE = {
+  sourcePhaseOrder: 1,
+  targetPhaseOrder: 2,
+  finishPosition: 1,
+  targetSlotNumber: 1,
+  sourcePoolIndex: null
+}
+
+// ── Phase type visual config (for canvas editor) ──
+export const PHASE_TYPE_COLORS = {
+  Draw: { bg: 'bg-cyan-500', light: 'bg-cyan-50', border: 'border-cyan-300', text: 'text-cyan-700', hex: '#06b6d4' },
+  SingleElimination: { bg: 'bg-indigo-500', light: 'bg-indigo-50', border: 'border-indigo-300', text: 'text-indigo-700', hex: '#6366f1' },
+  DoubleElimination: { bg: 'bg-purple-500', light: 'bg-purple-50', border: 'border-purple-300', text: 'text-purple-700', hex: '#a855f7' },
+  RoundRobin: { bg: 'bg-green-500', light: 'bg-green-50', border: 'border-green-300', text: 'text-green-700', hex: '#22c55e' },
+  Pools: { bg: 'bg-blue-500', light: 'bg-blue-50', border: 'border-blue-300', text: 'text-blue-700', hex: '#3b82f6' },
+  Swiss: { bg: 'bg-amber-500', light: 'bg-amber-50', border: 'border-amber-300', text: 'text-amber-700', hex: '#f59e0b' },
+  BracketRound: { bg: 'bg-rose-500', light: 'bg-rose-50', border: 'border-rose-300', text: 'text-rose-700', hex: '#f43f5e' },
+  Award: { bg: 'bg-yellow-500', light: 'bg-yellow-50', border: 'border-yellow-300', text: 'text-yellow-700', hex: '#eab308' }
+}
+
+export const PHASE_TYPE_ICONS = {
+  Draw: Users,
+  SingleElimination: GitBranch,
+  DoubleElimination: Swords,
+  RoundRobin: Repeat,
+  Pools: Grid3X3,
+  Swiss: Shuffle,
+  BracketRound: Target,
+  Award: Award
+}
+
+// ── Parse structureJson into visual state ──
+export function parseStructureToVisual(jsonStr) {
+  try {
+    const s = typeof jsonStr === 'string' ? JSON.parse(jsonStr) : jsonStr
+    if (s.isFlexible) {
+      return {
+        isFlexible: true,
+        generateBracket: s.generateBracket || { type: 'SingleElimination', consolation: false, calculateByes: true },
+        exitPositions: Array.isArray(s.exitPositions) ? s.exitPositions : [],
+        phases: [],
+        advancementRules: []
+      }
+    }
+    return {
+      isFlexible: false,
+      generateBracket: { type: 'SingleElimination', consolation: false, calculateByes: true },
+      phases: Array.isArray(s.phases) ? s.phases.map((p, i) => ({
+        name: p.name || `Phase ${i + 1}`,
+        phaseType: p.phaseType || p.type || 'SingleElimination',
+        sortOrder: p.sortOrder || i + 1,
+        incomingSlotCount: p.incomingSlotCount ?? p.incomingSlots ?? 8,
+        advancingSlotCount: p.advancingSlotCount ?? p.exitingSlots ?? 4,
+        poolCount: p.poolCount || 0,
+        bestOf: p.bestOf || 1,
+        matchDurationMinutes: p.matchDurationMinutes || 30,
+        seedingStrategy: p.seedingStrategy || 'Sequential',
+        includeConsolation: p.includeConsolation || p.hasConsolationMatch || false,
+        awardType: p.awardType || null,
+        drawMethod: p.drawMethod || null
+      })) : [],
+      advancementRules: Array.isArray(s.advancementRules) ? s.advancementRules.map(r => ({
+        sourcePhaseOrder: r.sourcePhaseOrder ?? r.fromPhase ?? 1,
+        targetPhaseOrder: r.targetPhaseOrder ?? r.toPhase ?? 2,
+        finishPosition: r.finishPosition ?? r.fromRank ?? 1,
+        targetSlotNumber: r.targetSlotNumber ?? r.toSlot ?? 1,
+        sourcePoolIndex: r.sourcePoolIndex ?? null
+      })) : [],
+      exitPositions: Array.isArray(s.exitPositions) ? s.exitPositions : []
+    }
+  } catch {
+    return {
+      isFlexible: false,
+      generateBracket: { type: 'SingleElimination', consolation: false, calculateByes: true },
+      phases: [{ ...DEFAULT_PHASE }],
+      advancementRules: [],
+      exitPositions: []
+    }
+  }
+}
+
+// ── Serialize visual state to JSON string ──
+export function serializeVisualToJson(vs) {
+  if (vs.isFlexible) {
+    return JSON.stringify({
+      isFlexible: true,
+      generateBracket: vs.generateBracket,
+      exitPositions: vs.exitPositions
+    }, null, 2)
+  }
+  const obj = {
+    phases: vs.phases.map((p, i) => ({
+      name: p.name,
+      phaseType: p.phaseType,
+      sortOrder: i + 1,
+      incomingSlotCount: parseInt(p.incomingSlotCount) || 0,
+      advancingSlotCount: parseInt(p.advancingSlotCount) || 0,
+      poolCount: p.phaseType === 'Pools' ? (parseInt(p.poolCount) || 0) : 0,
+      bestOf: parseInt(p.bestOf) || 1,
+      matchDurationMinutes: parseInt(p.matchDurationMinutes) || 30,
+      ...(p.seedingStrategy && p.seedingStrategy !== 'Sequential' ? { seedingStrategy: p.seedingStrategy } : {}),
+      ...(BRACKET_TYPES.includes(p.phaseType) && p.includeConsolation ? { includeConsolation: true } : {}),
+      ...(p.phaseType === 'Award' && p.awardType ? { awardType: p.awardType } : {}),
+      ...(p.phaseType === 'Draw' && p.drawMethod ? { drawMethod: p.drawMethod } : {})
+    })),
+    advancementRules: vs.advancementRules,
+    ...(vs.exitPositions.length > 0 ? { exitPositions: vs.exitPositions } : {})
+  }
+  return JSON.stringify(obj, null, 2)
+}
+
+// ── Auto-generate advancement rules ──
+export function autoGenerateRules(phases) {
+  const rules = []
+  for (let i = 0; i < phases.length - 1; i++) {
+    const src = phases[i]
+    const tgt = phases[i + 1]
+    const srcOrder = i + 1
+    const tgtOrder = i + 2
+    const slotsToAdvance = Math.min(
+      parseInt(src.advancingSlotCount) || 0,
+      parseInt(tgt.incomingSlotCount) || 0
+    )
+    if (src.phaseType === 'Pools' && (parseInt(src.poolCount) || 0) > 1) {
+      const poolCount = parseInt(src.poolCount)
+      const advPerPool = Math.max(1, Math.floor(slotsToAdvance / poolCount))
+      let slot = 1
+      for (let pool = 0; pool < poolCount; pool++) {
+        for (let pos = 1; pos <= advPerPool; pos++) {
+          rules.push({
+            sourcePhaseOrder: srcOrder,
+            targetPhaseOrder: tgtOrder,
+            finishPosition: pos,
+            targetSlotNumber: slot++,
+            sourcePoolIndex: pool
+          })
+        }
+      }
+    } else {
+      for (let pos = 1; pos <= slotsToAdvance; pos++) {
+        rules.push({
+          sourcePhaseOrder: srcOrder,
+          targetPhaseOrder: tgtOrder,
+          finishPosition: pos,
+          targetSlotNumber: pos,
+          sourcePoolIndex: null
+        })
+      }
+    }
+  }
+  return rules
+}

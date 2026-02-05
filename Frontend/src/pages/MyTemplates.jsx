@@ -2,232 +2,23 @@ import React, { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { tournamentApi } from '../services/api'
 import {
-  Layers, Plus, Edit2, Trash2, X, RefreshCw, AlertTriangle, Copy, ChevronDown,
-  ChevronUp, Code, Save, GitBranch, Trophy, Users, ArrowRight, Zap, Award,
-  ArrowLeft, Info, Lightbulb, Search, LayoutList, FileJson, Tag, Hash
+  Layers, Plus, Edit2, Trash2, X, RefreshCw, AlertTriangle, Copy,
+  Code, Save, GitBranch, Trophy,
+  ArrowLeft, Search, Settings
 } from 'lucide-react'
 import Navigation from '../components/ui/Navigation'
 
-// ── Constants ──
-const CATEGORIES = [
-  { value: 'SingleElimination', label: 'Single Elimination', icon: GitBranch },
-  { value: 'DoubleElimination', label: 'Double Elimination', icon: GitBranch },
-  { value: 'RoundRobin', label: 'Round Robin', icon: RefreshCw },
-  { value: 'Pools', label: 'Pools', icon: Layers },
-  { value: 'Combined', label: 'Combined (Pools + Bracket)', icon: Trophy },
-  { value: 'Custom', label: 'Custom', icon: Code }
-]
-const PHASE_TYPES = ['Draw','SingleElimination','DoubleElimination','RoundRobin','Pools','BracketRound','Swiss','Award']
-const BRACKET_TYPES = ['SingleElimination','DoubleElimination','BracketRound']
-const SEEDING_STRATEGIES = ['CrossPool','Sequential','Manual']
-const AWARD_TYPES = ['Gold','Silver','Bronze','none']
-const DEFAULT_PHASE = { name:'New Phase', phaseType:'SingleElimination', sortOrder:1, incomingSlotCount:8,
-  advancingSlotCount:4, poolCount:0, bestOf:1, matchDurationMinutes:30, seedingStrategy:'Sequential', includeConsolation:false }
+// Import shared constants, helpers, and the reusable editor
+import {
+  CATEGORIES,
+  parseStructureToVisual, serializeVisualToJson
+} from '../components/tournament/structureEditorConstants'
+import ListPhaseEditor from '../components/tournament/ListPhaseEditor'
+
 const DEFAULT_STRUCTURE = JSON.stringify({ phases:[{ name:'Main Bracket', phaseType:'SingleElimination',
   sortOrder:1, incomingSlotCount:8, advancingSlotCount:1, poolCount:0, bestOf:1, matchDurationMinutes:30 }], advancementRules:[] }, null, 2)
 const EMPTY_FORM = { name:'', description:'', category:'SingleElimination', minUnits:4, maxUnits:16, defaultUnits:8, diagramText:'', tags:'', structureJson:DEFAULT_STRUCTURE }
 
-// ── Helpers (matching PhaseTemplatesAdmin data model) ──
-function parseStructureToVisual(jsonStr) {
-  try {
-    const s = typeof jsonStr === 'string' ? JSON.parse(jsonStr) : jsonStr
-    if (s.isFlexible) return { isFlexible:true, generateBracket:s.generateBracket||{type:'SingleElimination',consolation:false,calculateByes:true}, exitPositions:s.exitPositions||[], phases:[], advancementRules:[] }
-    return { isFlexible:false, generateBracket:{type:'SingleElimination',consolation:false,calculateByes:true},
-      phases:(s.phases||[]).map((p,i)=>({ name:p.name||`Phase ${i+1}`, phaseType:p.phaseType||p.type||'SingleElimination', sortOrder:p.sortOrder||i+1,
-        incomingSlotCount:p.incomingSlotCount??p.incomingSlots??8, advancingSlotCount:p.advancingSlotCount??p.exitingSlots??4, poolCount:p.poolCount||0,
-        bestOf:p.bestOf||1, matchDurationMinutes:p.matchDurationMinutes||30, seedingStrategy:p.seedingStrategy||'Sequential',
-        includeConsolation:p.includeConsolation||p.hasConsolationMatch||false, awardType:p.awardType||null, drawMethod:p.drawMethod||null })),
-      advancementRules:(s.advancementRules||[]).map(r=>({ sourcePhaseOrder:r.sourcePhaseOrder??r.fromPhase??1, targetPhaseOrder:r.targetPhaseOrder??r.toPhase??2,
-        finishPosition:r.finishPosition??r.fromRank??1, targetSlotNumber:r.targetSlotNumber??r.toSlot??1, sourcePoolIndex:r.sourcePoolIndex??null })),
-      exitPositions:s.exitPositions||[] }
-  } catch { return { isFlexible:false, generateBracket:{type:'SingleElimination',consolation:false,calculateByes:true}, phases:[{...DEFAULT_PHASE}], advancementRules:[], exitPositions:[] } }
-}
-
-function serializeVisualToJson(vs) {
-  if (vs.isFlexible) return JSON.stringify({isFlexible:true,generateBracket:vs.generateBracket,exitPositions:vs.exitPositions},null,2)
-  return JSON.stringify({ phases:vs.phases.map((p,i)=>({ name:p.name, phaseType:p.phaseType, sortOrder:i+1,
-    incomingSlotCount:parseInt(p.incomingSlotCount)||0, advancingSlotCount:parseInt(p.advancingSlotCount)||0,
-    poolCount:p.phaseType==='Pools'?(parseInt(p.poolCount)||0):0, bestOf:parseInt(p.bestOf)||1, matchDurationMinutes:parseInt(p.matchDurationMinutes)||30,
-    ...(p.seedingStrategy&&p.seedingStrategy!=='Sequential'?{seedingStrategy:p.seedingStrategy}:{}),
-    ...(BRACKET_TYPES.includes(p.phaseType)&&p.includeConsolation?{includeConsolation:true}:{}),
-    ...(p.phaseType==='Award'&&p.awardType?{awardType:p.awardType}:{}), ...(p.phaseType==='Draw'&&p.drawMethod?{drawMethod:p.drawMethod}:{}) })),
-    advancementRules:vs.advancementRules, ...(vs.exitPositions.length>0?{exitPositions:vs.exitPositions}:{}) },null,2)
-}
-
-function autoGenerateRules(phases) {
-  const rules = []
-  for (let i=0;i<phases.length-1;i++) {
-    const src=phases[i], adv=Math.min(parseInt(src.advancingSlotCount)||0,parseInt(phases[i+1].incomingSlotCount)||0)
-    if (src.phaseType==='Pools'&&(parseInt(src.poolCount)||0)>1) {
-      const pc=parseInt(src.poolCount), app=Math.max(1,Math.floor(adv/pc)); let slot=1
-      for(let p=0;p<pc;p++) for(let pos=1;pos<=app;pos++) rules.push({sourcePhaseOrder:i+1,targetPhaseOrder:i+2,finishPosition:pos,targetSlotNumber:slot++,sourcePoolIndex:p})
-    } else { for(let pos=1;pos<=adv;pos++) rules.push({sourcePhaseOrder:i+1,targetPhaseOrder:i+2,finishPosition:pos,targetSlotNumber:pos,sourcePoolIndex:null}) }
-  }
-  return rules
-}
-
-// ══════════════════════════════════════════
-// PhaseEditor — List-based phase & rules editor
-// ══════════════════════════════════════════
-const PhaseEditor = ({ visualState: vs, onChange }) => {
-  const [collapsed, setCollapsed] = useState(new Set())
-  const update = (patch) => onChange({...vs,...patch})
-  const toggle = (i) => setCollapsed(p=>{const n=new Set(p);n.has(i)?n.delete(i):n.add(i);return n})
-  const updatePhase = (i,f,v) => {const p=[...vs.phases];p[i]={...p[i],[f]:v};update({phases:p})}
-  const addPhase = () => {
-    const o=vs.phases.length+1, prev=vs.phases[vs.phases.length-1], inc=prev?(parseInt(prev.advancingSlotCount)||4):8
-    update({phases:[...vs.phases,{...DEFAULT_PHASE,name:`Phase ${o}`,sortOrder:o,incomingSlotCount:inc,advancingSlotCount:Math.max(1,Math.floor(inc/2))}]})
-  }
-  const removePhase = (i) => { if(vs.phases.length<=1)return; const phases=vs.phases.filter((_,j)=>j!==i).map((p,j)=>({...p,sortOrder:j+1}))
-    const rules=vs.advancementRules.filter(r=>r.sourcePhaseOrder!==i+1&&r.targetPhaseOrder!==i+1).map(r=>({...r,
-      sourcePhaseOrder:r.sourcePhaseOrder>i+1?r.sourcePhaseOrder-1:r.sourcePhaseOrder, targetPhaseOrder:r.targetPhaseOrder>i+1?r.targetPhaseOrder-1:r.targetPhaseOrder}))
-    update({phases,advancementRules:rules}) }
-  const movePhase = (i,d) => { const s=i+d; if(s<0||s>=vs.phases.length)return; const p=[...vs.phases];[p[i],p[s]]=[p[s],p[i]]; update({phases:p.map((x,j)=>({...x,sortOrder:j+1}))}) }
-  const updateRule = (i,f,v) => {const r=[...vs.advancementRules];r[i]={...r[i],[f]:v};update({advancementRules:r})}
-  const addRule = () => update({advancementRules:[...vs.advancementRules,{sourcePhaseOrder:1,targetPhaseOrder:Math.min(2,vs.phases.length),finishPosition:1,targetSlotNumber:1,sourcePoolIndex:null}]})
-  const removeRule = (i) => update({advancementRules:vs.advancementRules.filter((_,j)=>j!==i)})
-  const updateExit = (i,f,v) => {const e=[...vs.exitPositions];e[i]={...e[i],[f]:v};update({exitPositions:e})}
-  const addExit = () => { const n=vs.exitPositions.length+1; const l=['Champion','Runner-up','3rd Place','4th Place'], a=['Gold','Silver','Bronze','none']
-    update({exitPositions:[...vs.exitPositions,{rank:n,label:l[n-1]||`${n}th Place`,awardType:a[n-1]||'none'}]}) }
-
-  const inp = "w-full px-2 py-1.5 border rounded text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
-  return (
-    <div className="space-y-4">
-      {/* Flexible toggle */}
-      <div className="flex items-center gap-3 p-3 bg-purple-50 rounded-lg border border-purple-200">
-        <label className="flex items-center gap-2 cursor-pointer">
-          <input type="checkbox" checked={vs.isFlexible} onChange={()=>update({isFlexible:!vs.isFlexible})} className="rounded border-purple-300 text-purple-600 focus:ring-purple-500"/>
-          <span className="text-sm font-medium text-purple-800">Flexible Template</span>
-        </label>
-        <span className="text-xs text-purple-600">Auto-generates bracket based on team count</span>
-      </div>
-
-      {vs.isFlexible ? (
-        <div className="bg-white border rounded-lg p-4 space-y-3">
-          <h4 className="text-sm font-semibold text-gray-700 flex items-center gap-2"><Zap className="w-4 h-4 text-purple-600"/>Bracket Generation Config</h4>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div><label className="block text-xs font-medium text-gray-600 mb-1">Bracket Type</label>
-              <select value={vs.generateBracket.type||'SingleElimination'} onChange={e=>update({generateBracket:{...vs.generateBracket,type:e.target.value}})} className={inp}>
-                {PHASE_TYPES.map(t=><option key={t}>{t}</option>)}</select></div>
-            <label className="flex items-center gap-2 cursor-pointer pt-5"><input type="checkbox" checked={vs.generateBracket.consolation||false}
-              onChange={e=>update({generateBracket:{...vs.generateBracket,consolation:e.target.checked}})} className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"/>
-              <span className="text-sm text-gray-700">Consolation</span></label>
-            <label className="flex items-center gap-2 cursor-pointer pt-5"><input type="checkbox" checked={vs.generateBracket.calculateByes||false}
-              onChange={e=>update({generateBracket:{...vs.generateBracket,calculateByes:e.target.checked}})} className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"/>
-              <span className="text-sm text-gray-700">Calculate Byes</span></label>
-          </div>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h4 className="text-sm font-semibold text-gray-700 flex items-center gap-2"><Layers className="w-4 h-4 text-purple-600"/>Phases ({vs.phases.length})</h4>
-            <button type="button" onClick={addPhase} className="flex items-center gap-1 px-3 py-1 text-sm bg-purple-600 text-white rounded-lg hover:bg-purple-700"><Plus className="w-3 h-3"/>Add Phase</button>
-          </div>
-          {vs.phases.map((phase,idx)=>(
-            <div key={idx} className="border rounded-lg overflow-hidden bg-white shadow-sm">
-              <div className="flex items-center justify-between px-3 py-2 bg-gray-50 border-b cursor-pointer" onClick={()=>toggle(idx)}>
-                <div className="flex items-center gap-2">
-                  <span className="w-6 h-6 rounded-full bg-purple-600 text-white text-xs flex items-center justify-center font-bold">{idx+1}</span>
-                  <span className="font-medium text-sm text-gray-800">{phase.name}</span>
-                  <span className="text-xs text-gray-500 bg-gray-200 px-2 py-0.5 rounded">{phase.phaseType}</span>
-                  <span className="text-xs text-gray-400 hidden sm:inline">{phase.incomingSlotCount} in → {phase.advancingSlotCount} out</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <button type="button" onClick={e=>{e.stopPropagation();movePhase(idx,-1)}} disabled={idx===0} className="p-1 text-gray-400 hover:text-gray-600 disabled:opacity-30"><ChevronUp className="w-4 h-4"/></button>
-                  <button type="button" onClick={e=>{e.stopPropagation();movePhase(idx,1)}} disabled={idx===vs.phases.length-1} className="p-1 text-gray-400 hover:text-gray-600 disabled:opacity-30"><ChevronDown className="w-4 h-4"/></button>
-                  <button type="button" onClick={e=>{e.stopPropagation();removePhase(idx)}} disabled={vs.phases.length<=1} className="p-1 text-gray-400 hover:text-red-500 disabled:opacity-30"><Trash2 className="w-4 h-4"/></button>
-                  {collapsed.has(idx)?<ChevronDown className="w-4 h-4 text-gray-400"/>:<ChevronUp className="w-4 h-4 text-gray-400"/>}
-                </div>
-              </div>
-              {!collapsed.has(idx)&&(
-                <div className="p-3 space-y-3">
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                    <div><label className="block text-xs font-medium text-gray-600 mb-1">Name</label>
-                      <input type="text" value={phase.name} onChange={e=>updatePhase(idx,'name',e.target.value)} className={inp}/></div>
-                    <div><label className="block text-xs font-medium text-gray-600 mb-1">Type</label>
-                      <select value={phase.phaseType} onChange={e=>updatePhase(idx,'phaseType',e.target.value)} className={inp}>
-                        {PHASE_TYPES.map(t=><option key={t}>{t}</option>)}</select></div>
-                    <div><label className="block text-xs font-medium text-gray-600 mb-1">Incoming</label>
-                      <input type="number" min={1} value={phase.incomingSlotCount} onChange={e=>updatePhase(idx,'incomingSlotCount',parseInt(e.target.value)||0)} className={inp}/></div>
-                    <div><label className="block text-xs font-medium text-gray-600 mb-1">Advancing</label>
-                      <input type="number" min={0} value={phase.advancingSlotCount} onChange={e=>updatePhase(idx,'advancingSlotCount',parseInt(e.target.value)||0)} className={inp}/></div>
-                    {phase.phaseType==='Pools'&&<div><label className="block text-xs font-medium text-gray-600 mb-1">Pools</label>
-                      <input type="number" min={1} value={phase.poolCount} onChange={e=>updatePhase(idx,'poolCount',parseInt(e.target.value)||0)} className={inp}/></div>}
-                    <div><label className="block text-xs font-medium text-gray-600 mb-1">Best Of</label>
-                      <select value={phase.bestOf} onChange={e=>updatePhase(idx,'bestOf',parseInt(e.target.value))} className={inp}>
-                        <option value={1}>1</option><option value={3}>3</option><option value={5}>5</option></select></div>
-                    <div><label className="block text-xs font-medium text-gray-600 mb-1">Duration (min)</label>
-                      <input type="number" min={1} value={phase.matchDurationMinutes} onChange={e=>updatePhase(idx,'matchDurationMinutes',parseInt(e.target.value)||0)} className={inp}/></div>
-                    <div><label className="block text-xs font-medium text-gray-600 mb-1">Seeding</label>
-                      <select value={phase.seedingStrategy||'Sequential'} onChange={e=>updatePhase(idx,'seedingStrategy',e.target.value)} className={inp}>
-                        {SEEDING_STRATEGIES.map(s=><option key={s}>{s}</option>)}</select></div>
-                  </div>
-                  {BRACKET_TYPES.includes(phase.phaseType)&&<label className="flex items-center gap-2 cursor-pointer">
-                    <input type="checkbox" checked={phase.includeConsolation||false} onChange={e=>updatePhase(idx,'includeConsolation',e.target.checked)}
-                      className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"/><span className="text-sm text-gray-700">Include consolation bracket</span></label>}
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Advancement Rules */}
-      {!vs.isFlexible&&vs.phases.length>1&&(
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h4 className="text-sm font-semibold text-gray-700 flex items-center gap-2"><ArrowRight className="w-4 h-4 text-purple-600"/>Rules ({vs.advancementRules.length})</h4>
-            <div className="flex items-center gap-2">
-              <button type="button" onClick={()=>update({advancementRules:autoGenerateRules(vs.phases)})}
-                className="flex items-center gap-1 px-3 py-1 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 border"><Zap className="w-3 h-3"/>Auto</button>
-              <button type="button" onClick={addRule} className="flex items-center gap-1 px-3 py-1 text-sm bg-purple-600 text-white rounded-lg hover:bg-purple-700"><Plus className="w-3 h-3"/>Add</button>
-            </div>
-          </div>
-          {vs.advancementRules.length===0?<p className="text-sm text-gray-400 italic py-2">No rules. Click "Auto" to generate defaults.</p>:(
-            <div className="border rounded-lg overflow-x-auto"><table className="w-full text-sm"><thead><tr className="bg-gray-50 text-gray-600">
-              <th className="px-3 py-2 text-left font-medium">Source</th><th className="px-3 py-2 text-left font-medium">Pool</th>
-              <th className="px-3 py-2 text-left font-medium">Pos</th><th className="px-3 py-2 w-6"></th>
-              <th className="px-3 py-2 text-left font-medium">Target</th><th className="px-3 py-2 text-left font-medium">Slot</th><th className="px-3 py-2 w-8"></th>
-            </tr></thead><tbody>{vs.advancementRules.map((rule,i)=>{
-              const sp=vs.phases[rule.sourcePhaseOrder-1], hp=sp?.phaseType==='Pools'&&(parseInt(sp.poolCount)||0)>1
-              return(<tr key={i} className="border-t hover:bg-gray-50">
-                <td className="px-3 py-1.5"><select value={rule.sourcePhaseOrder} onChange={e=>updateRule(i,'sourcePhaseOrder',parseInt(e.target.value))}
-                  className="w-full px-1 py-1 border rounded text-sm">{vs.phases.map((p,j)=><option key={j} value={j+1}>{j+1}. {p.name}</option>)}</select></td>
-                <td className="px-3 py-1.5">{hp?<select value={rule.sourcePoolIndex??''} onChange={e=>updateRule(i,'sourcePoolIndex',e.target.value===''?null:parseInt(e.target.value))}
-                  className="w-full px-1 py-1 border rounded text-sm"><option value="">Any</option>
-                  {Array.from({length:parseInt(sp.poolCount)||0},(_,k)=><option key={k} value={k}>Pool {k+1}</option>)}</select>:<span className="text-gray-400 text-xs">—</span>}</td>
-                <td className="px-3 py-1.5"><input type="number" min={1} value={rule.finishPosition} onChange={e=>updateRule(i,'finishPosition',parseInt(e.target.value)||1)}
-                  className="w-14 px-1 py-1 border rounded text-sm"/></td>
-                <td className="px-1"><ArrowRight className="w-3 h-3 text-purple-400"/></td>
-                <td className="px-3 py-1.5"><select value={rule.targetPhaseOrder} onChange={e=>updateRule(i,'targetPhaseOrder',parseInt(e.target.value))}
-                  className="w-full px-1 py-1 border rounded text-sm">{vs.phases.map((p,j)=><option key={j} value={j+1}>{j+1}. {p.name}</option>)}</select></td>
-                <td className="px-3 py-1.5"><input type="number" min={1} value={rule.targetSlotNumber} onChange={e=>updateRule(i,'targetSlotNumber',parseInt(e.target.value)||1)}
-                  className="w-14 px-1 py-1 border rounded text-sm"/></td>
-                <td className="px-2 py-1.5"><button type="button" onClick={()=>removeRule(i)} className="p-1 text-gray-400 hover:text-red-500"><Trash2 className="w-3.5 h-3.5"/></button></td>
-              </tr>)})}</tbody></table></div>)}
-        </div>
-      )}
-
-      {/* Exit Positions */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h4 className="text-sm font-semibold text-gray-700 flex items-center gap-2"><Award className="w-4 h-4 text-purple-600"/>Exits ({vs.exitPositions.length})</h4>
-          <button type="button" onClick={addExit} className="flex items-center gap-1 px-3 py-1 text-sm bg-purple-600 text-white rounded-lg hover:bg-purple-700"><Plus className="w-3 h-3"/>Add</button>
-        </div>
-        {vs.exitPositions.length===0?<p className="text-sm text-gray-400 italic py-2">No exit positions defined.</p>:(
-          <div className="space-y-2">{vs.exitPositions.map((ep,i)=>(
-            <div key={i} className="flex items-center gap-2 sm:gap-3 bg-white border rounded-lg px-3 py-2">
-              <span className="w-7 h-7 rounded-full bg-purple-100 text-purple-700 text-xs flex items-center justify-center font-bold flex-shrink-0">#{ep.rank}</span>
-              <input type="number" min={1} value={ep.rank} onChange={e=>updateExit(i,'rank',parseInt(e.target.value)||1)} className="w-14 px-2 py-1 border rounded text-sm"/>
-              <input type="text" value={ep.label} onChange={e=>updateExit(i,'label',e.target.value)} placeholder="Label" className="flex-1 min-w-0 px-2 py-1 border rounded text-sm"/>
-              <select value={ep.awardType||'none'} onChange={e=>updateExit(i,'awardType',e.target.value)} className="px-2 py-1 border rounded text-sm">
-                {AWARD_TYPES.map(a=><option key={a} value={a}>{a==='none'?'No Award':a}</option>)}</select>
-              <button type="button" onClick={()=>update({exitPositions:vs.exitPositions.filter((_,j)=>j!==i)})} className="p-1 text-gray-400 hover:text-red-500 flex-shrink-0"><Trash2 className="w-3.5 h-3.5"/></button>
-            </div>))}</div>)}
-      </div>
-    </div>
-  )
-}
 
 // ══════════════════════════════════════════
 // DuplicateFromSystemModal
@@ -382,7 +173,7 @@ const MyTemplates = () => {
         {/* Structure */}
         <div className="bg-white rounded-xl shadow-sm border p-6">
           <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2"><Layers className="w-5 h-5 text-purple-600"/>Structure</h2>
-          {editorMode==='visual'&&visualState?<PhaseEditor visualState={visualState} onChange={handleVisualChange}/>:(
+          {editorMode==='visual'&&visualState?<ListPhaseEditor visualState={visualState} onChange={handleVisualChange}/>:(
             <div><div className="flex items-center gap-2 mb-2"><FileJson className="w-4 h-4 text-gray-500"/><span className="text-sm text-gray-600">Raw JSON</span></div>
               <textarea value={formData.structureJson} onChange={e=>sf('structureJson',e.target.value)} rows={18}
                 className="w-full px-4 py-3 border rounded-lg font-mono text-sm bg-gray-50 focus:ring-2 focus:ring-purple-500"/></div>)}

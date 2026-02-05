@@ -29,759 +29,27 @@ import '@xyflow/react/dist/style.css'
 import dagre from 'dagre'
 import { toPng } from 'html-to-image'
 
-const CATEGORIES = [
-  { value: 'SingleElimination', label: 'Single Elimination', icon: GitBranch },
-  { value: 'DoubleElimination', label: 'Double Elimination', icon: GitBranch },
-  { value: 'RoundRobin', label: 'Round Robin', icon: RefreshCw },
-  { value: 'Pools', label: 'Pools', icon: Layers },
-  { value: 'Combined', label: 'Combined (Pools + Bracket)', icon: Trophy },
-  { value: 'Custom', label: 'Custom', icon: Code }
-]
+// Import shared constants and helpers from extracted module
+import {
+  CATEGORIES, PHASE_TYPES, BRACKET_TYPES, SEEDING_STRATEGIES, AWARD_TYPES,
+  DEFAULT_PHASE, DEFAULT_EXIT_POSITION, DEFAULT_ADVANCEMENT_RULE,
+  PHASE_TYPE_COLORS, PHASE_TYPE_ICONS,
+  parseStructureToVisual, serializeVisualToJson, autoGenerateRules
+} from '../components/tournament/structureEditorConstants'
 
-const PHASE_TYPES = [
-  'Draw', 'SingleElimination', 'DoubleElimination', 'RoundRobin', 'Pools', 'BracketRound', 'Swiss', 'Award'
-]
-
-const BRACKET_TYPES = ['SingleElimination', 'DoubleElimination', 'BracketRound']
-
-const SEEDING_STRATEGIES = ['CrossPool', 'Sequential', 'Manual']
-
-const AWARD_TYPES = ['Gold', 'Silver', 'Bronze', 'none']
-
-const DEFAULT_PHASE = {
-  name: 'New Phase',
-  phaseType: 'SingleElimination',
-  sortOrder: 1,
-  incomingSlotCount: 8,
-  advancingSlotCount: 4,
-  poolCount: 0,
-  bestOf: 1,
-  matchDurationMinutes: 30,
-  seedingStrategy: 'Sequential',
-  includeConsolation: false
-}
-
-const DEFAULT_EXIT_POSITION = { rank: 1, label: 'Champion', awardType: 'Gold' }
-
-const DEFAULT_ADVANCEMENT_RULE = {
-  sourcePhaseOrder: 1,
-  targetPhaseOrder: 2,
-  finishPosition: 1,
-  targetSlotNumber: 1,
-  sourcePoolIndex: null
-}
-
-// ── Helper: Parse structureJson into visual state ──
-function parseStructureToVisual(jsonStr) {
-  try {
-    const s = typeof jsonStr === 'string' ? JSON.parse(jsonStr) : jsonStr
-    if (s.isFlexible) {
-      return {
-        isFlexible: true,
-        generateBracket: s.generateBracket || { type: 'SingleElimination', consolation: false, calculateByes: true },
-        exitPositions: Array.isArray(s.exitPositions) ? s.exitPositions : [],
-        phases: [],
-        advancementRules: []
-      }
-    }
-    return {
-      isFlexible: false,
-      generateBracket: { type: 'SingleElimination', consolation: false, calculateByes: true },
-      phases: Array.isArray(s.phases) ? s.phases.map((p, i) => ({
-        name: p.name || `Phase ${i + 1}`,
-        phaseType: p.phaseType || p.type || 'SingleElimination',
-        sortOrder: p.sortOrder || i + 1,
-        incomingSlotCount: p.incomingSlotCount ?? p.incomingSlots ?? 8,
-        advancingSlotCount: p.advancingSlotCount ?? p.exitingSlots ?? 4,
-        poolCount: p.poolCount || 0,
-        bestOf: p.bestOf || 1,
-        matchDurationMinutes: p.matchDurationMinutes || 30,
-        seedingStrategy: p.seedingStrategy || 'Sequential',
-        includeConsolation: p.includeConsolation || p.hasConsolationMatch || false,
-        awardType: p.awardType || null,
-        drawMethod: p.drawMethod || null
-      })) : [],
-      advancementRules: Array.isArray(s.advancementRules) ? s.advancementRules.map(r => ({
-        sourcePhaseOrder: r.sourcePhaseOrder ?? r.fromPhase ?? 1,
-        targetPhaseOrder: r.targetPhaseOrder ?? r.toPhase ?? 2,
-        finishPosition: r.finishPosition ?? r.fromRank ?? 1,
-        targetSlotNumber: r.targetSlotNumber ?? r.toSlot ?? 1,
-        sourcePoolIndex: r.sourcePoolIndex ?? null
-      })) : [],
-      exitPositions: Array.isArray(s.exitPositions) ? s.exitPositions : []
-    }
-  } catch {
-    return {
-      isFlexible: false,
-      generateBracket: { type: 'SingleElimination', consolation: false, calculateByes: true },
-      phases: [{ ...DEFAULT_PHASE }],
-      advancementRules: [],
-      exitPositions: []
-    }
-  }
-}
-
-// ── Helper: Serialize visual state to JSON string ──
-function serializeVisualToJson(vs) {
-  if (vs.isFlexible) {
-    return JSON.stringify({
-      isFlexible: true,
-      generateBracket: vs.generateBracket,
-      exitPositions: vs.exitPositions
-    }, null, 2)
-  }
-  const obj = {
-    phases: vs.phases.map((p, i) => ({
-      name: p.name,
-      phaseType: p.phaseType,
-      sortOrder: i + 1,
-      incomingSlotCount: parseInt(p.incomingSlotCount) || 0,
-      advancingSlotCount: parseInt(p.advancingSlotCount) || 0,
-      poolCount: p.phaseType === 'Pools' ? (parseInt(p.poolCount) || 0) : 0,
-      bestOf: parseInt(p.bestOf) || 1,
-      matchDurationMinutes: parseInt(p.matchDurationMinutes) || 30,
-      ...(p.seedingStrategy && p.seedingStrategy !== 'Sequential' ? { seedingStrategy: p.seedingStrategy } : {}),
-      ...(BRACKET_TYPES.includes(p.phaseType) && p.includeConsolation ? { includeConsolation: true } : {}),
-      ...(p.phaseType === 'Award' && p.awardType ? { awardType: p.awardType } : {}),
-      ...(p.phaseType === 'Draw' && p.drawMethod ? { drawMethod: p.drawMethod } : {})
-    })),
-    advancementRules: vs.advancementRules,
-    ...(vs.exitPositions.length > 0 ? { exitPositions: vs.exitPositions } : {})
-  }
-  return JSON.stringify(obj, null, 2)
-}
-
-// ── Auto-generate advancement rules ──
-function autoGenerateRules(phases) {
-  const rules = []
-  for (let i = 0; i < phases.length - 1; i++) {
-    const src = phases[i]
-    const tgt = phases[i + 1]
-    const srcOrder = i + 1
-    const tgtOrder = i + 2
-    const slotsToAdvance = Math.min(
-      parseInt(src.advancingSlotCount) || 0,
-      parseInt(tgt.incomingSlotCount) || 0
-    )
-    if (src.phaseType === 'Pools' && (parseInt(src.poolCount) || 0) > 1) {
-      const poolCount = parseInt(src.poolCount)
-      const advPerPool = Math.max(1, Math.floor(slotsToAdvance / poolCount))
-      let slot = 1
-      for (let pool = 0; pool < poolCount; pool++) {
-        for (let pos = 1; pos <= advPerPool; pos++) {
-          rules.push({
-            sourcePhaseOrder: srcOrder,
-            targetPhaseOrder: tgtOrder,
-            finishPosition: pos,
-            targetSlotNumber: slot++,
-            sourcePoolIndex: pool
-          })
-        }
-      }
-    } else {
-      for (let pos = 1; pos <= slotsToAdvance; pos++) {
-        rules.push({
-          sourcePhaseOrder: srcOrder,
-          targetPhaseOrder: tgtOrder,
-          finishPosition: pos,
-          targetSlotNumber: pos,
-          sourcePoolIndex: null
-        })
-      }
-    }
-  }
-  return rules
-}
+// Import extracted ListPhaseEditor
+import ListPhaseEditor from '../components/tournament/ListPhaseEditor'
 
 
-// ══════════════════════════════════════════
-// ListPhaseEditor — inline sub-component (formerly VisualPhaseEditor)
-// ══════════════════════════════════════════
-const ListPhaseEditor = ({ visualState, onChange }) => {
-  const [collapsedPhases, setCollapsedPhases] = useState(new Set())
-  const vs = visualState
+// ListPhaseEditor is now imported from ../components/tournament/ListPhaseEditor
+// PHASE_TYPE_COLORS and PHASE_TYPE_ICONS are imported from structureEditorConstants
 
-  const update = (patch) => onChange({ ...vs, ...patch })
-
-  const toggleCollapse = (idx) => {
-    setCollapsedPhases(prev => {
-      const next = new Set(prev)
-      next.has(idx) ? next.delete(idx) : next.add(idx)
-      return next
-    })
-  }
-
-  // ── Phase helpers ──
-  const updatePhase = (idx, field, value) => {
-    const phases = [...vs.phases]
-    phases[idx] = { ...phases[idx], [field]: value }
-    update({ phases })
-  }
-
-  const addPhase = () => {
-    const order = vs.phases.length + 1
-    const prev = vs.phases[vs.phases.length - 1]
-    const incoming = prev ? (parseInt(prev.advancingSlotCount) || 4) : 8
-    update({
-      phases: [...vs.phases, {
-        ...DEFAULT_PHASE,
-        name: `Phase ${order}`,
-        sortOrder: order,
-        incomingSlotCount: incoming,
-        advancingSlotCount: Math.max(1, Math.floor(incoming / 2))
-      }]
-    })
-  }
-
-  const removePhase = (idx) => {
-    if (vs.phases.length <= 1) return
-    const phases = vs.phases.filter((_, i) => i !== idx).map((p, i) => ({ ...p, sortOrder: i + 1 }))
-    const rules = vs.advancementRules.filter(r =>
-      r.sourcePhaseOrder !== idx + 1 && r.targetPhaseOrder !== idx + 1
-    ).map(r => ({
-      ...r,
-      sourcePhaseOrder: r.sourcePhaseOrder > idx + 1 ? r.sourcePhaseOrder - 1 : r.sourcePhaseOrder,
-      targetPhaseOrder: r.targetPhaseOrder > idx + 1 ? r.targetPhaseOrder - 1 : r.targetPhaseOrder
-    }))
-    update({ phases, advancementRules: rules })
-  }
-
-  const movePhase = (idx, dir) => {
-    const swapIdx = idx + dir
-    if (swapIdx < 0 || swapIdx >= vs.phases.length) return
-    const phases = [...vs.phases]
-    ;[phases[idx], phases[swapIdx]] = [phases[swapIdx], phases[idx]]
-    const reordered = phases.map((p, i) => ({ ...p, sortOrder: i + 1 }))
-    update({ phases: reordered })
-  }
-
-  // ── Rule helpers ──
-  const updateRule = (idx, field, value) => {
-    const rules = [...vs.advancementRules]
-    rules[idx] = { ...rules[idx], [field]: value }
-    update({ advancementRules: rules })
-  }
-
-  const addRule = () => {
-    const src = vs.phases.length >= 1 ? 1 : 1
-    const tgt = vs.phases.length >= 2 ? 2 : 1
-    update({
-      advancementRules: [...vs.advancementRules, {
-        ...DEFAULT_ADVANCEMENT_RULE,
-        sourcePhaseOrder: src,
-        targetPhaseOrder: tgt
-      }]
-    })
-  }
-
-  const removeRule = (idx) => {
-    update({ advancementRules: vs.advancementRules.filter((_, i) => i !== idx) })
-  }
-
-  const handleAutoGenerate = () => {
-    update({ advancementRules: autoGenerateRules(vs.phases) })
-  }
-
-  // ── Exit position helpers ──
-  const updateExit = (idx, field, value) => {
-    const exits = [...vs.exitPositions]
-    exits[idx] = { ...exits[idx], [field]: value }
-    update({ exitPositions: exits })
-  }
-
-  const addExit = () => {
-    const nextRank = vs.exitPositions.length + 1
-    const labels = ['Champion', 'Runner-up', '3rd Place', '4th Place']
-    const awards = ['Gold', 'Silver', 'Bronze', 'none']
-    update({
-      exitPositions: [...vs.exitPositions, {
-        rank: nextRank,
-        label: labels[nextRank - 1] || `${nextRank}th Place`,
-        awardType: awards[nextRank - 1] || 'none'
-      }]
-    })
-  }
-
-  const removeExit = (idx) => {
-    update({ exitPositions: vs.exitPositions.filter((_, i) => i !== idx) })
-  }
-
-  // ── Flexible template toggle ──
-  const toggleFlexible = () => {
-    update({ isFlexible: !vs.isFlexible })
-  }
-
-  const updateBracketConfig = (field, value) => {
-    update({ generateBracket: { ...vs.generateBracket, [field]: value } })
-  }
-
-  // ══ RENDER ══
-  return (
-    <div className="space-y-4">
-      {/* Flexible toggle */}
-      <div className="flex items-center gap-3 p-3 bg-purple-50 rounded-lg border border-purple-200">
-        <label className="flex items-center gap-2 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={vs.isFlexible}
-            onChange={toggleFlexible}
-            className="rounded border-purple-300 text-purple-600 focus:ring-purple-500"
-          />
-          <span className="text-sm font-medium text-purple-800">Flexible Template</span>
-        </label>
-        <span className="text-xs text-purple-600">
-          Auto-generates bracket based on team count
-        </span>
-      </div>
-
-      {vs.isFlexible ? (
-        /* ── Flexible editor ── */
-        <div className="space-y-4">
-          <div className="bg-white border rounded-lg p-4 space-y-3">
-            <h4 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-              <Zap className="w-4 h-4 text-purple-600" />
-              Bracket Generation Config
-            </h4>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Bracket Type</label>
-                <select
-                  value={vs.generateBracket.type || 'SingleElimination'}
-                  onChange={e => updateBracketConfig('type', e.target.value)}
-                  className="w-full px-2 py-1.5 border rounded text-sm focus:ring-2 focus:ring-purple-500"
-                >
-                  {PHASE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-                </select>
-              </div>
-              <div className="flex items-end gap-4">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={vs.generateBracket.consolation || false}
-                    onChange={e => updateBracketConfig('consolation', e.target.checked)}
-                    className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
-                  />
-                  <span className="text-sm text-gray-700">Consolation</span>
-                </label>
-              </div>
-              <div className="flex items-end gap-4">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={vs.generateBracket.calculateByes || false}
-                    onChange={e => updateBracketConfig('calculateByes', e.target.checked)}
-                    className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
-                  />
-                  <span className="text-sm text-gray-700">Calculate Byes</span>
-                </label>
-              </div>
-            </div>
-          </div>
-        </div>
-      ) : (
-        /* ── Standard phases editor ── */
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h4 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-              <Layers className="w-4 h-4 text-purple-600" />
-              Phases ({vs.phases.length})
-            </h4>
-            <button
-              type="button"
-              onClick={addPhase}
-              className="flex items-center gap-1 px-3 py-1 text-sm bg-purple-600 text-white rounded-lg hover:bg-purple-700"
-            >
-              <Plus className="w-3 h-3" /> Add Phase
-            </button>
-          </div>
-
-          {vs.phases.map((phase, idx) => {
-            const collapsed = collapsedPhases.has(idx)
-            const isBracket = BRACKET_TYPES.includes(phase.phaseType)
-            const isPools = phase.phaseType === 'Pools'
-
-            return (
-              <div key={idx} className="border rounded-lg overflow-hidden bg-white shadow-sm">
-                {/* Phase header */}
-                <div
-                  className="flex items-center justify-between px-3 py-2 bg-gray-50 border-b cursor-pointer"
-                  onClick={() => toggleCollapse(idx)}
-                >
-                  <div className="flex items-center gap-2">
-                    <span className="w-6 h-6 rounded-full bg-purple-600 text-white text-xs flex items-center justify-center font-bold">
-                      {idx + 1}
-                    </span>
-                    <span className="font-medium text-sm text-gray-800">{phase.name}</span>
-                    <span className="text-xs text-gray-500 bg-gray-200 px-2 py-0.5 rounded">{phase.phaseType}</span>
-                    <span className="text-xs text-gray-400">
-                      {phase.incomingSlotCount} in → {phase.advancingSlotCount} out
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={e => { e.stopPropagation(); movePhase(idx, -1) }}
-                      disabled={idx === 0}
-                      className="p-1 text-gray-400 hover:text-gray-600 disabled:opacity-30"
-                      title="Move up"
-                    >
-                      <ChevronUp className="w-4 h-4" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={e => { e.stopPropagation(); movePhase(idx, 1) }}
-                      disabled={idx === vs.phases.length - 1}
-                      className="p-1 text-gray-400 hover:text-gray-600 disabled:opacity-30"
-                      title="Move down"
-                    >
-                      <ChevronDown className="w-4 h-4" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={e => { e.stopPropagation(); removePhase(idx) }}
-                      disabled={vs.phases.length <= 1}
-                      className="p-1 text-gray-400 hover:text-red-500 disabled:opacity-30"
-                      title="Remove phase"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                    {collapsed ? <ChevronDown className="w-4 h-4 text-gray-400" /> : <ChevronUp className="w-4 h-4 text-gray-400" />}
-                  </div>
-                </div>
-
-                {/* Phase body */}
-                {!collapsed && (
-                  <div className="p-3 space-y-3">
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                      {/* Name */}
-                      <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-1">Phase Name</label>
-                        <input
-                          type="text"
-                          value={phase.name}
-                          onChange={e => updatePhase(idx, 'name', e.target.value)}
-                          className="w-full px-2 py-1.5 border rounded text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
-                        />
-                      </div>
-                      {/* Type */}
-                      <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-1">Phase Type</label>
-                        <select
-                          value={phase.phaseType}
-                          onChange={e => updatePhase(idx, 'phaseType', e.target.value)}
-                          className="w-full px-2 py-1.5 border rounded text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
-                        >
-                          {PHASE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-                        </select>
-                      </div>
-                      {/* Incoming */}
-                      <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-1">Incoming Slots</label>
-                        <input
-                          type="number" min={1}
-                          value={phase.incomingSlotCount}
-                          onChange={e => updatePhase(idx, 'incomingSlotCount', parseInt(e.target.value) || 0)}
-                          className="w-full px-2 py-1.5 border rounded text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
-                        />
-                      </div>
-                      {/* Advancing */}
-                      <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-1">Advancing Slots</label>
-                        <input
-                          type="number" min={0}
-                          value={phase.advancingSlotCount}
-                          onChange={e => updatePhase(idx, 'advancingSlotCount', parseInt(e.target.value) || 0)}
-                          className="w-full px-2 py-1.5 border rounded text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
-                        />
-                      </div>
-                      {/* Pool Count (only for Pools) */}
-                      {isPools && (
-                        <div>
-                          <label className="block text-xs font-medium text-gray-600 mb-1">Pool Count</label>
-                          <input
-                            type="number" min={1}
-                            value={phase.poolCount}
-                            onChange={e => updatePhase(idx, 'poolCount', parseInt(e.target.value) || 0)}
-                            className="w-full px-2 py-1.5 border rounded text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
-                          />
-                        </div>
-                      )}
-                      {/* Best Of */}
-                      <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-1">Best Of</label>
-                        <select
-                          value={phase.bestOf}
-                          onChange={e => updatePhase(idx, 'bestOf', parseInt(e.target.value))}
-                          className="w-full px-2 py-1.5 border rounded text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
-                        >
-                          <option value={1}>1</option>
-                          <option value={3}>3</option>
-                          <option value={5}>5</option>
-                        </select>
-                      </div>
-                      {/* Duration */}
-                      <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-1">Duration (min)</label>
-                        <input
-                          type="number" min={1}
-                          value={phase.matchDurationMinutes}
-                          onChange={e => updatePhase(idx, 'matchDurationMinutes', parseInt(e.target.value) || 0)}
-                          className="w-full px-2 py-1.5 border rounded text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
-                        />
-                      </div>
-                      {/* Seeding Strategy */}
-                      <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-1">Seeding</label>
-                        <select
-                          value={phase.seedingStrategy || 'Sequential'}
-                          onChange={e => updatePhase(idx, 'seedingStrategy', e.target.value)}
-                          className="w-full px-2 py-1.5 border rounded text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
-                        >
-                          {SEEDING_STRATEGIES.map(s => <option key={s} value={s}>{s}</option>)}
-                        </select>
-                      </div>
-                    </div>
-                    {/* Consolation checkbox (bracket types only) */}
-                    {isBracket && (
-                      <label className="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={phase.includeConsolation || false}
-                          onChange={e => updatePhase(idx, 'includeConsolation', e.target.checked)}
-                          className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
-                        />
-                        <span className="text-sm text-gray-700">Include consolation bracket</span>
-                      </label>
-                    )}
-                  </div>
-                )}
-              </div>
-            )
-          })}
-        </div>
-      )}
-
-      {/* ── Advancement Rules (only for standard multi-phase) ── */}
-      {!vs.isFlexible && vs.phases.length > 1 && (
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h4 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-              <ArrowRight className="w-4 h-4 text-purple-600" />
-              Advancement Rules ({vs.advancementRules.length})
-            </h4>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={handleAutoGenerate}
-                className="flex items-center gap-1 px-3 py-1 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 border"
-                title="Auto-generate rules based on phase slot counts"
-              >
-                <Zap className="w-3 h-3" /> Auto-generate
-              </button>
-              <button
-                type="button"
-                onClick={addRule}
-                className="flex items-center gap-1 px-3 py-1 text-sm bg-purple-600 text-white rounded-lg hover:bg-purple-700"
-              >
-                <Plus className="w-3 h-3" /> Add Rule
-              </button>
-            </div>
-          </div>
-
-          {vs.advancementRules.length === 0 ? (
-            <p className="text-sm text-gray-400 italic py-2">
-              No advancement rules defined. Click "Auto-generate" to create defaults.
-            </p>
-          ) : (
-            <div className="border rounded-lg overflow-hidden">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="bg-gray-50 text-gray-600">
-                    <th className="px-3 py-2 text-left font-medium">Source Phase</th>
-                    <th className="px-3 py-2 text-left font-medium">Pool</th>
-                    <th className="px-3 py-2 text-left font-medium">Finish Pos</th>
-                    <th className="px-3 py-2 text-left font-medium">→</th>
-                    <th className="px-3 py-2 text-left font-medium">Target Phase</th>
-                    <th className="px-3 py-2 text-left font-medium">Slot #</th>
-                    <th className="px-3 py-2 w-10"></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {vs.advancementRules.map((rule, idx) => {
-                    const srcPhase = vs.phases[rule.sourcePhaseOrder - 1]
-                    const srcHasPools = srcPhase && srcPhase.phaseType === 'Pools' && (parseInt(srcPhase.poolCount) || 0) > 1
-                    return (
-                      <tr key={idx} className="border-t hover:bg-gray-50">
-                        <td className="px-3 py-1.5">
-                          <select
-                            value={rule.sourcePhaseOrder}
-                            onChange={e => updateRule(idx, 'sourcePhaseOrder', parseInt(e.target.value))}
-                            className="w-full px-1 py-1 border rounded text-sm focus:ring-2 focus:ring-purple-500"
-                          >
-                            {vs.phases.map((p, i) => (
-                              <option key={i} value={i + 1}>{i + 1}. {p.name}</option>
-                            ))}
-                          </select>
-                        </td>
-                        <td className="px-3 py-1.5">
-                          {srcHasPools ? (
-                            <select
-                              value={rule.sourcePoolIndex ?? ''}
-                              onChange={e => updateRule(idx, 'sourcePoolIndex', e.target.value === '' ? null : parseInt(e.target.value))}
-                              className="w-full px-1 py-1 border rounded text-sm focus:ring-2 focus:ring-purple-500"
-                            >
-                              <option value="">Any</option>
-                              {Array.from({ length: parseInt(srcPhase.poolCount) || 0 }, (_, i) => (
-                                <option key={i} value={i}>Pool {i + 1}</option>
-                              ))}
-                            </select>
-                          ) : (
-                            <span className="text-gray-400 text-xs">—</span>
-                          )}
-                        </td>
-                        <td className="px-3 py-1.5">
-                          <input
-                            type="number" min={1}
-                            value={rule.finishPosition}
-                            onChange={e => updateRule(idx, 'finishPosition', parseInt(e.target.value) || 1)}
-                            className="w-16 px-1 py-1 border rounded text-sm focus:ring-2 focus:ring-purple-500"
-                          />
-                        </td>
-                        <td className="px-3 py-1.5">
-                          <ArrowRight className="w-4 h-4 text-purple-400" />
-                        </td>
-                        <td className="px-3 py-1.5">
-                          <select
-                            value={rule.targetPhaseOrder}
-                            onChange={e => updateRule(idx, 'targetPhaseOrder', parseInt(e.target.value))}
-                            className="w-full px-1 py-1 border rounded text-sm focus:ring-2 focus:ring-purple-500"
-                          >
-                            {vs.phases.map((p, i) => (
-                              <option key={i} value={i + 1}>{i + 1}. {p.name}</option>
-                            ))}
-                          </select>
-                        </td>
-                        <td className="px-3 py-1.5">
-                          <input
-                            type="number" min={1}
-                            value={rule.targetSlotNumber}
-                            onChange={e => updateRule(idx, 'targetSlotNumber', parseInt(e.target.value) || 1)}
-                            className="w-16 px-1 py-1 border rounded text-sm focus:ring-2 focus:ring-purple-500"
-                          />
-                        </td>
-                        <td className="px-3 py-1.5">
-                          <button
-                            type="button"
-                            onClick={() => removeRule(idx)}
-                            className="p-1 text-gray-400 hover:text-red-500"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ── Exit Positions ── */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h4 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-            <Award className="w-4 h-4 text-purple-600" />
-            Exit Positions ({vs.exitPositions.length})
-          </h4>
-          <button
-            type="button"
-            onClick={addExit}
-            className="flex items-center gap-1 px-3 py-1 text-sm bg-purple-600 text-white rounded-lg hover:bg-purple-700"
-          >
-            <Plus className="w-3 h-3" /> Add Position
-          </button>
-        </div>
-
-        {vs.exitPositions.length === 0 ? (
-          <p className="text-sm text-gray-400 italic py-2">
-            No exit positions defined. Add positions for final placement (Champion, Runner-up, etc.)
-          </p>
-        ) : (
-          <div className="space-y-2">
-            {vs.exitPositions.map((ep, idx) => (
-              <div key={idx} className="flex items-center gap-3 bg-white border rounded-lg px-3 py-2">
-                <div className="flex items-center gap-2 min-w-0">
-                  <span className="w-7 h-7 rounded-full bg-purple-100 text-purple-700 text-xs flex items-center justify-center font-bold flex-shrink-0">
-                    #{ep.rank}
-                  </span>
-                </div>
-                <input
-                  type="number" min={1}
-                  value={ep.rank}
-                  onChange={e => updateExit(idx, 'rank', parseInt(e.target.value) || 1)}
-                  className="w-16 px-2 py-1 border rounded text-sm focus:ring-2 focus:ring-purple-500"
-                  title="Rank"
-                />
-                <input
-                  type="text"
-                  value={ep.label}
-                  onChange={e => updateExit(idx, 'label', e.target.value)}
-                  placeholder="Label (e.g. Champion)"
-                  className="flex-1 px-2 py-1 border rounded text-sm focus:ring-2 focus:ring-purple-500"
-                />
-                <select
-                  value={ep.awardType || 'none'}
-                  onChange={e => updateExit(idx, 'awardType', e.target.value)}
-                  className="px-2 py-1 border rounded text-sm focus:ring-2 focus:ring-purple-500"
-                >
-                  {AWARD_TYPES.map(a => (
-                    <option key={a} value={a}>{a === 'none' ? 'No Award' : a}</option>
-                  ))}
-                </select>
-                <button
-                  type="button"
-                  onClick={() => removeExit(idx)}
-                  className="p-1 text-gray-400 hover:text-red-500 flex-shrink-0"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
-
-
+// Placeholder to keep line references stable — the ListPhaseEditor was extracted
 // ══════════════════════════════════════════
 // Canvas Phase Editor — React Flow based
+// (ListPhaseEditor extracted to ../components/tournament/ListPhaseEditor.jsx)
+// (Constants extracted to ../components/tournament/structureEditorConstants.js)
 // ══════════════════════════════════════════
-
-const PHASE_TYPE_COLORS = {
-  Draw: { bg: 'bg-cyan-500', light: 'bg-cyan-50', border: 'border-cyan-300', text: 'text-cyan-700', hex: '#06b6d4' },
-  SingleElimination: { bg: 'bg-indigo-500', light: 'bg-indigo-50', border: 'border-indigo-300', text: 'text-indigo-700', hex: '#6366f1' },
-  DoubleElimination: { bg: 'bg-purple-500', light: 'bg-purple-50', border: 'border-purple-300', text: 'text-purple-700', hex: '#a855f7' },
-  RoundRobin: { bg: 'bg-green-500', light: 'bg-green-50', border: 'border-green-300', text: 'text-green-700', hex: '#22c55e' },
-  Pools: { bg: 'bg-blue-500', light: 'bg-blue-50', border: 'border-blue-300', text: 'text-blue-700', hex: '#3b82f6' },
-  Swiss: { bg: 'bg-amber-500', light: 'bg-amber-50', border: 'border-amber-300', text: 'text-amber-700', hex: '#f59e0b' },
-  BracketRound: { bg: 'bg-rose-500', light: 'bg-rose-50', border: 'border-rose-300', text: 'text-rose-700', hex: '#f43f5e' },
-  Award: { bg: 'bg-yellow-500', light: 'bg-yellow-50', border: 'border-yellow-300', text: 'text-yellow-700', hex: '#eab308' }
-}
-
-const PHASE_TYPE_ICONS = {
-  Draw: Users,
-  SingleElimination: GitBranch,
-  DoubleElimination: Swords,
-  RoundRobin: Repeat,
-  Pools: Grid3X3,
-  Swiss: Shuffle,
-  BracketRound: Target,
-  Award: Award
-}
 
 const NODE_WIDTH = 220
 const NODE_HEIGHT = 100
@@ -2703,6 +1971,15 @@ const PhaseTemplatesAdmin = ({ embedded = false }) => {
   const [expandedTemplates, setExpandedTemplates] = useState({})
   const [categoryFilter, setCategoryFilter] = useState('all')
 
+  // Community Templates tab state
+  const [viewTab, setViewTab] = useState('system') // 'system' | 'community'
+  const [communityTemplates, setCommunityTemplates] = useState([])
+  const [communityLoading, setCommunityLoading] = useState(false)
+  const [communityError, setCommunityError] = useState(null)
+  const [expandedCommunity, setExpandedCommunity] = useState({})
+  const [copyingId, setCopyingId] = useState(null)
+  const [copySuccess, setCopySuccess] = useState(null)
+
   // Editor mode: 'visual' or 'json'
   const [editorMode, setEditorMode] = useState('visual')
   // Visual sub-mode: 'canvas' or 'list'
@@ -2761,6 +2038,46 @@ const PhaseTemplatesAdmin = ({ embedded = false }) => {
   useEffect(() => {
     loadTemplates()
   }, [])
+
+  // Load community (user-created) templates
+  const loadCommunityTemplates = async () => {
+    setCommunityLoading(true)
+    setCommunityError(null)
+    try {
+      const response = await tournamentApi.getUserPhaseTemplates()
+      const list = Array.isArray(response) ? response : (response?.data || [])
+      setCommunityTemplates(list)
+    } catch (err) {
+      setCommunityError(err.message || 'Failed to load community templates')
+    } finally {
+      setCommunityLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    if (viewTab === 'community' && communityTemplates.length === 0 && !communityLoading) {
+      loadCommunityTemplates()
+    }
+  }, [viewTab])
+
+  // Copy a user template to system templates
+  const handleCopyToSystem = async (template) => {
+    setCopyingId(template.id)
+    setCopySuccess(null)
+    try {
+      await tournamentApi.copyToSystemTemplate(template.id)
+      setCopySuccess(template.id)
+      // Refresh both lists
+      loadTemplates()
+      loadCommunityTemplates()
+      // Auto-clear success after 4s
+      setTimeout(() => setCopySuccess(null), 4000)
+    } catch (err) {
+      alert(err.message || 'Failed to copy template to system')
+    } finally {
+      setCopyingId(null)
+    }
+  }
 
   // Filter templates by category
   const filteredTemplates = categoryFilter === 'all'
@@ -3068,13 +2385,38 @@ const PhaseTemplatesAdmin = ({ embedded = false }) => {
           </div>
         </div>
 
-        {error && (
+        {/* View Tabs */}
+        <div className="mb-4 flex items-center gap-1 border-b">
+          <button
+            onClick={() => setViewTab('system')}
+            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+              viewTab === 'system'
+                ? 'border-purple-600 text-purple-700'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            System Templates
+          </button>
+          <button
+            onClick={() => setViewTab('community')}
+            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+              viewTab === 'community'
+                ? 'border-purple-600 text-purple-700'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            Community Templates
+          </button>
+        </div>
+
+        {error && viewTab === 'system' && (
           <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2 text-red-700">
             <AlertTriangle className="w-5 h-5" />
             {error}
           </div>
         )}
 
+        {viewTab === 'system' ? (<>
         {/* Category Filter */}
         <div className="mb-4 flex items-center gap-2 flex-wrap">
           <span className="text-sm text-gray-500">Filter:</span>
