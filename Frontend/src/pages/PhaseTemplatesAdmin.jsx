@@ -53,6 +53,8 @@ import ListPhaseEditor from '../components/tournament/ListPhaseEditor'
 
 const NODE_WIDTH = 220
 const NODE_HEIGHT = 100
+const NODE_WIDTH_EXPANDED = 280
+const NODE_HEIGHT_EXPANDED = 220 // Taller when expanded to show mini diagram
 
 // ── PhaseInternalDiagram: SVG mini-diagram showing internal flow of a phase ──
 const PhaseInternalDiagram = memo(({ phaseType, incomingSlots, advancingSlots, poolCount, bestOf, includeConsolation }) => {
@@ -510,13 +512,21 @@ const PhaseInternalDiagram = memo(({ phaseType, incomingSlots, advancingSlots, p
 })
 
 // Dagre auto-layout
-function getLayoutedElements(nodes, edges, direction = 'TB') {
+function getLayoutedElements(nodes, edges, direction = 'TB', forceExpand = null) {
   const g = new dagre.graphlib.Graph()
   g.setDefaultEdgeLabel(() => ({}))
-  g.setGraph({ rankdir: direction, nodesep: direction === 'LR' ? 40 : 60, ranksep: direction === 'LR' ? 100 : 80 })
+  
+  // Use larger spacing when nodes are expanded
+  const isExpanded = forceExpand === true
+  const nodeWidth = isExpanded ? NODE_WIDTH_EXPANDED : NODE_WIDTH
+  const nodeHeight = isExpanded ? NODE_HEIGHT_EXPANDED : NODE_HEIGHT
+  const nodeSep = isExpanded ? (direction === 'LR' ? 60 : 80) : (direction === 'LR' ? 40 : 60)
+  const rankSep = isExpanded ? (direction === 'LR' ? 140 : 120) : (direction === 'LR' ? 100 : 80)
+  
+  g.setGraph({ rankdir: direction, nodesep: nodeSep, ranksep: rankSep })
 
   nodes.forEach((node) => {
-    g.setNode(node.id, { width: NODE_WIDTH, height: NODE_HEIGHT })
+    g.setNode(node.id, { width: nodeWidth, height: nodeHeight })
   })
   edges.forEach((edge) => {
     g.setEdge(edge.source, edge.target)
@@ -529,8 +539,8 @@ function getLayoutedElements(nodes, edges, direction = 'TB') {
     return {
       ...node,
       position: {
-        x: nodeWithPosition.x - NODE_WIDTH / 2,
-        y: nodeWithPosition.y - NODE_HEIGHT / 2,
+        x: nodeWithPosition.x - nodeWidth / 2,
+        y: nodeWithPosition.y - nodeHeight / 2,
       },
     }
   })
@@ -1553,9 +1563,9 @@ const CanvasPhaseEditorInner = ({ visualState, onChange }) => {
   // Auto-layout button
   const handleAutoLayout = useCallback(() => {
     const currentEdges = edges
-    const { nodes: layoutedNodes } = getLayoutedElements(nodes, currentEdges, layoutDirection)
+    const { nodes: layoutedNodes } = getLayoutedElements(nodes, currentEdges, layoutDirection, expandAll)
     setNodes(layoutedNodes)
-  }, [nodes, edges, setNodes, layoutDirection])
+  }, [nodes, edges, setNodes, layoutDirection, expandAll])
 
   // Re-layout when direction changes
   const handleDirectionChange = useCallback((dir) => {
@@ -1566,7 +1576,7 @@ const CanvasPhaseEditorInner = ({ visualState, onChange }) => {
         ...node,
         data: { ...node.data, layoutDirection: dir }
       }))
-      const { nodes: layoutedNodes } = getLayoutedElements(updated, edges, dir)
+      const { nodes: layoutedNodes } = getLayoutedElements(updated, edges, dir, expandAll)
       // Force React Flow to recalculate handle positions after render
       setTimeout(() => {
         updateNodeInternals(layoutedNodes.map(n => n.id))
@@ -1575,7 +1585,7 @@ const CanvasPhaseEditorInner = ({ visualState, onChange }) => {
     })
     // Force edge rebuild so React Flow recalculates paths for new handle positions
     setEdges(prev => prev.map(e => ({ ...e })))
-  }, [edges, setNodes, setEdges, updateNodeInternals])
+  }, [edges, setNodes, setEdges, updateNodeInternals, expandAll])
 
   // Compute topological sort order and sync to phases
   const handleSyncSortOrder = useCallback(() => {
@@ -1749,10 +1759,10 @@ const CanvasPhaseEditorInner = ({ visualState, onChange }) => {
             <button onClick={() => {
               const newExpand = !expandAll
               setExpandAll(newExpand)
-              // Rebuild nodes with forceExpand to trigger re-render
+              // Rebuild nodes with forceExpand to trigger re-render and re-layout with proper dimensions
               const newNodes = buildNodes(vs.phases, layoutDirection, newExpand)
               const edges = buildEdges(vs.advancementRules, vs.phases, selectedEdgeKey)
-              const { nodes: layoutedNodes } = getLayoutedElements(newNodes, edges, layoutDirection)
+              const { nodes: layoutedNodes } = getLayoutedElements(newNodes, edges, layoutDirection, newExpand)
               setNodes(layoutedNodes)
             }}
               className="flex items-center gap-1 px-2.5 py-1.5 bg-white border rounded-lg shadow-sm text-xs font-medium text-gray-600 hover:bg-gray-50">
