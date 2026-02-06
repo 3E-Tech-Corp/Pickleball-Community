@@ -544,7 +544,10 @@ export const userApi = {
   adminUpdatePhone: (userId, newPhone) => api.put(`/users/${userId}/admin-phone`, { newPhone }),
 
   // Admin: Re-sync a user from Funtime-Shared service
-  adminResyncUser: (userId) => api.post(`/users/${userId}/admin-resync`)
+  adminResyncUser: (userId) => api.post(`/users/${userId}/admin-resync`),
+
+  // Admin: Delete a user (requires dryRun=false to actually delete)
+  adminDeleteUser: (userId, dryRun = true) => api.delete(`/users/${userId}?dryRun=${dryRun}`)
 }
 
 // Content Types API

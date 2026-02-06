@@ -63,6 +63,10 @@ const AdminDashboard = () => {
   const [savingPassword, setSavingPassword] = useState(false)
   const [sendingTestEmail, setSendingTestEmail] = useState(false)
   const [userOnlineFilter, setUserOnlineFilter] = useState('all') // 'all' | 'online' | 'offline'
+  // Delete user state
+  const [deleteUserModal, setDeleteUserModal] = useState({ open: false, user: null })
+  const [deleteConfirmText, setDeleteConfirmText] = useState('')
+  const [deletingUser, setDeletingUser] = useState(false)
   const [pushModalOpen, setPushModalOpen] = useState(false)
   const [pushTargetUsers, setPushTargetUsers] = useState([]) // user IDs for push
   const [pushTargetMode, setPushTargetMode] = useState('selected') // 'selected' | 'online'
@@ -802,6 +806,46 @@ const AdminDashboard = () => {
     }
   }
 
+  // Handle delete user
+  const handleDeleteUser = async () => {
+    if (!deleteUserModal.user) return
+    const user = deleteUserModal.user
+    
+    // Verify confirmation text matches email
+    if (deleteConfirmText !== user.email) {
+      alert('Email does not match. Please type the exact email to confirm deletion.')
+      return
+    }
+    
+    setDeletingUser(true)
+    try {
+      // First do a dry run to show what will be deleted
+      const dryRunResponse = await userApi.adminDeleteUser(user.id, true)
+      if (!dryRunResponse.success && !dryRunResponse.Success) {
+        alert(dryRunResponse.message || dryRunResponse.Message || 'Failed to preview deletion')
+        setDeletingUser(false)
+        return
+      }
+      
+      // Actually delete
+      const response = await userApi.adminDeleteUser(user.id, false)
+      if (response.success || response.Success) {
+        alert(`User "${user.firstName} ${user.lastName}" (${user.email}) has been permanently deleted.`)
+        setDeleteUserModal({ open: false, user: null })
+        setDeleteConfirmText('')
+        // Refresh users list
+        fetchUsers()
+      } else {
+        alert(response.message || response.Message || 'Failed to delete user')
+      }
+    } catch (error) {
+      console.error('Error deleting user:', error)
+      alert(error.message || 'Failed to delete user')
+    } finally {
+      setDeletingUser(false)
+    }
+  }
+
   // Handle save user
   const handleSaveUser = async () => {
     if (!selectedUser) return
@@ -1312,6 +1356,16 @@ const AdminDashboard = () => {
                                 title="Edit user"
                               >
                                 <Edit2 className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setDeleteUserModal({ open: true, user: u })
+                                  setDeleteConfirmText('')
+                                }}
+                                className="text-red-600 hover:text-red-800 p-2 rounded-lg hover:bg-red-50"
+                                title="Delete user"
+                              >
+                                <Trash2 className="w-4 h-4" />
                               </button>
                             </td>
                           </tr>
@@ -3777,6 +3831,82 @@ const AdminDashboard = () => {
           userId={selectedProfileUserId}
           onClose={() => setSelectedProfileUserId(null)}
         />
+      )}
+
+      {/* Delete User Confirmation Modal */}
+      {deleteUserModal.open && deleteUserModal.user && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full">
+            <div className="bg-red-600 px-6 py-4 rounded-t-xl">
+              <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5" />
+                Delete User Permanently
+              </h3>
+            </div>
+            <div className="p-6">
+              <div className="mb-4">
+                <p className="text-gray-700 mb-2">
+                  You are about to <strong className="text-red-600">permanently delete</strong> this user:
+                </p>
+                <div className="bg-gray-100 rounded-lg p-3 mb-4">
+                  <p className="font-medium text-gray-900">{deleteUserModal.user.firstName} {deleteUserModal.user.lastName}</p>
+                  <p className="text-sm text-gray-600">{deleteUserModal.user.email}</p>
+                  <p className="text-xs text-gray-500">ID: {deleteUserModal.user.id}</p>
+                </div>
+                <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
+                  <p className="text-sm text-red-800 font-medium mb-1">⚠️ This action cannot be undone!</p>
+                  <p className="text-xs text-red-700">
+                    This will permanently delete the user from both PickleballCommunity and the shared auth service (FTPBAuth), 
+                    including all their data, external logins, and associated records.
+                  </p>
+                </div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  To confirm, type the user's email address:
+                </label>
+                <input
+                  type="text"
+                  value={deleteConfirmText}
+                  onChange={(e) => setDeleteConfirmText(e.target.value)}
+                  placeholder={deleteUserModal.user.email}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                  autoComplete="off"
+                />
+                {deleteConfirmText && deleteConfirmText !== deleteUserModal.user.email && (
+                  <p className="text-xs text-red-600 mt-1">Email does not match</p>
+                )}
+              </div>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    setDeleteUserModal({ open: false, user: null })
+                    setDeleteConfirmText('')
+                  }}
+                  className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 font-medium"
+                  disabled={deletingUser}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleDeleteUser}
+                  disabled={deletingUser || deleteConfirmText !== deleteUserModal.user.email}
+                  className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  {deletingUser ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
+                      Deleting...
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="w-4 h-4" />
+                      Delete Permanently
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )
