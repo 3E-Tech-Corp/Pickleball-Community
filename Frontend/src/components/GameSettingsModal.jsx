@@ -61,18 +61,41 @@ export default function GameSettingsModal({ isOpen, onClose, division, eventId, 
           if (data.matchFormats?.length > 0) {
             data.matchFormats.forEach(format => {
               const existingSetting = phase.matchSettings?.find(s => s.matchFormatId === format.id);
+              
+              // Convert gameFormats array to object keyed by gameNumber
+              const gameFormatsObj = {};
+              if (existingSetting?.gameFormats?.length > 0) {
+                existingSetting.gameFormats.forEach(gf => {
+                  gameFormatsObj[gf.gameNumber] = {
+                    scoreFormatId: gf.scoreFormatId,
+                    estimatedMinutes: gf.estimatedMinutes
+                  };
+                });
+              }
+              
               initialPhaseSettings[phase.phaseId][format.id] = {
                 bestOf: existingSetting?.bestOf || format.bestOf || 1,
-                scoreFormatId: existingSetting?.scoreFormatId || null
+                scoreFormatId: existingSetting?.scoreFormatId || null,
+                gameFormats: gameFormatsObj
               };
             });
           }
 
           // Also include null key for divisions with single match per encounter
           const defaultSetting = phase.matchSettings?.find(s => !s.matchFormatId);
+          const defaultGameFormatsObj = {};
+          if (defaultSetting?.gameFormats?.length > 0) {
+            defaultSetting.gameFormats.forEach(gf => {
+              defaultGameFormatsObj[gf.gameNumber] = {
+                scoreFormatId: gf.scoreFormatId,
+                estimatedMinutes: gf.estimatedMinutes
+              };
+            });
+          }
           initialPhaseSettings[phase.phaseId][null] = {
             bestOf: defaultSetting?.bestOf || 1,
-            scoreFormatId: defaultSetting?.scoreFormatId || null
+            scoreFormatId: defaultSetting?.scoreFormatId || null,
+            gameFormats: defaultGameFormatsObj
           };
         });
         setPhaseSettings(initialPhaseSettings);
@@ -107,11 +130,23 @@ export default function GameSettingsModal({ isOpen, onClose, division, eventId, 
 
         Object.entries(phaseSettings).forEach(([phaseId, formatSettings]) => {
           Object.entries(formatSettings).forEach(([matchFormatId, config]) => {
+            // Convert gameFormats object to array for API
+            const gameFormats = config.gameFormats 
+              ? Object.entries(config.gameFormats)
+                  .filter(([_, gf]) => gf.scoreFormatId) // Only include games with a format set
+                  .map(([gameNum, gf]) => ({
+                    gameNumber: parseInt(gameNum),
+                    scoreFormatId: gf.scoreFormatId,
+                    estimatedMinutes: gf.estimatedMinutes
+                  }))
+              : [];
+            
             settings.push({
               phaseId: parseInt(phaseId),
               matchFormatId: matchFormatId === 'null' ? null : parseInt(matchFormatId),
               bestOf: config.bestOf,
-              scoreFormatId: config.scoreFormatId
+              scoreFormatId: config.scoreFormatId,
+              gameFormats: gameFormats.length > 0 ? gameFormats : null
             });
           });
         });
@@ -154,7 +189,28 @@ export default function GameSettingsModal({ isOpen, onClose, division, eventId, 
         ...prev[phaseId],
         [matchFormatId]: {
           ...prev[phaseId]?.[matchFormatId],
-          [field]: value
+          [field]: value,
+          // Clear game formats when changing bestOf to 1
+          ...(field === 'bestOf' && value === 1 ? { gameFormats: {} } : {})
+        }
+      }
+    }));
+  };
+
+  const updateGameFormatSetting = (phaseId, matchFormatId, gameNumber, field, value) => {
+    setPhaseSettings(prev => ({
+      ...prev,
+      [phaseId]: {
+        ...prev[phaseId],
+        [matchFormatId]: {
+          ...prev[phaseId]?.[matchFormatId],
+          gameFormats: {
+            ...prev[phaseId]?.[matchFormatId]?.gameFormats,
+            [gameNumber]: {
+              ...prev[phaseId]?.[matchFormatId]?.gameFormats?.[gameNumber],
+              [field]: value
+            }
+          }
         }
       }
     }));
@@ -245,50 +301,78 @@ export default function GameSettingsModal({ isOpen, onClose, division, eventId, 
                         <div className="p-4 space-y-4">
                           {hasMatchFormats ? (
                             // Show settings per match format
-                            gameSettings.matchFormats.map((format) => (
-                              <div key={format.id} className="flex items-center gap-4 p-3 bg-gray-50 rounded-lg">
-                                <div className="flex-1">
+                            gameSettings.matchFormats.map((format) => {
+                              const currentBestOf = phaseSettings[phase.phaseId]?.[format.id]?.bestOf || 1;
+                              return (
+                              <div key={format.id} className="p-3 bg-gray-50 rounded-lg space-y-3">
+                                <div className="flex items-center gap-4">
+                                  <div className="flex-1">
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-medium text-sm text-gray-900">
+                                        {format.code && <span className="text-orange-600 mr-1">[{format.code}]</span>}
+                                        {format.name}
+                                      </span>
+                                    </div>
+                                    <div className="text-xs text-gray-500">
+                                      {format.maleCount > 0 && `${format.maleCount}M `}
+                                      {format.femaleCount > 0 && `${format.femaleCount}F `}
+                                      {format.unisexCount > 0 && `${format.unisexCount} Any`}
+                                    </div>
+                                  </div>
+
                                   <div className="flex items-center gap-2">
-                                    <span className="font-medium text-sm text-gray-900">
-                                      {format.code && <span className="text-orange-600 mr-1">[{format.code}]</span>}
-                                      {format.name}
-                                    </span>
+                                    <label className="text-xs text-gray-500">Games:</label>
+                                    <select
+                                      value={currentBestOf}
+                                      onChange={(e) => updatePhaseFormatSetting(phase.phaseId, format.id, 'bestOf', parseInt(e.target.value))}
+                                      className="border border-gray-300 rounded p-1.5 text-sm w-24"
+                                    >
+                                      <option value={1}>1 Game</option>
+                                      <option value={3}>Best of 3</option>
+                                      <option value={5}>Best of 5</option>
+                                    </select>
                                   </div>
-                                  <div className="text-xs text-gray-500">
-                                    {format.maleCount > 0 && `${format.maleCount}M `}
-                                    {format.femaleCount > 0 && `${format.femaleCount}F `}
-                                    {format.unisexCount > 0 && `${format.unisexCount} Any`}
-                                  </div>
-                                </div>
 
-                                <div className="flex items-center gap-2">
-                                  <label className="text-xs text-gray-500">Games:</label>
-                                  <select
-                                    value={phaseSettings[phase.phaseId]?.[format.id]?.bestOf || 1}
-                                    onChange={(e) => updatePhaseFormatSetting(phase.phaseId, format.id, 'bestOf', parseInt(e.target.value))}
-                                    className="border border-gray-300 rounded p-1.5 text-sm w-24"
-                                  >
-                                    <option value={1}>1 Game</option>
-                                    <option value={3}>Best of 3</option>
-                                    <option value={5}>Best of 5</option>
-                                  </select>
+                                  {currentBestOf === 1 && (
+                                    <div className="flex items-center gap-2">
+                                      <label className="text-xs text-gray-500">Score:</label>
+                                      <select
+                                        value={phaseSettings[phase.phaseId]?.[format.id]?.scoreFormatId || ''}
+                                        onChange={(e) => updatePhaseFormatSetting(phase.phaseId, format.id, 'scoreFormatId', e.target.value ? parseInt(e.target.value) : null)}
+                                        className="border border-gray-300 rounded p-1.5 text-sm w-32"
+                                      >
+                                        <option value="">Default</option>
+                                        {scoreFormats.map(sf => (
+                                          <option key={sf.id} value={sf.id}>{sf.name}</option>
+                                        ))}
+                                      </select>
+                                    </div>
+                                  )}
                                 </div>
-
-                                <div className="flex items-center gap-2">
-                                  <label className="text-xs text-gray-500">Score:</label>
-                                  <select
-                                    value={phaseSettings[phase.phaseId]?.[format.id]?.scoreFormatId || ''}
-                                    onChange={(e) => updatePhaseFormatSetting(phase.phaseId, format.id, 'scoreFormatId', e.target.value ? parseInt(e.target.value) : null)}
-                                    className="border border-gray-300 rounded p-1.5 text-sm w-32"
-                                  >
-                                    <option value="">Default</option>
-                                    {scoreFormats.map(sf => (
-                                      <option key={sf.id} value={sf.id}>{sf.name}</option>
+                                
+                                {/* Per-game format selection when Best of 3 or 5 */}
+                                {currentBestOf > 1 && (
+                                  <div className="ml-4 pl-4 border-l-2 border-orange-200 space-y-2">
+                                    <div className="text-xs font-medium text-gray-600">Score format per game:</div>
+                                    {Array.from({ length: currentBestOf }, (_, i) => i + 1).map(gameNum => (
+                                      <div key={gameNum} className="flex items-center gap-3">
+                                        <span className="text-xs text-gray-500 w-16">Game {gameNum}:</span>
+                                        <select
+                                          value={phaseSettings[phase.phaseId]?.[format.id]?.gameFormats?.[gameNum]?.scoreFormatId || ''}
+                                          onChange={(e) => updateGameFormatSetting(phase.phaseId, format.id, gameNum, 'scoreFormatId', e.target.value ? parseInt(e.target.value) : null)}
+                                          className="border border-gray-300 rounded p-1 text-sm flex-1"
+                                        >
+                                          <option value="">Default</option>
+                                          {scoreFormats.map(sf => (
+                                            <option key={sf.id} value={sf.id}>{sf.name}</option>
+                                          ))}
+                                        </select>
+                                      </div>
                                     ))}
-                                  </select>
-                                </div>
+                                  </div>
+                                )}
                               </div>
-                            ))
+                            );})
                           ) : (
                             // Single match format - simpler UI
                             <div className="flex items-center gap-4">

@@ -1064,6 +1064,8 @@ public class EncounterController : ControllerBase
         var allSettings = await _context.PhaseMatchSettings
             .Include(s => s.MatchFormat)
             .Include(s => s.ScoreFormat)
+            .Include(s => s.GameFormats)
+                .ThenInclude(g => g.ScoreFormat)
             .Join(
                 _context.DivisionPhases.Where(dp => dp.DivisionId == divisionId),
                 pms => pms.PhaseId,
@@ -1120,7 +1122,17 @@ public class EncounterController : ControllerBase
                         MatchFormatCode = s.MatchFormat?.Code,
                         BestOf = s.BestOf,
                         ScoreFormatId = s.ScoreFormatId,
-                        ScoreFormatName = s.ScoreFormat?.Name
+                        ScoreFormatName = s.ScoreFormat?.Name,
+                        GameFormats = s.GameFormats
+                            .OrderBy(g => g.GameNumber)
+                            .Select(g => new GameFormatDto
+                            {
+                                Id = g.Id,
+                                GameNumber = g.GameNumber,
+                                ScoreFormatId = g.ScoreFormatId,
+                                ScoreFormatName = g.ScoreFormat?.Name,
+                                EstimatedMinutes = g.EstimatedMinutes
+                            }).ToList()
                     }).ToList()
             }).ToList()
         };
@@ -1149,7 +1161,7 @@ public class EncounterController : ControllerBase
         if (!await IsEventOrganizer(phase.Division!.EventId, userId.Value))
             return Forbid();
 
-        // Remove existing settings for this phase
+        // Remove existing settings for this phase (cascade will delete GameFormats)
         var existingSettings = await _context.PhaseMatchSettings
             .Where(s => s.PhaseId == phaseId)
             .ToListAsync();
@@ -1158,13 +1170,29 @@ public class EncounterController : ControllerBase
         // Add new settings
         foreach (var dto in settings)
         {
-            _context.PhaseMatchSettings.Add(new PhaseMatchSettings
+            var setting = new PhaseMatchSettings
             {
                 PhaseId = phaseId,
                 MatchFormatId = dto.MatchFormatId,
                 BestOf = dto.BestOf,
                 ScoreFormatId = dto.ScoreFormatId
-            });
+            };
+            
+            // Add per-game formats if provided
+            if (dto.GameFormats?.Any() == true)
+            {
+                foreach (var gf in dto.GameFormats)
+                {
+                    setting.GameFormats.Add(new PhaseMatchGameFormat
+                    {
+                        GameNumber = gf.GameNumber,
+                        ScoreFormatId = gf.ScoreFormatId,
+                        EstimatedMinutes = gf.EstimatedMinutes
+                    });
+                }
+            }
+            
+            _context.PhaseMatchSettings.Add(setting);
         }
 
         await _context.SaveChangesAsync();
@@ -1212,18 +1240,34 @@ public class EncounterController : ControllerBase
         _context.PhaseMatchSettings.RemoveRange(existingSettings);
 
         // Add new settings
-        foreach (var setting in dto.Settings)
+        foreach (var settingDto in dto.Settings)
         {
-            if (!phaseIdSet.Contains(setting.PhaseId))
+            if (!phaseIdSet.Contains(settingDto.PhaseId))
                 continue; // Skip if phase doesn't belong to this division
 
-            _context.PhaseMatchSettings.Add(new PhaseMatchSettings
+            var setting = new PhaseMatchSettings
             {
-                PhaseId = setting.PhaseId,
-                MatchFormatId = setting.MatchFormatId,
-                BestOf = setting.BestOf,
-                ScoreFormatId = setting.ScoreFormatId
-            });
+                PhaseId = settingDto.PhaseId,
+                MatchFormatId = settingDto.MatchFormatId,
+                BestOf = settingDto.BestOf,
+                ScoreFormatId = settingDto.ScoreFormatId
+            };
+            
+            // Add per-game formats if provided
+            if (settingDto.GameFormats?.Any() == true)
+            {
+                foreach (var gf in settingDto.GameFormats)
+                {
+                    setting.GameFormats.Add(new PhaseMatchGameFormat
+                    {
+                        GameNumber = gf.GameNumber,
+                        ScoreFormatId = gf.ScoreFormatId,
+                        EstimatedMinutes = gf.EstimatedMinutes
+                    });
+                }
+            }
+            
+            _context.PhaseMatchSettings.Add(setting);
         }
 
         await _context.SaveChangesAsync();
@@ -1246,6 +1290,8 @@ public class EncounterController : ControllerBase
         var settings = await _context.PhaseMatchSettings
             .Include(s => s.MatchFormat)
             .Include(s => s.ScoreFormat)
+            .Include(s => s.GameFormats)
+                .ThenInclude(g => g.ScoreFormat)
             .Where(s => s.PhaseId == phaseId)
             .ToListAsync();
 
@@ -1259,7 +1305,17 @@ public class EncounterController : ControllerBase
             MatchFormatCode = s.MatchFormat?.Code,
             BestOf = s.BestOf,
             ScoreFormatId = s.ScoreFormatId,
-            ScoreFormatName = s.ScoreFormat?.Name
+            ScoreFormatName = s.ScoreFormat?.Name,
+            GameFormats = s.GameFormats
+                .OrderBy(g => g.GameNumber)
+                .Select(g => new GameFormatDto
+                {
+                    Id = g.Id,
+                    GameNumber = g.GameNumber,
+                    ScoreFormatId = g.ScoreFormatId,
+                    ScoreFormatName = g.ScoreFormat?.Name,
+                    EstimatedMinutes = g.EstimatedMinutes
+                }).ToList()
         }).ToList();
 
         return Ok(new { success = true, data = dtos });

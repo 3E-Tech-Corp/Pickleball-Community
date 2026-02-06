@@ -44,4 +44,10 @@ public class PhaseMatchSettings
 
     [ForeignKey("ScoreFormatId")]
     public ScoreFormat? ScoreFormat { get; set; }
+
+    /// <summary>
+    /// Per-game score format overrides for best-of-N matches.
+    /// When empty, all games use ScoreFormatId.
+    /// </summary>
+    public ICollection<PhaseMatchGameFormat> GameFormats { get; set; } = new List<PhaseMatchGameFormat>();
 }

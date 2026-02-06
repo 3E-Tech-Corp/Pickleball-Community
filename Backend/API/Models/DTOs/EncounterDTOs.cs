@@ -396,6 +396,33 @@ public class PhaseMatchSettingsDto
     public int BestOf { get; set; }
     public int? ScoreFormatId { get; set; }
     public string? ScoreFormatName { get; set; }
+    /// <summary>
+    /// Per-game score format overrides for best-of-N matches.
+    /// When empty or null, all games use ScoreFormatId.
+    /// </summary>
+    public List<GameFormatDto>? GameFormats { get; set; }
+}
+
+/// <summary>
+/// DTO for per-game score format settings
+/// </summary>
+public class GameFormatDto
+{
+    public int Id { get; set; }
+    public int GameNumber { get; set; }
+    public int? ScoreFormatId { get; set; }
+    public string? ScoreFormatName { get; set; }
+    public int? EstimatedMinutes { get; set; }
+}
+
+/// <summary>
+/// DTO for creating/updating per-game score format
+/// </summary>
+public class GameFormatCreateDto
+{
+    public int GameNumber { get; set; }
+    public int? ScoreFormatId { get; set; }
+    public int? EstimatedMinutes { get; set; }
 }
 
 /// <summary>
@@ -407,6 +434,10 @@ public class PhaseMatchSettingsCreateDto
     public int? MatchFormatId { get; set; }
     public int BestOf { get; set; } = 1;
     public int? ScoreFormatId { get; set; }
+    /// <summary>
+    /// Per-game score format overrides. When provided, these override ScoreFormatId for specific games.
+    /// </summary>
+    public List<GameFormatCreateDto>? GameFormats { get; set; }
 }
 
 /// <summary>
