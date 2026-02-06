@@ -640,17 +640,21 @@ const PaletteItem = ({ phaseType, label }) => {
 
 // Edge Config Panel — visual advancement rule editor
 const EdgeConfigPanel = ({ sourcePhase, targetPhase, sourceIdx, targetIdx, rules, onRulesChange, onClose }) => {
-  if (!sourcePhase || !targetPhase) return null
+  const [pendingSource, setPendingSource] = useState(null) // source slot being connected
 
+  // Compute derived values (safe even if sourcePhase/targetPhase are null)
   const srcOrder = sourceIdx + 1
   const tgtOrder = targetIdx + 1
-  const connectionRules = rules.filter(r => r.sourcePhaseOrder === srcOrder && r.targetPhaseOrder === tgtOrder)
-  const isPools = sourcePhase.phaseType === 'Pools' && (parseInt(sourcePhase.poolCount) || 0) > 1
-  const poolCount = parseInt(sourcePhase.poolCount) || 1
-  const [pendingSource, setPendingSource] = useState(null) // source slot being connected
+  const connectionRules = useMemo(() => 
+    rules.filter(r => r.sourcePhaseOrder === srcOrder && r.targetPhaseOrder === tgtOrder),
+    [rules, srcOrder, tgtOrder]
+  )
+  const isPools = sourcePhase?.phaseType === 'Pools' && (parseInt(sourcePhase?.poolCount) || 0) > 1
+  const poolCount = parseInt(sourcePhase?.poolCount) || 1
 
   // Build source exit slots
   const exitSlots = useMemo(() => {
+    if (!sourcePhase) return []
     const advancing = parseInt(sourcePhase.advancingSlotCount) || 0
     if (isPools) {
       const advPerPool = Math.max(1, Math.floor(advancing / poolCount))
@@ -679,6 +683,7 @@ const EdgeConfigPanel = ({ sourcePhase, targetPhase, sourceIdx, targetIdx, rules
 
   // Build target incoming slots
   const inSlots = useMemo(() => {
+    if (!targetPhase) return []
     const count = parseInt(targetPhase.incomingSlotCount) || 0
     return Array.from({ length: count }, (_, i) => ({ id: `${i + 1}`, label: `${i + 1}`, slotNumber: i + 1 }))
   }, [targetPhase])
@@ -721,6 +726,9 @@ const EdgeConfigPanel = ({ sourcePhase, targetPhase, sourceIdx, targetIdx, rules
     })
     return taken
   }, [rules, srcOrder, tgtOrder])
+
+  // Early return AFTER all hooks
+  if (!sourcePhase || !targetPhase) return null
 
   const updateRules = (newMappings) => {
     const otherRules = rules.filter(r => !(r.sourcePhaseOrder === srcOrder && r.targetPhaseOrder === tgtOrder))

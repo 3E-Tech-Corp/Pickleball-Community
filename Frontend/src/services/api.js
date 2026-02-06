@@ -455,9 +455,6 @@ export const themeApi = {
     });
   },
 
-  // Delete hero video (admin only)
-  deleteHeroVideo: () => api.delete('/theme/hero-video'),
-
   // Upload hero image (admin only)
   uploadHeroImage: (file) => {
     const formData = new FormData();
