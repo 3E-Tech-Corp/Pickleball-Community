@@ -66,15 +66,19 @@ BEGIN
             -- Event check-ins checked by
             UPDATE EventCheckIns SET CheckedInByUserId = NULL WHERE CheckedInByUserId = @UserId;
             
-            -- Club finance transactions (various nullable user refs)
+            -- Club finance transactions (ApprovedByUserId and VoidedByUserId are nullable, RecordedByUserId is NOT NULL)
             UPDATE ClubFinanceTransactions SET ApprovedByUserId = NULL WHERE ApprovedByUserId = @UserId;
-            UPDATE ClubFinanceTransactions SET RecordedByUserId = NULL WHERE RecordedByUserId = @UserId;
             UPDATE ClubFinanceTransactions SET VoidedByUserId = NULL WHERE VoidedByUserId = @UserId;
+            -- For RecordedByUserId (NOT NULL), we delete the transaction
+            DELETE FROM ClubFinanceTransactionAttachments WHERE TransactionId IN (SELECT Id FROM ClubFinanceTransactions WHERE RecordedByUserId = @UserId);
+            DELETE FROM ClubFinanceTransactions WHERE RecordedByUserId = @UserId;
             
-            -- Club grant transactions
+            -- Club grant transactions (ApprovedByUserId and VoidedByUserId are nullable, ProcessedByUserId is NOT NULL)
             UPDATE ClubGrantTransactions SET ApprovedByUserId = NULL WHERE ApprovedByUserId = @UserId;
-            UPDATE ClubGrantTransactions SET ProcessedByUserId = NULL WHERE ProcessedByUserId = @UserId;
             UPDATE ClubGrantTransactions SET VoidedByUserId = NULL WHERE VoidedByUserId = @UserId;
+            -- For ProcessedByUserId (NOT NULL), delete the transaction and its attachments
+            DELETE FROM GrantTransactionAttachments WHERE TransactionId IN (SELECT Id FROM ClubGrantTransactions WHERE ProcessedByUserId = @UserId);
+            DELETE FROM ClubGrantTransactions WHERE ProcessedByUserId = @UserId;
             
             -- Division phases locked by
             UPDATE DivisionPhases SET LockedByUserId = NULL WHERE LockedByUserId = @UserId;
@@ -86,12 +90,12 @@ BEGIN
             -- Event match lineups (submitted by)
             UPDATE EventMatchLineups SET SubmittedByUserId = NULL WHERE SubmittedByUserId = @UserId;
             
-            -- Event game score history
-            UPDATE EventGameScoreHistory SET ChangedByUserId = NULL WHERE ChangedByUserId = @UserId;
+            -- Event game score history (ChangedByUserId is NOT NULL, so delete)
+            DELETE FROM EventGameScoreHistory WHERE ChangedByUserId = @UserId;
             
             -- InstaGame matches
-            UPDATE InstaGameMatches SET ConfirmedByUserId = NULL WHERE ConfirmedByUserId = @UserId;
-            UPDATE InstaGameMatches SET SubmittedByUserId = NULL WHERE SubmittedByUserId = @UserId;
+            UPDATE InstaGameMatches SET ScoreConfirmedByUserId = NULL WHERE ScoreConfirmedByUserId = @UserId;
+            UPDATE InstaGameMatches SET ScoreSubmittedByUserId = NULL WHERE ScoreSubmittedByUserId = @UserId;
             
             -- Phase slots
             UPDATE PhaseSlots SET ResolvedByUserId = NULL WHERE ResolvedByUserId = @UserId;
@@ -108,15 +112,25 @@ BEGIN
             -- Video review requests (accepted by)
             UPDATE VideoReviewRequests SET AcceptedByCoachId = NULL WHERE AcceptedByCoachId = @UserId;
             
-            -- Release notes
-            UPDATE ReleaseNotes SET CreatedByUserId = NULL WHERE CreatedByUserId = @UserId;
+            -- Release notes (UpdatedByUserId is nullable, CreatedByUserId is NOT NULL)
             UPDATE ReleaseNotes SET UpdatedByUserId = NULL WHERE UpdatedByUserId = @UserId;
+            DELETE FROM UserDismissedReleases WHERE ReleaseId IN (SELECT Id FROM ReleaseNotes WHERE CreatedByUserId = @UserId);
+            DELETE FROM ReleaseNotes WHERE CreatedByUserId = @UserId;
             
             -- Game history recorded by
             UPDATE GameHistory SET RecordedByUserId = NULL WHERE RecordedByUserId = @UserId;
             
-            -- Object assets
-            UPDATE ObjectAssets SET UploadedByUserId = NULL WHERE UploadedByUserId = @UserId;
+            -- Object assets (UploadedByUserId is NOT NULL, so delete instead of update)
+            DELETE FROM ObjectAssets WHERE UploadedByUserId = @UserId;
+            
+            -- Club documents (UploadedByUserId is NOT NULL)
+            DELETE FROM ClubDocuments WHERE UploadedByUserId = @UserId;
+            
+            -- Event documents (UploadedByUserId is NOT NULL)
+            DELETE FROM EventDocuments WHERE UploadedByUserId = @UserId;
+            
+            -- Grant transaction attachments (UploadedByUserId is NOT NULL) - also deleted above for ProcessedByUserId
+            DELETE FROM GrantTransactionAttachments WHERE UploadedByUserId = @UserId;
         END
         ELSE
         BEGIN
@@ -472,9 +486,12 @@ BEGIN
         IF OBJECT_ID('GrantManagers', 'U') IS NOT NULL
         BEGIN
             IF @DryRun = 0
+            BEGIN
                 DELETE FROM GrantManagers WHERE UserId = @UserId;
+                DELETE FROM GrantManagers WHERE CreatedByUserId = @UserId;
+            END
             ELSE
-                SELECT 'GrantManagers' AS [Table], COUNT(*) AS [ToDelete] FROM GrantManagers WHERE UserId = @UserId;
+                SELECT 'GrantManagers' AS [Table], COUNT(*) AS [ToDelete] FROM GrantManagers WHERE UserId = @UserId OR CreatedByUserId = @UserId;
         END
 
         IF OBJECT_ID('LeagueManagers', 'U') IS NOT NULL
@@ -497,9 +514,9 @@ BEGIN
         IF OBJECT_ID('SiteContent', 'U') IS NOT NULL
         BEGIN
             IF @DryRun = 0
-                DELETE FROM SiteContent WHERE UpdatedByUserId = @UserId;
+                UPDATE SiteContent SET LastUpdatedByUserId = NULL WHERE LastUpdatedByUserId = @UserId;
             ELSE
-                SELECT 'SiteContent' AS [Table], COUNT(*) AS [ToDelete] FROM SiteContent WHERE UpdatedByUserId = @UserId;
+                SELECT 'SiteContent' AS [Table], COUNT(*) AS [ToUpdate] FROM SiteContent WHERE LastUpdatedByUserId = @UserId;
         END
 
         -- Coach profile
