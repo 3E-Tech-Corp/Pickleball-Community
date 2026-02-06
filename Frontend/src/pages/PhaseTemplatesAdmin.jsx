@@ -1124,17 +1124,20 @@ const CanvasPhaseEditorInner = ({ visualState, onChange }) => {
         return s.targetSlotNumber !== i + 1
       })
 
-      // Determine if this edge only maps winners or losers
+      // Show exit position numbers (1 for gold, 2 for silver, 3 for bronze, etc.)
       let label
-      if (srcPhase?.phaseType === 'BracketRound') {
-        const numMatches = Math.floor((parseInt(srcPhase.incomingSlotCount) || 0) / 2)
-        const hasWinners = connRules.some(r => r.finishPosition <= numMatches)
-        const hasLosers = connRules.some(r => r.finishPosition > numMatches)
-        if (hasWinners && !hasLosers) label = `${count} Winners`
-        else if (hasLosers && !hasWinners) label = `${count} Losers`
-        else label = srcPhase ? `Top ${count}` : `${count} slots`
+      const positions = connRules.map(r => r.finishPosition).sort((a, b) => a - b)
+      if (count === 1) {
+        // Single slot: just show the position number
+        label = `${positions[0]}`
       } else {
-        label = srcPhase ? `Top ${count}` : `${count} slots`
+        // Multiple slots: show range if consecutive, otherwise comma-separated
+        const isConsecutive = positions.every((p, i) => i === 0 || p === positions[i - 1] + 1)
+        if (isConsecutive && positions.length > 2) {
+          label = `${positions[0]}-${positions[positions.length - 1]}`
+        } else {
+          label = positions.join(', ')
+        }
       }
       const customLabel = isCustom ? '🔀 ' : ''
       const displayLabel = isSelected ? `✏️ ${label}` : `${customLabel}${label}`
