@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import api, { scoreMethodsApi } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
-import { useNotifications } from '../contexts/NotificationContext';
+import { useNotifications } from '../hooks/useNotifications';
 import { getSharedAssetUrl } from '../services/api';
 import HelpIcon from '../components/ui/HelpIcon';
 import GameScoreModal from '../components/ui/GameScoreModal';
