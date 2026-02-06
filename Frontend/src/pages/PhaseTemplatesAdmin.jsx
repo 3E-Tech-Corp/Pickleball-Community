@@ -1128,20 +1128,17 @@ const CanvasPhaseEditorInner = ({ visualState, onChange }) => {
         return s.targetSlotNumber !== i + 1
       })
 
-      // Show exit position numbers (1 for gold, 2 for silver, 3 for bronze, etc.)
+      // Show exit position numbers sorted by target (incoming) slot number
+      // So if slot 3 → Gold(1), slot 2 → Silver(2), slot 1 → Bronze(3), label shows "3, 2, 1"
       let label
-      const positions = connRules.map(r => r.finishPosition).sort((a, b) => a - b)
+      const sortedByTarget = [...connRules].sort((a, b) => a.targetSlotNumber - b.targetSlotNumber)
+      const positions = sortedByTarget.map(r => r.finishPosition)
       if (count === 1) {
         // Single slot: just show the position number
         label = `${positions[0]}`
       } else {
-        // Multiple slots: show range if consecutive, otherwise comma-separated
-        const isConsecutive = positions.every((p, i) => i === 0 || p === positions[i - 1] + 1)
-        if (isConsecutive && positions.length > 2) {
-          label = `${positions[0]}-${positions[positions.length - 1]}`
-        } else {
-          label = positions.join(', ')
-        }
+        // Multiple slots: show comma-separated in target slot order
+        label = positions.join(', ')
       }
       const customLabel = isCustom ? '🔀 ' : ''
       const displayLabel = isSelected ? `✏️ ${label}` : `${customLabel}${label}`
