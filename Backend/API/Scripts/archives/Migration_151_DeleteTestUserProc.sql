@@ -11,6 +11,11 @@ IF EXISTS (SELECT * FROM sys.objects WHERE type = 'P' AND name = 'sp_DeleteTestU
     DROP PROCEDURE sp_DeleteTestUser;
 GO
 
+-- Required for tables with indexed views, filtered indexes, computed columns
+SET QUOTED_IDENTIFIER ON;
+SET ANSI_NULLS ON;
+GO
+
 CREATE PROCEDURE sp_DeleteTestUser
     @UserId INT,
     @DryRun BIT = 1,  -- Default to dry run for safety
