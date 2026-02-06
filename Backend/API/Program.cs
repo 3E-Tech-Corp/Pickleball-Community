@@ -148,6 +148,7 @@ builder.Services.AddScoped<ITournamentFeeService, TournamentFeeService>();
 builder.Services.AddScoped<ITournamentManagementService, TournamentManagementService>();
 builder.Services.AddScoped<IVideoRoomService, VideoRoomService>();
 builder.Services.AddScoped<IGameDayPlayerStatusService, GameDayPlayerStatusService>();
+builder.Services.AddScoped<IGameNotificationService, GameNotificationService>();
 builder.Services.AddMemoryCache();
 builder.Services.AddHttpClient<IGeocodingService, GeocodingService>();
 
