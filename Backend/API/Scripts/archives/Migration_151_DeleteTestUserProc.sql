@@ -1,7 +1,7 @@
 -- Migration Script: Create sp_DeleteTestUser stored procedure
 -- Date: 2025-02-06
--- Description: Deletes a test user from PickleballCommunity and FTPBAuth databases
--- IMPORTANT: ExternalLogins in FTPBAuth has ON DELETE CASCADE, so deleting from FTPBAuth.Users handles it automatically
+-- Description: Deletes a test user from PickleballCommunity and FuntimeIdentity databases
+-- IMPORTANT: ExternalLogins in FuntimeIdentity has ON DELETE CASCADE, so deleting from FuntimeIdentity.Users handles it automatically
 
 USE PickleballCommunity;
 GO
@@ -538,24 +538,24 @@ BEGIN
             SELECT 'Users (PickleballCommunity)' AS [Table], 1 AS [ToDelete];
 
         -- =============================================
-        -- STEP 4: Delete from FTPBAuth.Users (cascades to ExternalLogins)
+        -- STEP 4: Delete from FuntimeIdentity.Users (cascades to ExternalLogins)
         -- =============================================
-        IF @Verbose = 1 PRINT 'Deleting from FTPBAuth.Users (cascades to ExternalLogins)...';
+        IF @Verbose = 1 PRINT 'Deleting from FuntimeIdentity.Users (cascades to ExternalLogins)...';
 
-        IF EXISTS (SELECT 1 FROM FTPBAuth.dbo.Users WHERE Id = @UserId)
+        IF EXISTS (SELECT 1 FROM FuntimeIdentity.dbo.Users WHERE Id = @UserId)
         BEGIN
             IF @DryRun = 0
-                DELETE FROM FTPBAuth.dbo.Users WHERE Id = @UserId;
+                DELETE FROM FuntimeIdentity.dbo.Users WHERE Id = @UserId;
             ELSE
             BEGIN
-                SELECT 'Users (FTPBAuth)' AS [Table], 1 AS [ToDelete];
-                SELECT 'ExternalLogins (FTPBAuth - CASCADE)' AS [Table], COUNT(*) AS [ToDelete]
-                FROM FTPBAuth.dbo.ExternalLogins WHERE UserId = @UserId;
+                SELECT 'Users (FuntimeIdentity)' AS [Table], 1 AS [ToDelete];
+                SELECT 'ExternalLogins (FuntimeIdentity - CASCADE)' AS [Table], COUNT(*) AS [ToDelete]
+                FROM FuntimeIdentity.dbo.ExternalLogins WHERE UserId = @UserId;
             END
         END
         ELSE
         BEGIN
-            IF @Verbose = 1 PRINT 'User not found in FTPBAuth.Users (may have been deleted already)';
+            IF @Verbose = 1 PRINT 'User not found in FuntimeIdentity.Users (may have been deleted already)';
         END
 
         -- =============================================
