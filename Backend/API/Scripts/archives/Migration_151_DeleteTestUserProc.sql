@@ -114,11 +114,11 @@ BEGIN
             
             -- Release notes (UpdatedByUserId is nullable, CreatedByUserId is NOT NULL)
             UPDATE ReleaseNotes SET UpdatedByUserId = NULL WHERE UpdatedByUserId = @UserId;
-            DELETE FROM UserDismissedReleases WHERE ReleaseId IN (SELECT Id FROM ReleaseNotes WHERE CreatedByUserId = @UserId);
+            DELETE FROM UserDismissedReleases WHERE ReleaseNoteId IN (SELECT Id FROM ReleaseNotes WHERE CreatedByUserId = @UserId);
             DELETE FROM ReleaseNotes WHERE CreatedByUserId = @UserId;
             
-            -- Game history recorded by
-            UPDATE GameHistory SET RecordedByUserId = NULL WHERE RecordedByUserId = @UserId;
+            -- Game history (RecordedById is NOT NULL, so delete)
+            DELETE FROM GameHistory WHERE RecordedById = @UserId;
             
             -- Object assets (UploadedByUserId is NOT NULL, so delete instead of update)
             DELETE FROM ObjectAssets WHERE UploadedByUserId = @UserId;
