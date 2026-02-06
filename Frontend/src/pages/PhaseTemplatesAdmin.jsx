@@ -5,7 +5,7 @@ import {
   Copy, ChevronDown, ChevronUp, Eye, EyeOff, Code, FileJson, Save, GitBranch,
   Trophy, Users, Hash, ArrowRight, Clock, Zap, Settings, Award, Move,
   LayoutGrid, List, Shuffle, Repeat, Grid3X3, Swords, Target, GripVertical,
-  ArrowLeft, Info, Lightbulb, MousePointer, Link, ChevronRight
+  ArrowLeft, Info, Lightbulb, MousePointer, Link, ChevronRight, ChevronsUpDown
 } from 'lucide-react'
 import {
   ReactFlow,
@@ -540,7 +540,9 @@ function getLayoutedElements(nodes, edges, direction = 'TB') {
 
 // Custom Phase Node — compact by default, expand on button click
 const PhaseNode = memo(({ data, selected }) => {
-  const [expanded, setExpanded] = useState(false)
+  const [localExpanded, setLocalExpanded] = useState(false)
+  // forceExpand: null = use local state, true = force expanded, false = force collapsed
+  const expanded = data.forceExpand !== null ? data.forceExpand : localExpanded
   const colors = PHASE_TYPE_COLORS[data.phaseType] || PHASE_TYPE_COLORS.SingleElimination
   const Icon = PHASE_TYPE_ICONS[data.phaseType] || GitBranch
 
@@ -559,7 +561,7 @@ const PhaseNode = memo(({ data, selected }) => {
         <span className="text-white text-xs font-semibold truncate flex-1">{data.label}</span>
         <span className="text-white/70 text-[10px] mr-1">#{data.sortOrder}</span>
         <button
-          onClick={(e) => { e.stopPropagation(); setExpanded(v => !v) }}
+          onClick={(e) => { e.stopPropagation(); setLocalExpanded(v => !v) }}
           className="text-white/60 hover:text-white transition-colors p-0.5 rounded"
           title={expanded ? 'Collapse' : 'Expand'}
         >
@@ -1070,9 +1072,10 @@ const CanvasPhaseEditorInner = ({ visualState, onChange }) => {
   const [selectedNodeId, setSelectedNodeId] = useState(null)
   const [selectedEdgeKey, setSelectedEdgeKey] = useState(null) // "srcIdx-tgtIdx"
   const [layoutDirection, setLayoutDirection] = useState('TB') // 'TB' | 'LR'
+  const [expandAll, setExpandAll] = useState(false) // Toggle all nodes expanded/collapsed
 
   // Convert visualState phases to React Flow nodes
-  const buildNodes = useCallback((phases, dir = 'TB') => {
+  const buildNodes = useCallback((phases, dir = 'TB', forceExpand = null) => {
     return phases.map((phase, idx) => ({
       id: `phase-${idx}`,
       type: 'phaseNode',
@@ -1089,6 +1092,7 @@ const CanvasPhaseEditorInner = ({ visualState, onChange }) => {
         awardType: phase.awardType,
         drawMethod: phase.drawMethod,
         layoutDirection: dir,
+        forceExpand, // null = use local state, true = force expanded, false = force collapsed
       },
     }))
   }, [])
@@ -1744,6 +1748,19 @@ const CanvasPhaseEditorInner = ({ visualState, onChange }) => {
             <button onClick={handleExportImage}
               className="flex items-center gap-1 px-2.5 py-1.5 bg-white border rounded-lg shadow-sm text-xs font-medium text-gray-600 hover:bg-gray-50">
               <Eye className="w-3.5 h-3.5" /> Export PNG
+            </button>
+            <button onClick={() => {
+              const newExpand = !expandAll
+              setExpandAll(newExpand)
+              // Rebuild nodes with forceExpand to trigger re-render
+              const newNodes = buildNodes(vs.phases, layoutDirection, newExpand)
+              const edges = buildEdges(vs.advancementRules, vs.phases, selectedEdgeKey)
+              const { nodes: layoutedNodes } = getLayoutedElements(newNodes, edges, layoutDirection)
+              setNodes(layoutedNodes)
+            }}
+              className="flex items-center gap-1 px-2.5 py-1.5 bg-white border rounded-lg shadow-sm text-xs font-medium text-gray-600 hover:bg-gray-50">
+              {expandAll ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronsUpDown className="w-3.5 h-3.5" />}
+              {expandAll ? 'Collapse All' : 'Expand All'}
             </button>
             <div className="flex items-center bg-white border rounded-lg shadow-sm overflow-hidden">
               <button onClick={() => handleDirectionChange('TB')}
