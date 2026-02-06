@@ -85,7 +85,6 @@ public class SharedAuthService : ISharedAuthService
 
             // Extract user info from claims
             var claims = jwtToken.Claims.ToList();
-            _logger.LogInformation("JWT Claims: {Claims}", string.Join(", ", claims.Select(c => $"{c.Type}={c.Value}")));
 
             // Try different claim types for user ID (FuntimePickleball uses "nameid")
             var userIdClaim = claims.FirstOrDefault(c => c.Type == "nameid" || c.Type == "sub" || c.Type == ClaimTypes.NameIdentifier || c.Type == "userId" || c.Type == "UserId" || c.Type == "id");
@@ -136,8 +135,7 @@ public class SharedAuthService : ISharedAuthService
                 IsValid = true
             };
 
-            _logger.LogInformation("Decoded token for user {UserId} ({Email}) - FirstName: {FirstName}, LastName: {LastName}, Avatar: {Avatar}", 
-                userInfo.Id, userInfo.Email, userInfo.FirstName ?? "(null)", userInfo.LastName ?? "(null)", userInfo.ProfileImageUrl ?? "(null)");
+            _logger.LogInformation("Decoded token for user {UserId} ({Email})", userInfo.Id, userInfo.Email);
             return Task.FromResult<SharedUserInfo?>(userInfo);
         }
         catch (Exception ex)
