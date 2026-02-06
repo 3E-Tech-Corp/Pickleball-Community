@@ -2,7 +2,8 @@ import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Users, LayoutGrid, Play, Settings, Plus, Trash2, ChevronDown, ChevronUp,
-  Clock, CheckCircle, XCircle, Pause, RefreshCw, ArrowLeft, Edit2, Save, X, Info
+  Clock, CheckCircle, XCircle, Pause, RefreshCw, ArrowLeft, Edit2, Save, X, Info,
+  Bell, BellRing, Send
 } from 'lucide-react';
 import api, { scoreMethodsApi } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
@@ -31,7 +32,10 @@ const gamedayApi = {
   checkInPlayer: (eventId, userId) => api.post(`/gameday/events/${eventId}/check-in`, { userId }),
   bulkCheckIn: (eventId, userIds) => api.post(`/gameday/events/${eventId}/bulk-check-in`, { userIds }),
   checkInAll: (eventId) => api.post(`/gameday/events/${eventId}/check-in-all`),
-  undoCheckIn: (eventId, userId) => api.post(`/gameday/events/${eventId}/undo-check-in`, { userId })
+  undoCheckIn: (eventId, userId) => api.post(`/gameday/events/${eventId}/undo-check-in`, { userId }),
+  // Push check-in
+  sendCheckInPush: (eventId, userId) => api.post(`/gameday/events/${eventId}/send-checkin-push`, { userId }),
+  getPlayersPushStatus: (eventId) => api.get(`/gameday/events/${eventId}/players-push-status`)
 };
 
 const TABS = [
@@ -389,6 +393,26 @@ const OverviewTab = ({ data, onGameClick }) => {
 const PlayersTab = ({ data, selectedDivision, setSelectedDivision, eventId, onRefresh }) => {
   const [checkingIn, setCheckingIn] = useState(null);
   const [bulkCheckingIn, setBulkCheckingIn] = useState(false);
+  const [sendingPush, setSendingPush] = useState(null);
+  const [pushStatus, setPushStatus] = useState({}); // userId -> { status, message }
+
+  // Handle sending push check-in notification
+  const handleSendPush = async (userId, memberName) => {
+    setSendingPush(userId);
+    try {
+      const res = await gamedayApi.sendCheckInPush(eventId, userId);
+      if (res.success) {
+        setPushStatus(prev => ({ ...prev, [userId]: { status: 'pending', message: res.message } }));
+      } else {
+        setPushStatus(prev => ({ ...prev, [userId]: { status: res.pushStatus || 'failed', message: res.message } }));
+      }
+    } catch (err) {
+      console.error('Error sending push:', err);
+      setPushStatus(prev => ({ ...prev, [userId]: { status: 'failed', message: 'Failed to send' } }));
+    } finally {
+      setSendingPush(null);
+    }
+  };
 
   // Calculate stats
   const selectedDivisionData = data.divisions.find(d => d.id === selectedDivision);
@@ -515,6 +539,36 @@ const PlayersTab = ({ data, selectedDivision, setSelectedDivision, eventId, onRe
                           </div>
                         )}
                         <span className="text-sm text-gray-700">{member.name}</span>
+                        
+                        {/* Push status indicator */}
+                        {pushStatus[member.userId] && (
+                          <span className={`text-xs px-1.5 py-0.5 rounded ${
+                            pushStatus[member.userId].status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
+                            pushStatus[member.userId].status === 'none' ? 'bg-gray-100 text-gray-500' :
+                            'bg-red-100 text-red-700'
+                          }`} title={pushStatus[member.userId].message}>
+                            {pushStatus[member.userId].status === 'pending' ? '📤' : 
+                             pushStatus[member.userId].status === 'none' ? '🔕' : '❌'}
+                          </span>
+                        )}
+                        
+                        {/* Send push button - only show if not checked in */}
+                        {!member.isCheckedIn && (
+                          <button
+                            onClick={() => handleSendPush(member.userId, member.name)}
+                            disabled={sendingPush === member.userId}
+                            className="p-1 rounded text-orange-500 hover:bg-orange-100 transition"
+                            title="Send check-in push notification"
+                          >
+                            {sendingPush === member.userId ? (
+                              <RefreshCw className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <Bell className="w-4 h-4" />
+                            )}
+                          </button>
+                        )}
+                        
+                        {/* Check-in button */}
                         <button
                           onClick={() => handleToggleCheckIn(member.userId, member.isCheckedIn)}
                           disabled={checkingIn === member.userId}
@@ -523,7 +577,7 @@ const PlayersTab = ({ data, selectedDivision, setSelectedDivision, eventId, onRe
                               ? 'text-green-600 hover:bg-green-200'
                               : 'text-blue-600 hover:bg-blue-100'
                           }`}
-                          title={member.isCheckedIn ? "Undo check-in" : "Check in"}
+                          title={member.isCheckedIn ? "Undo check-in" : "Manual check in"}
                         >
                           {checkingIn === member.userId ? (
                             <RefreshCw className="w-4 h-4 animate-spin" />

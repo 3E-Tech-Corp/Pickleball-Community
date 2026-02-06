@@ -303,6 +303,26 @@ public class EventUnitMember
     [MaxLength(500)]
     public string? MergedWaiverPdfUrl { get; set; }
 
+    // ==========================================
+    // Push Check-In Fields
+    // ==========================================
+
+    /// <summary>
+    /// When push notification was sent for check-in
+    /// </summary>
+    public DateTime? CheckInPushSentAt { get; set; }
+
+    /// <summary>
+    /// Token for verifying push check-in confirmation
+    /// </summary>
+    [MaxLength(255)]
+    public string? CheckInPushToken { get; set; }
+
+    /// <summary>
+    /// When the player confirmed check-in via push link
+    /// </summary>
+    public DateTime? CheckInPushConfirmedAt { get; set; }
+
     public DateTime CreatedAt { get; set; } = DateTime.Now;
 
     // Navigation

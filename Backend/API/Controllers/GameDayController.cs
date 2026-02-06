@@ -20,17 +20,23 @@ public class GameDayController : EventControllerBase
     private readonly ILogger<GameDayController> _logger;
     private readonly IScoreBroadcaster _scoreBroadcaster;
     private readonly IGameDayPlayerStatusService _playerStatusService;
+    private readonly IPushNotificationService _pushService;
+    private readonly IConfiguration _configuration;
 
     public GameDayController(
         ApplicationDbContext context,
         ILogger<GameDayController> logger,
         IScoreBroadcaster scoreBroadcaster,
-        IGameDayPlayerStatusService playerStatusService)
+        IGameDayPlayerStatusService playerStatusService,
+        IPushNotificationService pushService,
+        IConfiguration configuration)
         : base(context)
     {
         _logger = logger;
         _scoreBroadcaster = scoreBroadcaster;
         _playerStatusService = playerStatusService;
+        _pushService = pushService;
+        _configuration = configuration;
     }
 
     // ==========================================
@@ -1722,6 +1728,222 @@ public class GameDayController : EventControllerBase
                 isCheckedIn = false
             }
         });
+    }
+
+    // ==========================================
+    // Push Check-In (verify push works + confirm presence)
+    // ==========================================
+
+    /// <summary>
+    /// Send a check-in push notification to a player
+    /// </summary>
+    [HttpPost("events/{eventId}/send-checkin-push")]
+    public async Task<IActionResult> SendCheckInPush(int eventId, [FromBody] CheckInPlayerDto dto)
+    {
+        var organizerId = GetUserId();
+        if (!organizerId.HasValue)
+            return Unauthorized(new { success = false, message = "Unauthorized" });
+
+        if (!await IsEventOrganizerAsync(eventId, organizerId.Value))
+            return Forbid();
+
+        // Find the player's membership
+        var membership = await _context.EventUnitMembers
+            .Include(m => m.Unit)
+                .ThenInclude(u => u!.Division)
+                    .ThenInclude(d => d!.Event)
+            .Include(m => m.User)
+            .FirstOrDefaultAsync(m => m.Unit!.EventId == eventId &&
+                                      m.UserId == dto.UserId &&
+                                      m.InviteStatus == "Accepted");
+
+        if (membership == null)
+            return NotFound(new { success = false, message = "Player not found in this event" });
+
+        // Check if user has push subscriptions
+        var hasPushSubscription = await _context.PushSubscriptions
+            .AnyAsync(ps => ps.UserId == dto.UserId && ps.IsActive);
+
+        if (!hasPushSubscription)
+        {
+            return Ok(new { 
+                success = false, 
+                message = "Player has no push subscription. They need to enable notifications in their browser.",
+                pushStatus = "none"
+            });
+        }
+
+        // Generate a secure token for check-in confirmation
+        var token = GenerateCheckInToken(eventId, dto.UserId);
+        
+        // Store pending check-in request
+        membership.CheckInPushSentAt = DateTime.Now;
+        membership.CheckInPushToken = token;
+        await _context.SaveChangesAsync();
+
+        // Build confirmation URL
+        var baseUrl = _configuration["AppSettings:FrontendUrl"] ?? "https://pickleball.community";
+        var confirmUrl = $"{baseUrl}/confirm-checkin?token={token}";
+        
+        var eventName = membership.Unit?.Division?.Event?.Name ?? "the event";
+        var playerName = Utility.FormatName(membership.User?.LastName, membership.User?.FirstName);
+
+        // Send push notification
+        var sentCount = await _pushService.SendToUserAsync(
+            dto.UserId,
+            $"Check-In: {eventName}",
+            $"Tap to confirm you're at the venue and ready to play!",
+            confirmUrl,
+            "/icons/check-in-192.png"
+        );
+
+        if (sentCount > 0)
+        {
+            _logger.LogInformation("Sent check-in push to user {UserId} for event {EventId}", dto.UserId, eventId);
+            return Ok(new {
+                success = true,
+                message = $"Check-in push sent to {playerName}",
+                pushStatus = "pending",
+                sentTo = sentCount
+            });
+        }
+        else
+        {
+            return Ok(new {
+                success = false,
+                message = "Failed to send push notification. Subscription may be expired.",
+                pushStatus = "failed"
+            });
+        }
+    }
+
+    /// <summary>
+    /// Confirm check-in via push notification link (player-facing)
+    /// </summary>
+    [HttpGet("confirm-checkin")]
+    [AllowAnonymous]
+    public async Task<IActionResult> ConfirmCheckInViaPush([FromQuery] string token)
+    {
+        if (string.IsNullOrEmpty(token))
+            return BadRequest(new { success = false, message = "Invalid token" });
+
+        // Parse and validate token
+        var (eventId, userId, isValid) = ParseCheckInToken(token);
+        if (!isValid || eventId == 0 || userId == 0)
+            return BadRequest(new { success = false, message = "Invalid or expired token" });
+
+        // Find the membership with matching token
+        var membership = await _context.EventUnitMembers
+            .Include(m => m.Unit)
+                .ThenInclude(u => u!.Division)
+                    .ThenInclude(d => d!.Event)
+            .Include(m => m.User)
+            .FirstOrDefaultAsync(m => m.Unit!.EventId == eventId &&
+                                      m.UserId == userId &&
+                                      m.InviteStatus == "Accepted" &&
+                                      m.CheckInPushToken == token);
+
+        if (membership == null)
+            return NotFound(new { success = false, message = "Check-in request not found or already used" });
+
+        // Check if token is expired (valid for 4 hours)
+        if (membership.CheckInPushSentAt.HasValue && 
+            DateTime.Now - membership.CheckInPushSentAt.Value > TimeSpan.FromHours(4))
+        {
+            return BadRequest(new { success = false, message = "Check-in link has expired" });
+        }
+
+        // Confirm check-in
+        membership.IsCheckedIn = true;
+        membership.CheckedInAt = DateTime.Now;
+        membership.CheckInPushConfirmedAt = DateTime.Now;
+        membership.CheckInPushToken = null; // Clear token after use
+        await _context.SaveChangesAsync();
+
+        var eventName = membership.Unit?.Division?.Event?.Name ?? "the event";
+        var playerName = Utility.FormatName(membership.User?.LastName, membership.User?.FirstName);
+
+        _logger.LogInformation("Player {UserId} confirmed check-in via push for event {EventId}", userId, eventId);
+
+        // Return success page or redirect
+        return Ok(new {
+            success = true,
+            message = $"You're checked in for {eventName}!",
+            playerName = playerName,
+            eventName = eventName,
+            checkedInAt = membership.CheckedInAt
+        });
+    }
+
+    /// <summary>
+    /// Get push subscription status for players (for UI to show push status)
+    /// </summary>
+    [HttpGet("events/{eventId}/players-push-status")]
+    public async Task<IActionResult> GetPlayersPushStatus(int eventId)
+    {
+        var userId = GetUserId();
+        if (!userId.HasValue)
+            return Unauthorized(new { success = false, message = "Unauthorized" });
+
+        if (!await IsEventOrganizerAsync(eventId, userId.Value))
+            return Forbid();
+
+        // Get all players and their push subscription status
+        var players = await _context.EventUnitMembers
+            .Where(m => m.Unit!.EventId == eventId && m.InviteStatus == "Accepted")
+            .Select(m => new {
+                userId = m.UserId,
+                isCheckedIn = m.IsCheckedIn,
+                checkedInAt = m.CheckedInAt,
+                checkInPushSentAt = m.CheckInPushSentAt,
+                checkInPushConfirmedAt = m.CheckInPushConfirmedAt,
+                hasPushSubscription = _context.PushSubscriptions.Any(ps => ps.UserId == m.UserId && ps.IsActive)
+            })
+            .ToListAsync();
+
+        return Ok(new { success = true, data = players });
+    }
+
+    // Token generation/parsing helpers
+    private string GenerateCheckInToken(int eventId, int userId)
+    {
+        var timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        var data = $"{eventId}:{userId}:{timestamp}";
+        var bytes = System.Text.Encoding.UTF8.GetBytes(data);
+        return Convert.ToBase64String(bytes).Replace('+', '-').Replace('/', '_').TrimEnd('=');
+    }
+
+    private (int eventId, int userId, bool isValid) ParseCheckInToken(string token)
+    {
+        try
+        {
+            // Restore base64 padding
+            token = token.Replace('-', '+').Replace('_', '/');
+            switch (token.Length % 4)
+            {
+                case 2: token += "=="; break;
+                case 3: token += "="; break;
+            }
+            var bytes = Convert.FromBase64String(token);
+            var data = System.Text.Encoding.UTF8.GetString(bytes);
+            var parts = data.Split(':');
+            if (parts.Length != 3) return (0, 0, false);
+            
+            var eventId = int.Parse(parts[0]);
+            var userId = int.Parse(parts[1]);
+            var timestamp = long.Parse(parts[2]);
+            
+            // Check if token is not too old (24 hours max)
+            var tokenTime = DateTimeOffset.FromUnixTimeSeconds(timestamp);
+            if (DateTimeOffset.UtcNow - tokenTime > TimeSpan.FromHours(24))
+                return (0, 0, false);
+                
+            return (eventId, userId, true);
+        }
+        catch
+        {
+            return (0, 0, false);
+        }
     }
 
     // ==========================================
