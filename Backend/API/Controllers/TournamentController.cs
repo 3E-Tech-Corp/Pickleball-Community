@@ -2042,7 +2042,7 @@ public class TournamentController : EventControllerBase
         // Count pending join requests for this event
         var pendingJoinRequestCount = await _context.EventUnitJoinRequests
             .Include(r => r.Unit)
-            .CountAsync(r => r.Unit!.EventId == eventId && r.Status == "Pending");
+            .CountAsync(r => r.Unit != null && r.Unit.EventId == eventId && r.Status == "Pending");
 
         var dashboard = new TournamentDashboardDto
         {
