@@ -31,14 +31,15 @@ public class ClubFinanceController : ControllerBase
     {
         var membership = await _context.ClubMembers
             .Where(m => m.ClubId == clubId && m.UserId == userId && m.IsActive)
-            .Select(m => new { m.Role })
+            .Select(m => new { m.Role, m.Title })
             .FirstOrDefaultAsync();
 
         if (membership == null)
             return (false, false, null);
 
-        // Admin and Treasurer can edit
-        var canEdit = membership.Role == "Admin" || membership.Role == "Treasurer";
+        // Admin and Treasurer can edit (Treasurer is stored as Title, not Role)
+        var canEdit = membership.Role == "Admin" || 
+                      string.Equals(membership.Title, "Treasurer", StringComparison.OrdinalIgnoreCase);
         return (true, canEdit, membership.Role);
     }
 
