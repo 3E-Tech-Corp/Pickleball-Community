@@ -25,7 +25,7 @@ export default function EventView() {
   const [error, setError] = useState(null);
   const [selectedProfileUserId, setSelectedProfileUserId] = useState(null);
   const [userRegistrations, setUserRegistrations] = useState([]);
-  const [staffStatus, setStaffStatus] = useState(null); // { isStaff: boolean, status: string, roleName: string }
+  const [staffStatus, setStaffStatus] = useState(null); // EventStaffDto or null if not staff
   const [selectedAd, setSelectedAd] = useState(null); // For fullsize ad modal
 
   // Load event data
@@ -226,8 +226,18 @@ export default function EventView() {
           <span className="text-sm font-medium">Events</span>
         </Link>
 
-        {/* Admin Manage Button - Show for admins and organizers */}
-        {isAuthenticated && (isAdmin || user?.id === event.organizedByUserId) && (
+        {/* Admin Manage Button - Show for admins, organizers, and staff with management permissions */}
+        {isAuthenticated && (
+          isAdmin || 
+          user?.id === event.organizedByUserId || 
+          (staffStatus?.status === 'Active' && (
+            staffStatus?.canFullyManageEvent || 
+            staffStatus?.canManagePayments || 
+            staffStatus?.canViewAllData ||
+            staffStatus?.canManageSchedule ||
+            staffStatus?.canManageCourts
+          ))
+        ) && (
           <Link
             to={event.eventTypeName?.toLowerCase() === 'tournament'
               ? `/tournament/${eventId}/manage`
@@ -258,14 +268,14 @@ export default function EventView() {
               <div className="text-center text-gray-600">
                 <p className="font-medium">Registration opens {formatDate(event.registrationOpenDate)}</p>
               </div>
-            ) : isAuthenticated && (userRegistrations.length > 0 || staffStatus?.isStaff) ? (
+            ) : isAuthenticated && (userRegistrations.length > 0 || staffStatus) ? (
               <div className="space-y-2">
                 <div className="flex items-center justify-center gap-2 text-green-700 bg-green-100 py-2 px-4 rounded-lg">
                   <Check className="w-5 h-5" />
                   <span className="font-medium">
-                    {userRegistrations.length > 0 && staffStatus?.isStaff
+                    {userRegistrations.length > 0 && staffStatus
                       ? "You're registered as Player & Staff!"
-                      : staffStatus?.isStaff
+                      : staffStatus
                       ? "You're registered as Staff!"
                       : "You're registered!"}
                   </span>
@@ -794,7 +804,7 @@ export default function EventView() {
           {/* Bottom Register Button (mobile) */}
           <div className="p-4 bg-gray-50 border-t border-gray-100 sm:hidden">
             {!isEventPast && isRegistrationOpen && !isRegistrationClosed && (
-              isAuthenticated && (userRegistrations.length > 0 || staffStatus?.isStaff) ? (
+              isAuthenticated && (userRegistrations.length > 0 || staffStatus) ? (
                 <button
                   onClick={handleRegister}
                   className="w-full py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
