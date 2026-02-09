@@ -30,9 +30,10 @@ export const getSharedAssetUrl = (path) => {
     return path
   }
 
-  // For Funtime-Shared asset paths like /asset/123, use local proxy
+  // For Funtime-Shared asset paths like /asset/123 or /api/asset/123, use local proxy
   // This allows the backend to add API key authentication
-  const assetMatch = path.match(/^\/asset\/(\d+)/)
+  // Match both /asset/123 and /api/asset/123 formats
+  const assetMatch = path.match(/^(?:\/api)?\/asset\/(\d+)/)
   if (assetMatch) {
     const assetId = assetMatch[1]
     // In dev mode, API_BASE_URL is full URL (https://localhost:7009) - need absolute URL
@@ -48,12 +49,17 @@ export const getSharedAssetUrl = (path) => {
   // For other paths, use direct Funtime-Shared URL (fallback)
   const baseUrl = SHARED_AUTH_URL
 
-  // Keep the full path including /api if present
-  if (path.startsWith('/')) {
-    return `${baseUrl}${path}`
+  // Strip /api prefix if present to avoid double /api when concatenating
+  let cleanPath = path
+  if (path.startsWith('/api/')) {
+    cleanPath = path.substring(4) // Remove '/api' prefix
+  }
+
+  if (cleanPath.startsWith('/')) {
+    return `${baseUrl}${cleanPath}`
   }
   // For relative paths without leading slash, prepend base URL with /
-  return `${baseUrl}/${path}`
+  return `${baseUrl}/${cleanPath}`
 }
 
 // Export URLs for direct use if needed
