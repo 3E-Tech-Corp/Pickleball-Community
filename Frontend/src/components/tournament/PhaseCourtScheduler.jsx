@@ -720,7 +720,30 @@ export default function PhaseCourtScheduler({ eventId, data, onUpdate }) {
       {/* ─── Right Panel: Court Timeline ─── */}
       <div className="flex-1 bg-white rounded-xl border overflow-hidden flex flex-col">
         {/* Header with controls */}
-        <div className="p-4 border-b bg-gray-50 flex items-center gap-4">
+        <div className="p-4 border-b bg-gray-50 flex items-center gap-4 flex-wrap">
+          {/* Date Picker */}
+          <div className="flex items-center gap-2">
+            <Calendar className="w-4 h-4 text-gray-500" />
+            <input
+              type="date"
+              value={dayStart.toISOString().split('T')[0]}
+              onChange={(e) => {
+                const newDate = new Date(e.target.value)
+                // Update dayStart keeping the time
+                const newStart = new Date(dayStart)
+                newStart.setFullYear(newDate.getFullYear(), newDate.getMonth(), newDate.getDate())
+                setDayStart(newStart)
+                // Update dayEnd keeping the time
+                const newEnd = new Date(dayEnd)
+                newEnd.setFullYear(newDate.getFullYear(), newDate.getMonth(), newDate.getDate())
+                setDayEnd(newEnd)
+              }}
+              className="px-2 py-1 border rounded text-sm font-medium"
+            />
+          </div>
+          
+          <div className="h-6 border-l border-gray-300" />
+          
           <div className="flex items-center gap-2">
             <label className="text-sm text-gray-600">Start:</label>
             <input
