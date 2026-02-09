@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Calendar, Settings, Clock, ChevronRight, ChevronLeft,
   Check, Lock, Loader2, AlertCircle, ListOrdered, Grid3X3, Timer
@@ -53,23 +53,24 @@ export default function DivisionSchedulingWizard({
   const [phases, setPhases] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [hasAutoResumed, setHasAutoResumed] = useState(false);
+  const loadedRef = useRef(false);
   
-  // Step completion status
+  // Step completion status - simplified, computed from phases only
   const [stepStatus, setStepStatus] = useState({
     phases: { complete: false, encounterCount: 0 },
-    formats: { complete: false, configuredCount: 0 },
+    formats: { complete: true, configuredCount: 0 }, // Default to true for simple tournaments
     courts: { complete: false, assignedCount: 0 }
   });
 
-  // Load division and phases
+  // Load division and phases - only once on mount
   useEffect(() => {
-    if (divisionId) {
+    if (divisionId && !loadedRef.current) {
+      loadedRef.current = true;
       loadDivisionData();
     }
   }, [divisionId]);
 
-  const loadDivisionData = useCallback(async () => {
+  const loadDivisionData = async () => {
     try {
       setLoading(true);
       setError(null);
@@ -80,13 +81,29 @@ export default function DivisionSchedulingWizard({
         tournamentApi.getDivisionPhases(divisionId)
       ]);
 
+      let divisionData = null;
       if (configRes.success) {
-        setDivision(configRes.data);
+        divisionData = configRes.data;
+        setDivision(divisionData);
       }
 
       if (phasesRes.success) {
-        setPhases(phasesRes.data || []);
-        updateStepStatus(phasesRes.data || []);
+        const phasesData = phasesRes.data || [];
+        setPhases(phasesData);
+        
+        // Compute step status synchronously from phases data
+        const totalEncounters = phasesData.reduce((sum, p) => sum + (p.encounterCount || 0), 0);
+        const phasesComplete = phasesData.length > 0 && totalEncounters > 0;
+        
+        // For simple tournaments (1 match per encounter), formats step is auto-complete
+        const matchesPerEncounter = divisionData?.matchesPerEncounter || 1;
+        const formatsComplete = matchesPerEncounter <= 1;
+        
+        setStepStatus({
+          phases: { complete: phasesComplete, encounterCount: totalEncounters },
+          formats: { complete: formatsComplete, configuredCount: 0 },
+          courts: { complete: false, assignedCount: 0 }
+        });
       }
     } catch (err) {
       console.error('Error loading division data:', err);
@@ -94,74 +111,27 @@ export default function DivisionSchedulingWizard({
     } finally {
       setLoading(false);
     }
-  }, [divisionId]);
-
-  const updateStepStatus = useCallback(async (phasesData) => {
-    // Check phase schedule completion
-    const totalEncounters = phasesData.reduce((sum, p) => sum + (p.encounterCount || 0), 0);
-    const phasesComplete = phasesData.length > 0 && totalEncounters > 0;
-
-    // Check game formats completion (if phases are complete)
-    let formatsComplete = false;
-    let configuredCount = 0;
-    if (phasesComplete) {
-      try {
-        const settingsRes = await encounterApi.getDivisionGameSettings(divisionId);
-        if (settingsRes.success && settingsRes.data) {
-          const { phases: phaseSettings } = settingsRes.data;
-          configuredCount = phaseSettings?.reduce((sum, p) => sum + (p.matchSettings?.length || 0), 0) || 0;
-          // Consider formats complete if at least one phase has settings OR division has no match formats
-          formatsComplete = configuredCount > 0 || (division?.matchesPerEncounter || 1) <= 1;
-        }
-      } catch (err) {
-        console.error('Error checking game format status:', err);
-      }
-    }
-
-    // Check court assignment completion
-    let courtsComplete = false;
-    let assignedCount = 0;
-    if (formatsComplete) {
-      try {
-        // Check how many encounters have court/time assignments
-        for (const phase of phasesData) {
-          const scheduleRes = await tournamentApi.getPhaseSchedule(phase.id);
-          if (scheduleRes.success && scheduleRes.data?.encounters) {
-            const assigned = scheduleRes.data.encounters.filter(e => e.courtId || e.scheduledTime).length;
-            assignedCount += assigned;
-          }
-        }
-        courtsComplete = assignedCount > 0 && assignedCount >= totalEncounters * 0.5; // At least 50% assigned
-      } catch (err) {
-        console.error('Error checking court assignment status:', err);
-      }
-    }
-
-    setStepStatus({
-      phases: { complete: phasesComplete, encounterCount: totalEncounters },
-      formats: { complete: formatsComplete, configuredCount },
-      courts: { complete: courtsComplete, assignedCount }
-    });
-
-    // Auto-resume is disabled - always start at step 0 unless user navigates
-    // This gives users control over where to start
-    if (!hasAutoResumed) {
-      setHasAutoResumed(true);
-      // Stay on initialStep (default 0) - user can navigate forward if steps are complete
-    }
-  }, [divisionId, division, hasAutoResumed]);
+  };
 
   const handlePhasesUpdated = useCallback(() => {
+    loadedRef.current = false;
     loadDivisionData();
-  }, [loadDivisionData]);
+  }, [divisionId]);
 
   const handleFormatsUpdated = useCallback(() => {
-    loadDivisionData();
-  }, [loadDivisionData]);
+    // Just mark formats as complete when user saves
+    setStepStatus(prev => ({
+      ...prev,
+      formats: { complete: true, configuredCount: prev.formats.configuredCount + 1 }
+    }));
+  }, []);
 
   const handleCourtsUpdated = useCallback(() => {
-    loadDivisionData();
-  }, [loadDivisionData]);
+    setStepStatus(prev => ({
+      ...prev,
+      courts: { complete: true, assignedCount: prev.courts.assignedCount + 1 }
+    }));
+  }, []);
 
   const canAccessStep = (stepIndex) => {
     if (stepIndex === 0) return true;
@@ -207,7 +177,7 @@ export default function DivisionSchedulingWizard({
           <p className="text-gray-700 font-medium mb-2">Error</p>
           <p className="text-gray-500">{error}</p>
           <button
-            onClick={loadDivisionData}
+            onClick={() => { loadedRef.current = false; loadDivisionData(); }}
             className="mt-4 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700"
           >
             Retry
@@ -227,13 +197,7 @@ export default function DivisionSchedulingWizard({
               Schedule: {division?.divisionName || division?.name}
             </h2>
             <p className="text-sm text-gray-500 mt-1">
-              {stepStatus.phases.complete && currentStep > 0 ? (
-                <span className="text-green-600">
-                  Continuing from Step {currentStep + 1}: {STEPS[currentStep].title}
-                </span>
-              ) : (
-                'Division Scheduling Wizard'
-              )}
+              Division Scheduling Wizard
             </p>
           </div>
           {onClose && (
