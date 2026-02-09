@@ -146,10 +146,10 @@ export default function PhaseCourtScheduler({ eventId, data, onUpdate }) {
       match.effectiveGameDuration = gameDur
       match.effectiveChangeover = changeover
       match.effectiveBuffer = buffer
-      // Match duration = (games × gameDuration) + ((games - 1) × changeover)
+      // Match duration = (games × gameDuration) + ((games - 1) × changeover) + buffer
       const playTime = match.totalGames * gameDur
       const changeoverTime = Math.max(0, match.totalGames - 1) * changeover
-      match.duration = playTime + changeoverTime
+      match.duration = playTime + changeoverTime + buffer
       return match
     })
   }, [games, phaseTiming])
@@ -244,9 +244,8 @@ export default function PhaseCourtScheduler({ eventId, data, onUpdate }) {
     const teams = getTeamIds(match)
     if (teams.length === 0) return false
     
+    // Duration now includes buffer, so end time accounts for buffer
     const endTime = addMinutes(new Date(startTime), match.duration)
-    // Use effective buffer (may be overridden via phaseTiming)
-    const bufferMs = (match.effectiveBuffer ?? match.matchBufferMinutes ?? 5) * 60000
     
     // Check against all scheduled matches
     for (const other of scheduledMatches) {
@@ -255,11 +254,11 @@ export default function PhaseCourtScheduler({ eventId, data, onUpdate }) {
       const hasOverlappingTeam = teams.some(t => otherTeams.includes(t))
       if (!hasOverlappingTeam) continue
       
-      // Check for time overlap or back-to-back (within buffer time)
+      // Check for time overlap (buffer is already in duration)
       const otherStart = new Date(other.startTime)
       const otherEnd = addMinutes(otherStart, other.duration)
       
-      if (startTime < otherEnd.getTime() + bufferMs && endTime.getTime() > otherStart.getTime() - bufferMs) {
+      if (startTime < otherEnd.getTime() && endTime.getTime() > otherStart.getTime()) {
         return true
       }
     }
@@ -277,7 +276,7 @@ export default function PhaseCourtScheduler({ eventId, data, onUpdate }) {
       const otherStart = new Date(assignment.startTime)
       const otherEnd = addMinutes(otherStart, other.duration)
       
-      if (startTime < otherEnd.getTime() + bufferMs && endTime.getTime() > otherStart.getTime() - bufferMs) {
+      if (startTime < otherEnd.getTime() && endTime.getTime() > otherStart.getTime()) {
         return true
       }
     }
@@ -691,11 +690,9 @@ export default function PhaseCourtScheduler({ eventId, data, onUpdate }) {
                     />
                     <span className="text-xs text-gray-500">min</span>
                   </div>
-                  {timing.bestOf > 1 && (
-                    <div className="text-xs text-blue-700 mt-1">
-                      Bo{timing.bestOf} = {timing.bestOf * timing.gameDurationMinutes + (timing.bestOf - 1) * timing.changeoverMinutes}min/match
-                    </div>
-                  )}
+                  <div className="text-xs text-blue-700 mt-1 pt-1 border-t border-blue-200">
+                    {timing.bestOf > 1 ? `Bo${timing.bestOf}` : '1 game'} = {timing.bestOf * timing.gameDurationMinutes + (timing.bestOf - 1) * timing.changeoverMinutes + timing.matchBufferMinutes}min/slot
+                  </div>
                 </div>
               )
             })()}
