@@ -25,15 +25,11 @@ export const getAssetUrl = (path) => {
 // Routes through local proxy endpoint to add authentication headers
 export const getSharedAssetUrl = (path) => {
   if (!path) return null
-  // If path is already a full URL, return as-is
-  if (path.startsWith('http://') || path.startsWith('https://')) {
-    return path
-  }
 
-  // For Funtime-Shared asset paths like /asset/123 or /api/asset/123, use local proxy
-  // This allows the backend to add API key authentication
-  // Match both /asset/123 and /api/asset/123 formats
-  const assetMatch = path.match(/^(?:\/api)?\/asset\/(\d+)/)
+  // Extract asset ID from ANY URL format and always use local proxy
+  // Handles: /asset/123, https://shared.funtimepb.com/asset/123, /api/assets/shared/123, etc.
+  // The proxy adds API key authentication required by Funtime-Shared
+  const assetMatch = path.match(/\/asset[s]?(?:\/shared)?\/(\d+)/)
   if (assetMatch) {
     const assetId = assetMatch[1]
     // In dev mode, API_BASE_URL is full URL (https://localhost:7009) - need absolute URL
