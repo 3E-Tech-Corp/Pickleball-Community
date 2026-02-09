@@ -170,6 +170,13 @@ export default function AdminPaymentModal({ isOpen, onClose, unit, event, onPaym
 
   const getProofUrl = (url) => {
     if (!url) return null;
+    // Always use local proxy - extract asset ID from any URL format
+    // Handles: /asset/123, https://shared.funtimepb.com/asset/123, /api/assets/shared/123, etc.
+    const assetMatch = url.match(/\/asset[s]?(?:\/shared)?\/(\d+)/);
+    if (assetMatch) {
+      return getSharedAssetUrl(`/asset/${assetMatch[1]}`);
+    }
+    // Fallback for relative paths
     return url.startsWith('http') ? url : getSharedAssetUrl(url);
   };
 
