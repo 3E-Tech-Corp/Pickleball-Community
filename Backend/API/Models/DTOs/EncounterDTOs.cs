@@ -333,6 +333,14 @@ public class GameSchedulingDto
     public DateTime? ScheduledEndTime { get; set; }
     public int EstimatedDurationMinutes { get; set; }
     public string Status { get; set; } = "New";
+    
+    // Timing parameters from phase settings
+    /// <summary>Per-game duration in minutes</summary>
+    public int GameDurationMinutes { get; set; } = 15;
+    /// <summary>Changeover time between games of same match</summary>
+    public int ChangeoverMinutes { get; set; } = 2;
+    /// <summary>Buffer time between different matches on same court</summary>
+    public int MatchBufferMinutes { get; set; } = 5;
 }
 
 /// <summary>

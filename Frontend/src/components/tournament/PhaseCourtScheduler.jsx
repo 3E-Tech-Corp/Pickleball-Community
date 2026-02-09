@@ -115,7 +115,10 @@ export default function PhaseCourtScheduler({ eventId, data, onUpdate }) {
           courtLabel: null,
           scheduledStartTime: null,
           scheduledEndTime: null,
-          gameDuration: game.estimatedDurationMinutes || DEFAULT_GAME_DURATION
+          // Timing parameters from phase
+          gameDurationMinutes: game.gameDurationMinutes || DEFAULT_GAME_DURATION,
+          changeoverMinutes: game.changeoverMinutes ?? 2,
+          matchBufferMinutes: game.matchBufferMinutes ?? 5
         }
       }
       matchMap[key].games.push(game)
@@ -130,8 +133,10 @@ export default function PhaseCourtScheduler({ eventId, data, onUpdate }) {
     // Sort games within each match and calculate duration
     return Object.values(matchMap).map(match => {
       match.games.sort((a, b) => a.gameNumber - b.gameNumber)
-      // Match duration = number of games × per-game duration
-      match.duration = match.totalGames * match.gameDuration
+      // Match duration = (games × gameDuration) + ((games - 1) × changeover)
+      const playTime = match.totalGames * match.gameDurationMinutes
+      const changeoverTime = Math.max(0, match.totalGames - 1) * match.changeoverMinutes
+      match.duration = playTime + changeoverTime
       return match
     })
   }, [games])
@@ -227,6 +232,8 @@ export default function PhaseCourtScheduler({ eventId, data, onUpdate }) {
     if (teams.length === 0) return false
     
     const endTime = addMinutes(new Date(startTime), match.duration)
+    // Use the match's buffer setting (from phase), default 5 min
+    const bufferMs = (match.matchBufferMinutes ?? 5) * 60000
     
     // Check against all scheduled matches
     for (const other of scheduledMatches) {
@@ -235,11 +242,10 @@ export default function PhaseCourtScheduler({ eventId, data, onUpdate }) {
       const hasOverlappingTeam = teams.some(t => otherTeams.includes(t))
       if (!hasOverlappingTeam) continue
       
-      // Check for time overlap or back-to-back (within 5 minutes)
+      // Check for time overlap or back-to-back (within buffer time)
       const otherStart = new Date(other.startTime)
       const otherEnd = addMinutes(otherStart, other.duration)
       
-      const bufferMs = 5 * 60000 // 5 minute buffer
       if (startTime < otherEnd.getTime() + bufferMs && endTime.getTime() > otherStart.getTime() - bufferMs) {
         return true
       }
@@ -258,7 +264,6 @@ export default function PhaseCourtScheduler({ eventId, data, onUpdate }) {
       const otherStart = new Date(assignment.startTime)
       const otherEnd = addMinutes(otherStart, other.duration)
       
-      const bufferMs = 5 * 60000
       if (startTime < otherEnd.getTime() + bufferMs && endTime.getTime() > otherStart.getTime() - bufferMs) {
         return true
       }

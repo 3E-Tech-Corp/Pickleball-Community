@@ -164,9 +164,29 @@ public class DivisionPhase
     public DateTime? EstimatedEndTime { get; set; }
 
     /// <summary>
-    /// Estimated match duration in minutes (overrides division default)
+    /// Estimated match duration in minutes (overrides division default).
+    /// If set, used directly. If null, calculated from game settings.
     /// </summary>
     public int? EstimatedMatchDurationMinutes { get; set; }
+
+    /// <summary>
+    /// Estimated duration per game in minutes (e.g., 12 for rally to 11, 18 for rally to 21).
+    /// Used with BestOf to calculate total match time.
+    /// </summary>
+    public int? GameDurationMinutes { get; set; }
+
+    /// <summary>
+    /// Time in minutes between games within the same match (changeover/break).
+    /// Default: 2 minutes.
+    /// </summary>
+    public int ChangeoverMinutes { get; set; } = 2;
+
+    /// <summary>
+    /// Buffer time in minutes between different matches on the same court.
+    /// Accounts for court transition, cleanup, etc.
+    /// Default: 5 minutes.
+    /// </summary>
+    public int MatchBufferMinutes { get; set; } = 5;
 
     /// <summary>
     /// Whether this phase has been manually locked (no automatic slot resolution)

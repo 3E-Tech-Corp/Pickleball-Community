@@ -1216,7 +1216,17 @@ public class TournamentCourtPlanningController : EventControllerBase
                 ScheduledStartTime = g.ScheduledStartTime,
                 ScheduledEndTime = g.ScheduledEndTime,
                 EstimatedDurationMinutes = g.EstimatedDurationMinutes ?? g.EncounterMatch.Encounter.Division!.EstimatedMatchDurationMinutes ?? 30,
-                Status = g.Status
+                Status = g.Status,
+                // Timing parameters from phase
+                GameDurationMinutes = g.EncounterMatch.Encounter.Phase != null 
+                    ? g.EncounterMatch.Encounter.Phase.GameDurationMinutes ?? 15 
+                    : 15,
+                ChangeoverMinutes = g.EncounterMatch.Encounter.Phase != null 
+                    ? g.EncounterMatch.Encounter.Phase.ChangeoverMinutes 
+                    : 2,
+                MatchBufferMinutes = g.EncounterMatch.Encounter.Phase != null 
+                    ? g.EncounterMatch.Encounter.Phase.MatchBufferMinutes 
+                    : 5
             })
             .ToListAsync();
 
