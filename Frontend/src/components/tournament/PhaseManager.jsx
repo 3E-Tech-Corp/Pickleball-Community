@@ -32,7 +32,7 @@ const PHASE_STATUS_COLORS = {
  * PhaseManager - Manages division phases for multi-phase tournaments
  * Provides CRUD operations, schedule generation, and phase configuration
  */
-export default function PhaseManager({ divisionId, eventId, unitCount = 8, readOnly = false }) {
+export default function PhaseManager({ divisionId, eventId, unitCount = 8, readOnly = false, onPhasesUpdated }) {
   const [phases, setPhases] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -53,6 +53,7 @@ export default function PhaseManager({ divisionId, eventId, unitCount = 8, readO
       const response = await tournamentApi.getDivisionPhases(divisionId);
       if (response.success) {
         setPhases(response.data || []);
+        onPhasesUpdated?.();
       }
     } catch (err) {
       setError('Failed to load phases');
