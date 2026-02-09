@@ -63,6 +63,10 @@ public class DivisionPhasesController : ControllerBase
                 p.IsManuallyLocked,
                 p.IncludeConsolation,
                 p.SeedingStrategy,
+                // Timing fields for court scheduling
+                p.GameDurationMinutes,
+                p.ChangeoverMinutes,
+                p.MatchBufferMinutes,
                 EncounterCount = p.Encounters.Count,
                 SlotCount = p.Slots.Count,
                 PoolNames = p.Pools.OrderBy(pl => pl.PoolOrder).Select(pl => pl.PoolName).ToList()
@@ -115,6 +119,10 @@ public class DivisionPhasesController : ControllerBase
                 phase.IsManuallyLocked,
                 phase.IncludeConsolation,
                 phase.SeedingStrategy,
+                // Timing fields for court scheduling
+                phase.GameDurationMinutes,
+                phase.ChangeoverMinutes,
+                phase.MatchBufferMinutes,
                 Slots = phase.Slots.OrderBy(s => s.SlotType).ThenBy(s => s.SlotNumber).Select(s => new
                 {
                     s.Id,
@@ -240,6 +248,10 @@ public class DivisionPhasesController : ControllerBase
         if (request.Settings != null) phase.Settings = request.Settings;
         if (request.IncludeConsolation.HasValue) phase.IncludeConsolation = request.IncludeConsolation.Value;
         if (request.SeedingStrategy != null) phase.SeedingStrategy = request.SeedingStrategy;
+        // Court scheduling timing
+        if (request.GameDurationMinutes.HasValue) phase.GameDurationMinutes = request.GameDurationMinutes.Value;
+        if (request.ChangeoverMinutes.HasValue) phase.ChangeoverMinutes = request.ChangeoverMinutes.Value;
+        if (request.MatchBufferMinutes.HasValue) phase.MatchBufferMinutes = request.MatchBufferMinutes.Value;
 
         phase.UpdatedAt = DateTime.UtcNow;
 
@@ -1292,6 +1304,10 @@ public class UpdatePhaseRequest
     public string? Settings { get; set; }
     public bool? IncludeConsolation { get; set; }
     public string? SeedingStrategy { get; set; }
+    // Court scheduling timing
+    public int? GameDurationMinutes { get; set; }
+    public int? ChangeoverMinutes { get; set; }
+    public int? MatchBufferMinutes { get; set; }
 }
 
 public class AdvancementRuleRequest
