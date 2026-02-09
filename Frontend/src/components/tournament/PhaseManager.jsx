@@ -558,69 +558,18 @@ function PhaseModal({ phase, onChange, onSave, onClose }) {
           {/* Match Duration */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Estimated Match Duration (minutes)</label>
-            <p className="text-xs text-gray-500 mb-1">Total match time. If blank, calculated from game settings below.</p>
             <input
               type="number"
               min="5"
               max="120"
-              value={phase.estimatedMatchDurationMinutes || ''}
-              onChange={(e) => handleChange('estimatedMatchDurationMinutes', e.target.value ? parseInt(e.target.value) : null)}
-              placeholder="Auto-calculate"
+              value={phase.estimatedMatchDurationMinutes || 20}
+              onChange={(e) => handleChange('estimatedMatchDurationMinutes', parseInt(e.target.value))}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
             />
-          </div>
-        </div>
-
-        {/* Timing Settings for Court Scheduling */}
-        <div className="p-4 bg-gray-50 rounded-lg">
-          <h4 className="font-medium text-gray-900 mb-3 flex items-center gap-2">
-            <Clock className="w-4 h-4" />
-            Court Scheduling Timing
-          </h4>
-          <div className="grid grid-cols-3 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Per-Game Duration</label>
-              <p className="text-xs text-gray-500 mb-1">Minutes per game (e.g., 12 for rally-11)</p>
-              <input
-                type="number"
-                min="5"
-                max="60"
-                value={phase.gameDurationMinutes || ''}
-                onChange={(e) => handleChange('gameDurationMinutes', e.target.value ? parseInt(e.target.value) : null)}
-                placeholder="15"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Changeover Time</label>
-              <p className="text-xs text-gray-500 mb-1">Minutes between games in same match</p>
-              <input
-                type="number"
-                min="0"
-                max="15"
-                value={phase.changeoverMinutes ?? 2}
-                onChange={(e) => handleChange('changeoverMinutes', parseInt(e.target.value))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Match Buffer</label>
-              <p className="text-xs text-gray-500 mb-1">Minutes between matches on court</p>
-              <input
-                type="number"
-                min="0"
-                max="30"
-                value={phase.matchBufferMinutes ?? 5}
-                onChange={(e) => handleChange('matchBufferMinutes', parseInt(e.target.value))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-          </div>
-          {phase.bestOf > 1 && phase.gameDurationMinutes > 0 && (
-            <p className="mt-2 text-sm text-gray-600">
-              📊 Calculated: Bo{phase.bestOf} = {phase.bestOf * (phase.gameDurationMinutes || 15) + (phase.bestOf - 1) * (phase.changeoverMinutes ?? 2)} min/match
+            <p className="text-xs text-gray-500 mt-1">
+              Detailed timing (per-game, changeover, buffer) can be set in the Court Scheduler.
             </p>
-          )}
+          </div>
         </div>
 
         <div className="p-6 border-t bg-gray-50 flex justify-end gap-3">

@@ -55,6 +55,10 @@ export default function PhaseCourtScheduler({ eventId, data, onUpdate }) {
   // Scheduling state (at match level)
   const [assignments, setAssignments] = useState({}) // matchId -> { courtId, startTime }
   const [saving, setSaving] = useState(false)
+  
+  // Phase timing overrides (edited inline)
+  const [phaseTiming, setPhaseTiming] = useState({}) // phaseId -> { gameDurationMinutes, changeoverMinutes, matchBufferMinutes }
+  const [savingTiming, setSavingTiming] = useState(false)
   const [dayStart, setDayStart] = useState(() => {
     const d = new Date(data?.eventStartDate || new Date())
     d.setHours(8, 0, 0, 0)
@@ -133,13 +137,22 @@ export default function PhaseCourtScheduler({ eventId, data, onUpdate }) {
     // Sort games within each match and calculate duration
     return Object.values(matchMap).map(match => {
       match.games.sort((a, b) => a.gameNumber - b.gameNumber)
+      // Use phase timing overrides if set, otherwise use values from API
+      const timing = phaseTiming[match.phaseId] || {}
+      const gameDur = timing.gameDurationMinutes ?? match.gameDurationMinutes
+      const changeover = timing.changeoverMinutes ?? match.changeoverMinutes
+      const buffer = timing.matchBufferMinutes ?? match.matchBufferMinutes
+      // Store effective timing on match
+      match.effectiveGameDuration = gameDur
+      match.effectiveChangeover = changeover
+      match.effectiveBuffer = buffer
       // Match duration = (games × gameDuration) + ((games - 1) × changeover)
-      const playTime = match.totalGames * match.gameDurationMinutes
-      const changeoverTime = Math.max(0, match.totalGames - 1) * match.changeoverMinutes
+      const playTime = match.totalGames * gameDur
+      const changeoverTime = Math.max(0, match.totalGames - 1) * changeover
       match.duration = playTime + changeoverTime
       return match
     })
-  }, [games])
+  }, [games, phaseTiming])
 
   // ─── Group matches by division and phase ──────────────────────────────────
   const matchesByDivPhase = useMemo(() => {
@@ -232,8 +245,8 @@ export default function PhaseCourtScheduler({ eventId, data, onUpdate }) {
     if (teams.length === 0) return false
     
     const endTime = addMinutes(new Date(startTime), match.duration)
-    // Use the match's buffer setting (from phase), default 5 min
-    const bufferMs = (match.matchBufferMinutes ?? 5) * 60000
+    // Use effective buffer (may be overridden via phaseTiming)
+    const bufferMs = (match.effectiveBuffer ?? match.matchBufferMinutes ?? 5) * 60000
     
     // Check against all scheduled matches
     for (const other of scheduledMatches) {
@@ -392,6 +405,55 @@ export default function PhaseCourtScheduler({ eventId, data, onUpdate }) {
       toast.error('Failed to save schedule')
     } finally {
       setSaving(false)
+    }
+  }
+
+  // ─── Save phase timing to backend ──────────────────────────────────
+  const savePhaseTimimg = async (phaseId) => {
+    const timing = phaseTiming[phaseId]
+    if (!timing) return
+    
+    setSavingTiming(true)
+    try {
+      const response = await tournamentApi.updatePhase(phaseId, {
+        gameDurationMinutes: timing.gameDurationMinutes,
+        changeoverMinutes: timing.changeoverMinutes,
+        matchBufferMinutes: timing.matchBufferMinutes
+      })
+      if (response.success) {
+        toast.success('Timing saved')
+      } else {
+        toast.error(response.message || 'Failed to save timing')
+      }
+    } catch (err) {
+      console.error('Save timing error:', err)
+      toast.error('Failed to save timing')
+    } finally {
+      setSavingTiming(false)
+    }
+  }
+
+  // Update local phase timing
+  const updatePhaseTiming = (phaseId, field, value) => {
+    setPhaseTiming(prev => ({
+      ...prev,
+      [phaseId]: {
+        ...(prev[phaseId] || {}),
+        [field]: value
+      }
+    }))
+  }
+
+  // Get effective timing for a phase (local overrides + defaults from API)
+  const getEffectiveTiming = (phaseId) => {
+    const phaseMatches = matchesByDivPhase[selectedDivision]?.[phaseId] || []
+    const firstMatch = phaseMatches[0]
+    const local = phaseTiming[phaseId] || {}
+    return {
+      gameDurationMinutes: local.gameDurationMinutes ?? firstMatch?.gameDurationMinutes ?? 15,
+      changeoverMinutes: local.changeoverMinutes ?? firstMatch?.changeoverMinutes ?? 2,
+      matchBufferMinutes: local.matchBufferMinutes ?? firstMatch?.matchBufferMinutes ?? 5,
+      bestOf: firstMatch?.totalGames ?? 1
     }
   }
 
@@ -572,6 +634,73 @@ export default function PhaseCourtScheduler({ eventId, data, onUpdate }) {
             )
           })}
         </div>
+
+        {/* Phase Timing Editor - shown when a phase is selected */}
+        {selectedPhase && selectedPhase !== 'no-phase' && (
+          <div className="p-3 border-t bg-blue-50">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium text-blue-800 flex items-center gap-1">
+                <Clock className="w-3 h-3" />
+                Timing Settings
+              </span>
+              <button 
+                onClick={() => savePhaseTimimg(selectedPhase)}
+                disabled={savingTiming}
+                className="text-xs text-blue-600 hover:underline disabled:opacity-50"
+              >
+                {savingTiming ? 'Saving...' : 'Save'}
+              </button>
+            </div>
+            {(() => {
+              const timing = getEffectiveTiming(selectedPhase)
+              return (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <label className="text-xs text-gray-600 w-20">Per game:</label>
+                    <input
+                      type="number"
+                      min="5"
+                      max="60"
+                      value={timing.gameDurationMinutes}
+                      onChange={(e) => updatePhaseTiming(selectedPhase, 'gameDurationMinutes', parseInt(e.target.value) || 15)}
+                      className="w-16 px-2 py-1 text-xs border rounded"
+                    />
+                    <span className="text-xs text-gray-500">min</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <label className="text-xs text-gray-600 w-20">Changeover:</label>
+                    <input
+                      type="number"
+                      min="0"
+                      max="15"
+                      value={timing.changeoverMinutes}
+                      onChange={(e) => updatePhaseTiming(selectedPhase, 'changeoverMinutes', parseInt(e.target.value) || 0)}
+                      className="w-16 px-2 py-1 text-xs border rounded"
+                    />
+                    <span className="text-xs text-gray-500">min</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <label className="text-xs text-gray-600 w-20">Match buffer:</label>
+                    <input
+                      type="number"
+                      min="0"
+                      max="30"
+                      value={timing.matchBufferMinutes}
+                      onChange={(e) => updatePhaseTiming(selectedPhase, 'matchBufferMinutes', parseInt(e.target.value) || 0)}
+                      className="w-16 px-2 py-1 text-xs border rounded"
+                    />
+                    <span className="text-xs text-gray-500">min</span>
+                  </div>
+                  {timing.bestOf > 1 && (
+                    <div className="text-xs text-blue-700 mt-1">
+                      Bo{timing.bestOf} = {timing.bestOf * timing.gameDurationMinutes + (timing.bestOf - 1) * timing.changeoverMinutes}min/match
+                    </div>
+                  )}
+                </div>
+              )
+            })()}
+          </div>
+        )}
 
         {/* Selection summary */}
         {selectedMatches.size > 0 && (
