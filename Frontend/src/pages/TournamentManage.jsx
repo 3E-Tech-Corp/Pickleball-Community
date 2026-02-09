@@ -14,6 +14,7 @@ import { useToast } from '../contexts/ToastContext';
 import { useNotifications } from '../hooks/useNotifications';
 import { tournamentApi, gameDayApi, eventsApi, objectAssetsApi, checkInApi, sharedAssetApi, getSharedAssetUrl, eventTypesApi, eventStaffApi, teamUnitsApi, skillLevelsApi, ageGroupsApi, objectAssetTypesApi, friendsApi } from '../services/api';
 import ScheduleConfigModal from '../components/ScheduleConfigModal';
+import GameSettingsModal from '../components/GameSettingsModal';
 import DivisionFeesEditor from '../components/DivisionFeesEditor';
 import MatchFormatEditor from '../components/MatchFormatEditor';
 import PhaseManager from '../components/tournament/PhaseManager';
@@ -64,6 +65,8 @@ export default function TournamentManage() {
 
   // Modal states
   const [scheduleConfigModal, setScheduleConfigModal] = useState({ isOpen: false, division: null });
+  const [gameSettingsModal, setGameSettingsModal] = useState({ isOpen: false, division: null });
+  const [scheduleDropdownOpen, setScheduleDropdownOpen] = useState(null); // Track which division's schedule dropdown is open
 
   // Add courts modal state
   const [showAddCourtsModal, setShowAddCourtsModal] = useState(false);
@@ -3751,6 +3754,14 @@ export default function TournamentManage() {
                 <h2 className="text-lg font-semibold text-gray-900">Tournament Divisions</h2>
                 <div className="flex items-center gap-2">
                   <Link
+                    to="/my-templates"
+                    className="px-4 py-2 text-sm font-medium text-purple-600 border border-purple-300 rounded-lg hover:bg-purple-50 flex items-center gap-2"
+                    title="Create or manage your own phase templates"
+                  >
+                    <Layers className="w-4 h-4" />
+                    My Templates
+                  </Link>
+                  <Link
                     to={`/tournament/${eventId}/schedules`}
                     className="px-4 py-2 text-sm font-medium text-blue-600 border border-blue-300 rounded-lg hover:bg-blue-50 flex items-center gap-2"
                   >
@@ -3833,24 +3844,58 @@ export default function TournamentManage() {
                         {div.isActive ? 'Active' : 'Activate'}
                       </button>
 
-                      {/* Generate/Re-generate Schedule - disabled after event starts */}
-                      {div.isActive && !['Running', 'Started'].includes(dashboard?.tournamentStatus) && (
-                        <button
-                          onClick={() => handleOpenScheduleConfig(div)}
-                          disabled={generatingSchedule}
-                          className={`px-3 py-2 text-sm font-medium rounded-lg flex items-center gap-2 disabled:opacity-50 ${
-                            div.scheduleReady
-                              ? 'text-gray-700 border border-gray-300 hover:bg-gray-50'
-                              : 'text-white bg-orange-600 hover:bg-orange-700'
-                          }`}
-                        >
-                          {generatingSchedule ? (
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                          ) : (
+                      {/* Schedule Button Group - Phases, Formats, Court Time */}
+                      {div.isActive && (
+                        <div className="relative">
+                          <button
+                            onClick={() => setScheduleDropdownOpen(scheduleDropdownOpen === div.id ? null : div.id)}
+                            className="px-3 py-2 text-sm font-medium text-orange-600 border border-orange-300 rounded-lg hover:bg-orange-50 flex items-center gap-2"
+                          >
                             <Calendar className="w-4 h-4" />
+                            Schedule
+                            <ChevronDown className={`w-4 h-4 transition-transform ${scheduleDropdownOpen === div.id ? 'rotate-180' : ''}`} />
+                          </button>
+                          {scheduleDropdownOpen === div.id && (
+                            <>
+                              {/* Click-away overlay */}
+                              <div className="fixed inset-0 z-10" onClick={() => setScheduleDropdownOpen(null)} />
+                              <div className="absolute right-0 mt-1 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-20">
+                              <button
+                                onClick={() => {
+                                  handleOpenScheduleConfig(div);
+                                  setScheduleDropdownOpen(null);
+                                }}
+                                disabled={generatingSchedule}
+                                className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2 disabled:opacity-50"
+                              >
+                                <Layers className="w-4 h-4" />
+                                Phases
+                                {!div.scheduleReady && <span className="ml-auto text-xs text-orange-500">Setup</span>}
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setGameSettingsModal({ isOpen: true, division: div });
+                                  setScheduleDropdownOpen(null);
+                                }}
+                                disabled={!div.scheduleReady}
+                                className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2 disabled:opacity-50 disabled:text-gray-400"
+                              >
+                                <Settings className="w-4 h-4" />
+                                Formats
+                                {!div.scheduleReady && <span className="ml-auto text-xs text-gray-400">Need phases</span>}
+                              </button>
+                              <Link
+                                to={`/tournament/${eventId}/schedule-dashboard`}
+                                onClick={() => setScheduleDropdownOpen(null)}
+                                className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                              >
+                                <Clock className="w-4 h-4" />
+                                Court Time
+                              </Link>
+                            </div>
+                            </>
                           )}
-                          {div.scheduleReady ? 'Re-configure' : 'Configure Schedule'}
-                        </button>
+                        </div>
                       )}
 
                       {/* View Schedule - links to printable schedule page */}
@@ -3863,16 +3908,6 @@ export default function TournamentManage() {
                           View Schedule
                         </Link>
                       )}
-
-                      {/* My Templates - TD can create/manage their own phase templates */}
-                      <Link
-                        to="/my-templates"
-                        className="px-3 py-2 text-sm font-medium text-purple-600 border border-purple-300 rounded-lg hover:bg-purple-50 flex items-center gap-2"
-                        title="Create or manage your own phase templates"
-                      >
-                        <Layers className="w-4 h-4" />
-                        My Templates
-                      </Link>
                     </div>
                   )}
                 </div>
@@ -8380,6 +8415,15 @@ export default function TournamentManage() {
         division={scheduleConfigModal.division}
         onGenerate={handleGenerateSchedule}
         isGenerating={generatingSchedule}
+      />
+
+      {/* Game Settings Modal (Formats per phase/match) */}
+      <GameSettingsModal
+        isOpen={gameSettingsModal.isOpen}
+        onClose={() => setGameSettingsModal({ isOpen: false, division: null })}
+        division={gameSettingsModal.division}
+        eventId={eventId}
+        onSave={() => loadDashboard()}
       />
 
       {/* Public Profile Modal */}
