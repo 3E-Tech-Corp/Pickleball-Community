@@ -3898,18 +3898,14 @@ export default function TournamentManage() {
                                 Formats
                                 {!div.scheduleReady && <span className="ml-auto text-xs text-gray-400">Need phases</span>}
                               </button>
-                              <button
-                                onClick={() => {
-                                  setSchedulingWizardModal({ isOpen: true, division: div, initialStep: 2 });
-                                  setScheduleDropdownOpen(null);
-                                }}
-                                disabled={!div.scheduleReady}
-                                className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2 disabled:opacity-50 disabled:text-gray-400"
+                              <Link
+                                to={`/tournament/${eventId}/schedule-dashboard`}
+                                onClick={() => setScheduleDropdownOpen(null)}
+                                className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
                               >
                                 <Clock className="w-4 h-4" />
                                 Court Time
-                                {!div.scheduleReady && <span className="ml-auto text-xs text-gray-400">Need phases</span>}
-                              </button>
+                              </Link>
                             </div>
                             </>
                           )}

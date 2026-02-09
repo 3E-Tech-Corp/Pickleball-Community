@@ -1,13 +1,12 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Calendar, Settings, Clock, ChevronRight, ChevronLeft,
-  Check, Lock, Loader2, AlertCircle, ListOrdered, Grid3X3, Timer
+  Check, Lock, Loader2, AlertCircle, ListOrdered, Grid3X3
 } from 'lucide-react';
 import { tournamentApi, encounterApi } from '../../services/api';
 import PhaseManager from './PhaseManager';
 import SchedulePreview from './SchedulePreview';
 import GameFormatConfig from './GameFormatConfig';
-import PhaseCourtScheduler from './PhaseCourtScheduler';
 
 const STEPS = [
   {
@@ -23,13 +22,6 @@ const STEPS = [
     shortTitle: 'Games',
     icon: Grid3X3,
     description: 'Configure games per phase/match'
-  },
-  {
-    id: 'courts',
-    title: 'Court & Time',
-    shortTitle: 'Courts',
-    icon: Timer,
-    description: 'Assign courts and schedule times'
   }
 ];
 
@@ -58,8 +50,7 @@ export default function DivisionSchedulingWizard({
   // Step completion status - simplified, computed from phases only
   const [stepStatus, setStepStatus] = useState({
     phases: { complete: false, encounterCount: 0 },
-    formats: { complete: true, configuredCount: 0 }, // Default to true for simple tournaments
-    courts: { complete: false, assignedCount: 0 }
+    formats: { complete: true, configuredCount: 0 } // Default to true for simple tournaments
   });
 
   // Load division and phases - only once on mount
@@ -101,8 +92,7 @@ export default function DivisionSchedulingWizard({
         
         setStepStatus({
           phases: { complete: phasesComplete, encounterCount: totalEncounters },
-          formats: { complete: formatsComplete, configuredCount: 0 },
-          courts: { complete: false, assignedCount: 0 }
+          formats: { complete: formatsComplete, configuredCount: 0 }
         });
       }
     } catch (err) {
@@ -126,17 +116,9 @@ export default function DivisionSchedulingWizard({
     }));
   }, []);
 
-  const handleCourtsUpdated = useCallback(() => {
-    setStepStatus(prev => ({
-      ...prev,
-      courts: { complete: true, assignedCount: prev.courts.assignedCount + 1 }
-    }));
-  }, []);
-
   const canAccessStep = (stepIndex) => {
     if (stepIndex === 0) return true;
     if (stepIndex === 1) return stepStatus.phases.complete;
-    if (stepIndex === 2) return stepStatus.phases.complete && stepStatus.formats.complete;
     return false;
   };
 
@@ -216,8 +198,7 @@ export default function DivisionSchedulingWizard({
             const StepIcon = step.icon;
             const isActive = currentStep === idx;
             const isComplete = idx === 0 ? stepStatus.phases.complete :
-                               idx === 1 ? stepStatus.formats.complete :
-                               stepStatus.courts.complete;
+                               stepStatus.formats.complete;
             const isAccessible = canAccessStep(idx);
 
             return (
@@ -355,25 +336,6 @@ export default function DivisionSchedulingWizard({
           </div>
         )}
 
-        {currentStep === 2 && (
-          <div className="p-6">
-            <div className="mb-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                Step 3: Court & Time Scheduling
-              </h3>
-              <p className="text-gray-600">
-                Assign encounters to courts and time slots. Drag and drop to arrange the schedule.
-              </p>
-            </div>
-
-            <PhaseCourtScheduler
-              eventId={eventId}
-              divisionId={divisionId}
-              phases={phases}
-              onUpdated={handleCourtsUpdated}
-            />
-          </div>
-        )}
       </div>
 
       {/* Footer Navigation */}
