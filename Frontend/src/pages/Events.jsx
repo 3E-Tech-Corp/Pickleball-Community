@@ -5882,7 +5882,7 @@ function EventDetailModal({ event, isAuthenticated, isAdmin, currentUserId, user
                               <div className="flex items-center gap-3 text-sm">
                                 {payment.paymentProofUrl && (
                                   <a
-                                    href={payment.paymentProofUrl.startsWith('http') ? payment.paymentProofUrl : `https://shared.funtimepb.com${payment.paymentProofUrl}`}
+                                    href={getSharedAssetUrl(payment.paymentProofUrl)}
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     className="text-blue-600 hover:underline flex items-center gap-1"
