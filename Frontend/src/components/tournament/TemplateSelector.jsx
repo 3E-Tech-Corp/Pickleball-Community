@@ -8,11 +8,47 @@ import {
   useEdgesState,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
+import dagre from 'dagre';
 import {
   FileText, Users, Check, X, Loader2, Grid3X3, Table,
   RefreshCcw, GitBranch, Layers, Trophy
 } from 'lucide-react';
 import { tournamentApi } from '../../services/api';
+
+// Layout constants
+const NODE_WIDTH = 180;
+const NODE_HEIGHT = 80;
+
+/**
+ * Use dagre to compute tree layout positions
+ */
+function getLayoutedElements(nodes, edges, direction = 'TB') {
+  const g = new dagre.graphlib.Graph();
+  g.setDefaultEdgeLabel(() => ({}));
+  g.setGraph({ rankdir: direction, nodesep: 60, ranksep: 100 });
+
+  nodes.forEach((node) => {
+    g.setNode(node.id, { width: NODE_WIDTH, height: NODE_HEIGHT });
+  });
+  edges.forEach((edge) => {
+    g.setEdge(edge.source, edge.target);
+  });
+
+  dagre.layout(g);
+
+  const layoutedNodes = nodes.map((node) => {
+    const nodeWithPosition = g.node(node.id);
+    return {
+      ...node,
+      position: {
+        x: nodeWithPosition.x - NODE_WIDTH / 2,
+        y: nodeWithPosition.y - NODE_HEIGHT / 2,
+      },
+    };
+  });
+
+  return { nodes: layoutedNodes, edges };
+}
 
 /**
  * TemplateSelector - Full-width template selection with visual flow preview
@@ -276,7 +312,7 @@ export default function TemplateSelector({ divisionId, unitCount = 8, onApply, o
                 </div>
               ) : preview?.phases?.length > 0 ? (
                 viewMode === 'visual' ? (
-                  <PhaseFlowDiagram phases={preview.phases} />
+                  <PhaseFlowDiagram phases={preview.phases} structureJson={selectedTemplate?.structureJson} />
                 ) : (
                   <PhaseDataView phases={preview.phases} />
                 )
@@ -334,57 +370,111 @@ export default function TemplateSelector({ divisionId, unitCount = 8, onApply, o
 }
 
 /**
- * React Flow diagram for phase visualization
+ * React Flow diagram for phase visualization with tree layout
  */
-function PhaseFlowDiagram({ phases }) {
+function PhaseFlowDiagram({ phases, structureJson }) {
+  // Parse structure to get advancement rules
+  const structure = useMemo(() => {
+    if (!structureJson) return null;
+    try {
+      return typeof structureJson === 'string' ? JSON.parse(structureJson) : structureJson;
+    } catch {
+      return null;
+    }
+  }, [structureJson]);
+
   const { nodes, edges } = useMemo(() => {
     const nodeList = [];
     const edgeList = [];
     
-    const nodeWidth = 180;
-    const nodeHeight = 80;
-    const verticalGap = 100;
-    const horizontalGap = 220;
-    
-    // Calculate positions - tree layout
-    // For now, simple vertical layout
+    // Build nodes from phases
     phases.forEach((phase, index) => {
-      const x = 200;
-      const y = index * (nodeHeight + verticalGap) + 50;
-      
+      const order = phase.order || (index + 1);
       nodeList.push({
-        id: `phase-${phase.order || index}`,
+        id: `phase-${order - 1}`,
         type: 'phaseNode',
-        position: { x, y },
+        position: { x: 0, y: 0 }, // Will be set by dagre
         data: {
           label: phase.name,
           type: phase.type,
           inSlots: phase.incomingSlots || phase.inSlots,
           outSlots: phase.exitingSlots || phase.outSlots,
           poolCount: phase.poolCount,
-          encounterCount: phase.encounterCount
+          encounterCount: phase.encounterCount,
+          order: order
         }
       });
-      
-      // Add edge to next phase
-      if (index < phases.length - 1) {
+    });
+
+    // Build edges from advancement rules if available
+    const advancementRules = structure?.advancementRules || [];
+    
+    if (advancementRules.length > 0) {
+      // Group rules by source-target pair
+      const edgeMap = new Map();
+      advancementRules.forEach((rule) => {
+        const key = `${rule.sourcePhaseOrder}-${rule.targetPhaseOrder}`;
+        if (!edgeMap.has(key)) {
+          edgeMap.set(key, { 
+            sourcePhaseOrder: rule.sourcePhaseOrder, 
+            targetPhaseOrder: rule.targetPhaseOrder, 
+            count: 0, 
+            rules: [] 
+          });
+        }
+        const entry = edgeMap.get(key);
+        entry.count++;
+        entry.rules.push(rule);
+      });
+
+      // Create edges from grouped rules
+      edgeMap.forEach(({ sourcePhaseOrder, targetPhaseOrder, count, rules }) => {
+        // Sort by target slot to get label
+        const sortedByTarget = [...rules].sort((a, b) => a.targetSlotNumber - b.targetSlotNumber);
+        const positions = sortedByTarget.map(r => r.finishPosition);
+        const label = count === 1 ? `${positions[0]}` : positions.join(', ');
+
         edgeList.push({
-          id: `edge-${index}`,
-          source: `phase-${phase.order || index}`,
-          target: `phase-${phases[index + 1].order || index + 1}`,
+          id: `e-${sourcePhaseOrder}-${targetPhaseOrder}`,
+          source: `phase-${sourcePhaseOrder - 1}`,
+          target: `phase-${targetPhaseOrder - 1}`,
           type: 'smoothstep',
           animated: true,
-          style: { stroke: '#a78bfa', strokeWidth: 2 },
+          style: { stroke: '#a78bfa', strokeWidth: 2, strokeDasharray: '5,5' },
           markerEnd: { type: MarkerType.ArrowClosed, color: '#a78bfa' },
-          label: `${phase.exitingSlots || phase.outSlots || '?'}`,
-          labelStyle: { fill: '#7c3aed', fontWeight: 600 },
-          labelBgStyle: { fill: '#f3e8ff' }
+          label: label,
+          labelStyle: { fill: '#7c3aed', fontWeight: 600, fontSize: 12 },
+          labelBgStyle: { fill: '#f3e8ff', stroke: '#c4b5fd' },
+          labelBgPadding: [6, 4],
+          labelBgBorderRadius: 8,
         });
-      }
-    });
+      });
+    } else {
+      // Fallback: sequential edges if no advancement rules
+      phases.forEach((phase, index) => {
+        if (index < phases.length - 1) {
+          const order = phase.order || (index + 1);
+          const nextOrder = phases[index + 1].order || (index + 2);
+          edgeList.push({
+            id: `edge-${index}`,
+            source: `phase-${order - 1}`,
+            target: `phase-${nextOrder - 1}`,
+            type: 'smoothstep',
+            animated: true,
+            style: { stroke: '#a78bfa', strokeWidth: 2 },
+            markerEnd: { type: MarkerType.ArrowClosed, color: '#a78bfa' },
+            label: `${phase.exitingSlots || phase.outSlots || '?'}`,
+            labelStyle: { fill: '#7c3aed', fontWeight: 600 },
+            labelBgStyle: { fill: '#f3e8ff' }
+          });
+        }
+      });
+    }
     
-    return { nodes: nodeList, edges: edgeList };
-  }, [phases]);
+    // Apply dagre layout
+    const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements(nodeList, edgeList, 'TB');
+    return { nodes: layoutedNodes, edges: layoutedEdges };
+  }, [phases, structure]);
 
   const [flowNodes, setNodes, onNodesChange] = useNodesState(nodes);
   const [flowEdges, setEdges, onEdgesChange] = useEdgesState(edges);
@@ -400,7 +490,7 @@ function PhaseFlowDiagram({ phases }) {
   }), []);
 
   return (
-    <div className="h-72 border rounded-lg overflow-hidden bg-gradient-to-b from-gray-50 to-white">
+    <div className="h-80 border rounded-lg overflow-hidden bg-gradient-to-b from-gray-50 to-white">
       <ReactFlow
         nodes={flowNodes}
         edges={flowEdges}
@@ -408,7 +498,7 @@ function PhaseFlowDiagram({ phases }) {
         onEdgesChange={onEdgesChange}
         nodeTypes={nodeTypes}
         fitView
-        fitViewOptions={{ padding: 0.3 }}
+        fitViewOptions={{ padding: 0.2 }}
         nodesDraggable={false}
         nodesConnectable={false}
         elementsSelectable={false}
