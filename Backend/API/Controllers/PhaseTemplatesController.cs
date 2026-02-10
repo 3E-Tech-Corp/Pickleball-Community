@@ -885,14 +885,14 @@ public class PhaseTemplatesController : ControllerBase
     {
         var phases = new List<TemplatePhasePreviewDto>();
         var category = template.Category?.ToLower() ?? "";
-        var name = template.Name?.ToLower() ?? "";
+        var templateName = template.Name?.ToLower() ?? "";
         
         // Check both category and name for type hints
         var isRoundRobin = category.Contains("roundrobin") || category.Contains("round") 
-            || name.Contains("rr") || name.Contains("round robin");
-        var isDoubleElim = category.Contains("double") || name.Contains("double");
+            || templateName.Contains("rr") || templateName.Contains("round robin");
+        var isDoubleElim = category.Contains("double") || templateName.Contains("double");
         var isSingleElim = category.Contains("single") || category.Contains("bracket") 
-            || category.Contains("elimination") || name.Contains("elimination") || name.Contains("bracket");
+            || category.Contains("elimination") || templateName.Contains("elimination") || templateName.Contains("bracket");
 
         if (isRoundRobin)
         {
