@@ -472,15 +472,44 @@ public class PhaseTemplatesController : ControllerBase
         // Parse and generate preview
         try
         {
+            // Handle null/empty/invalid JSON by using fallback
+            if (string.IsNullOrWhiteSpace(template.StructureJson) || template.StructureJson == "{}")
+            {
+                var fallbackPreview = GenerateFallbackPreviewResult(template, unitCount);
+                return Ok(fallbackPreview);
+            }
+            
             var structure = JsonDocument.Parse(template.StructureJson);
             var preview = GeneratePreview(template, structure, unitCount);
             return Ok(preview);
+        }
+        catch (JsonException ex)
+        {
+            // JSON parsing failed - use fallback based on template name/category
+            _logger.LogWarning(ex, "Invalid JSON in template {TemplateId}, using fallback preview", request.TemplateId);
+            var fallbackPreview = GenerateFallbackPreviewResult(template, unitCount);
+            return Ok(fallbackPreview);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error generating template preview for template {TemplateId}", request.TemplateId);
             return BadRequest("Error parsing template structure");
         }
+    }
+    
+    private TemplatePreviewDto GenerateFallbackPreviewResult(PhaseTemplate template, int unitCount)
+    {
+        var phases = GenerateFallbackPreview(template, unitCount);
+        return new TemplatePreviewDto
+        {
+            TemplateId = template.Id,
+            TemplateName = template.Name,
+            UnitCount = unitCount,
+            Phases = phases,
+            TotalEncounters = phases.Sum(p => p.EncounterCount),
+            TotalRounds = phases.Count,
+            AdvancementRules = new List<TemplateAdvancementPreviewDto>()
+        };
     }
 
     /// <summary>
