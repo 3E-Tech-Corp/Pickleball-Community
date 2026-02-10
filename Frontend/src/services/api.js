@@ -26,6 +26,15 @@ export const getAssetUrl = (path) => {
 export const getSharedAssetUrl = (path) => {
   if (!path) return null
 
+  // EXTERNAL URLs (Google photos, etc.): Return as-is, don't process
+  // These are already complete URLs that don't need our proxy
+  if (path.startsWith('http://') || path.startsWith('https://')) {
+    // Exception: shared.funtimepb.com URLs still need to extract asset ID
+    if (!path.includes('shared.funtimepb.com/asset/')) {
+      return path // External URL (Google, etc.) - use directly
+    }
+  }
+
   // LOCAL ASSETS: If already a local asset URL (/api/assets/123), return as-is
   // These don't need the shared proxy - they're served directly by our backend
   const localAssetMatch = path.match(/^\/api\/assets\/(\d+)$/)
@@ -33,7 +42,7 @@ export const getSharedAssetUrl = (path) => {
     return path // Return as-is, already correct format
   }
 
-  // SHARED ASSETS: Extract asset ID from external URL formats and route through proxy
+  // SHARED ASSETS: Extract asset ID from shared asset URL formats and route through proxy
   // Handles: /asset/123, https://shared.funtimepb.com/asset/123, /api/assets/shared/123, etc.
   // The proxy adds API key authentication required by Funtime-Shared
   const sharedAssetMatch = path.match(/\/asset[s]?\/shared\/(\d+)|shared\.funtimepb\.com\/asset\/(\d+)|^\/asset\/(\d+)/)
