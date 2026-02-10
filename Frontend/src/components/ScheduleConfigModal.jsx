@@ -482,7 +482,7 @@ export default function ScheduleConfigModal({
 /**
  * React Flow diagram for phase visualization with tree layout
  */
-function PhaseFlowDiagram({ phases, structureJson }) {
+export function PhaseFlowDiagram({ phases, structureJson }) {
   const [direction, setDirection] = useState('TB'); // 'TB' or 'LR'
   const [isExpanded, setIsExpanded] = useState(false);
 

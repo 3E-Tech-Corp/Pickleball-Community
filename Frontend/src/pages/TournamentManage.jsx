@@ -13,7 +13,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import { useNotifications } from '../hooks/useNotifications';
 import { tournamentApi, gameDayApi, eventsApi, objectAssetsApi, checkInApi, sharedAssetApi, getSharedAssetUrl, eventTypesApi, eventStaffApi, teamUnitsApi, skillLevelsApi, ageGroupsApi, objectAssetTypesApi, friendsApi } from '../services/api';
-import ScheduleConfigModal from '../components/ScheduleConfigModal';
+import ScheduleConfigModal, { PhaseFlowDiagram } from '../components/ScheduleConfigModal';
 import GameSettingsModal from '../components/GameSettingsModal';
 import DivisionFeesEditor from '../components/DivisionFeesEditor';
 import MatchFormatEditor from '../components/MatchFormatEditor';
@@ -237,6 +237,10 @@ export default function TournamentManage() {
   const [courtAssignmentMode, setCourtAssignmentMode] = useState(false); // toggle court assignment UI
   const [selectedCourtGroupsForAssignment, setSelectedCourtGroupsForAssignment] = useState([]);
   const [assigningCourts, setAssigningCourts] = useState(false);
+  
+  // Phase diagram state for each division
+  const [expandedPhaseDiagrams, setExpandedPhaseDiagrams] = useState(new Set()); // Set of division IDs with expanded diagrams
+  const [divisionPhaseData, setDivisionPhaseData] = useState({}); // { divisionId: { phases, structureJson } }
   const [courtAssignmentTimeFrom, setCourtAssignmentTimeFrom] = useState('');
   const [courtAssignmentTimeTo, setCourtAssignmentTimeTo] = useState('');
   const [schedulingStartTime, setSchedulingStartTime] = useState('');
@@ -1005,6 +1009,51 @@ export default function TournamentManage() {
     } finally {
       setLoadingPhases(false);
     }
+  };
+
+  // Load phase diagram data for a division
+  const loadDivisionPhaseDiagram = async (divisionId) => {
+    if (divisionPhaseData[divisionId]) return; // Already loaded
+    try {
+      const response = await tournamentApi.getDivision(divisionId);
+      if (response.success && response.data) {
+        const div = response.data;
+        // Get the structure JSON
+        const structureJson = div.phaseTemplateJson || div.structureJson;
+        // Get phases for display
+        const phasesRes = await tournamentApi.getDivisionPhases(divisionId);
+        const phases = phasesRes.success ? (phasesRes.data || []).map((p, i) => ({
+          name: p.name,
+          type: p.phaseType,
+          order: p.sortOrder || (i + 1),
+          incomingSlots: p.incomingSlotCount,
+          exitingSlots: p.advancingSlotCount,
+          inSlots: p.incomingSlotCount,
+          outSlots: p.advancingSlotCount,
+          poolCount: p.poolCount,
+          encounterCount: p.encounterCount
+        })) : [];
+        setDivisionPhaseData(prev => ({
+          ...prev,
+          [divisionId]: { phases, structureJson }
+        }));
+      }
+    } catch (err) {
+      console.error('Error loading division phase diagram:', err);
+    }
+  };
+
+  const togglePhaseDiagram = (divisionId) => {
+    setExpandedPhaseDiagrams(prev => {
+      const next = new Set(prev);
+      if (next.has(divisionId)) {
+        next.delete(divisionId);
+      } else {
+        next.add(divisionId);
+        loadDivisionPhaseDiagram(divisionId);
+      }
+      return next;
+    });
   };
 
   const handleGeneratePhaseEncounters = async (phaseId) => {
@@ -3968,6 +4017,35 @@ export default function TournamentManage() {
                   <p className="text-sm text-gray-500 mt-4">
                     Configure and generate a schedule to begin tournament play
                   </p>
+                )}
+
+                {/* Phase Diagram Toggle */}
+                {div.scheduleReady && (
+                  <div className="mt-4 border-t pt-4">
+                    <button
+                      onClick={() => togglePhaseDiagram(div.id)}
+                      className="flex items-center gap-2 text-sm text-purple-600 hover:text-purple-700"
+                    >
+                      <Layers className="w-4 h-4" />
+                      {expandedPhaseDiagrams.has(div.id) ? 'Hide' : 'Show'} Phase Structure
+                      <ChevronDown className={`w-4 h-4 transition-transform ${expandedPhaseDiagrams.has(div.id) ? 'rotate-180' : ''}`} />
+                    </button>
+                    
+                    {expandedPhaseDiagrams.has(div.id) && (
+                      <div className="mt-3">
+                        {divisionPhaseData[div.id]?.phases?.length > 0 ? (
+                          <PhaseFlowDiagram 
+                            phases={divisionPhaseData[div.id].phases}
+                            structureJson={divisionPhaseData[div.id].structureJson}
+                          />
+                        ) : (
+                          <div className="h-32 flex items-center justify-center text-gray-400">
+                            <Loader2 className="w-5 h-5 animate-spin" />
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
             ))}
