@@ -13,6 +13,7 @@ import {
   Table, Grid3X3, RefreshCcw, GitBranch, Layers, Trophy
 } from 'lucide-react';
 import { tournamentApi } from '../services/api';
+import { parseStructureToVisual } from './tournament/structureEditorConstants';
 
 /**
  * ScheduleConfigModal - Full-width template selection with visual flow preview
@@ -82,6 +83,38 @@ export default function ScheduleConfigModal({
 
     try {
       setPreviewLoading(true);
+      
+      // First try to parse structureJson directly from template (like template editor does)
+      if (template.structureJson) {
+        const visualState = parseStructureToVisual(template.structureJson);
+        if (visualState?.phases?.length > 0) {
+          // Convert visual state to preview format
+          const phases = visualState.phases.map((p, i) => ({
+            order: p.sortOrder || i + 1,
+            name: p.name || `Phase ${i + 1}`,
+            type: p.phaseType || p.type || 'RoundRobin',
+            incomingSlots: p.incomingSlotCount || p.incomingSlots || unitCount,
+            exitingSlots: p.advancingSlotCount || p.exitingSlots || unitCount,
+            poolCount: p.poolCount || null,
+            encounterCount: calculateEncounters(p, unitCount),
+            includeConsolation: p.includeConsolation || false
+          }));
+          
+          setPreview({
+            templateId: template.id,
+            templateName: template.name,
+            unitCount: unitCount || template.defaultUnits,
+            phases,
+            totalEncounters: phases.reduce((sum, p) => sum + (p.encounterCount || 0), 0),
+            totalRounds: phases.length,
+            advancementRules: visualState.advancementRules || []
+          });
+          setPreviewLoading(false);
+          return;
+        }
+      }
+      
+      // Fall back to API preview
       const response = await tournamentApi.previewTemplate(
         template.id,
         divisionId,
@@ -93,6 +126,23 @@ export default function ScheduleConfigModal({
       setPreview(null);
     } finally {
       setPreviewLoading(false);
+    }
+  };
+  
+  // Helper to calculate encounter count based on phase type
+  const calculateEncounters = (phase, teams) => {
+    const n = phase.incomingSlotCount || phase.incomingSlots || teams;
+    const type = (phase.phaseType || phase.type || '').toLowerCase();
+    
+    if (type.includes('roundrobin') || type.includes('round')) {
+      return n * (n - 1) / 2;
+    } else if (type.includes('pool')) {
+      const poolCount = phase.poolCount || 1;
+      const perPool = Math.ceil(n / poolCount);
+      return poolCount * (perPool * (perPool - 1) / 2);
+    } else {
+      // Bracket - roughly n/2 matches per round
+      return Math.ceil(n / 2);
     }
   };
 
