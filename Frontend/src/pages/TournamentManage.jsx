@@ -1015,14 +1015,10 @@ export default function TournamentManage() {
   const loadDivisionPhaseDiagram = async (divisionId) => {
     if (divisionPhaseData[divisionId]) return; // Already loaded
     try {
-      const response = await tournamentApi.getDivision(divisionId);
-      if (response.success && response.data) {
-        const div = response.data;
-        // Get the structure JSON
-        const structureJson = div.phaseTemplateJson || div.structureJson;
-        // Get phases for display
-        const phasesRes = await tournamentApi.getDivisionPhases(divisionId);
-        const phases = phasesRes.success ? (phasesRes.data || []).map((p, i) => ({
+      // Get phases for display
+      const phasesRes = await tournamentApi.getDivisionPhases(divisionId);
+      if (phasesRes.success) {
+        const phases = (phasesRes.data || []).map((p, i) => ({
           name: p.name,
           type: p.phaseType,
           order: p.sortOrder || (i + 1),
@@ -1032,7 +1028,10 @@ export default function TournamentManage() {
           outSlots: p.advancingSlotCount,
           poolCount: p.poolCount,
           encounterCount: p.encounterCount
-        })) : [];
+        }));
+        // Try to get structureJson from the division in dashboard data
+        const div = dashboard?.divisions?.find(d => d.id === divisionId);
+        const structureJson = div?.phaseTemplateJson || div?.structureJson || null;
         setDivisionPhaseData(prev => ({
           ...prev,
           [divisionId]: { phases, structureJson }
