@@ -609,8 +609,8 @@ export default function PhaseCourtScheduler({ eventId, data, onUpdate }) {
           {divisions.map(div => {
             const divMatches = matchesByDivPhase[div.id] || {}
             const phases = div.phases || []
-            // Filter out Award and Draw phases from counts (they're entry/exit points, not playable)
-            const playablePhases = phases.filter(p => p.phaseType !== 'Award' && p.phaseType !== 'Draw')
+            // Exclude phases with 0 incoming or 0 advancing slots (entry/exit points, not playable)
+            const playablePhases = phases.filter(p => (p.incomingSlotCount || 0) > 0 && (p.advancingSlotCount || 0) > 0)
             const playablePhaseIds = new Set(playablePhases.map(p => p.id))
             const noPhaseMatches = divMatches['no-phase'] || []
             const color = divColors[div.id]

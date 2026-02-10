@@ -123,8 +123,8 @@ export default function TournamentScheduleDashboard() {
       const noPhase = divEncs.filter(e => !e.phaseId)
       const totalAssigned = divEncs.filter(e => e.courtId && e.estimatedStartTime).length
       
-      // Exclude Award and Draw phases from counts (they're just entry/exit points, not playable phases)
-      const playablePhases = phases.filter(ph => ph.phaseType !== 'Award' && ph.phaseType !== 'Draw')
+      // Exclude phases with 0 incoming or 0 advancing slots (entry/exit points, not playable phases)
+      const playablePhases = phases.filter(ph => (ph.incomingSlotCount || 0) > 0 && (ph.advancingSlotCount || 0) > 0)
       const playablePhaseIds = new Set(playablePhases.map(ph => ph.id))
       // Only count encounters from playable phases
       const playableEncounters = divEncs.filter(e => !e.phaseId || playablePhaseIds.has(e.phaseId))
