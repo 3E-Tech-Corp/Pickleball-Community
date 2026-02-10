@@ -879,14 +879,22 @@ public class PhaseTemplatesController : ControllerBase
 
     /// <summary>
     /// Generate a basic preview when template has no explicit phases defined
-    /// Uses template category and unit count to create a sensible default
+    /// Uses template category and name to infer type, then generates preview
     /// </summary>
     private List<TemplatePhasePreviewDto> GenerateFallbackPreview(PhaseTemplate template, int unitCount)
     {
         var phases = new List<TemplatePhasePreviewDto>();
         var category = template.Category?.ToLower() ?? "";
+        var name = template.Name?.ToLower() ?? "";
+        
+        // Check both category and name for type hints
+        var isRoundRobin = category.Contains("roundrobin") || category.Contains("round") 
+            || name.Contains("rr") || name.Contains("round robin");
+        var isDoubleElim = category.Contains("double") || name.Contains("double");
+        var isSingleElim = category.Contains("single") || category.Contains("bracket") 
+            || category.Contains("elimination") || name.Contains("elimination") || name.Contains("bracket");
 
-        if (category.Contains("roundrobin") || category.Contains("round"))
+        if (isRoundRobin)
         {
             // Simple round robin
             phases.Add(new TemplatePhasePreviewDto
@@ -899,7 +907,7 @@ public class PhaseTemplatesController : ControllerBase
                 EncounterCount = unitCount * (unitCount - 1) / 2
             });
         }
-        else if (category.Contains("double"))
+        else if (isDoubleElim)
         {
             // Double elimination
             phases.Add(new TemplatePhasePreviewDto
@@ -912,7 +920,7 @@ public class PhaseTemplatesController : ControllerBase
                 EncounterCount = (unitCount * 2) - 1
             });
         }
-        else if (category.Contains("single") || category.Contains("bracket") || category.Contains("elimination"))
+        else if (isSingleElim)
         {
             // Single elimination bracket
             var bracketSize = 1;
