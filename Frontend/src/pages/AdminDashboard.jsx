@@ -2681,6 +2681,8 @@ const AdminDashboard = () => {
               </div>
             </div>
           )}
+        </div>
+      </div>
 
       {/* User Edit Modal */}
       {isUserModalOpen && selectedUser && (
