@@ -6,6 +6,8 @@ import {
   MarkerType,
   useNodesState,
   useEdgesState,
+  Handle,
+  Position,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import dagre from 'dagre';
@@ -227,10 +229,10 @@ export default function ScheduleConfigModal({
     }
   };
 
-  // Calculate preview stats
+  // Calculate preview stats (exclude phases with 0 incoming or 0 advancing slots)
   const previewStats = preview ? {
-    phases: preview.phases?.length || 0,
-    encounters: preview.totalEncounters || preview.phases?.reduce((sum, p) => sum + (p.encounterCount || 0), 0) || 0,
+    phases: preview.phases?.filter(p => (p.incomingSlots || p.inSlots || 0) > 0 && (p.exitingSlots || p.outSlots || 0) > 0)?.length || 0,
+    encounters: preview.totalEncounters || preview.phases?.filter(p => (p.incomingSlots || p.inSlots || 0) > 0 && (p.exitingSlots || p.outSlots || 0) > 0)?.reduce((sum, p) => sum + (p.encounterCount || 0), 0) || 0,
     teams: customUnitCount
   } : null;
 
@@ -668,9 +670,13 @@ function PhaseNode({ data }) {
 
   return (
     <div 
-      className={`bg-white rounded-lg shadow-md border-2 overflow-hidden transition-all ${colors.border}`}
+      className={`bg-white rounded-lg shadow-md border-2 overflow-hidden transition-all ${colors.border} relative`}
       style={{ width: isExpanded ? 220 : 180 }}
     >
+      {/* React Flow Handles for edge connections */}
+      <Handle type="target" position={Position.Top} className="!bg-purple-400 !w-3 !h-3 !border-2 !border-white" />
+      <Handle type="source" position={Position.Bottom} className="!bg-purple-400 !w-3 !h-3 !border-2 !border-white" />
+      
       {/* Header */}
       <div className={`${colors.bg} text-white px-3 py-1.5 flex items-center gap-2`}>
         <Icon className="w-3.5 h-3.5" />
@@ -685,7 +691,9 @@ function PhaseNode({ data }) {
           <span className="text-xs text-gray-500">
             {data.type?.toLowerCase() === 'award' 
               ? `${data.inSlots} in → 🏆` 
-              : `${data.inSlots} in → ${data.outSlots} out`}
+              : data.type?.toLowerCase() === 'draw'
+                ? `🎲 → ${data.outSlots} out`
+                : `${data.inSlots} in → ${data.outSlots} out`}
           </span>
         </div>
         {data.poolCount > 1 && (
