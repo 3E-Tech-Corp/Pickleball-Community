@@ -899,7 +899,9 @@ export default function NotificationSystemAdmin() {
                     onChange={(e) => {
                       try {
                         setFormData({ ...formData, context: JSON.parse(e.target.value) });
-                      } catch {}
+                      } catch {
+                        // Ignore parse errors while typing
+                      }
                     }}
                     placeholder='{"playerName": "John", "eventName": "Spring Tournament"}'
                     rows={4}
