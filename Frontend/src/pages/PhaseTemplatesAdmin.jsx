@@ -1095,7 +1095,8 @@ const CanvasPhaseEditorInner = ({ visualState, onChange, readOnly = false }) => 
   const updateNodeInternals = useUpdateNodeInternals()
   const [selectedNodeId, setSelectedNodeId] = useState(null)
   const [selectedEdgeKey, setSelectedEdgeKey] = useState(null) // "srcIdx-tgtIdx"
-  const [layoutDirection, setLayoutDirection] = useState('TB') // 'TB' | 'LR'
+  // Initialize layout direction from saved canvasLayout or default to 'TB'
+  const [layoutDirection, setLayoutDirection] = useState(vs.canvasLayout?.direction || 'TB')
   const [expandAll, setExpandAll] = useState(false) // Toggle all nodes expanded/collapsed
 
   // Convert visualState phases to React Flow nodes
@@ -1191,12 +1192,28 @@ const CanvasPhaseEditorInner = ({ visualState, onChange, readOnly = false }) => 
 
   // Initialize nodes/edges from visual state
   const initialNodes = useMemo(() => {
-    const nodes = buildNodes(vs.phases, 'TB')
+    const savedLayout = vs.canvasLayout
+    const dir = savedLayout?.direction || 'TB'
+    const nodes = buildNodes(vs.phases, dir)
     const edges = buildEdges(vs.advancementRules, vs.phases)
-    const { nodes: layoutedNodes } = getLayoutedElements(nodes, edges, 'TB')
+    
+    // If we have saved positions, use them; otherwise auto-layout
+    let positionedNodes
+    if (savedLayout?.nodePositions && Object.keys(savedLayout.nodePositions).length > 0) {
+      // Apply saved positions
+      positionedNodes = nodes.map(node => {
+        const savedPos = savedLayout.nodePositions[node.id]
+        return savedPos ? { ...node, position: savedPos } : node
+      })
+    } else {
+      // Auto-layout with dagre
+      const { nodes: layoutedNodes } = getLayoutedElements(nodes, edges, dir)
+      positionedNodes = layoutedNodes
+    }
+    
     const phaseNames = {}
     vs.phases.forEach((p, i) => { phaseNames[i + 1] = p.name })
-    return layoutedNodes.map((node, idx) => {
+    return positionedNodes.map((node, idx) => {
       const order = idx + 1
       return {
         ...node,
@@ -1579,7 +1596,17 @@ const CanvasPhaseEditorInner = ({ visualState, onChange, readOnly = false }) => 
     const currentEdges = edges
     const { nodes: layoutedNodes } = getLayoutedElements(nodes, currentEdges, layoutDirection, expandAll)
     setNodes(layoutedNodes)
-  }, [nodes, edges, setNodes, layoutDirection, expandAll])
+    // Save new positions to canvasLayout
+    const nodePositions = {}
+    layoutedNodes.forEach(n => { nodePositions[n.id] = n.position })
+    onChange({
+      ...vs,
+      canvasLayout: {
+        direction: layoutDirection,
+        nodePositions
+      }
+    })
+  }, [nodes, edges, setNodes, layoutDirection, expandAll, vs, onChange])
 
   // Re-layout when direction changes
   const handleDirectionChange = useCallback((dir) => {
@@ -1595,11 +1622,21 @@ const CanvasPhaseEditorInner = ({ visualState, onChange, readOnly = false }) => 
       setTimeout(() => {
         updateNodeInternals(layoutedNodes.map(n => n.id))
       }, 0)
+      // Save new positions and direction to canvasLayout
+      const nodePositions = {}
+      layoutedNodes.forEach(n => { nodePositions[n.id] = n.position })
+      onChange({
+        ...vs,
+        canvasLayout: {
+          direction: dir,
+          nodePositions
+        }
+      })
       return layoutedNodes
     })
     // Force edge rebuild so React Flow recalculates paths for new handle positions
     setEdges(prev => prev.map(e => ({ ...e })))
-  }, [edges, setNodes, setEdges, updateNodeInternals, expandAll])
+  }, [edges, setNodes, setEdges, updateNodeInternals, expandAll, vs, onChange])
 
   // Compute topological sort order and sync to phases
   const handleSyncSortOrder = useCallback(() => {
@@ -1744,6 +1781,21 @@ const CanvasPhaseEditorInner = ({ visualState, onChange, readOnly = false }) => 
           onPaneClick={readOnly ? undefined : onPaneClick}
           onDragOver={readOnly ? undefined : onDragOver}
           onDrop={readOnly ? undefined : onDrop}
+          onNodeDragStop={readOnly ? undefined : (event, node) => {
+            // Save all node positions when any node is dragged
+            const nodePositions = {}
+            nodes.forEach(n => {
+              // Use the updated position for the dragged node, current position for others
+              nodePositions[n.id] = n.id === node.id ? node.position : n.position
+            })
+            onChange({
+              ...vs,
+              canvasLayout: {
+                direction: layoutDirection,
+                nodePositions
+              }
+            })
+          }}
           nodeTypes={nodeTypes}
           fitView
           deleteKeyCode={readOnly ? null : ['Backspace', 'Delete']}

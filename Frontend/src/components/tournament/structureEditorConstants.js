@@ -85,7 +85,8 @@ export function parseStructureToVisual(jsonStr) {
         generateBracket: s.generateBracket || { type: 'SingleElimination', consolation: false, calculateByes: true },
         exitPositions: Array.isArray(s.exitPositions) ? s.exitPositions : [],
         phases: [],
-        advancementRules: []
+        advancementRules: [],
+        canvasLayout: null
       }
     }
     return {
@@ -112,7 +113,9 @@ export function parseStructureToVisual(jsonStr) {
         targetSlotNumber: r.targetSlotNumber ?? r.toSlot ?? 1,
         sourcePoolIndex: r.sourcePoolIndex ?? null
       })) : [],
-      exitPositions: Array.isArray(s.exitPositions) ? s.exitPositions : []
+      exitPositions: Array.isArray(s.exitPositions) ? s.exitPositions : [],
+      // Canvas layout: saved node positions and direction
+      canvasLayout: s.canvasLayout || null
     }
   } catch {
     return {
@@ -120,7 +123,8 @@ export function parseStructureToVisual(jsonStr) {
       generateBracket: { type: 'SingleElimination', consolation: false, calculateByes: true },
       phases: [{ ...DEFAULT_PHASE }],
       advancementRules: [],
-      exitPositions: []
+      exitPositions: [],
+      canvasLayout: null
     }
   }
 }
@@ -150,7 +154,9 @@ export function serializeVisualToJson(vs) {
       ...(p.phaseType === 'Draw' && p.drawMethod ? { drawMethod: p.drawMethod } : {})
     })),
     advancementRules: vs.advancementRules,
-    ...(vs.exitPositions.length > 0 ? { exitPositions: vs.exitPositions } : {})
+    ...(vs.exitPositions.length > 0 ? { exitPositions: vs.exitPositions } : {}),
+    // Save canvas layout (node positions and direction) if present
+    ...(vs.canvasLayout ? { canvasLayout: vs.canvasLayout } : {})
   }
   return JSON.stringify(obj, null, 2)
 }
