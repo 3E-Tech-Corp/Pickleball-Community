@@ -7370,7 +7370,10 @@ export default function TournamentManage() {
                 <div className="divide-y">
                   {staffList.map(staff => (
                     <div key={staff.id} className="p-4 flex items-center justify-between hover:bg-gray-50">
-                      <div className="flex items-center gap-3">
+                      <Link 
+                        to={`/member/${staff.userId}`}
+                        className="flex items-center gap-3 hover:opacity-80 transition-opacity"
+                      >
                         {staff.userProfileImageUrl ? (
                           <img
                             src={staff.userProfileImageUrl}
@@ -7391,7 +7394,7 @@ export default function TournamentManage() {
                           <User className="w-5 h-5 text-blue-600" />
                         </div>
                         <div>
-                          <div className="font-medium text-gray-900">{staff.userName || staff.userEmail}</div>
+                          <div className="font-medium text-gray-900 hover:text-orange-600">{staff.userName || staff.userEmail}</div>
                           <div className="flex items-center gap-2 text-sm">
                             <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full text-xs">
                               {staff.roleName}
@@ -7405,7 +7408,7 @@ export default function TournamentManage() {
                             )}
                           </div>
                         </div>
-                      </div>
+                      </Link>
                       <div className="flex items-center gap-1">
                         <button
                           onClick={() => openEditStaffModal(staff)}
