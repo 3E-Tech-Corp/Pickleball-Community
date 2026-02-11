@@ -1137,14 +1137,26 @@ public class PhaseTemplatesController : ControllerBase
 
     private async Task<DivisionPhase> CreatePhaseFromJson(int divisionId, JsonElement phaseJson)
     {
+        // Support both old and new property names for backward compatibility
+        // Old: order, type, incomingSlots, exitingSlots
+        // New: sortOrder, phaseType, incomingSlotCount, advancingSlotCount
+        var phaseOrder = phaseJson.TryGetProperty("order", out var orderProp) ? orderProp.GetInt32()
+            : phaseJson.TryGetProperty("sortOrder", out var sortOrderProp) ? sortOrderProp.GetInt32() : 1;
+        var phaseType = phaseJson.TryGetProperty("type", out var typeProp) ? typeProp.GetString()
+            : phaseJson.TryGetProperty("phaseType", out var phaseTypeProp) ? phaseTypeProp.GetString() : PhaseTypes.RoundRobin;
+        var incomingSlots = phaseJson.TryGetProperty("incomingSlots", out var inProp) ? inProp.GetInt32()
+            : phaseJson.TryGetProperty("incomingSlotCount", out var inCountProp) ? inCountProp.GetInt32() : 8;
+        var advancingSlots = phaseJson.TryGetProperty("exitingSlots", out var exitProp) ? exitProp.GetInt32()
+            : phaseJson.TryGetProperty("advancingSlotCount", out var advCountProp) ? advCountProp.GetInt32() : 4;
+
         var phase = new DivisionPhase
         {
             DivisionId = divisionId,
-            PhaseOrder = phaseJson.GetProperty("order").GetInt32(),
-            Name = phaseJson.GetProperty("name").GetString() ?? "",
-            PhaseType = phaseJson.GetProperty("type").GetString() ?? PhaseTypes.RoundRobin,
-            IncomingSlotCount = phaseJson.GetProperty("incomingSlots").GetInt32(),
-            AdvancingSlotCount = phaseJson.GetProperty("exitingSlots").GetInt32(),
+            PhaseOrder = phaseOrder,
+            Name = phaseJson.TryGetProperty("name", out var nameProp) ? nameProp.GetString() ?? "" : "",
+            PhaseType = phaseType ?? PhaseTypes.RoundRobin,
+            IncomingSlotCount = incomingSlots,
+            AdvancingSlotCount = advancingSlots,
             PoolCount = phaseJson.TryGetProperty("poolCount", out var pc) ? pc.GetInt32() : 1,
             IncludeConsolation = phaseJson.TryGetProperty("includeConsolation", out var ic) && ic.GetBoolean(),
             Status = PhaseStatus.Pending
