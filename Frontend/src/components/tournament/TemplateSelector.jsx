@@ -131,13 +131,12 @@ export default function TemplateSelector({ divisionId, unitCount = 8, onApply, o
 
       const result = response?.data || response;
       if (result?.success !== false) {
-        const phaseIds = result?.createdPhaseIds || [];
-        for (const phaseId of phaseIds) {
-          try {
-            await tournamentApi.generatePhaseSchedule(phaseId);
-          } catch (err) {
-            console.warn(`Failed to generate schedule for phase ${phaseId}`);
-          }
+        // Use generateAllPhaseSchedules to generate encounters for all phases in correct order
+        // This handles Draw/Award phases (skips them) and ensures proper numbering
+        try {
+          await tournamentApi.generateAllPhaseSchedules(divisionId, false); // false = don't clear (just created)
+        } catch (err) {
+          console.warn('Failed to generate schedules for phases:', err);
         }
         onApply?.(result);
       } else {
