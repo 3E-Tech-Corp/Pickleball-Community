@@ -1608,23 +1608,22 @@ const CanvasPhaseEditorInner = ({ visualState, onChange, readOnly = false }) => 
     })
   }, [nodes, edges, setNodes, layoutDirection, expandAll, vs, onChange])
 
-  // Re-layout when direction changes
+  // Change direction WITHOUT re-layout (just update handle positions)
   const handleDirectionChange = useCallback((dir) => {
     setLayoutDirection(dir)
-    // Update node data with new direction and re-layout
+    // Update node data with new direction but keep current positions
     setNodes(prev => {
       const updated = prev.map(node => ({
         ...node,
         data: { ...node.data, layoutDirection: dir }
       }))
-      const { nodes: layoutedNodes } = getLayoutedElements(updated, edges, dir, expandAll)
       // Force React Flow to recalculate handle positions after render
       setTimeout(() => {
-        updateNodeInternals(layoutedNodes.map(n => n.id))
+        updateNodeInternals(updated.map(n => n.id))
       }, 0)
-      // Save new positions and direction to canvasLayout
+      // Save direction change (keep existing positions)
       const nodePositions = {}
-      layoutedNodes.forEach(n => { nodePositions[n.id] = n.position })
+      updated.forEach(n => { nodePositions[n.id] = n.position })
       onChange({
         ...vs,
         canvasLayout: {
@@ -1632,11 +1631,11 @@ const CanvasPhaseEditorInner = ({ visualState, onChange, readOnly = false }) => 
           nodePositions
         }
       })
-      return layoutedNodes
+      return updated
     })
     // Force edge rebuild so React Flow recalculates paths for new handle positions
     setEdges(prev => prev.map(e => ({ ...e })))
-  }, [edges, setNodes, setEdges, updateNodeInternals, expandAll, vs, onChange])
+  }, [setNodes, setEdges, updateNodeInternals, vs, onChange])
 
   // Compute topological sort order and sync to phases
   const handleSyncSortOrder = useCallback(() => {
