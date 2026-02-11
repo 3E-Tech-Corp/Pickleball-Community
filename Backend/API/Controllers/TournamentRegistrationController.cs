@@ -1901,7 +1901,7 @@ public class TournamentRegistrationController : EventControllerBase
     // ============================================
 
     [HttpDelete("events/{eventId}/registrations/{unitId}/members/{userId}")]
-    public async Task<ActionResult<ApiResponse<bool>>> RemoveRegistration(int eventId, int unitId, int userId)
+    public async Task<ActionResult<ApiResponse<bool>>> RemoveRegistration(int eventId, int unitId, int userId, [FromQuery] bool force = false)
     {
         var currentUserId = GetUserId();
         if (!currentUserId.HasValue)
@@ -1935,12 +1935,13 @@ public class TournamentRegistrationController : EventControllerBase
         if (isOnlyMember)
         {
             // Only member in the unit - check if we can delete the unit
-            if (memberHasPayment)
+            if (memberHasPayment && !force)
             {
                 return BadRequest(new ApiResponse<bool>
                 {
                     Success = false,
-                    Message = "Cannot remove last member with payment records. Cancel payment first or use a different method."
+                    Message = "This player has payment records. Are you sure you want to remove them? This will delete their payment history.",
+                    Data = false
                 });
             }
 

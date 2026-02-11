@@ -2565,24 +2565,40 @@ export default function TournamentManage() {
     }
   };
 
-  const handleRemoveMember = async (unit, member) => {
+  const handleRemoveMember = async (unit, member, forceRemove = false) => {
     const acceptedCount = unit.members?.filter(m => m.inviteStatus === 'Accepted').length || 0;
     const isLastMember = acceptedCount <= 1;
-    const confirmMessage = isLastMember
-      ? `Cancel registration for ${member.firstName} ${member.lastName}? This will remove the entire registration.`
-      : `Remove ${member.firstName} ${member.lastName} from "${unit.name}"?`;
+    
+    // Only show initial confirmation if not a force removal
+    if (!forceRemove) {
+      const confirmMessage = isLastMember
+        ? `Cancel registration for ${member.firstName} ${member.lastName}? This will remove the entire registration.`
+        : `Remove ${member.firstName} ${member.lastName} from "${unit.name}"?`;
 
-    if (!confirm(confirmMessage)) return;
+      if (!confirm(confirmMessage)) return;
+    }
+    
     setProcessingUnitAction({ unitId: unit.id, action: 'remove-member' });
     try {
-      const response = await tournamentApi.removeRegistration(eventId, unit.id, member.userId);
+      const response = await tournamentApi.removeRegistration(eventId, unit.id, member.userId, forceRemove);
       if (response.success) {
         toast.success(isLastMember ? 'Registration cancelled' : 'Member removed from unit');
         loadUnits();
         loadDashboard();
         loadCheckIns();
       } else {
-        toast.error(response.message || 'Failed to remove member');
+        // Check if this is a payment warning that can be force-overridden
+        if (response.message?.includes('payment') && !forceRemove) {
+          const forceConfirm = confirm(
+            `${response.message}\n\nClick OK to confirm removal, or Cancel to abort.`
+          );
+          if (forceConfirm) {
+            setProcessingUnitAction(null);
+            return handleRemoveMember(unit, member, true);
+          }
+        } else {
+          toast.error(response.message || 'Failed to remove member');
+        }
       }
     } catch (err) {
       console.error('Error removing member:', err);

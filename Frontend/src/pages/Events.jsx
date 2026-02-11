@@ -2777,12 +2777,12 @@ function EventDetailModal({ event, isAuthenticated, isAdmin, currentUserId, user
   };
 
   // Remove a registration
-  const handleRemoveRegistration = async (registration) => {
-    if (!confirm(`Remove ${registration.userName} from ${registration.divisionName}?`)) return;
+  const handleRemoveRegistration = async (registration, forceRemove = false) => {
+    if (!forceRemove && !confirm(`Remove ${registration.userName} from ${registration.divisionName}?`)) return;
 
     setUpdatingRegistration(registration.id);
     try {
-      const response = await tournamentApi.removeRegistration(event.id, registration.unitId, registration.userId);
+      const response = await tournamentApi.removeRegistration(event.id, registration.unitId, registration.userId, forceRemove);
       if (response.success) {
         setAllRegistrations(prev => prev.filter(r => r.id !== registration.id));
 
@@ -2796,7 +2796,18 @@ function EventDetailModal({ event, isAuthenticated, isAdmin, currentUserId, user
         toast.success('Registration removed');
         onUpdate();
       } else {
-        toast.error(response.message || 'Failed to remove registration');
+        // Check if this is a payment warning that can be force-overridden
+        if (response.message?.includes('payment') && !forceRemove) {
+          setUpdatingRegistration(null);
+          const forceConfirm = confirm(
+            `${response.message}\n\nClick OK to confirm removal, or Cancel to abort.`
+          );
+          if (forceConfirm) {
+            return handleRemoveRegistration(registration, true);
+          }
+        } else {
+          toast.error(response.message || 'Failed to remove registration');
+        }
       }
     } catch (err) {
       console.error('Error removing registration:', err);
@@ -2807,7 +2818,7 @@ function EventDetailModal({ event, isAuthenticated, isAdmin, currentUserId, user
   };
 
   // Remove a player from a unit (from registration tab)
-  const handleRemovePlayerFromUnit = async (unit, member, division) => {
+  const handleRemovePlayerFromUnit = async (unit, member, division, forceRemove = false) => {
     const memberName = member.lastName && member.firstName
       ? `${member.lastName}, ${member.firstName}`
       : member.lastName || member.firstName || 'Player';
@@ -2816,14 +2827,16 @@ function EventDetailModal({ event, isAuthenticated, isAdmin, currentUserId, user
     const acceptedMembers = unit.members?.filter(m => m.inviteStatus === 'Accepted') || [];
     const isOnlyMember = acceptedMembers.length <= 1;
 
-    const confirmMessage = isOnlyMember
-      ? `Remove ${memberName}? This will cancel the entire registration for ${division.name}.`
-      : `Remove ${memberName} from this team? They will get their own individual registration.`;
+    if (!forceRemove) {
+      const confirmMessage = isOnlyMember
+        ? `Remove ${memberName}? This will cancel the entire registration for ${division.name}.`
+        : `Remove ${memberName} from this team? They will get their own individual registration.`;
 
-    if (!confirm(confirmMessage)) return;
+      if (!confirm(confirmMessage)) return;
+    }
 
     try {
-      const response = await tournamentApi.removeRegistration(event.id, unit.id, member.userId);
+      const response = await tournamentApi.removeRegistration(event.id, unit.id, member.userId, forceRemove);
       if (response.success) {
         toast.success(response.message || 'Player removed');
         // Refetch division registrations immediately
@@ -2846,7 +2859,17 @@ function EventDetailModal({ event, isAuthenticated, isAdmin, currentUserId, user
           onUpdate(updatedEventResponse.data);
         }
       } else {
-        toast.error(response.message || 'Failed to remove player');
+        // Check if this is a payment warning that can be force-overridden
+        if (response.message?.includes('payment') && !forceRemove) {
+          const forceConfirm = confirm(
+            `${response.message}\n\nClick OK to confirm removal, or Cancel to abort.`
+          );
+          if (forceConfirm) {
+            return handleRemovePlayerFromUnit(unit, member, division, true);
+          }
+        } else {
+          toast.error(response.message || 'Failed to remove player');
+        }
       }
     } catch (err) {
       console.error('Error removing player:', err);
