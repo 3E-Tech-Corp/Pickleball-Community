@@ -7371,7 +7371,23 @@ export default function TournamentManage() {
                   {staffList.map(staff => (
                     <div key={staff.id} className="p-4 flex items-center justify-between hover:bg-gray-50">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
+                        {staff.userProfileImageUrl ? (
+                          <img
+                            src={staff.userProfileImageUrl}
+                            alt={staff.userName || 'Staff'}
+                            className="w-10 h-10 rounded-full object-cover"
+                            onError={(e) => {
+                              e.target.onerror = null;
+                              e.target.src = '';
+                              e.target.style.display = 'none';
+                              e.target.nextSibling.style.display = 'flex';
+                            }}
+                          />
+                        ) : null}
+                        <div 
+                          className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center"
+                          style={{ display: staff.userProfileImageUrl ? 'none' : 'flex' }}
+                        >
                           <User className="w-5 h-5 text-blue-600" />
                         </div>
                         <div>
