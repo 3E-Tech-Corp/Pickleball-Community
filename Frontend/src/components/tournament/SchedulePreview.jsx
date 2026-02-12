@@ -507,12 +507,12 @@ function PhaseAdvancementInfo({ phaseDetails, phases }) {
 function RoundGroup({ group, allEncounters, onEncounterClick }) {
   const [isExpanded, setIsExpanded] = useState(true);
 
-  // Build lookup: encounter DB id → display match number
+  // Build lookup: encounter DB id → display match number (M1, M2, etc.)
   const matchNumberById = {};
   if (allEncounters) {
     allEncounters.forEach((enc) => {
-      const num = enc.divisionMatchNumber || enc.encounterNumber || enc.encounterLabel;
-      if (num) matchNumberById[enc.id] = num;
+      const num = enc.divisionMatchNumber || enc.encounterNumber;
+      if (num) matchNumberById[enc.id] = `M${num}`;
     });
   }
 
@@ -561,9 +561,11 @@ function EncounterRow({ encounter, matchNumberById = {}, onEncounterClick }) {
       <div className="flex items-center justify-between">
         {/* Match Info */}
         <div className="flex items-center gap-4">
-          {/* Match Label */}
+          {/* Match Label - use divisionMatchNumber */}
           <div className="w-16 text-center">
-            <span className="text-sm font-mono text-gray-500">{encounter.encounterLabel}</span>
+            <span className="text-sm font-mono text-gray-500">
+              {encounter.divisionMatchNumber ? `M${encounter.divisionMatchNumber}` : encounter.encounterLabel}
+            </span>
           </div>
 
           {/* Units */}
@@ -679,11 +681,14 @@ function BracketMatch({ encounter, onEncounterClick }) {
 
   const borderColor = statusColors[encounter.status] || statusColors.default;
 
+  // Use divisionMatchNumber for consistent labeling
+  const matchLabel = encounter.divisionMatchNumber ? `M${encounter.divisionMatchNumber}` : (encounter.encounterLabel || `M${encounter.encounterNumber}`);
+
   return (
     <div className={`bg-white border-2 ${borderColor} rounded-lg shadow-sm w-56 ${onEncounterClick ? 'cursor-pointer hover:shadow-md hover:border-blue-400 transition-all' : ''}`} onClick={() => onEncounterClick?.(encounter.id)}>
       <div className="p-2 border-b border-gray-100">
         <div className="flex items-center justify-between">
-          <span className="text-xs text-gray-500">{encounter.encounterLabel}</span>
+          <span className="text-xs font-medium text-gray-600">{matchLabel}</span>
           {encounter.courtLabel && (
             <span className="text-xs text-gray-400">{encounter.courtLabel}</span>
           )}
@@ -727,11 +732,11 @@ function TableView({ encounters, phaseName, onEncounterClick }) {
     Bye: 'bg-purple-100 text-purple-700',
   };
 
-  // Build lookup: encounter DB id → display match number
+  // Build lookup: encounter DB id → display match number (M1, M2, etc.)
   const matchNumberById = {};
   encounters.forEach((enc) => {
-    const num = enc.divisionMatchNumber || enc.encounterNumber || enc.encounterLabel;
-    if (num) matchNumberById[enc.id] = num;
+    const num = enc.divisionMatchNumber || enc.encounterNumber;
+    if (num) matchNumberById[enc.id] = `M${num}`;
   });
 
   // Format unit source for display
@@ -804,10 +809,10 @@ function TableView({ encounters, phaseName, onEncounterClick }) {
                 className={`${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'} ${onEncounterClick ? 'cursor-pointer hover:bg-blue-50' : ''}`}
                 onClick={() => onEncounterClick?.(encounter.id)}
               >
-                {/* Match Number */}
+                {/* Match Number - use divisionMatchNumber with M prefix */}
                 <td className="px-3 py-3 whitespace-nowrap">
                   <span className="inline-flex items-center justify-center w-10 h-8 bg-blue-100 text-blue-800 font-bold text-sm rounded">
-                    {encounter.divisionMatchNumber || encounter.encounterNumber || encounter.encounterLabel}
+                    {encounter.divisionMatchNumber ? `M${encounter.divisionMatchNumber}` : (encounter.encounterLabel || `M${encounter.encounterNumber}`)}
                   </span>
                 </td>
 
