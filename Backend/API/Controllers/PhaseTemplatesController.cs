@@ -1316,23 +1316,119 @@ public class PhaseTemplatesController : ControllerBase
     private async Task GenerateAutoAdvancementRules(Dictionary<int, DivisionPhase> phases)
     {
         var orderedPhases = phases.OrderBy(kv => kv.Key).Select(kv => kv.Value).ToList();
-
-        for (int i = 0; i < orderedPhases.Count - 1; i++)
+        
+        // Group phases: identify parallel pool phases vs sequential phases
+        // Phases with "Pool" in name at same level are parallel (both receive from prior, both feed to next)
+        var processedIndices = new HashSet<int>();
+        
+        for (int i = 0; i < orderedPhases.Count; i++)
         {
-            var sourcePhase = orderedPhases[i];
-            var targetPhase = orderedPhases[i + 1];
-
-            // Create rules for each advancing slot
-            var advancingCount = Math.Min(sourcePhase.AdvancingSlotCount, targetPhase.IncomingSlotCount);
-            for (int slot = 1; slot <= advancingCount; slot++)
+            if (processedIndices.Contains(i)) continue;
+            
+            var currentPhase = orderedPhases[i];
+            
+            // Check if this is a pool phase and find all parallel pool phases
+            var isPoolPhase = currentPhase.Name?.Contains("Pool") == true || currentPhase.PoolCount > 1;
+            var parallelPools = new List<(int index, DivisionPhase phase)> { (i, currentPhase) };
+            
+            if (isPoolPhase)
             {
-                _context.PhaseAdvancementRules.Add(new PhaseAdvancementRule
+                // Find other pool phases at similar position (consecutive pool phases are parallel)
+                for (int j = i + 1; j < orderedPhases.Count; j++)
                 {
-                    SourcePhaseId = sourcePhase.Id,
-                    TargetPhaseId = targetPhase.Id,
-                    SourceRank = slot,
-                    TargetSlotNumber = slot
-                });
+                    var nextPhase = orderedPhases[j];
+                    var nextIsPool = nextPhase.Name?.Contains("Pool") == true || nextPhase.PoolCount > 1;
+                    if (nextIsPool)
+                    {
+                        parallelPools.Add((j, nextPhase));
+                        processedIndices.Add(j);
+                    }
+                    else
+                    {
+                        break; // Stop at first non-pool phase
+                    }
+                }
+            }
+            
+            processedIndices.Add(i);
+            
+            if (parallelPools.Count > 1)
+            {
+                // Multiple parallel pool phases - all receive from the phase before first pool
+                var sourcePhase = i > 0 ? orderedPhases[i - 1] : null;
+                var targetPhaseIndex = parallelPools.Max(p => p.index) + 1;
+                var targetPhase = targetPhaseIndex < orderedPhases.Count ? orderedPhases[targetPhaseIndex] : null;
+                
+                if (sourcePhase != null)
+                {
+                    // Distribute source advancing slots across all pools
+                    // E.g., 11 teams from Draw → 5 to Pool A, 6 to Pool B
+                    int totalPoolSlots = parallelPools.Sum(p => p.phase.IncomingSlotCount);
+                    int slotOffset = 0;
+                    
+                    foreach (var (_, poolPhase) in parallelPools)
+                    {
+                        for (int slot = 1; slot <= poolPhase.IncomingSlotCount; slot++)
+                        {
+                            _context.PhaseAdvancementRules.Add(new PhaseAdvancementRule
+                            {
+                                SourcePhaseId = sourcePhase.Id,
+                                TargetPhaseId = poolPhase.Id,
+                                SourceRank = slotOffset + slot,
+                                TargetSlotNumber = slot
+                            });
+                        }
+                        slotOffset += poolPhase.IncomingSlotCount;
+                    }
+                }
+                
+                if (targetPhase != null)
+                {
+                    // All pools feed into next phase (e.g., Semifinals)
+                    // Cross-pool seeding: Pool A #1, Pool B #1, Pool A #2, Pool B #2, etc.
+                    int targetSlot = 1;
+                    int maxAdvancing = parallelPools.Max(p => p.phase.AdvancingSlotCount);
+                    
+                    for (int rank = 1; rank <= maxAdvancing && targetSlot <= targetPhase.IncomingSlotCount; rank++)
+                    {
+                        foreach (var (_, poolPhase) in parallelPools)
+                        {
+                            if (rank <= poolPhase.AdvancingSlotCount && targetSlot <= targetPhase.IncomingSlotCount)
+                            {
+                                _context.PhaseAdvancementRules.Add(new PhaseAdvancementRule
+                                {
+                                    SourcePhaseId = poolPhase.Id,
+                                    TargetPhaseId = targetPhase.Id,
+                                    SourceRank = rank,
+                                    TargetSlotNumber = targetSlot++
+                                });
+                            }
+                        }
+                    }
+                    
+                    // Mark target phase as processed since we handled advancement to it
+                    processedIndices.Add(targetPhaseIndex);
+                }
+            }
+            else
+            {
+                // Single phase - simple sequential advancement to next phase
+                if (i < orderedPhases.Count - 1)
+                {
+                    var targetPhase = orderedPhases[i + 1];
+                    var advancingCount = Math.Min(currentPhase.AdvancingSlotCount, targetPhase.IncomingSlotCount);
+                    
+                    for (int slot = 1; slot <= advancingCount; slot++)
+                    {
+                        _context.PhaseAdvancementRules.Add(new PhaseAdvancementRule
+                        {
+                            SourcePhaseId = currentPhase.Id,
+                            TargetPhaseId = targetPhase.Id,
+                            SourceRank = slot,
+                            TargetSlotNumber = slot
+                        });
+                    }
+                }
             }
         }
     }
