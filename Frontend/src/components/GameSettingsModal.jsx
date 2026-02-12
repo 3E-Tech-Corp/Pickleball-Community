@@ -270,7 +270,9 @@ export default function GameSettingsModal({ isOpen, onClose, division, eventId, 
                     <span>Configure game settings for each phase</span>
                   </div>
 
-                  {gameSettings.phases.map((phase) => (
+                  {gameSettings.phases
+                    .filter(phase => phase.phaseType !== 'Draw' && phase.phaseType !== 'Award')
+                    .map((phase) => (
                     <div key={phase.phaseId} className="border rounded-lg overflow-hidden">
                       {/* Phase Header */}
                       <button
