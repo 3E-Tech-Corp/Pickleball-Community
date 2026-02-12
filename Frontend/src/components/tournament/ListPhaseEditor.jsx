@@ -358,16 +358,31 @@ const ListPhaseEditor = ({ visualState, onChange }) => {
                   </tr>
                 </thead>
                 <tbody>
-                  {vs.advancementRules.map((rule, idx) => {
+                  {/* Sort rules by source phase's sortOrder */}
+                  {[...vs.advancementRules]
+                    .map((rule, origIdx) => ({ ...rule, origIdx }))
+                    .sort((a, b) => {
+                      const srcA = vs.phases[a.sourcePhaseOrder - 1]
+                      const srcB = vs.phases[b.sourcePhaseOrder - 1]
+                      const orderA = srcA?.sortOrder || a.sourcePhaseOrder
+                      const orderB = srcB?.sortOrder || b.sourcePhaseOrder
+                      return orderA - orderB || a.finishPosition - b.finishPosition
+                    })
+                    .map((rule) => {
+                    const idx = rule.origIdx
                     const srcPhase = vs.phases[rule.sourcePhaseOrder - 1]
                     const srcHasPools = srcPhase && srcPhase.phaseType === 'Pools' && (parseInt(srcPhase.poolCount) || 0) > 1
+                    // Sort phases by sortOrder for dropdowns
+                    const sortedPhases = [...vs.phases]
+                      .map((p, i) => ({ ...p, origIdx: i }))
+                      .sort((a, b) => (a.sortOrder || a.origIdx + 1) - (b.sortOrder || b.origIdx + 1))
                     return (
                       <tr key={idx} className="border-t hover:bg-gray-50">
                         <td className="px-3 py-1.5">
                           <select value={rule.sourcePhaseOrder}
                             onChange={e => updateRule(idx, 'sourcePhaseOrder', parseInt(e.target.value))}
                             className="w-full px-1 py-1 border rounded text-sm focus:ring-2 focus:ring-purple-500">
-                            {vs.phases.map((p, i) => <option key={i} value={i + 1}>{i + 1}. {p.name}</option>)}
+                            {sortedPhases.map((p) => <option key={p.origIdx} value={p.origIdx + 1}>{p.sortOrder || (p.origIdx + 1)}. {p.name}</option>)}
                           </select>
                         </td>
                         <td className="px-3 py-1.5">
@@ -392,7 +407,7 @@ const ListPhaseEditor = ({ visualState, onChange }) => {
                           <select value={rule.targetPhaseOrder}
                             onChange={e => updateRule(idx, 'targetPhaseOrder', parseInt(e.target.value))}
                             className="w-full px-1 py-1 border rounded text-sm focus:ring-2 focus:ring-purple-500">
-                            {vs.phases.map((p, i) => <option key={i} value={i + 1}>{i + 1}. {p.name}</option>)}
+                            {sortedPhases.map((p) => <option key={p.origIdx} value={p.origIdx + 1}>{p.sortOrder || (p.origIdx + 1)}. {p.name}</option>)}
                           </select>
                         </td>
                         <td className="px-3 py-1.5">
