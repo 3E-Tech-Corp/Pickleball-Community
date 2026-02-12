@@ -6,6 +6,16 @@ import {
 import { tournamentApi } from '../../services/api';
 import EncounterDetail from './EncounterDetail';
 
+// Format phase names for display (e.g., "RoundRobin Pool A" -> "Round Robin Pool A")
+const formatPhaseName = (name) => {
+  if (!name) return name;
+  return name
+    .replace(/RoundRobin/g, 'Round Robin')
+    .replace(/SingleElimination/g, 'Single Elimination')
+    .replace(/DoubleElimination/g, 'Double Elimination')
+    .replace(/BracketRound/g, 'Bracket');
+};
+
 /**
  * SchedulePreview - Displays tournament schedule with placeholder or resolved units
  * Shows matches organized by phase/pool with court assignments and estimated times
@@ -161,7 +171,7 @@ export default function SchedulePreview({ divisionId, phaseId = null, showFilter
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
               }`}
             >
-              {phase.name}
+              {formatPhaseName(phase.name)}
             </button>
           ))}
         </div>
@@ -387,9 +397,14 @@ function PhaseAdvancementInfo({ phaseDetails, phases }) {
             Phase Internal
           </h4>
           
-          {/* Exit position mapping */}
-          {exitPositions.length > 0 && (
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-3">
+          {/* For RoundRobin phases, just show "Round Robin" */}
+          {phaseDetails.phaseType === 'RoundRobin' && (
+            <div className="text-sm text-gray-700 mb-3">Round Robin</div>
+          )}
+          
+          {/* Exit position mapping (skip for RoundRobin) */}
+          {exitPositions.length > 0 && phaseDetails.phaseType !== 'RoundRobin' && (
+            <div className="grid grid-cols-3 gap-2 mb-3">
               {exitPositions.map((pos, idx) => (
                 <div key={idx} className="flex items-center gap-2 text-sm text-gray-700">
                   <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
