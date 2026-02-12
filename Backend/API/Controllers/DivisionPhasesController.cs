@@ -188,7 +188,19 @@ public class DivisionPhasesController : ControllerBase
                                 : null
                         } : null
                     })
-                    .Where(r => r != null)
+                    .Where(r => r != null),
+                // Exit position mapping (for bracket phases: which match result = which exit position)
+                ExitPositionMapping = phase.Encounters
+                    .Where(e => e.RoundNumber == phase.Encounters.Max(x => x.RoundNumber)) // Final round only
+                    .OrderBy(e => e.EncounterNumber)
+                    .SelectMany((e, idx) => new[] {
+                        new { Position = idx + 1, Source = $"Winner of M{e.EncounterNumber}", Type = "Winner" },
+                        phase.IncludeConsolation || phase.AdvancingSlotCount > phase.Encounters.Count(x => x.RoundNumber == phase.Encounters.Max(y => y.RoundNumber))
+                            ? new { Position = phase.Encounters.Count(x => x.RoundNumber == phase.Encounters.Max(y => y.RoundNumber)) + idx + 1, Source = $"Loser of M{e.EncounterNumber}", Type = "Loser" }
+                            : null
+                    })
+                    .Where(x => x != null)
+                    .OrderBy(x => x.Position)
             }
         });
     }

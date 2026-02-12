@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import {
   Calendar, Clock, MapPin, Users, Trophy, ChevronDown, ChevronRight,
-  Filter, Grid3X3, GitBranch, Loader2, RefreshCw, List, Table2, ArrowRight, Award, X
+  Filter, Grid3X3, GitBranch, Loader2, RefreshCw, List, Table2, ArrowRight, Award, X, Target
 } from 'lucide-react';
 import { tournamentApi } from '../../services/api';
 import EncounterDetail from './EncounterDetail';
@@ -335,8 +335,9 @@ function PhaseAdvancementInfo({ phaseDetails, phases }) {
   const incomingRules = phaseDetails.incomingRules || [];
   const outgoingRules = phaseDetails.outgoingRules || [];
   const internalRules = phaseDetails.internalRules || [];
+  const exitPositions = phaseDetails.exitPositionMapping || [];
 
-  if (incomingRules.length === 0 && outgoingRules.length === 0 && internalRules.length === 0) return null;
+  if (incomingRules.length === 0 && outgoingRules.length === 0 && internalRules.length === 0 && exitPositions.length === 0) return null;
 
   // Build phase name lookup
   const phaseNameById = {};
@@ -443,6 +444,28 @@ function PhaseAdvancementInfo({ phaseDetails, phases }) {
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Exit position mapping (for bracket phases) */}
+      {exitPositions.length > 0 && (
+        <div className="mt-4 pt-4 border-t border-blue-200">
+          <h4 className="text-xs font-medium text-blue-700 uppercase tracking-wider mb-2 flex items-center gap-1">
+            <Target className="w-3 h-3" />
+            Exit Position Mapping
+          </h4>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+            {exitPositions.map((pos, idx) => (
+              <div key={idx} className="flex items-center gap-2 text-xs text-gray-600">
+                <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
+                  pos.type === 'Winner' ? 'bg-green-500' : 'bg-orange-500'
+                }`} />
+                <span>
+                  <span className="font-medium">#{pos.position}</span> = {pos.source}
+                </span>
+              </div>
+            ))}
           </div>
         </div>
       )}
