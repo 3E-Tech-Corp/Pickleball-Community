@@ -645,7 +645,7 @@ const PaletteItem = ({ phaseType, label }) => {
 }
 
 // Edge Config Panel — visual advancement rule editor
-const EdgeConfigPanel = ({ sourcePhase, targetPhase, sourceIdx, targetIdx, rules, onRulesChange, onClose }) => {
+const EdgeConfigPanel = ({ sourcePhase, targetPhase, sourceIdx, targetIdx, rules, onRulesChange, onClose, onDelete }) => {
   const [pendingSource, setPendingSource] = useState(null) // source slot being connected
 
   // Use phase names for rule matching (new format)
@@ -870,6 +870,17 @@ const EdgeConfigPanel = ({ sourcePhase, targetPhase, sourceIdx, targetIdx, rules
           </button>
         )}
       </div>
+
+      {/* Delete connector button */}
+      {onDelete && (
+        <button 
+          onClick={onDelete}
+          className="w-full px-2 py-1.5 text-[10px] font-medium bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 text-red-600 transition-colors flex items-center justify-center gap-1"
+        >
+          <Trash2 className="w-3 h-3" />
+          Delete Connector
+        </button>
+      )}
 
       {/* Visual slot mapper */}
       <div className="bg-white border rounded-lg p-2 relative">
@@ -2015,6 +2026,21 @@ const CanvasPhaseEditorInner = ({ visualState, onChange, readOnly = false }) => 
                   rules={vs.advancementRules}
                   onRulesChange={(newRules) => onChange({ ...vs, advancementRules: newRules })}
                   onClose={() => setSelectedEdgeKey(null)}
+                  onDelete={() => {
+                    // Remove all rules for this connection and close
+                    const srcName = srcPhase?.name
+                    const tgtName = tgtPhase?.name
+                    const srcOrder = srcPhase?.sortOrder || (srcIdx + 1)
+                    const tgtOrder = tgtPhase?.sortOrder || (tgtIdx + 1)
+                    const filteredRules = vs.advancementRules.filter(r => !(
+                      (r.sourcePhase === srcName && r.targetPhase === tgtName) ||
+                      (r.sourcePhaseOrder === srcOrder && r.targetPhaseOrder === tgtOrder)
+                    ))
+                    onChange({ ...vs, advancementRules: filteredRules })
+                    setSelectedEdgeKey(null)
+                    // Also remove the edge from React Flow
+                    setEdges(eds => eds.filter(e => !(e.source === `phase-${srcIdx}` && e.target === `phase-${tgtIdx}`)))
+                  }}
                 />
               </div>
             </div>
