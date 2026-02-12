@@ -1042,25 +1042,15 @@ const NodeConfigPanel = ({ phase, phaseIndex, onChange, onDelete }) => {
               className="w-full px-2 py-1 border rounded text-sm focus:ring-2 focus:ring-purple-500" />
           </div>
         )}
+        {/* Phase Order - controls scheduling sequence (lower = scheduled first) */}
+        <div>
+          <label className="block text-[11px] font-medium text-gray-500 mb-0.5">Phase Order</label>
+          <input type="number" min={1} value={phase.sortOrder || 1}
+            onChange={e => update('sortOrder', parseInt(e.target.value) || 1)}
+            className="w-full px-2 py-1 border rounded text-sm focus:ring-2 focus:ring-purple-500" />
+        </div>
         {phase.phaseType !== 'Award' && phase.phaseType !== 'Draw' && (
           <>
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="block text-[11px] font-medium text-gray-500 mb-0.5">Best Of</label>
-                <select value={phase.bestOf} onChange={e => update('bestOf', parseInt(e.target.value))}
-                  className="w-full px-2 py-1 border rounded text-sm focus:ring-2 focus:ring-purple-500">
-                  <option value={1}>1</option>
-                  <option value={3}>3</option>
-                  <option value={5}>5</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-[11px] font-medium text-gray-500 mb-0.5">Duration</label>
-                <input type="number" min={1} value={phase.matchDurationMinutes}
-                  onChange={e => update('matchDurationMinutes', parseInt(e.target.value) || 0)}
-                  className="w-full px-2 py-1 border rounded text-sm focus:ring-2 focus:ring-purple-500" />
-              </div>
-            </div>
             <div>
               <label className="block text-[11px] font-medium text-gray-500 mb-0.5">Seeding</label>
               <select value={phase.seedingStrategy || 'Sequential'} onChange={e => update('seedingStrategy', e.target.value)}
