@@ -1040,6 +1040,7 @@ public class PhaseTemplatesController : ControllerBase
             foreach (var phaseJson in phases.EnumerateArray())
             {
                 var phase = await CreatePhaseFromJson(division.Id, phaseJson);
+                _logger.LogInformation("Created phase: name={Name}, order={Order}, id={Id}", phase.Name, phase.PhaseOrder, phase.Id);
                 createdPhases[phase.PhaseOrder] = phase;
                 result.CreatedPhaseIds.Add(phase.Id);
             }
@@ -1278,11 +1279,19 @@ public class PhaseTemplatesController : ControllerBase
         var toPhaseOrder = ruleJson.TryGetProperty("targetPhaseOrder", out var tpo) ? tpo.GetInt32()
             : ruleJson.TryGetProperty("toPhase", out var tp) ? tp.GetInt32() : 0;
 
+        _logger.LogInformation("CreateAdvancementRule: from={From}, to={To}, ruleJson={Json}, phaseKeys=[{Keys}]", 
+            fromPhaseOrder, toPhaseOrder, ruleJson.GetRawText(), string.Join(",", phases.Keys));
+
         if (!phases.TryGetValue(fromPhaseOrder, out var fromPhase) ||
             !phases.TryGetValue(toPhaseOrder, out var toPhase))
         {
+            _logger.LogWarning("CreateAdvancementRule: SKIPPED - fromPhase={FromFound}, toPhase={ToFound}", 
+                phases.ContainsKey(fromPhaseOrder), phases.ContainsKey(toPhaseOrder));
             return; // Skip invalid rules
         }
+        
+        _logger.LogInformation("CreateAdvancementRule: fromPhase={FromName}(id={FromId}), toPhase={ToName}(id={ToId})", 
+            fromPhase.Name, fromPhase.Id, toPhase.Name, toPhase.Id);
 
         var targetSlot = ruleJson.TryGetProperty("targetSlotNumber", out var tsn) ? tsn.GetInt32()
             : ruleJson.TryGetProperty("toSlot", out var ts) ? ts.GetInt32() : 1;
