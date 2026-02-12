@@ -1101,41 +1101,29 @@ public class DivisionPhasesController : ControllerBase
         if (n < 2)
             return (0, encounterNumber);
 
-        // Simple all-pairs approach for round robin: each team plays every other team once
-        // Total matches = n * (n-1) / 2
-        // Organize into rounds where each team plays at most once per round
-        
-        // For scheduling into rounds, use circle method with virtual team for odd counts
-        int virtualN = n % 2 == 0 ? n : n + 1; // Add phantom team if odd
-        int rounds = virtualN - 1;
-        int matchesPerRound = virtualN / 2;
+        // Standard round robin using polygon method
+        // If odd number of teams, add a "ghost" team for byes
+        var teams = Enumerable.Range(0, n).ToList();
+        bool hasGhost = n % 2 == 1;
+        if (hasGhost)
+        {
+            teams.Add(n); // Ghost team index = n
+        }
 
-        for (int round = 0; round < rounds; round++)
+        int numTeams = teams.Count; // Even number now
+        int numRounds = numTeams - 1;
+        int matchesPerRound = numTeams / 2;
+
+        // Polygon method: fix team 0, rotate the rest
+        for (int round = 0; round < numRounds; round++)
         {
             for (int match = 0; match < matchesPerRound; match++)
             {
-                int home, away;
-                
-                if (match == 0)
-                {
-                    // First match: team 0 vs rotating team
-                    home = 0;
-                    away = virtualN - 1 - round;
-                    if (away == 0) away = virtualN - 1;
-                }
-                else
-                {
-                    // Circle rotation for other matches
-                    home = 1 + ((round + match - 1) % (virtualN - 1));
-                    away = 1 + ((round + virtualN - 1 - match) % (virtualN - 1));
-                }
+                int home = teams[match];
+                int away = teams[numTeams - 1 - match];
 
-                // Skip if either team is the phantom (index >= n means bye)
+                // Skip if either is the ghost team (bye)
                 if (home >= n || away >= n)
-                    continue;
-
-                // Skip invalid or duplicate
-                if (home == away || home < 0 || away < 0)
                     continue;
 
                 var encounter = new EventEncounter
@@ -1159,6 +1147,15 @@ public class DivisionPhasesController : ControllerBase
                 _context.EventEncounters.Add(encounter);
                 created++;
             }
+
+            // Rotate: keep teams[0] fixed, rotate rest clockwise
+            // [0, 1, 2, 3, 4, 5] -> [0, 5, 1, 2, 3, 4]
+            var last = teams[numTeams - 1];
+            for (int i = numTeams - 1; i > 1; i--)
+            {
+                teams[i] = teams[i - 1];
+            }
+            teams[1] = last;
         }
 
         await _context.SaveChangesAsync();
