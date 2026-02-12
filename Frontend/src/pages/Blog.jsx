@@ -4,6 +4,23 @@ import { FileText, Search, Tag, Calendar, User, MessageCircle, Star, Edit2, Plus
 import { useAuth } from '../contexts/AuthContext';
 import { blogApi, ratingApi, getSharedAssetUrl } from '../services/api';
 
+// Helper functions for video embeds
+const getYouTubeId = (url) => {
+  if (!url) return null;
+  const match = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([^&\s?]+)/);
+  return match ? match[1] : null;
+};
+
+const getVimeoId = (url) => {
+  if (!url) return null;
+  const match = url.match(/vimeo\.com\/(\d+)/);
+  return match ? match[1] : null;
+};
+
+const isExternalVideo = (url) => {
+  return url && (url.startsWith('http://') || url.startsWith('https://'));
+};
+
 export default function Blog() {
   const { user, isAuthenticated } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -540,20 +557,40 @@ function WritePostModal({ post, categories, onClose, onSave }) {
             </div>
           </div>
 
-          {/* Video Upload for Vlogs */}
+          {/* Video for Vlogs - External URL or Upload */}
           {formData.postType === 'Vlog' && (
-            <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
-              <label className="block text-sm font-medium text-red-700 mb-2">
+            <div className="p-4 bg-red-50 border border-red-200 rounded-lg space-y-4">
+              <label className="block text-sm font-medium text-red-700">
                 <Video className="w-4 h-4 inline mr-1" />
-                Upload Video *
+                Video Source *
               </label>
+              
               {formData.videoUrl ? (
                 <div className="space-y-3">
-                  <video
-                    src={formData.videoUrl}
-                    controls
-                    className="w-full max-h-64 rounded-lg bg-black"
-                  />
+                  {/* Show video preview - handle YouTube/Vimeo embeds vs direct videos */}
+                  {formData.videoUrl.includes('youtube.com') || formData.videoUrl.includes('youtu.be') ? (
+                    <div className="aspect-video rounded-lg overflow-hidden bg-black">
+                      <iframe
+                        src={`https://www.youtube.com/embed/${getYouTubeId(formData.videoUrl)}`}
+                        className="w-full h-full"
+                        allowFullScreen
+                      />
+                    </div>
+                  ) : formData.videoUrl.includes('vimeo.com') ? (
+                    <div className="aspect-video rounded-lg overflow-hidden bg-black">
+                      <iframe
+                        src={`https://player.vimeo.com/video/${getVimeoId(formData.videoUrl)}`}
+                        className="w-full h-full"
+                        allowFullScreen
+                      />
+                    </div>
+                  ) : (
+                    <video
+                      src={formData.videoUrl.startsWith('http') ? formData.videoUrl : `/api/assets/${formData.videoAssetId || formData.videoUrl}`}
+                      controls
+                      className="w-full max-h-64 rounded-lg bg-black"
+                    />
+                  )}
                   <button
                     type="button"
                     onClick={() => setFormData({ ...formData, videoUrl: '', videoAssetId: null })}
@@ -563,19 +600,62 @@ function WritePostModal({ post, categories, onClose, onSave }) {
                   </button>
                 </div>
               ) : (
-                <div className="flex items-center gap-3">
-                  <label className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg cursor-pointer hover:bg-red-700 transition-colors">
-                    <Upload className="w-4 h-4" />
-                    {uploading ? 'Uploading...' : 'Choose Video'}
-                    <input
-                      type="file"
-                      accept="video/*"
-                      onChange={handleVideoUpload}
-                      disabled={uploading}
-                      className="hidden"
-                    />
-                  </label>
-                  <span className="text-sm text-gray-500">Max 500MB</span>
+                <div className="space-y-4">
+                  {/* External URL input */}
+                  <div>
+                    <label className="block text-xs text-gray-600 mb-1">External Video URL (YouTube, Vimeo, or direct link)</label>
+                    <div className="flex gap-2">
+                      <input
+                        type="url"
+                        placeholder="https://youtube.com/watch?v=... or https://vimeo.com/..."
+                        className="flex-1 border border-gray-300 rounded-lg p-2 text-sm focus:ring-red-500 focus:border-red-500"
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            const url = e.target.value.trim();
+                            if (url) {
+                              setFormData({ ...formData, videoUrl: url, videoAssetId: null });
+                            }
+                          }
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          const input = e.target.previousElementSibling;
+                          const url = input.value.trim();
+                          if (url) {
+                            setFormData({ ...formData, videoUrl: url, videoAssetId: null });
+                          }
+                        }}
+                        className="px-3 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700"
+                      >
+                        Add
+                      </button>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center gap-4">
+                    <div className="flex-1 border-t border-gray-300"></div>
+                    <span className="text-xs text-gray-500">OR</span>
+                    <div className="flex-1 border-t border-gray-300"></div>
+                  </div>
+                  
+                  {/* File upload */}
+                  <div className="flex items-center gap-3">
+                    <label className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg cursor-pointer hover:bg-red-700 transition-colors">
+                      <Upload className="w-4 h-4" />
+                      {uploading ? 'Uploading...' : 'Upload Video File'}
+                      <input
+                        type="file"
+                        accept="video/*"
+                        onChange={handleVideoUpload}
+                        disabled={uploading}
+                        className="hidden"
+                      />
+                    </label>
+                    <span className="text-sm text-gray-500">Max 500MB</span>
+                  </div>
                 </div>
               )}
             </div>
@@ -790,12 +870,34 @@ function PostDetailModal({ post, user, isAuthenticated, canEdit, onClose, onEdit
           {(post.postType === 'Vlog' || post.videoUrl || post.videoAssetId) && (
             <div className="mb-6">
               <div className="relative rounded-lg overflow-hidden bg-black">
-                <video
-                  src={post.videoUrl || `/api/assets/${post.videoAssetId}`}
-                  controls
-                  className="w-full max-h-[400px]"
-                  poster={post.featuredImageUrl ? getSharedAssetUrl(post.featuredImageUrl) : undefined}
-                />
+                {/* YouTube embed */}
+                {post.videoUrl && (post.videoUrl.includes('youtube.com') || post.videoUrl.includes('youtu.be')) ? (
+                  <div className="aspect-video">
+                    <iframe
+                      src={`https://www.youtube.com/embed/${getYouTubeId(post.videoUrl)}`}
+                      className="w-full h-full"
+                      allowFullScreen
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    />
+                  </div>
+                ) : post.videoUrl && post.videoUrl.includes('vimeo.com') ? (
+                  /* Vimeo embed */
+                  <div className="aspect-video">
+                    <iframe
+                      src={`https://player.vimeo.com/video/${getVimeoId(post.videoUrl)}`}
+                      className="w-full h-full"
+                      allowFullScreen
+                    />
+                  </div>
+                ) : (
+                  /* Direct video file */
+                  <video
+                    src={isExternalVideo(post.videoUrl) ? post.videoUrl : (post.videoUrl || `/api/assets/${post.videoAssetId}`)}
+                    controls
+                    className="w-full max-h-[400px]"
+                    poster={post.featuredImageUrl ? getSharedAssetUrl(post.featuredImageUrl) : undefined}
+                  />
+                )}
               </div>
               <div className="mt-2 flex items-center gap-2 text-red-600">
                 <Video className="w-4 h-4" />
