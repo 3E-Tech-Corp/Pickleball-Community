@@ -142,7 +142,7 @@ export function serializeVisualToJson(vs) {
     phases: vs.phases.map((p, i) => ({
       name: p.name,
       phaseType: p.phaseType,
-      sortOrder: i + 1,
+      sortOrder: parseInt(p.sortOrder) || (i + 1),
       incomingSlotCount: parseInt(p.incomingSlotCount) || 0,
       advancingSlotCount: parseInt(p.advancingSlotCount) || 0,
       poolCount: p.phaseType === 'Pools' ? (parseInt(p.poolCount) || 0) : 0,
