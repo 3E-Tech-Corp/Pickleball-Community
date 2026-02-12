@@ -773,8 +773,13 @@ const EdgeConfigPanel = ({ sourcePhase, targetPhase, sourceIdx, targetIdx, rules
 
   const handleResetDefault = () => {
     const newMap = new Map()
-    exitSlots.forEach((slot, i) => {
-      if (i < inSlots.length) newMap.set(slot.id, inSlots[i].slotNumber)
+    // Get available exit slots (not taken by other edges)
+    const availableExits = exitSlots.filter(s => !takenExitSlots.has(s.id))
+    // Get available incoming slots (not taken by other edges)
+    const availableIns = inSlots.filter(s => !takenInSlots.has(s.slotNumber))
+    // Map available exits to available incomings 1:1
+    availableExits.forEach((slot, i) => {
+      if (i < availableIns.length) newMap.set(slot.id, availableIns[i].slotNumber)
     })
     updateRules(newMap)
     setPendingSource(null)
@@ -1432,9 +1437,35 @@ const CanvasPhaseEditorInner = ({ visualState, onChange, readOnly = false }) => 
           newRules.push({ sourcePhase: srcName, targetPhase: tgtName, finishPosition: pos, targetSlotNumber: targetSlot++, sourcePoolIndex: null })
         }
       } else {
-        for (let pos = 1; pos <= slotsToAdvance; pos++) {
-          newRules.push({ sourcePhase: srcName, targetPhase: tgtName, finishPosition: pos, targetSlotNumber: pos, sourcePoolIndex: null })
-        }
+        // Find which exit positions are already taken by OTHER edges
+        const takenExits = new Set()
+        vs.advancementRules.forEach(r => {
+          const isFromThisSrc = r.sourcePhase === srcName || r.sourcePhaseOrder === (srcPhase?.sortOrder || (sourceIdx + 1))
+          const isToThisTgt = r.targetPhase === tgtName || r.targetPhaseOrder === (tgtPhase?.sortOrder || (targetIdx + 1))
+          if (isFromThisSrc && !isToThisTgt) {
+            takenExits.add(r.finishPosition)
+          }
+        })
+        // Find which incoming slots are already taken by OTHER edges
+        const takenIns = new Set()
+        vs.advancementRules.forEach(r => {
+          const isToThisTgt = r.targetPhase === tgtName || r.targetPhaseOrder === (tgtPhase?.sortOrder || (targetIdx + 1))
+          const isFromThisSrc = r.sourcePhase === srcName || r.sourcePhaseOrder === (srcPhase?.sortOrder || (sourceIdx + 1))
+          if (isToThisTgt && !isFromThisSrc) {
+            takenIns.add(r.targetSlotNumber)
+          }
+        })
+        
+        // Get available positions and slots
+        const availableExits = Array.from({ length: slotsToAdvance }, (_, i) => i + 1).filter(p => !takenExits.has(p))
+        const availableIns = Array.from({ length: parseInt(tgtPhase?.incomingSlotCount) || slotsToAdvance }, (_, i) => i + 1).filter(s => !takenIns.has(s))
+        
+        // Map available exits to available incomings 1:1
+        availableExits.forEach((pos, i) => {
+          if (i < availableIns.length) {
+            newRules.push({ sourcePhase: srcName, targetPhase: tgtName, finishPosition: pos, targetSlotNumber: availableIns[i], sourcePoolIndex: null })
+          }
+        })
       }
     }
 
