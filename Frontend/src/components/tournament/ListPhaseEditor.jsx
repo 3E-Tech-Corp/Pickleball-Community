@@ -8,10 +8,10 @@
  */
 import { useState } from 'react'
 import {
-  Layers, Plus, Trash2, ChevronDown, ChevronUp, ArrowRight, Zap, Award
+  Layers, Plus, Trash2, ChevronDown, ChevronUp, ArrowRight, Zap
 } from 'lucide-react'
 import {
-  PHASE_TYPES, BRACKET_TYPES, SEEDING_STRATEGIES, AWARD_TYPES,
+  PHASE_TYPES, BRACKET_TYPES, SEEDING_STRATEGIES,
   DEFAULT_PHASE, DEFAULT_ADVANCEMENT_RULE,
   autoGenerateRules
 } from './structureEditorConstants'
@@ -99,30 +99,6 @@ const ListPhaseEditor = ({ visualState, onChange }) => {
 
   const handleAutoGenerate = () => {
     update({ advancementRules: autoGenerateRules(vs.phases) })
-  }
-
-  // ── Exit position helpers ──
-  const updateExit = (idx, field, value) => {
-    const exits = [...vs.exitPositions]
-    exits[idx] = { ...exits[idx], [field]: value }
-    update({ exitPositions: exits })
-  }
-
-  const addExit = () => {
-    const nextRank = vs.exitPositions.length + 1
-    const labels = ['Champion', 'Runner-up', '3rd Place', '4th Place']
-    const awards = ['Gold', 'Silver', 'Bronze', 'none']
-    update({
-      exitPositions: [...vs.exitPositions, {
-        rank: nextRank,
-        label: labels[nextRank - 1] || `${nextRank}th Place`,
-        awardType: awards[nextRank - 1] || 'none'
-      }]
-    })
-  }
-
-  const removeExit = (idx) => {
-    update({ exitPositions: vs.exitPositions.filter((_, i) => i !== idx) })
   }
 
   // ── Flexible template toggle ──
@@ -430,51 +406,7 @@ const ListPhaseEditor = ({ visualState, onChange }) => {
         </div>
       )}
 
-      {/* Exit Positions */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h4 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-            <Award className="w-4 h-4 text-purple-600" />
-            Exit Positions ({vs.exitPositions.length})
-          </h4>
-          <button type="button" onClick={addExit}
-            className="flex items-center gap-1 px-3 py-1 text-sm bg-purple-600 text-white rounded-lg hover:bg-purple-700">
-            <Plus className="w-3 h-3" /> Add Position
-          </button>
-        </div>
-
-        {vs.exitPositions.length === 0 ? (
-          <p className="text-sm text-gray-400 italic py-2">
-            No exit positions defined. Add positions for final placement (Champion, Runner-up, etc.)
-          </p>
-        ) : (
-          <div className="space-y-2">
-            {vs.exitPositions.map((ep, idx) => (
-              <div key={idx} className="flex items-center gap-3 bg-white border rounded-lg px-3 py-2">
-                <span className="w-7 h-7 rounded-full bg-purple-100 text-purple-700 text-xs flex items-center justify-center font-bold flex-shrink-0">
-                  #{ep.rank}
-                </span>
-                <input type="number" min={1} value={ep.rank}
-                  onChange={e => updateExit(idx, 'rank', parseInt(e.target.value) || 1)}
-                  className="w-16 px-2 py-1 border rounded text-sm focus:ring-2 focus:ring-purple-500" title="Rank" />
-                <input type="text" value={ep.label}
-                  onChange={e => updateExit(idx, 'label', e.target.value)}
-                  placeholder="Label (e.g. Champion)"
-                  className="flex-1 px-2 py-1 border rounded text-sm focus:ring-2 focus:ring-purple-500" />
-                <select value={ep.awardType || 'none'}
-                  onChange={e => updateExit(idx, 'awardType', e.target.value)}
-                  className="px-2 py-1 border rounded text-sm focus:ring-2 focus:ring-purple-500">
-                  {AWARD_TYPES.map(a => <option key={a} value={a}>{a === 'none' ? 'No Award' : a}</option>)}
-                </select>
-                <button type="button" onClick={() => removeExit(idx)}
-                  className="p-1 text-gray-400 hover:text-red-500 flex-shrink-0">
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+      {/* Exit Positions removed - Award phases now serve this purpose */}
     </div>
   )
 }
