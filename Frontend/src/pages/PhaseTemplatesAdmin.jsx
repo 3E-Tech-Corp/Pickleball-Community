@@ -722,23 +722,29 @@ const EdgeConfigPanel = ({ sourcePhase, targetPhase, sourceIdx, targetIdx, rules
   const takenExitSlots = useMemo(() => {
     const taken = new Set()
     rules.forEach(r => {
-      if (r.sourcePhaseOrder === srcOrder && r.targetPhaseOrder !== tgtOrder) {
+      // Check if rule is from this source but to a DIFFERENT target
+      const isFromThisSource = r.sourcePhase === srcName || r.sourcePhaseOrder === srcOrder
+      const isToThisTarget = r.targetPhase === tgtName || r.targetPhaseOrder === tgtOrder
+      if (isFromThisSource && !isToThisTarget) {
         const srcId = r.sourcePoolIndex != null ? `${r.sourcePoolIndex}-${r.finishPosition}` : `${r.finishPosition}`
         taken.add(srcId)
       }
     })
     return taken
-  }, [rules, srcOrder, tgtOrder])
+  }, [rules, srcName, tgtName, srcOrder, tgtOrder])
 
   const takenInSlots = useMemo(() => {
     const taken = new Set()
     rules.forEach(r => {
-      if (r.targetPhaseOrder === tgtOrder && r.sourcePhaseOrder !== srcOrder) {
+      // Check if rule is to this target but from a DIFFERENT source
+      const isToThisTarget = r.targetPhase === tgtName || r.targetPhaseOrder === tgtOrder
+      const isFromThisSource = r.sourcePhase === srcName || r.sourcePhaseOrder === srcOrder
+      if (isToThisTarget && !isFromThisSource) {
         taken.add(r.targetSlotNumber)
       }
     })
     return taken
-  }, [rules, srcOrder, tgtOrder])
+  }, [rules, srcName, tgtName, srcOrder, tgtOrder])
 
   // Early return AFTER all hooks
   if (!sourcePhase || !targetPhase) return null
@@ -1434,11 +1440,19 @@ const CanvasPhaseEditorInner = ({ visualState, onChange, readOnly = false }) => 
     const pairsToRemove = deletedEdges.map(e => {
       const srcIdx = parseInt(e.source.replace('phase-', ''))
       const tgtIdx = parseInt(e.target.replace('phase-', ''))
-      // Use phase names (new format)
-      return { srcName: vs.phases[srcIdx]?.name, tgtName: vs.phases[tgtIdx]?.name }
+      return { 
+        srcName: vs.phases[srcIdx]?.name, 
+        tgtName: vs.phases[tgtIdx]?.name,
+        srcOrder: vs.phases[srcIdx]?.sortOrder || (srcIdx + 1),
+        tgtOrder: vs.phases[tgtIdx]?.sortOrder || (tgtIdx + 1)
+      }
     })
+    // Match by name (new format) OR sortOrder (old format)
     const filteredRules = vs.advancementRules.filter(r =>
-      !pairsToRemove.some(p => r.sourcePhase === p.srcName && r.targetPhase === p.tgtName)
+      !pairsToRemove.some(p => 
+        (r.sourcePhase === p.srcName && r.targetPhase === p.tgtName) ||
+        (r.sourcePhaseOrder === p.srcOrder && r.targetPhaseOrder === p.tgtOrder)
+      )
     )
     onChange({ ...vs, advancementRules: filteredRules })
   }, [vs, onChange])
