@@ -136,6 +136,7 @@ builder.Services.AddScoped<IDrawingBroadcaster, DrawingBroadcaster>();
 builder.Services.AddScoped<IScoreBroadcaster, ScoreBroadcaster>();
 builder.Services.AddScoped<IBracketProgressionService, BracketProgressionService>();
 builder.Services.AddScoped<ISharedAssetService, SharedAssetService>();
+builder.Services.AddScoped<IVideoThumbnailService, VideoThumbnailService>();
 builder.Services.AddScoped<IWaiverPdfService, WaiverPdfService>();
 builder.Services.AddScoped<ISchedulingService, SchedulingService>();
 builder.Services.AddScoped<ICourtAssignmentService>(sp => sp.GetRequiredService<ISchedulingService>() as ICourtAssignmentService

@@ -15,6 +15,7 @@ public class AssetsController : ControllerBase
 {
     private readonly ApplicationDbContext _context;
     private readonly IAssetService _assetService;
+    private readonly IVideoThumbnailService _thumbnailService;
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly IConfiguration _configuration;
     private readonly ILogger<AssetsController> _logger;
@@ -22,12 +23,14 @@ public class AssetsController : ControllerBase
     public AssetsController(
         ApplicationDbContext context,
         IAssetService assetService,
+        IVideoThumbnailService thumbnailService,
         IHttpClientFactory httpClientFactory,
         IConfiguration configuration,
         ILogger<AssetsController> logger)
     {
         _context = context;
         _assetService = assetService;
+        _thumbnailService = thumbnailService;
         _httpClientFactory = httpClientFactory;
         _configuration = configuration;
         _logger = logger;
@@ -528,5 +531,125 @@ public class AssetsController : ControllerBase
             Success = true,
             Data = result
         });
+    }
+
+    /// <summary>
+    /// Generate a thumbnail from a video asset
+    /// </summary>
+    /// <param name="videoAssetId">The ID of the video asset</param>
+    /// <param name="seekSeconds">Seconds into the video to capture (default: 1)</param>
+    [HttpPost("{videoAssetId:int}/thumbnail")]
+    public async Task<ActionResult<ApiResponse<AssetUploadResponse>>> GenerateThumbnail(
+        int videoAssetId,
+        [FromQuery] int seekSeconds = 1)
+    {
+        try
+        {
+            var userId = GetCurrentUserId();
+            if (!userId.HasValue)
+            {
+                return Unauthorized(new ApiResponse<AssetUploadResponse>
+                {
+                    Success = false,
+                    Message = "User not authenticated"
+                });
+            }
+
+            // Get the video asset
+            var asset = await _context.Assets.FindAsync(videoAssetId);
+            if (asset == null)
+            {
+                return NotFound(new ApiResponse<AssetUploadResponse>
+                {
+                    Success = false,
+                    Message = "Video asset not found"
+                });
+            }
+
+            // Verify it's a video
+            if (!asset.ContentType?.StartsWith("video/") == true)
+            {
+                return BadRequest(new ApiResponse<AssetUploadResponse>
+                {
+                    Success = false,
+                    Message = "Asset is not a video"
+                });
+            }
+
+            // Get the video file path
+            var videoPath = _assetService.GetAssetFilePath(videoAssetId);
+            if (string.IsNullOrEmpty(videoPath) || !System.IO.File.Exists(videoPath))
+            {
+                return NotFound(new ApiResponse<AssetUploadResponse>
+                {
+                    Success = false,
+                    Message = "Video file not found"
+                });
+            }
+
+            // Generate thumbnail path
+            var thumbnailFileName = $"thumb_{videoAssetId}_{DateTime.Now:yyyyMMddHHmmss}.jpg";
+            var tempPath = Path.Combine(Path.GetTempPath(), thumbnailFileName);
+
+            // Generate the thumbnail
+            var (success, thumbnailPath, errorMessage) = await _thumbnailService.GenerateThumbnailAsync(
+                videoPath, tempPath, seekSeconds);
+
+            if (!success || thumbnailPath == null)
+            {
+                return BadRequest(new ApiResponse<AssetUploadResponse>
+                {
+                    Success = false,
+                    Message = errorMessage ?? "Failed to generate thumbnail"
+                });
+            }
+
+            // Upload the thumbnail as a new asset
+            await using var thumbnailStream = System.IO.File.OpenRead(thumbnailPath);
+            var formFile = new FormFile(thumbnailStream, 0, thumbnailStream.Length, "thumbnail", thumbnailFileName)
+            {
+                Headers = new HeaderDictionary(),
+                ContentType = "image/jpeg"
+            };
+
+            var uploadResult = await _assetService.UploadFileAsync(formFile, "thumbnails", userId, "VideoThumbnail", videoAssetId);
+
+            // Clean up temp file
+            try { System.IO.File.Delete(tempPath); } catch { }
+
+            if (!uploadResult.Success)
+            {
+                return BadRequest(new ApiResponse<AssetUploadResponse>
+                {
+                    Success = false,
+                    Message = uploadResult.ErrorMessage ?? "Failed to save thumbnail"
+                });
+            }
+
+            return Ok(new ApiResponse<AssetUploadResponse>
+            {
+                Success = true,
+                Message = "Thumbnail generated successfully",
+                Data = new AssetUploadResponse
+                {
+                    FileId = uploadResult.FileId!.Value,
+                    Url = uploadResult.Url!,
+                    FileName = uploadResult.FileName!,
+                    OriginalFileName = thumbnailFileName,
+                    FileSize = uploadResult.FileSize,
+                    ContentType = "image/jpeg",
+                    Folder = "thumbnails"
+                }
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error generating thumbnail for video {VideoAssetId}", videoAssetId);
+            return StatusCode(500, new ApiResponse<AssetUploadResponse>
+            {
+                Success = false,
+                Message = "An error occurred while generating thumbnail"
+            });
+        }
     }
 }

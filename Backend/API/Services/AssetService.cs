@@ -15,6 +15,7 @@ public interface IAssetService
     Task<(Stream? stream, string? contentType, string? fileName)> GetAssetStreamAsync(int fileId);
     string GetUploadPath(string folder);
     string GetAssetUrl(int fileId);
+    string? GetAssetFilePath(int fileId);
     ValidationResult ValidateFile(IFormFile file, string folder);
     CategoryOptions? GetCategoryOptions(string folder);
 }
@@ -243,6 +244,19 @@ public class AssetService : IAssetService
             return $"{_options.AssetBaseUrl.TrimEnd('/')}/api/assets/{fileId}";
         }
         return $"/api/assets/{fileId}";
+    }
+
+    public string? GetAssetFilePath(int fileId)
+    {
+        var asset = _context.Assets.Find(fileId);
+        if (asset == null || string.IsNullOrEmpty(asset.FilePath))
+            return null;
+
+        // FilePath contains the relative path like "videos/2026-02/123.mp4"
+        var basePath = Path.Combine(AppContext.BaseDirectory, _options.LocalUploadPath ?? "uploads");
+        var fullPath = Path.Combine(basePath, asset.FilePath);
+        
+        return File.Exists(fullPath) ? fullPath : null;
     }
 
     private int? ExtractFileIdFromUrl(string url)
